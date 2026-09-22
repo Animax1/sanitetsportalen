@@ -84,6 +84,7 @@ HENDELSE_PRIORITET = 'hendelse_prioritet'
 HENDELSE_LAG_PAA = 'hendelse_lag_paa'
 HENDELSE_LAG_AV = 'hendelse_lag_av'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
+TAVLE_FLYTTET = 'tavle_flyttet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -138,6 +139,12 @@ KODER: dict[str, str] = {
     HENDELSE_LAG_AV:
         'Motstykket: laget er ledig igjen. Uten den ser kortet ledig ut mens '
         'loggen fortsatt sier at det er på H14.',
+    # Tavla (22. sep. 2026). Operatørens handling, skrevet av `ko/tavle.py`
+    # med hvem — per **ressurs**, ikke per person: det er lagene som flyttes,
+    # og en linje per mannskap ville druknet loggen ved hvert vaktskifte.
+    TAVLE_FLYTTET:
+        '«Lag 3 → Parkscene» er det tavla på veggen aldri kunne si: når, og '
+        'hvem som flyttet. Forklarer hullene i «hvem har vært på Parkscene».',
 }
 
 
@@ -256,6 +263,12 @@ def tegn(kode: str, data: dict) -> str:
         if data.get('tittel'):
             linje += f' · {data["tittel"]}'
         return linje
+    if kode == TAVLE_FLYTTET:
+        hvem = data.get('ressurs') or 'Ressurs'
+        til, fra = data.get('til') or '', data.get('fra') or ''
+        if not til:
+            return f'{hvem} uten plass' + (f' (var {fra})' if fra else '')
+        return f'{hvem} → {til}' + (f' (fra {fra})' if fra else '')
     if kode == OPPDRAG_KNYTTET:
         fra = data.get('fra_hendelsesnummer')
         til = data.get('hendelsesnummer')

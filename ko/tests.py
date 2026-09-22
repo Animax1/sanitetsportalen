@@ -341,8 +341,11 @@ class SidenHarIngenFanerTests(TestCase):
         # Rammen: to rader, en skillelinje i hver og en mellom dem.
         self.assertEqual(markup.count('class="ko-splitter-v"'), 2)
         self.assertEqual(markup.count('class="ko-splitter-h"'), 1)
-        # Hvert vindu har håndtaket som bytter plass.
-        self.assertEqual(markup.count('ko-grip'), 4)
+        # Hvert vindu har håndtaket som bytter plass — tavla også, som deler
+        # plass med ressursoversikten og står parkert fra start (22. sep. 2026).
+        self.assertEqual(markup.count('ko-grip'), 5)
+        tavle = markup[markup.index('data-vindu="tavle"') - 200:markup.index('data-vindu="tavle"')]
+        self.assertIn('d-none', tavle, 'tavla står parkert til noen henter den')
 
     def test_sidebaren_tar_ikke_en_kolonne(self):
         """«Pålogget» er et nedtrekk fra knappen i toppen.

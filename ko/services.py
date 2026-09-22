@@ -807,6 +807,8 @@ def sett_lag(hendelse, ressurs_ider, *, bruker, naa=None, logg=True):
     opprettelse står de på opprettelseslinja i stedet. En lukket hendelse tar
     ikke imot — som `knytt_oppdrag`: ellers betyr «lukket» ingenting.
     """
+    from . import tavle
+
     if hendelse.er_lukket:
         raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
     onsket = _lag_fra(hendelse.vakt, ressurs_ider, hendelse)
@@ -823,10 +825,15 @@ def sett_lag(hendelse, ressurs_ider, *, bruker, naa=None, logg=True):
             hendelse=hendelse, ressurs=r, ressurs_navn=r.navn, fra=naa,
             av=bruker if bruker and getattr(bruker, 'is_authenticated', False) else None,
             av_navn=getattr(bruker, 'username', '') or '')
+        # Hendelsen har forrang på tavla (22. sep. 2026): plassen laget sto
+        # på, lukkes nå.
+        tavle.avslutt_for_hendelse(r.pk, naa)
         lagt_til.append(r.navn)
     for ressurs_id, rad in naa_rader.items():
         if ressurs_id not in onsket_ider:
             tatt_av.append(rad.ressurs_navn)
+            # Tida på hendelsen blir historikk på tavla, og laget står uten plass.
+            tavle.skriv_hendelsestid(rad, naa)
             rad.delete()
     if logg:
         for navn in lagt_til:
@@ -949,6 +956,8 @@ def lukk_hendelse(hendelse, *, bruker, confirm=False, naa=None) -> Hendelse:
     (§4.6): en lukket hendelse med kjørende biler er nøyaktig tilstanden der en
     enhet blir glemt. Operatøren skal aldri møte en vegg, bare en dør hun må
     åpne bevisst — og at hun åpnet den står på linja."""
+    from . import tavle
+
     if hendelse.er_lukket:
         raise Ugyldig('Hendelsen er allerede lukket.')
     apne = apne_oppdrag_i(hendelse)
@@ -962,6 +971,10 @@ def lukk_hendelse(hendelse, *, bruker, confirm=False, naa=None) -> Hendelse:
     hendelse.versjon += 1
     hendelse.save(update_fields=['status', 'lukket_at', 'lukket_av',
                                  'lukket_av_navn', 'versjon'])
+    # Lagene går til «Uten plass» på tavla (André, 22. sep. 2026), og tida
+    # de sto på hendelsen blir historikk der.
+    for rad in hendelse.lag.all():
+        tavle.skriv_hendelsestid(rad, tid)
     data = _hendelsesdata(hendelse)
     data['apne_oppdrag'] = apne
     systemlinje(hendelse.vakt, _kode('HENDELSE_LUKKET'), data, tidspunkt=tid,

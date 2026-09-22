@@ -55,6 +55,10 @@ urlpatterns = [
          name='ko_api_ansvarsomraade_detalj'),
     # Nullstilling (18. sep. 2026): global admin, `confirm`, aktiv vakt.
     path('api/nullstill/<str:hva>/', views.nullstill_view, name='ko_api_nullstill'),
+    # Tavla (22. sep. 2026): lesingen i ett svar, skrivingen i navngitte stier.
+    path('api/tavle/', views.tavle_view, name='ko_api_tavle'),
+    path('api/tavle/plasser/', views.tavle_plasser_view, name='ko_api_tavle_plasser'),
+    path('api/tavle/uten-plass/', views.tavle_uten_plass_view, name='ko_api_tavle_uten_plass'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,

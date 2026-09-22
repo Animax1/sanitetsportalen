@@ -626,3 +626,71 @@ class Ansvarsmerke(models.Model):
 
     def __str__(self):
         return f'{self.bruker_id}: {self.omraade or "—"}'
+
+
+class Tavleplassering(models.Model):
+    """Hvor et lag står på tavla, og fra når (André, 22. sep. 2026).
+
+    Tavla på veggen i KO digitalt: lokasjonene som rader, tida som kolonner,
+    og en rad per gang en ressurs ble satt et sted. **Den åpne raden**
+    (`til` tom) er der ressursen står nå; de lukkede er historikken som
+    «Besøk» teller («Lag 1 var 3 ganger fredag, 0 lørdag»).
+
+    **Pekeren går til vaktlistas ressurs og oppdragsmodulens lokasjon** —
+    KO eier ingen ressurser og ingen lokasjoner (§3.1). Begge strippes i
+    backupen og navnene fryses ved siden av, som `HendelseLag`: kanten ut av
+    modulen ville ellers gitt en sirkel i gjenopprettingen.
+
+    **Bare ledige plasseres** (André): den som er på en hendelse eller et
+    oppdrag står på tavla som det, og det har forrang. Når laget går på en
+    hendelse, lukkes plasseringen (`ko.tavle.avslutt_for_hendelse`); når det
+    går av igjen, står tiden på hendelsen som en lukket rad med
+    `hendelse_nummer` — historikk, ikke noe noen satte — og laget står
+    **uten plass**.
+
+    `pause` er Pause-raden, som ikke er en lokasjon: da sto «Pause» som sted i
+    «Nytt oppdrag».
+    """
+
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT,
+        related_name='ko_tavleplasseringer', verbose_name='Vakt')
+    ressurs = models.ForeignKey(
+        'vaktliste.Ressurs', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_tavleplasseringer', verbose_name='Ressurs')
+    ressurs_navn = models.CharField(max_length=120, verbose_name='Ressurs (navn)')
+    lokasjon = models.ForeignKey(
+        'oppdrag.Lokasjon', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_tavleplasseringer', verbose_name='Lokasjon')
+    lokasjon_navn = models.CharField(
+        max_length=255, blank=True, default='', verbose_name='Lokasjon (navn)')
+    pause = models.BooleanField(default=False, verbose_name='Pause')
+    #: Satt når raden er tiden laget sto på en hendelse — historikk skrevet
+    #: av KO selv, ikke en plassering noen gjorde.
+    hendelse_nummer = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Hendelse')
+    fra = models.DateTimeField(verbose_name='Fra')
+    til = models.DateTimeField(null=True, blank=True, verbose_name='Til')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_tavleplasseringer',
+        verbose_name='Satt av')
+    av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Satt av (navn)')
+
+    class Meta:
+        verbose_name = 'Tavleplassering'
+        verbose_name_plural = 'Tavleplasseringer'
+        ordering = ['fra', 'id']
+        constraints = [
+            # Én åpen plassering per ressurs — ett sted om gangen. I basen og
+            # ikke bare i tjenesten: to operatører som drar samme lag samtidig
+            # skal få en feil, ikke et lag på to steder.
+            models.UniqueConstraint(
+                fields=['ressurs'], condition=Q(til__isnull=True),
+                name='en_aapen_tavleplassering_per_ressurs'),
+        ]
+
+    def __str__(self):
+        sted = 'Pause' if self.pause else self.lokasjon_navn
+        return f'{self.ressurs_navn} · {sted}'

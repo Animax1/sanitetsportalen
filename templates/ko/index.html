@@ -302,6 +302,13 @@
           {% else %}
           <span id="av-vakt-teller" class="ko-vindu-tall"></span>
           {% endif %}
+          {% if kan_se_vaktliste %}
+          {# Tavla deler plass med ressursoversikten (22. sep. 2026). #}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koByttPar" data-arg="ressurser" title="Bytt til tavla">
+            <i class="bi bi-arrow-left-right me-1"></i>Tavle
+          </button>
+          {% endif %}
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="ressurser"
                   title="Skjul vinduet" aria-label="Skjul ressursoversikten">
@@ -392,6 +399,44 @@
             Du har ikke tilgang til oppdragsmodulen, så oppdragene vises ikke
             her. Be en administrator om en rad på <strong>oppdrag</strong>.
           </p>
+          {% endif %}
+        </div>
+      </section>
+
+      {# ═════ TAVLE (22. sep. 2026) ═════ #}
+      {% comment %}
+        **Deler plass med ressursoversikten** (`KO_PAR` i ko-layout.js): den ene
+        står i rutenettet, den andre i stripa. Parkert som standard — André:
+        «la den være tilgjengelig som en skjult vindu som erstattes med
+        ressursoversikt». Tegnes av ko-tavle.js; gaten er vaktlistas `les`,
+        som ressursoversikten.
+      {% endcomment %}
+      <section class="ko-vindu d-none" id="ko-vindu-tavle" data-vindu="tavle">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-grid-3x3"></i><span class="ko-vindu-tittel">Tavle</span>
+          {% if kan_se_vaktliste %}
+          <div class="btn-group btn-group-sm ms-2 flex-wrap" role="group" aria-label="Filter" id="ko-tavle-filter"></div>
+          {% endif %}
+          <span class="ms-auto d-flex align-items-center gap-1">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-action="koByttPar" data-arg="tavle" title="Bytt til ressursoversikten">
+              <i class="bi bi-arrow-left-right me-1"></i>Ressursoversikt
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ko-skjul-knapp"
+                    data-action="koSkjulVindu" data-arg="tavle"
+                    title="Skjul vinduet" aria-label="Skjul tavla">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+          </span>
+        </div>
+        <div class="ko-tavle-melding d-none" id="ko-tavle-valgt" role="status"></div>
+        <div class="alert alert-warning py-1 px-2 m-2 small d-none" id="ko-tavle-feil" role="alert"></div>
+        <div class="ko-vindu-kropp ko-tavle-kropp">
+          {% if kan_se_vaktliste %}
+          <div class="ko-tavle" id="ko-tavle"><div class="tom-melding">Laster…</div></div>
+          {% else %}
+          <p class="text-muted small mb-0">Tavla viser vaktlistas ressurser, og krever tilgang til vaktlista.</p>
           {% endif %}
         </div>
       </section>
@@ -506,5 +551,6 @@
 {% endcomment %}
 <script src="{% static 'js/ko-layout.js' %}"></script>
 <script src="{% static 'js/ko-hendelser.js' %}"></script>
+<script src="{% static 'js/ko-tavle.js' %}"></script>
 <script src="{% static 'js/ko.js' %}"></script>
 {% endblock %}

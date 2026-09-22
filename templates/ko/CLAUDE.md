@@ -17,6 +17,8 @@ rute ingen ser på.
 før koden — de er målet): `Hendelseslogg │ Loggstrøm` øverst, `Ressursoversikt │
 Oppdragsliste` nederst. «Tre kolonner er taket» fra 17. sep. ble opphevet av André samme
 dag som hendelsene ble en egen flate. Prinsippet — alt synlig samtidig, ingen faner — står.
+**Tavla er det femte vinduet og deler plass med ressursoversikten** (22. sep. 2026, `KO_PAR`):
+den som ikke står i rutenettet står i stripa, og «⇄» i hodet bytter.
 
 **Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
 Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad
@@ -44,7 +46,8 @@ skjerm i et kommandopunkt.
 
 | Regel | Hvor |
 |---|---|
-| Sidebaren, loggstrømmen og oppstarten i nettleseren | `static/js/ko.js` — siste av tre filer, `KO_JS` |
+| Sidebaren, loggstrømmen og oppstarten i nettleseren | `static/js/ko.js` — siste av fire filer, `KO_JS` |
+| Tavla: reglene, byggerne, dra og slipp | `static/js/ko-tavle.js`; modellen og tjenestene i `ko/tavle.py` |
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
@@ -117,3 +120,24 @@ den gatet oppdragsdata på `ko:les`, og to pollere mot samme `#enhetsliste` blir
 
 **Loggen er fortsatt KOs egen**, og `ko:les` alene gir den. Uten oppdragstilgang ser
 operatøren loggen og en beskjed om hva som mangler — ikke en tom kolonne.
+
+## Tavla (22. sep. 2026)
+
+Lokasjonene som rader, tida som kolonner, lagene i rutene — tavla på veggen i KO. Hva den
+eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
+
+| Valg | Hvorfor |
+|---|---|
+| **Pekerhendelser, ikke HTML5-dra** | HTML5-dra virker dårlig på nettbrett. Under `KO_TAVLE_DRAGRENSE_PX` er et trykk et klikk |
+| **Klikk laget, så raden** — og Enter, og Esc | Samme handling for den som ikke kan dra. `koTavleKlikk` er den ene inngangen |
+| **Klikket etter et drag svelges** (`koTavleSvelgKlikk`) | Det lander på felles forelder og ville ellers valgt noe |
+| Bare `koTavleKanDras` får `data-dras` | En knapp som fører til en vegg er verre enn ingen knapp — `les` og de opptatte får ingen |
+| **Nå står ved to tredjedeler** (`koTavleVindu`) | Det meste av vinduet er det som har skjedd |
+| Åpne og opptatte stolper **slutter ved nå** og vokser bakover til `max(72px, …)` | En stolpe forbi nå-streken ser ut som en plan |
+| **Ingen `min-width` på rutenettet** | Tavla står ofte i den smale plassen; rullet tidslinja vannrett, forsvant nå-streken |
+| Poller hvert 15. s **bare når den står framme**, tegner nå-streken hvert minutt | `koTegnOppsett` kaller `koTavleSynligNaa`, så en tavle som hentes fram viser nå |
+| Filteret er vaktlistas ressursgrupper, huskes per nettleser (`ko.tavle.filter`) | Gruppene finnes alt; fire faste valg ville vært en taksonomi til |
+
+**Gaten er komposisjonsregelen**: tavla krever `les` i vaktlista (403 ellers), bilene
+bare med `les` i oppdragsmodulen — både i svaret og ved flytting (404: en bil man ikke får
+se, finnes ikke). Flytting er `skriv_full` i KO.

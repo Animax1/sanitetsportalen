@@ -158,6 +158,36 @@ def statusmelding_skrevet(sender, instance, created, **kwargs):
                 tidspunkt=instance.tidspunkt)
 
 
+@receiver(post_save, sender=Statusmelding)
+@ikke_under_loaddata
+@_trygt('tavle')
+def bil_rykket_ut(sender, instance, created, **kwargs):
+    """Bilen forlot plassen sin på tavla (22. sep. 2026).
+
+    Oppdraget har forrang: fra hun rykker ut står hun på tavla som
+    «O12 Rykker ut», og plassen hun sto på lukkes. Uten det dukket den gamle
+    plassen opp igjen når oppdraget var ferdig — et sted bilen forlot for en
+    time siden.
+
+    **Hver opptatt-status lukker, ikke bare Rykker ut**: en bil som melder
+    Fremme uten å ha trykket Rykker ut, er like opptatt. **En tidsretting
+    rører ikke tavla** — den retter et oppdrag som kanskje er ferdig for
+    lengst, og plassen bilen står på nå har ingenting med det å gjøre.
+    """
+    from .models import Tavleplassering
+    from .tavle import OPPTATT_STATUSER
+
+    if not created or instance.korrigerer_id or instance.status not in OPPTATT_STATUSER:
+        return
+    enhet_id = getattr(instance.oppdragsenhet, 'enhet_id', None)
+    if enhet_id is None:
+        return
+    for p in Tavleplassering.objects.filter(ressurs__enhet_id=enhet_id, til__isnull=True):
+        # Et stempel meldt forsinket kan ligge før plasseringen ble satt.
+        p.til = max(p.fra, instance.tidspunkt)
+        p.save(update_fields=['til'])
+
+
 @receiver(post_save, sender=Oppdragsenhet)
 @ikke_under_loaddata
 @_trygt('enhet_varslet')

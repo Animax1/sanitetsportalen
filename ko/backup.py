@@ -86,11 +86,15 @@ class KoBackupHandler(BaseBackupHandler):
     #: mot vaktlista: `vaktliste.Ressurs.enhet` → `oppdrag` → `ko` er alt en
     #: kjede, og en peker tilbake til vaktlista lukker den til en sirkel.
     #: Navnet står i `ressurs_navn`; `av` er en brukerpeker som de andre.
+    #:
+    #: `Tavleplassering` (22. sep. 2026) er begge deler på én rad: ressursen
+    #: mot vaktlista, lokasjonen mot oppdrag. Navnene står frosset.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av', 'delt_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],
+        'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
     }
 
 

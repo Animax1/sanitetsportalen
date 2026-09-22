@@ -34,6 +34,7 @@ uten at noen rykket ut.
 | «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
 | **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
+| **Tavla**: plasseringene, forrangen, historikken fra hendelsene | `ko.Tavleplassering`, `ko/tavle.py`, `bil_rykket_ut` i `ko/signals.py` |
 
 ## Retningen: KO er øverste lag
 
@@ -225,3 +226,25 @@ den som bare leser kan likevel ha samband. Lista er `ko.Ansvarsomraade` (rediger
 KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen.
 `skriv_linje` stemper det når kallet ikke oppgir noe; oppgitt verdi — også tom — vinner.
 `tilstede()` bærer det. **Ikke i backupen**: merket er hva som gjelder nå.
+
+## Tavla (22. sep. 2026)
+
+Skissene ble avtalt før koden, og svarene står i `TODO.md` til steg 2 er levert. Flaten
+står i `templates/ko/CLAUDE.md`.
+
+**Tavla eier én ting: hvor en *ledig* ressurs står** (`Tavleplassering`, frosne navn,
+`ressurs`/`lokasjon`/`av` strippet i backupen). Hvem som er på vakt, hvem som er opptatt og
+hvilke rader som finnes er projeksjon — `opptatt()` utleder det ved hver lesing, som
+`enhet_status`. Maks én åpen plassering per ressurs, håndhevet av basen.
+
+| Regel | Hvorfor |
+|---|---|
+| **Opptatt har forrang** — lag på en åpen hendelse, bil fra første opptatt-status. Kan ikke plasseres | André: «hendelser og oppdrag tar prioritet» |
+| Laget går på en hendelse → plassen lukkes (`services.sett_lag`). Går av, eller hendelsen lukkes → tida skrives som en **lukket rad med `hendelse_nummer`**, og laget står **uten plass** | «Besøk» skal telle tida på hendelsen. Gjenåpnet hendelse begynner der forrige del sluttet; null varighet gir ingen rad |
+| Bilen: **hver opptatt-status lukker plassen** (`bil_rykket_ut`), en tidsretting gjør det ikke. Slutten er aldri før starten | Fremme uten Rykker ut er like opptatt; en retting gjelder et oppdrag som kan være ferdig |
+| Bilen står i raden til oppdragets lokasjon bare i `PAA_OPPDRAGETS_STED` | Fra Avreist er hun på vei bort |
+| Til samme sted igjen er en feil, ikke en ny rad | Ellers teller «Besøk» ett besøk som to |
+| Hver flytting er en systemlinje (`TAVLE_FLYTTET`) med hvem | Å gå på en hendelse har alt sin linje |
+
+**Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
+oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.

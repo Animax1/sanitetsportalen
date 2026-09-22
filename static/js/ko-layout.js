@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-// ko-layout.js — rutenettet: fire vinduer i 2×2, bytte av plass og størrelse.
+// ko-layout.js — rutenettet: fire plasser i 2×2 (fem vinduer — tavla deler plass), bytte av plass og størrelse.
 //
-// Første av KOs tre filer (`KO_JS` i patients/js_test_utils.py). Ingen
+// Første av KOs fire filer (`KO_JS` i patients/js_test_utils.py). Ingen
 // bundler, ett globalt navnerom, og **ingenting kjører på toppnivå her** —
 // `koOppsettStart()` kalles fra `DOMContentLoaded`-kroken i ko.js, som er
 // den siste fila.
@@ -26,8 +26,19 @@
 
 const KO_OPPSETT_NOKKEL = 'ko.oppsett';
 
-//: De fire vinduene, ved navnet i `data-vindu`.
-const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag'];
+//: Vinduene, ved navnet i `data-vindu`. **Fem vinduer, fire plasser**
+//: (22. sep. 2026): tavla og ressursoversikten deler én plass i rutenettet
+//: (`KO_PAR`) — André: «den skal være med, selv om det kanskje ikke er plass
+//: med de fire andre … som et skjult vindu som erstattes». Den som ikke står i
+//: rutenettet, står i stripa over konsollen, som de skjulte: en flate man ikke
+//: ser, skal være en tilstand man ser.
+const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag', 'tavle'];
+
+//: Plassene i rutenettet — to rader med to.
+const KO_PLASSER = 4;
+
+//: Parene som deler en plass: den ene står i rutenettet, den andre er parkert.
+const KO_PAR = { ressurser: 'tavle', tavle: 'ressurser' };
 
 //: Standardoppsettet: hendelsesloggen og loggstrømmen øverst, ressursene og
 //: oppdragene nederst. `bredde` er venstre vindus andel per rad, `hoyde` er
@@ -46,6 +57,7 @@ const KO_VINDUSNAVN = {
   logg: 'Loggstrøm',
   ressurser: 'Ressursoversikt',
   oppdrag: 'Oppdragsliste',
+  tavle: 'Tavle',
 };
 
 //: Gulvet, i prosent. Under dette kan en skillelinje ikke dras: et vindu på
@@ -60,8 +72,19 @@ function koKlemProsent(prosent) {
   return Math.min(100 - KO_MIN_PROSENT, Math.max(KO_MIN_PROSENT, p));
 }
 
+// Hvilke fire vinduer som står i rutenettet er gyldig: de tre uten partner
+// hver én gang, og **nøyaktig én** av hvert par. Et oppsett lagret før tavla
+// fantes (fire vinduer, ressursoversikten med) er dermed gyldig som det er —
+// ingen KO-PC mister oppsettet sitt av en oppdatering.
+function koGyldigePlasser(flate) {
+  if (flate.length !== KO_PLASSER || new Set(flate).size !== KO_PLASSER) return false;
+  if (!flate.every((v) => KO_VINDUER.includes(v))) return false;
+  return Object.keys(KO_PAR).every((v) => flate.includes(v) !== flate.includes(KO_PAR[v]))
+    && KO_VINDUER.filter((v) => !KO_PAR[v]).every((v) => flate.includes(v));
+}
+
 // Et lagret oppsett er brukerdata fra en annen versjon av sida, og leses
-// deretter: to rader med to vinduer hver, hvert av de fire nøyaktig én gang,
+// deretter: to rader med to vinduer hver, gyldige plasser (`koGyldigePlasser`),
 // tallene klemt. Alt annet gir `null`, og da gjelder standarden — et oppsett
 // som mangler et vindu ville vært nettopp det rammen skal hindre.
 function koGyldigOppsett(raa) {
@@ -71,25 +94,36 @@ function koGyldigOppsett(raa) {
     if (!Array.isArray(rad) || rad.length !== 2) return null;
     flate.push(...rad);
   }
-  if ([...flate].sort().join(',') !== [...KO_VINDUER].sort().join(',')) return null;
+  if (!koGyldigePlasser(flate)) return null;
   const bredde = Array.isArray(raa.bredde) && raa.bredde.length === 2
     ? raa.bredde.map(koKlemProsent) : [...KO_OPPSETT_STANDARD.bredde];
   return {
     rader: [[...raa.rader[0]], [...raa.rader[1]]],
     bredde,
     hoyde: koKlemProsent(raa.hoyde === undefined ? KO_OPPSETT_STANDARD.hoyde : raa.hoyde),
-    skjult: koGyldigSkjult(raa.skjult),
+    skjult: koGyldigSkjult(raa.skjult, flate),
   };
 }
 
-// Skjultlista er brukerdata fra en annen versjon av sida, som resten: kjente
-// navn, hver én gang. **Alle fire skjult gir ingen** — en tom konsoll er
-// ingen tilstand noen har bedt om, og lagringen skal ikke kunne bære den
-// tilbake etter at `koKanSkjule()` har nektet den i grensesnittet.
-function koGyldigSkjult(raa) {
+// Vinduene som står i rutenettet.
+function koIRutenettet(oppsett) {
+  return [...oppsett.rader[0], ...oppsett.rader[1]];
+}
+
+// Vinduet som er parkert fordi partneren har plassen.
+function koParkerte(oppsett) {
+  const i = koIRutenettet(oppsett);
+  return KO_VINDUER.filter((v) => !i.includes(v));
+}
+
+// Skjultlista er brukerdata fra en annen versjon av sida, som resten: navn
+// som står i rutenettet, hver én gang. **Alle fire skjult gir ingen** — en tom
+// konsoll er ingen tilstand noen har bedt om, og lagringen skal ikke kunne
+// bære den tilbake etter at `koKanSkjule()` har nektet den i grensesnittet.
+function koGyldigSkjult(raa, flate) {
   if (!Array.isArray(raa)) return [];
-  const rene = KO_VINDUER.filter((v) => raa.includes(v));
-  return rene.length >= KO_VINDUER.length ? [] : rene;
+  const rene = (flate || KO_VINDUER).filter((v) => raa.includes(v));
+  return rene.length >= KO_PLASSER ? [] : rene;
 }
 
 function koErSkjult(oppsett, navn) {
@@ -100,19 +134,26 @@ function koErSkjult(oppsett, navn) {
 // konsollen bli tom, og da er det ingenting igjen å hente noe tilbake fra
 // utenom stripa — en tilstand det ikke er noen grunn til å tilby.
 function koKanSkjule(oppsett, navn) {
-  if (!KO_VINDUER.includes(navn) || koErSkjult(oppsett, navn)) return false;
-  return (oppsett.skjult || []).length < KO_VINDUER.length - 1;
+  if (!koIRutenettet(oppsett).includes(navn) || koErSkjult(oppsett, navn)) return false;
+  return (oppsett.skjult || []).length < KO_PLASSER - 1;
 }
 
 function koSkjul(oppsett, navn) {
   const ny = koGyldigOppsett(oppsett) || koStandardOppsett();
   if (!koKanSkjule(ny, navn)) return ny;
-  ny.skjult = KO_VINDUER.filter((v) => v === navn || koErSkjult(ny, v));
+  ny.skjult = koIRutenettet(ny).filter((v) => v === navn || koErSkjult(ny, v));
   return ny;
 }
 
+// Hent et vindu fram. **Er det parkert, tar det partnerens plass** — og
+// partneren parkeres, synlig i stripa. Det er hele «Tavle ⇄ Ressursoversikt».
 function koVisIgjen(oppsett, navn) {
   const ny = koGyldigOppsett(oppsett) || koStandardOppsett();
+  const partner = KO_PAR[navn];
+  if (partner && koParkerte(ny).includes(navn)) {
+    ny.rader = ny.rader.map((rad) => rad.map((v) => (v === partner ? navn : v)));
+    ny.skjult = (ny.skjult || []).filter((v) => v !== partner);
+  }
   ny.skjult = (ny.skjult || []).filter((v) => v !== navn);
   return ny;
 }
@@ -142,7 +183,8 @@ function koLagreOppsett(oppsett) {
 // ikke. Samme vindu to ganger, eller et ukjent navn, gir oppsettet uendret.
 function koBytt(oppsett, a, b) {
   const ny = koGyldigOppsett(oppsett) || koStandardOppsett();
-  if (a === b || !KO_VINDUER.includes(a) || !KO_VINDUER.includes(b)) return ny;
+  const i = koIRutenettet(ny);
+  if (a === b || !i.includes(a) || !i.includes(b)) return ny;
   ny.rader = ny.rader.map((rad) => rad.map((v) => (v === a ? b : (v === b ? a : v))));
   return ny;
 }
@@ -180,6 +222,11 @@ function koTegnOppsett(oppsett) {
     hoyre.style.flex = skjultV ? '1 1 100%' : '1 1 ' + (100 - oppsett.bredde[i]) + '%';
     radSynlig[i] = !(skjultV && skjultH);
   });
+  // Den parkerte står ikke i noen rad, og vises ikke.
+  koParkerte(oppsett).forEach((navn) => {
+    const el = koVinduElement(navn);
+    if (el) el.classList.add('d-none');
+  });
   const vannrett = document.querySelector('.ko-splitter-h');
   if (vannrett) vannrett.classList.toggle('d-none', !(radSynlig[0] && radSynlig[1]));
   rader.forEach((rad, i) => rad.classList.toggle('d-none', !radSynlig[i]));
@@ -190,13 +237,16 @@ function koTegnOppsett(oppsett) {
     rader.forEach((rad) => { rad.style.flex = '1 1 100%'; });
   }
   koTegnSkjulte(oppsett);
+  // Tavla som nettopp ble hentet fram skal vise nå (ko-tavle.js). Gjennom en
+  // vakt: fila lastes etter denne, og kallet skjer først ved tegning.
+  if (typeof koTavleSynligNaa === 'function') koTavleSynligNaa();
 }
 
 // Stripa over konsollen: ett kort per skjult vindu, med navnet sitt. Den er
 // hele svaret på «en flate ingen ser» — skjult skal være en tilstand man ser,
 // og veien tilbake skal stå der tilstanden står.
 function koSkjulteHtml(oppsett) {
-  return (oppsett.skjult || []).map((v) => '<button type="button"'
+  return (oppsett.skjult || []).concat(koParkerte(oppsett)).map((v) => '<button type="button"'
     + ' class="btn btn-sm btn-outline-secondary ko-hent-tilbake"'
     + ' data-action="koVisVindu" data-arg="' + escapeHtml(v) + '">'
     + '<i class="bi bi-eye me-1"></i>' + escapeHtml(KO_VINDUSNAVN[v] || v) + '</button>').join('');
@@ -205,7 +255,7 @@ function koSkjulteHtml(oppsett) {
 function koTegnSkjulte(oppsett) {
   const stripe = document.getElementById('ko-skjulte');
   if (!stripe) return;
-  const skjult = oppsett.skjult || [];
+  const skjult = (oppsett.skjult || []).concat(koParkerte(oppsett));
   stripe.classList.toggle('d-none', !skjult.length);
   stripe.innerHTML = skjult.length
     ? '<span class="ko-skjulte-tekst">Skjult:</span>' + koSkjulteHtml(oppsett) : '';
@@ -224,6 +274,11 @@ function koVisVindu(navn) {
   koOppsett = koVisIgjen(koOppsett || koLesOppsett(), navn);
   koLagreOppsett(koOppsett);
   koTegnOppsett(koOppsett);
+}
+
+// «⇄» i hodet til tavla og ressursoversikten: bytt til partneren.
+function koByttPar(navn) {
+  if (KO_PAR[navn]) koVisVindu(KO_PAR[navn]);
 }
 
 function koTilbakestillOppsett() {

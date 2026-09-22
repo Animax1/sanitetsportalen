@@ -354,3 +354,81 @@ body.ko-drar-h { cursor: row-resize; }
 
 /* Skjulknappen i vinduets hode: samme lille format som «i» og kolonnene. */
 .ko-skjul-knapp { --bs-btn-padding-y: 0.05rem; --bs-btn-padding-x: 0.35rem; }
+
+/* ── Tavla (22. sep. 2026) ─────────────────────────────────────────────────
+   Lokasjonene som rader, tida som kolonner, lagene i rutene — tavla på veggen
+   i KO digitalt. «Uten plass» er en egen kolonne til venstre, og et slippmål
+   som radene. Stolpene står i prosent av tidslinja, så tavla følger vinduets
+   bredde uten å måle den. */
+.ko-tavle-kropp { padding: 0; }
+.ko-tavle { display: flex; min-height: 100%; }
+.ko-tavle-uten {
+  width: 150px; flex-shrink: 0; padding: 0.5rem; border-right: 1px solid var(--portal-border);
+  display: flex; flex-direction: column; gap: 0.35rem; overflow-y: auto;
+}
+.ko-tavle-overskrift {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-muted); font-weight: 600;
+}
+.ko-tavle-tom { font-size: 0.8rem; color: var(--text-muted); }
+.ko-tavle-kort {
+  padding: 0.35rem 0.5rem; border-radius: 6px; background: #1d4ed8; color: #fff;
+  font-size: 0.85rem; font-weight: 600; user-select: none;
+}
+.ko-tavle-kort.ko-tavle-bil, .ko-tavle-stolpe.ko-tavle-bil { background: #b45309; }
+.ko-tavle-kort-under { font-size: 0.72rem; font-weight: 400; color: #e2e8f0; }
+/* Ingen `min-width`: tavla står ofte i den smale plassen nederst til venstre,
+   og en tidslinje som ruller vannrett gjemmer nå-streken — det ene tavla skal
+   vise. Heller trangt enn skjult; skillelinja gir den mer. */
+.ko-tavle-rutenett { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; }
+.ko-tavle-hode {
+  display: flex; position: sticky; top: 0; z-index: 3;
+  background: var(--portal-surface); border-bottom: 1px solid var(--portal-border);
+}
+.ko-tavle-radnavn {
+  width: 120px; flex-shrink: 0; padding: 0.35rem 0.5rem; display: flex; gap: 0.4rem;
+  align-items: center; font-size: 0.85rem; font-weight: 600;
+}
+.ko-tavle-hode .ko-tavle-radnavn { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.ko-tavle-radtall { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+.ko-tavle-tidslinje { position: relative; flex-grow: 1; height: 24px; }
+.ko-tavle-time {
+  position: absolute; top: 4px; padding-left: 3px; font-size: 0.72rem;
+  color: var(--text-muted); border-left: 1px solid var(--portal-border);
+}
+.ko-tavle-rader { position: relative; }
+.ko-tavle-naa-lag {
+  position: absolute; top: 0; bottom: 0; left: 120px; right: 0; pointer-events: none; z-index: 2;
+}
+.ko-tavle-naa { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; }
+.ko-tavle-rad { display: flex; border-bottom: 1px solid var(--portal-surface-2); }
+.ko-tavle-pause { background: var(--surface-3); }
+.ko-tavle-spor { position: relative; flex-grow: 1; }
+.ko-tavle-stolpe {
+  position: absolute; height: 24px; box-sizing: border-box; border-radius: 5px;
+  background: #1d4ed8; color: #fff; font-size: 0.75rem; font-weight: 600;
+  padding: 3px 6px; overflow: hidden; white-space: nowrap; border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.ko-tavle-pause .ko-tavle-stolpe { background: #475569; }
+/* Den åpne plasseringen gripes også når den er ny og kort: bredden settes i
+   `koTavleStolpeHtml()` med `max(72px, …)`, forankret i nå-streken. */
+.ko-tavle-stolpe:not(.ko-tavle-aapen) { opacity: 0.75; }
+/* Hendelser og oppdrag er ikke noe tavla satte: stiplet, og aldri et drag. */
+.ko-tavle-stolpe.ko-tavle-opptatt, .ko-tavle-stolpe.ko-tavle-hendelse,
+.ko-tavle-kort.ko-tavle-opptatt {
+  background: repeating-linear-gradient(135deg, rgba(245, 158, 11, 0.28) 0 6px, rgba(245, 158, 11, 0.08) 6px 12px);
+  border: 1px dashed #f59e0b; color: #fde68a; opacity: 1;
+}
+.ko-tavle-stolpe.ko-tavle-hendelse { opacity: 0.7; }
+.ko-tavle-kort.ko-tavle-opptatt .ko-tavle-kort-under { color: #fcd34d; }
+.ko-tavle-tid-tekst { font-weight: 400; }
+.ko-tavle-dras { cursor: grab; touch-action: none; }
+.ko-tavle-valgt { outline: 3px solid #93c5fd; outline-offset: 1px; }
+.ko-tavle-mal-over { background: rgba(59, 130, 246, 0.18); }
+.ko-tavle-melding { padding: 0.35rem 0.75rem; background: #1e3a8a; color: #dbeafe; font-size: 0.85rem; }
+.ko-tavle-spokelse {
+  position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -120%);
+  padding: 0.3rem 0.6rem; border-radius: 12px; background: #1d4ed8; color: #fff;
+  font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-select: none; }

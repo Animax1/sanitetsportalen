@@ -203,6 +203,14 @@ KO_LOGG_BYGGERE = (
     'koDeltMerke',
     'koDelingKnapper',
     'koDelteLinjerHtml',
+    # ko-tavle.js (22. sep. 2026): stolpene, radene, timene, «Uten plass»,
+    # filteret og funksjonen som setter dem sammen.
+    'koTavleStolpeHtml',
+    'koTavleRadHtml',
+    'koTavleTimerHtml',
+    'koTavleUtenPlassHtml',
+    'koTavleFilterHtml',
+    'koTegnTavle',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -947,7 +955,8 @@ class DelingOgLagTests(SimpleTestCase):
         const vannrett = lagEl('splitter-h');
         const elementer = new Map();
         for (const id of ['ko-rad-1', 'ko-rad-2', 'ko-skjulte', 'ko-vindu-hendelser',
-                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag']) {
+                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag',
+                          'ko-vindu-tavle']) {
           elementer.set(id, lagEl(id));
         }
         elementer.get('ko-rad-1').querySelector = () => rad1Splitter;
@@ -1378,15 +1387,16 @@ class OppsettetTests(SimpleTestCase):
             (KO_JS, ('koKlemProsent', 'koGyldigOppsett', 'koStandardOppsett',
                      'koBytt', 'koProsentAv', 'koGyldigSkjult', 'koErSkjult',
                      'koKanSkjule', 'koSkjul', 'koVisIgjen', 'koSkjulteHtml',
-                     'koTegnOppsett', 'koTegnSkjulte', 'koVinduElement')),
+                     'koTegnOppsett', 'koTegnSkjulte', 'koVinduElement',
+                     'koGyldigePlasser', 'koIRutenettet', 'koParkerte')),
         ))
-
-    PRE = ("const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag'];\n"
-           "const KO_OPPSETT_STANDARD = { rader: [['hendelser', 'logg'], ['ressurser', 'oppdrag']],"
-           ' bredde: [56, 34], hoyde: 56, skjult: [] };\n'
-           "const KO_VINDUSNAVN = { hendelser: 'Hendelseslogg', logg: 'Loggstrøm',"
-           " ressurser: 'Ressursoversikt', oppdrag: 'Oppdragsliste' };\n"
-           'const KO_MIN_PROSENT = 20;\n')
+        # Konstantene leses fra fila, ikke skrives av (22. sep. 2026). Kopien
+        # som sto her hadde fire vinduer og ville fortsatt vært grønn den dagen
+        # tavla kom — mot en side som ikke fantes lenger.
+        from oppdrag.tests_runde_d import _konst
+        self.pre = ''.join(_konst(KO_JS[0], n) for n in (
+            'KO_VINDUER', 'KO_PLASSER', 'KO_PAR', 'KO_OPPSETT_STANDARD',
+            'KO_VINDUSNAVN', 'KO_MIN_PROSENT'))
 
     #: Et rutenett av stubber: de to radene med hver sin skillelinje, de fire
     #: vinduene, den vannrette skillelinja og stripa. `skjult` leses av
@@ -1406,7 +1416,8 @@ class OppsettetTests(SimpleTestCase):
         const vannrett = lagEl('splitter-h');
         const elementer = new Map();
         for (const id of ['ko-rad-1', 'ko-rad-2', 'ko-skjulte', 'ko-vindu-hendelser',
-                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag']) {
+                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag',
+                          'ko-vindu-tavle']) {
           elementer.set(id, lagEl(id));
         }
         elementer.get('ko-rad-1').querySelector = () => rad1Splitter;
@@ -1421,7 +1432,7 @@ class OppsettetTests(SimpleTestCase):
     """
 
     def _kjor(self, kode):
-        return run_node(self.harness, kode, preamble=self.PRE).splitlines()
+        return run_node(self.harness, kode, preamble=self.pre).splitlines()
 
     def test_gulvet_klemmer_begge_veier(self):
         ut = self._kjor('console.log([koKlemProsent(5), koKlemProsent(50), koKlemProsent(99), koKlemProsent("x")].join(","));')
@@ -1499,9 +1510,9 @@ class OppsettetTests(SimpleTestCase):
 
     def test_stripa_navngir_vinduet_og_escaper(self):
         ut = self._kjor(
-            "console.log(koSkjulteHtml({skjult: ['ressurser', 'logg']}));\n"
+            "console.log(koSkjulteHtml({...koStandardOppsett(), skjult: ['ressurser', 'logg']}));\n"
             "KO_VINDUSNAVN.logg = '<b>x</b>';\n"
-            "console.log(koSkjulteHtml({skjult: ['logg']}));\n")
+            "console.log(koSkjulteHtml({...koStandardOppsett(), skjult: ['logg']}));\n")
         self.assertIn('Ressursoversikt', ut[0])
         self.assertIn('Loggstrøm', ut[0])
         self.assertIn('data-action="koVisVindu" data-arg="ressurser"', ut[0])
@@ -1527,15 +1538,70 @@ class OppsettetTests(SimpleTestCase):
         self.assertEqual(ut[1], 'true true 1 1 100%', 'tom rad borte, den andre tar høyden')
         self.assertEqual(ut[2], 'false false false 1 1 56%', 'alt tilbake')
 
-    def test_stripa_vises_bare_naar_noe_er_skjult(self):
+    def test_stripa_viser_det_parkerte_og_det_skjulte(self):
+        """Tavla står i stripa fra første stund: en flate man ikke ser, skal
+        være en tilstand man ser — samme grunn som for de skjulte."""
         ut = self._kjor(self.DOM + """
             koTegnOppsett(koStandardOppsett());
-            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML === '');
+            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML.includes('Tavle'),
+                        el('ko-vindu-tavle').skjult);
             koTegnOppsett(koSkjul(koStandardOppsett(), 'oppdrag'));
-            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML.includes('Oppdragsliste'));
+            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML.includes('Oppdragsliste'),
+                        el('ko-skjulte').innerHTML.includes('Tavle'));
         """)
-        self.assertEqual(ut[0], 'true true')
-        self.assertEqual(ut[1], 'false true')
+        self.assertEqual(ut[0], 'false true true')
+        self.assertEqual(ut[1], 'false true true')
+
+    # ── Tavla og ressursoversikten deler plass (22. sep. 2026) ─────────────
+
+    def test_et_oppsett_fra_foer_tavla_er_gyldig_som_det_er(self):
+        """Ingen KO-PC skal miste oppsettet sitt av en oppdatering."""
+        ut = self._kjor(
+            "console.log(JSON.stringify(koGyldigOppsett({rader: [['oppdrag','logg'],['ressurser','hendelser']], skjult: ['logg']})));\n"
+            "console.log(JSON.stringify(koGyldigOppsett({rader: [['oppdrag','logg'],['tavle','hendelser']]}).rader));\n")
+        self.assertEqual(json.loads(ut[0])['rader'], [['oppdrag', 'logg'], ['ressurser', 'hendelser']])
+        self.assertEqual(json.loads(ut[0])['skjult'], ['logg'])
+        self.assertEqual(json.loads(ut[1]), [['oppdrag', 'logg'], ['tavle', 'hendelser']])
+
+    def test_begge_i_paret_eller_ingen_av_dem_avvises(self):
+        """Nøyaktig én av paret står i rutenettet. Begge ville skjøvet ut et
+        vindu uten partner — og det har ingen vei tilbake."""
+        ut = self._kjor(
+            "console.log(koGyldigOppsett({rader: [['tavle','logg'],['ressurser','hendelser']]}));\n"
+            "console.log(koGyldigOppsett({rader: [['oppdrag','logg'],['hendelser','hendelser']]}));\n"
+            "console.log(koGyldigOppsett({rader: [['oppdrag','logg'],['tull','hendelser']]}));\n")
+        self.assertEqual(ut[:3], ['null', 'null', 'null'])
+
+    def test_hent_tavla_tar_ressursoversiktens_plass(self):
+        ut = self._kjor(
+            'const o = koStandardOppsett();\n'
+            "const t = koVisIgjen(o, 'tavle');\n"
+            'console.log(JSON.stringify(t.rader), JSON.stringify(koParkerte(t)));\n'
+            'console.log(JSON.stringify(o.rader), "det gamle er urørt");\n'
+            "console.log(JSON.stringify(koVisIgjen(t, 'ressurser').rader));\n"
+            "console.log(JSON.stringify(koVisIgjen(koSkjul(o, 'ressurser'), 'tavle').skjult),"
+            " 'den skjulte partneren slippes med');\n")
+        self.assertEqual(ut[0], '[["hendelser","logg"],["tavle","oppdrag"]] ["ressurser"]')
+        self.assertEqual(ut[1], '[["hendelser","logg"],["ressurser","oppdrag"]] det gamle er urørt')
+        self.assertEqual(json.loads(ut[2]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']])
+        self.assertEqual(ut[3], '[] den skjulte partneren slippes med')
+
+    def test_det_parkerte_kan_ikke_skjules_eller_byttes(self):
+        """Det står ikke i rutenettet; å «skjule» det ville lagt et navn i
+        skjultlista som ingen plass bærer."""
+        ut = self._kjor(
+            'const o = koStandardOppsett();\n'
+            "console.log(koKanSkjule(o, 'tavle'), JSON.stringify(koSkjul(o, 'tavle').skjult));\n"
+            "console.log(JSON.stringify(koBytt(o, 'tavle', 'logg').rader));\n")
+        self.assertEqual(ut[0], 'false []')
+        self.assertEqual(json.loads(ut[1]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']])
+
+    def test_den_parkerte_tegnes_ikke(self):
+        ut = self._kjor(self.DOM + """
+            koTegnOppsett(koVisIgjen(koStandardOppsett(), 'tavle'));
+            console.log(el('ko-vindu-tavle').skjult, el('ko-vindu-ressurser').skjult);
+        """)
+        self.assertEqual(ut[0], 'false true')
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

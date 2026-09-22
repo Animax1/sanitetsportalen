@@ -4,6 +4,63 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — KO-tavla, steg 1: vinduet, dra og slipp, «Uten plass» og forrangen  `#ko/oppsett`
+
+André: «Hvis tavlen skal være på /ko så finner jeg den ikke» — den var skissert, ikke
+bygget. Nå er den der: **«Tavle» i hodet på Ressursoversikten**, og i stripa over
+konsollen («Skjult: Tavle»). Tavla og ressursoversikten **deler én plass** i rutenettet
+(`KO_PAR` i `ko-layout.js`); den som ikke står der, står i stripa. Et oppsett lagret før
+tavla fantes er gyldig som det er — ingen KO-PC mister oppsettet sitt.
+
+**Hva som er med:** lokasjonene fra oppdragsmodulen som rader med **Pause** fast øverst;
+tidslinja med nå-streken ved to tredjedeler (12 t foreløpig); **«Uten plass»** som egen
+kolonne og slippmål, med «Siden pause: 1 t 30» på de ledige og de opptatte under;
+**dra og slipp** med pekerhendelser (virker på nettbrett), og **klikk laget, så raden**
+(også Enter/Esc); filteret er vaktlistas ressursgrupper (Alle, Lag, Ambulanse,
+Mannskapsbil …); ⏱ på et lag som har stått over tre timer på samme sted.
+
+**Forrangen (André: «hendelser og oppdrag tar prioritet men skal vises på tavlen»):**
+bare en ledig ressurs kan dras. Et lag på en åpen hendelse står stiplet i raden til
+hendelsens lokasjon, «På H14»; en bil fra første opptatt-status står stiplet ved
+oppdragets lokasjon, «O12 Fremme». Laget som går på en hendelse forlater plassen sin, og
+**når det går av eller hendelsen lukkes, står det uten plass** — tida på hendelsen blir
+en lukket rad med H-nummeret, så «Besøk» (steg 2) teller den. Bilens plass lukkes av
+signalet på første opptatt-status, også når sentralbordet fører Fremme uten Rykker ut;
+en tidsretting på et ferdig oppdrag rører den ikke.
+
+**Tilgang:** tavla krever `les` i KO **og** i vaktlista; bilene bare med `les` i
+oppdragsmodulen — også ved flytting (404, ikke 403). Flytte er `skriv_full` i KO. Hver
+flytting er en systemlinje: «Lag 1 → Parkscene (fra Club Venue)», «Lag 1 uten plass (var
+Parkscene)».
+
+**Modell:** `ko.Tavleplassering` (migrasjon `ko/0013`) — ressurs, lokasjon eller pause,
+fra/til, frosne navn, maks én åpen per ressurs (håndhevet av basen). `ressurs`,
+`lokasjon` og `av` strippes i backupen. Endepunkter: `GET /ko/api/tavle/`,
+`POST /ko/api/tavle/plasser/`, `POST /ko/api/tavle/uten-plass/` — 162 ruter nå.
+
+**Prøvd i Chromium** med seedede lag, en hendelse og en bil på oppdrag: drag fra «Uten
+plass» til en rad, klikk-så-rad til Pause, ingen konsollfeil. To ting ble rettet av det:
+en åpen stolpe med minimumsbredde stakk forbi nå-streken (den vokser nå bakover), og
+rutenettet hadde `min-width` som rullet nå-streken ut av syne i den smale plassen.
+Klikk på en rad etter å ha valgt et lag gjorde ingenting med mus — klikket ble bare lest
+i `pointerup`, som ikke fyrer for en rad uten drag; `click` tar det nå, og klikket etter
+et drag svelges.
+
+**Mutasjoner: 66, alle drept utenom fire likeverdige.** Tjenestelaget og portene (44):
+de første 33 lot **9 overleve**, og hver fikk en prøve — slettet lokasjon er ikke pause,
+av og på i samme øyeblikk gir ingen rad, en åpen hendelse i en annen vakt gjør ikke laget
+opptatt, inaktive lokasjoner og andre vakters plasseringer er ikke i svaret, tidsretting
+rører ikke plassen, et stempel ført bakover gir ingen rad som slutter før den begynte.
+`med_biler` i `opptatt()` var død (bilene er med når de er blant ressursene) og er
+fjernet, og signalet lukker nå på hver opptatt-status, ikke bare Rykker ut — funnet av
+mutanten. JS (22): **3 overlevde og er likeverdige** — pause-raden sjekket `!p.pause` to
+ganger (forenklet), og de to leddene i `koGyldigePlasser` impliserer hverandre med ett
+par og fire plasser (begge beholdt: med to par trengs begge). ⏱ på en lang pause fikk en
+prøve. `OPPTATT_STATUSER` + `tildelt` er likeverdig: tildelt har ingen koblingsrad.
+
+**Kjent grense:** bilens tid på oppdrag blir ikke tavlehistorikk; den står i
+oppdragsmodulen. Lag uten ressurs i vaktlista står ikke på tavla.
+
 ## 2026-09-22 — KO-tavla: pauser planlegges i Pause-raden  `#ko/oppsett`
 
 André: «la oss kunne sette en pause rad og legge inn pauser der for lagene. Som skal

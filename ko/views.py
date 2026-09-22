@@ -883,3 +883,96 @@ def nullstill_view(request, hva):
         ip=klient_ip(request),
     )
     return JsonResponse({'status': 'ok', 'antall': antall})
+
+
+# ── Tavla (22. sep. 2026) ─────────────────────────────────────────────────────
+#
+# **Tavla viser vaktlistas ressurser, så gaten er vaktlistas også** — `les` i
+# vaktlista, som ressursoversikten og besetningen. Bilene og oppdragene på dem
+# tas med bare for den som ser oppdragene: KO *viser* modulenes data, og hvem
+# som får se dem er modulens sak (komposisjonsregelen, rollemodellen §5).
+
+def _tavle_gate(request):
+    if not har_tilgang(request.user, 'vaktliste', 'les'):
+        return _feil('Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.', 403)
+    return None
+
+
+def _tavle_ressurs(request, data):
+    """Ressursen i kroppen — og **en bil bare med lesetilgang i
+    oppdragsmodulen**, samme regel som `tavle_view` bruker for å vise den. En
+    bil man ikke får se, finnes ikke: 404, ikke 403."""
+    from vaktliste.models import Ressurs
+    try:
+        ressurs = Ressurs.objects.get(pk=int(data.get('ressurs_id')))
+    except (Ressurs.DoesNotExist, TypeError, ValueError):
+        return None
+    if ressurs.enhet_id is not None and not har_tilgang(request.user, 'oppdrag', 'les'):
+        return None
+    return ressurs
+
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET'])
+@rate_limit(group='ko:tavle', rate='240/m', method='GET')
+def tavle_view(request):
+    """Alt tavla trenger, i ett svar. Polles som loggen."""
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    data = tavle.tavle_data(hent_aktiv_vakt(),
+                            med_biler=har_tilgang(request.user, 'oppdrag', 'les'))
+    return JsonResponse({'status': 'ok', 'data': data})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:tavle_plasser', rate='120/m', method='POST')
+def tavle_plasser_view(request):
+    """Sett en ledig ressurs på en lokasjon, eller i pause, fra nå."""
+    from oppdrag.models import Lokasjon
+
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    data = _json_body(request)
+    ressurs = _tavle_ressurs(request, data)
+    if ressurs is None:
+        return _feil('Ukjent ressurs.', 404)
+    lokasjon = None
+    if not data.get('pause'):
+        try:
+            lokasjon = Lokasjon.objects.get(pk=int(data.get('lokasjon_id')))
+        except (Lokasjon.DoesNotExist, TypeError, ValueError):
+            return _feil('Ukjent lokasjon.', 404)
+    try:
+        p = tavle.plasser(hent_aktiv_vakt(), ressurs, bruker=request.user,
+                          lokasjon=lokasjon, pause=bool(data.get('pause')))
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': {'id': p.pk}})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:tavle_uten_plass', rate='120/m', method='POST')
+def tavle_uten_plass_view(request):
+    """Ta ressursen av tavla — dit man drar den når den ikke står noe sted."""
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    ressurs = _tavle_ressurs(request, _json_body(request))
+    if ressurs is None:
+        return _feil('Ukjent ressurs.', 404)
+    try:
+        tavle.avslutt(hent_aktiv_vakt(), ressurs, bruker=request.user)
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok'})

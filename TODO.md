@@ -145,7 +145,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
-### KO-tavla — skisser 22. sep. 2026, bygges når André har sett dem
+### KO-tavla — steg 1 levert 22. sep. 2026, steg 2 under arbeid
 
 Tavla på veggen i KO digitalt: lokasjoner som rader, tid som kolonner, lagene plassert
 i rutene. Skissene ligger i Artifact «KO-tavla — skisser» (fem artboards). **Svarene fra
@@ -173,11 +173,13 @@ André 22. sep. 2026, før koden:**
 | Filteret | Bygges fra `vaktliste.Ressursgruppe`, ikke fire faste valg |
 | Planlagte pauser | **KO kan planlegge pauser i Pause-raden** for lag, også lag uten avtalt pause i vaktlista. **Vaktlista er utgangspunktet**: en avtalt pause derfra står der av seg selv. **KO kan endre den i drift**, og da gjelder KOs versjon resten av vakta, merket «endret i drift» — vaktlista overstyrer den ikke lenger. Når pausen er her, får laget «Pause nå»; KO starter den, tavla flytter ingen av seg selv |
 
-- [ ] **Bygg tavla** etter skissene. Egen modell i `ko` som peker på
-      `vaktliste.Ressurs` og `oppdrag.Lokasjon` med navnene frosset (som `HendelseLag`,
-      strippet i backupen); dra og slipp med pekerhendelser, så det virker på nettbrett,
-      og klikk-så-rad som alternativ. `KO_VINDUER` i `ko-layout.js` må kjenne et femte
-      vindu. Flaten dokumenteres i `templates/ko/CLAUDE.md`.
+- [ ] **Steg 2 av tavla.** Steg 1 — vinduet, radene, «Uten plass», dra og slipp, filteret,
+      forrangen til hendelser og oppdrag — står i CHANGELOG. Igjen: planlagte pauser i
+      Pause-raden med «Pause nå» (regelen i tabellen over); retting av en plassering i
+      etterkant (fra/til, logget); «Besøk» per lokasjon per døgn og for hele vakta, med
+      døgnstart; tidsvinduet 12–24 t og døgnstarten som portalinnstilling (global admin);
+      «På tavla» og «Følg besøk ★» per lokasjon i KO-innstillinger (`skriv_leder`); og
+      «Ikke vært på \<fulgt sted\>» under tavla.
 
 ### Vaktlista: avtalte pauser — ønsket 22. sep. 2026
 
