@@ -1,0 +1,18 @@
+{% comment %}
+  «Vis»-menyen over ressurslista (André, 23. sep. 2026: «istedenfor minimer
+  som tar plass at vi har en synlighetsknapp»). Delt av `/oppdrag/` og `/ko/`;
+  innholdet tegnes av `oppdaterSynlighetsmeny()` i oppdrag-kort.js.
+
+  `auto-close="outside"`: flere grupper skal kunne skjules uten at menyen
+  lukker seg for hvert klikk. `strategy: fixed`: KO-vinduene klipper det som
+  stikker ut (`overflow: hidden`), og en meny som klippes er en meny halve
+  lista ikke når.
+{% endcomment %}
+<div class="dropdown d-inline-block ms-2 synlighet">
+  <button type="button" class="btn btn-outline-secondary btn-sm synlighet-knapp" id="ressurs-vis-knapp"
+          data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config='{"strategy":"fixed"}'
+          aria-expanded="false" title="Hvilke grupper som vises">
+    <i class="bi bi-eye me-1"></i>Vis<span id="ressurs-vis-tall"></span>
+  </button>
+  <div class="dropdown-menu synlighet-meny" id="ressurs-vis-meny" role="menu" aria-label="Grupper som vises"></div>
+</div>

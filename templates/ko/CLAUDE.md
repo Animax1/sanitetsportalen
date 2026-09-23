@@ -50,7 +50,7 @@ skjerm i et kommandopunkt.
 | Tavla: reglene, byggerne, dra og slipp | `static/js/ko-tavle.js`; modellen og tjenestene i `ko/tavle.py` |
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
-| Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
+| «Vis»-menyen over ressurslista | `oppdaterSynlighetsmeny()` i `static/js/oppdrag-kort.js`, `templates/oppdrag/_synlighetsmeny.html` |
 | Vaktlistas ressurser uten enhet | `vaktliste.services.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
 
 ## Hendelsesloggen og loggstrømmen i nettleseren
@@ -73,10 +73,15 @@ KO-referanse: oppdragsmodulen kjenner fortsatt ikke `ko`. Hver fane har sin egen
 
 ## Ressursoversikten (pulje 6)
 
-**Filteret ble minimering** (§7.2, André: «ressurstypene må kunne minimeres»).
-Gruppeoverskriften er en knapp; tilstanden huskes under `tavle.grupper.lukket`, og
-**overskriften viser antallet når gruppa er lukket**. I `oppdrag-kort.js`, begge sidene;
-nøkler `type:<id>` og `gruppe:<id>`.
+**«Vis»-menyen avgjør hva som står** (23. sep. 2026, André: «istedenfor minimer som tar
+plass … en synlighetsknapp»). Den erstattet to ting: minimerbare gruppeoverskrifter
+(pulje 6) og Alle | Biler | Lag. Én avkrysning per gruppe, under seksjonene «Biler» og
+«Lag» — seksjonen er den gamle snarveien. **En skjult gruppe tar null plass, men det skjulte
+synes:** knappen bærer «· N skjult» (ressurser, ikke grupper) og er gul så lenge noe er
+skjult. `tavle.grupper.skjult` per nettleser, nøkler `type:<id>` og `gruppe:<id>`; felles
+for `/oppdrag/` og `/ko/`. Menyen bor i `oppdrag-kort.js`; vaktlistas grupper meldes inn av
+`koSynlighetsgrupper()`, og `ko.js` kaller menyen gjennom en vakt (`koOppdaterSynlighet`) —
+`oppdrag-kort.js` lastes bare med oppdragstilgang.
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
 enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste`
@@ -89,7 +94,6 @@ fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner **inne i hver g
 la alle lagene i én kolonne, og et rutenett fragmenterer ikke). Oppdragslistas hode teller aktive · ferdig (historikken
 med); «Oppdrag uten ressurs» og «Tildelt» filtrerer, ett om gangen (`koOppdragFilter`).
 **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om gangen som bilens.
-Alle | Biler | Lag huskes per nettleser (`ko.ressursvisning`); det skjulte står som et tall.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 

@@ -207,11 +207,23 @@
 .hastegrad-knapp.valgt.hastegrad-knapp-drift  { background: #1e3a8a; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-plassering { background: #7e22ce; color: #fff; }
 
-/* Gruppeoverskriften som knapp (KO pulje 6): lukker og åpner gruppa, og
-   viser antallet når den er lukket — det som er skjult skal være lesbart. */
-.enhet-gruppe-knapp { cursor: pointer; user-select: none; }
-.enhet-gruppe-knapp:hover { color: var(--text-main); }
-.enhet-gruppe-tall { text-transform: none; letter-spacing: 0; font-weight: 600; }
+/* «Vis»-menyen over ressurslista (23. sep. 2026) — erstatter gruppene som
+   lukket seg og Alle | Biler | Lag. Knappen er framhevet når noe er skjult,
+   så det skjulte synes også med menyen lukket. */
+/* `!important` fordi portal.css setter kant og tekst på alle
+   `.btn-outline-secondary` med `!important` — uten det vant den, og knappen
+   så lik ut enten noe var skjult eller ikke. */
+.synlighet-knapp.aktiv { border-color: #f59e0b !important; color: #fde68a !important; }
+.synlighet-meny { min-width: 14rem; max-height: 70vh; overflow-y: auto;
+  background: var(--surface-2, #1e293b); border-color: var(--border-color, #334155); }
+.synlighet-valg { display: flex; align-items: center; gap: 0.5rem; color: var(--text-main, #e2e8f0); }
+.synlighet-valg:hover, .synlighet-valg:focus { background: var(--surface-1, #0f172a); color: var(--text-main, #e2e8f0); }
+.synlighet-seksjon { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+.synlighet-valg:not(.synlighet-seksjon) { padding-left: 1.5rem; }
+.synlighet-skjult { color: var(--portal-text-muted, #94a3b8); text-decoration: line-through; }
+.synlighet-antall { font-size: 0.75rem; color: var(--portal-text-muted, #94a3b8); }
+.synlighet-meny .dropdown-item-text { color: var(--portal-text-muted, #94a3b8); }
+.synlighet-meny .dropdown-divider { border-color: var(--border-color, #334155); }
 .ko-ressurskort .ko-ressursikon { font-size: 1.1rem; color: var(--portal-text-muted, #94a3b8); }
 
 /* Enhetene gruppert på type, i tavla og i «Nytt oppdrag». */

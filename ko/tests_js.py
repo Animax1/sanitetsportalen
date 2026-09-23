@@ -928,8 +928,7 @@ class LoggfilteretTests(SimpleTestCase):
 class DelingOgLagTests(SimpleTestCase):
     """Deling av logglinjer med enhetene og lagene på hendelsen (19. sep.
     2026): «Delt»-merket og Del/Angre etter nivå, «Fra loggen i H14» i
-    oppdragets detaljmodal, «siden»-teksten, tallet på det skjulte i
-    ressursoversikten — og at tekst, navn og lagnavn escapes."""
+    oppdragets detaljmodal, «siden»-teksten — og at tekst, navn og lagnavn escapes."""
 
     DELING = ('koErDelt', 'koDeltEtikett', 'koDeltMerke', 'koDelingKnapper', 'koRettFjernKnapper',
               'koKlokke', 'koKanSkrive', 'koKanFjerne', 'koDetaljLinjeHtml')
@@ -938,7 +937,7 @@ class DelingOgLagTests(SimpleTestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
             (OPPDRAG_KORT_JS, ('oppdragsnr',)),
-            (KO_JS, self.DELING + ('koSiden', 'koSkjultTall', 'koLagBrikkeHtml', 'koDelteLinjerHtml',
+            (KO_JS, self.DELING + ('koSiden', 'koLagBrikkeHtml', 'koDelteLinjerHtml',
                                    'koHendelseLinjer', 'koOperatorlinjer')),
         ))
 
@@ -987,11 +986,6 @@ class DelingOgLagTests(SimpleTestCase):
             "console.log([koSiden('2026-09-19T21:37:00Z', naa), koSiden('2026-09-19T20:55:00Z', naa),"
             " koSiden('2026-09-19T22:30:00Z', naa), koSiden('x', naa)].join('|'));")
         self.assertEqual(ut[0], '23 min|1t 5m|0 min|')
-
-    def test_tallet_paa_det_skjulte(self):
-        ut = self._kjor("console.log([koSkjultTall('alle', 4, 3), koSkjultTall('biler', 4, 3), koSkjultTall('lag', 4, 3),"
-                        " koSkjultTall('lag', 0, 3), koSkjultTall('biler', 4, 0)].join('|'));")
-        self.assertEqual(ut[0], '|3 lag skjult|4 biler skjult||')
 
     def test_delt_etiketten_sier_alle_eller_hvilke(self):
         ut = self._kjor(
@@ -1765,10 +1759,15 @@ class MerkeneTests(SimpleTestCase):
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class MinimerbareGrupperTests(SimpleTestCase):
-    """Gruppeoverskriften er en knapp, og **en lukket gruppe skjuler ingenting
-    stille** (§7.2): antallet står i overskriften. Tilstanden huskes i
-    `localStorage`, stubbet her."""
+class SynlighetsmenyTests(SimpleTestCase):
+    """«Vis»-menyen (André, 23. sep. 2026: «istedenfor minimer som tar plass at
+    vi har en synlighetsknapp»). Erstatter de minimerbare gruppene og
+    Alle | Biler | Lag. **Det skjulte skal fortsatt synes** (§7.2): knappen
+    bærer antallet. Tilstanden huskes i `localStorage`, stubbet her.
+
+    Testene går gjennom de ekte inngangene — `tegnEnhetsliste` og
+    `koTegnRessurser` for lista, `oppdaterSynlighetsmeny` for menyen, og
+    handlingene menyen kaller — ikke bare hjelperne."""
 
     LAGER = '''
       const _lager = {};
@@ -1776,67 +1775,155 @@ class MinimerbareGrupperTests(SimpleTestCase):
         getItem: (k) => (k in _lager ? _lager[k] : null),
         setItem: (k, v) => { _lager[k] = String(v); },
       };
-      globalThis.window = { OPPDRAG_ENHETSTYPER: [[1, 'Ambulanse'], [2, 'Lag']], MODUL_TILGANG: {} };
+      globalThis.window = { OPPDRAG_ENHETSTYPER: [[1, 'Ambulanse'], [2, 'Mannskapsbil']], MODUL_TILGANG: {} };
       let sisteEnhetsliste = []; let enhetslisteKilde = null;
       let besetninger = {}; let apenBesetning = null;
-      const GRUPPER_LUKKET_NOKKEL = 'tavle.grupper.lukket';
-      function tegnEnhetslistePaaNytt() {}
+      let koRessurser = []; let koApenRessurs = null;
+      const GRUPPER_SKJULT_NOKKEL = 'tavle.grupper.skjult';
       function mkBesetning() { return ''; }
       function kanSeBesetning() { return false; }
+      function koRessursOpptattHtml() { return ''; }
+      const el = (id) => { const e = { id, innerHTML: '', textContent: '', klasser: new Set() };
+        e.classList = { toggle: (k, v) => { v ? e.klasser.add(k) : e.klasser.delete(k); } }; return e; };
+      const dom = { 'enhetsliste': el('enhetsliste'), 'vaktliste-ressurser': el('vaktliste-ressurser'),
+                    'ressurs-vis-meny': el('ressurs-vis-meny'), 'ressurs-vis-tall': el('ressurs-vis-tall'),
+                    'ressurs-vis-knapp': el('ressurs-vis-knapp') };
+      globalThis.document = { getElementById: (id) => dom[id] || null, activeElement: null };
+      const LISTE = [
+        {id: 1, navn: 'HGSD 56', pa_vakt: true, type: 1, status: 'ledig', status_navn: 'Ledig'},
+        {id: 2, navn: 'KARM 12', pa_vakt: true, type: 1, status: 'fremme', status_navn: 'Fremme'},
+        {id: 3, navn: 'MB 3', pa_vakt: true, type: 2, status: 'ledig', status_navn: 'Ledig'},
+        {id: 4, navn: 'Av', pa_vakt: false, type: 2, status: 'ledig', status_navn: 'Ledig'},
+      ];
+      koRessurser = [
+        {id: 7, navn: 'Lag 1', gruppe_id: 5, gruppe_navn: 'Lag', antall: 3, tilstede: 2},
+        {id: 8, navn: 'Lag 2', gruppe_id: 5, gruppe_navn: 'Lag', antall: 0, tilstede: 0},
+        {id: 9, navn: 'Samleplass A', gruppe_id: 6, gruppe_navn: 'Samleplass', antall: 2, tilstede: 2}];
+      // Som i sentralbordet: en ny tegning av lista tegner også lagene.
+      function tegnEnhetslistePaaNytt() { tegnEnhetsliste(LISTE); }
+      function koTegnRessurserPaaNytt() { koTegnRessurser(); koOppdaterSynlighet(); }
+      const vis = () => JSON.stringify({ biler: dom['enhetsliste'].innerHTML, lag: dom['vaktliste-ressurser'].innerHTML,
+        meny: dom['ressurs-vis-meny'].innerHTML, tall: dom['ressurs-vis-tall'].textContent,
+        aktiv: dom['ressurs-vis-knapp'].klasser.has('aktiv') });
     '''
 
     def setUp(self):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-            (OPPDRAG_KORT_JS, ('_lukkedeGrupper', 'gruppeErLukket', 'vippGruppe', 'gruppehode',
-                               '_ledigSammendrag', 'tegnEnhetsliste', '_grupperEnheter',
-                               '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
-                               'tidSiden', 'hastegradKlasse', '_grovMerke', '_problemMedAntall',
-                               '_medAntall', 'oppdragsnr')),
+            (OPPDRAG_KORT_JS, self.OPPDRAG_KORT),
+            (KO_JS, ('koTegnRessurser', 'koSynlighetsgrupper', 'koOppdaterSynlighet', 'koGruppenokkel',
+                     'koGrupperRessurser', 'koRessurskort')),
         ))
 
-    def _kjor(self, kode):
-        return run_node(self.harness, self.LAGER + kode)
+    OPPDRAG_KORT = ('_skjulteGrupper', 'gruppeErSkjult', '_lagreSkjulte', 'vippSynlighet',
+                    'vippSeksjon', 'visAlleGrupper', 'synlighetsSeksjoner', 'skjultTall',
+                    '_synlighetsvalg', 'synlighetsmenyHtml', 'oppdaterSynlighetsmeny',
+                    'gruppehode', 'tegnEnhetsliste', '_grupperEnheter',
+                    '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                    'tidSiden', 'hastegradKlasse', '_grovMerke', '_problemMedAntall',
+                    '_medAntall', 'oppdragsnr')
 
-    def test_vipp_lukker_og_aapner_og_huskes(self):
-        ut = self._kjor('''
-            console.log(gruppeErLukket('type:1'));
-            vippGruppe('type:1');
-            console.log(gruppeErLukket('type:1'));
-            console.log(localStorage.getItem('tavle.grupper.lukket'));
-            vippGruppe('type:1');
-            console.log(gruppeErLukket('type:1'));
+    def _steg(self, *handlinger):
+        """Tegn lista, kjør handlingene i rekkefølge, og returner tilstanden
+        etter hver av dem (den første er før noe er gjort)."""
+        kode = 'tegnEnhetslistePaaNytt(); koTegnRessurserPaaNytt(); console.log(vis());\n' + ''.join(
+            f'{h}; console.log(vis());\n' for h in handlinger)
+        return [json.loads(linje) for linje in run_node(self.harness, self.LAGER + kode).splitlines()[:len(handlinger) + 1]]
+
+    def test_alt_vises_fra_start_og_menyen_har_begge_seksjonene(self):
+        [start] = self._steg()
+        self.assertIn('HGSD 56', start['biler'])
+        self.assertIn('MB 3', start['biler'])
+        self.assertIn('Lag 1', start['lag'])
+        self.assertEqual(start['tall'], '')
+        self.assertFalse(start['aktiv'])
+        for arg in ('biler', 'type:1', 'type:2', 'lag', 'gruppe:5', 'gruppe:6'):
+            self.assertIn(f'data-arg="{arg}"', start['meny'])
+        self.assertNotIn('visAlleGrupper', start['meny'], '«Vis alle» bare når noe er skjult')
+        self.assertIn('Ambulanse</span><span class="synlighet-antall">2<', start['meny'],
+                      'antallet på vakt — ikke den av vakt')
+
+    def test_en_skjult_gruppe_tar_null_plass_og_telles_paa_knappen(self):
+        start, skjult, tilbake = self._steg("vippSynlighet('type:1')", "vippSynlighet('type:1')")
+        self.assertNotIn('HGSD 56', skjult['biler'])
+        self.assertNotIn('Ambulanse', skjult['biler'], 'heller ikke overskriften står igjen')
+        self.assertIn('MB 3', skjult['biler'])
+        self.assertEqual(skjult['tall'], ' · 2 skjult', 'antallet ressurser, ikke grupper')
+        self.assertTrue(skjult['aktiv'])
+        self.assertIn('aria-checked="false" data-action="vippSynlighet" data-arg="type:1"', skjult['meny'])
+        self.assertIn('visAlleGrupper', skjult['meny'])
+        self.assertEqual(tilbake, start, 'et klikk til gir alt tilbake')
+
+    def test_seksjonen_er_det_alle_biler_lag_var(self):
+        _, bare_biler, begge, delvis, lag_av = self._steg(
+            "vippSeksjon('lag')", "vippSeksjon('lag')", "vippSynlighet('gruppe:6')", "vippSeksjon('lag')")
+        self.assertEqual(bare_biler['lag'], '', 'Lag av: ingen av vaktlistas grupper')
+        self.assertIn('HGSD 56', bare_biler['biler'])
+        self.assertEqual(bare_biler['tall'], ' · 3 skjult')
+        self.assertIn('Lag 1', begge['lag'])
+        self.assertIn('Lag 1', delvis['lag'])
+        self.assertNotIn('Samleplass A', delvis['lag'])
+        self.assertEqual(lag_av['lag'], '', 'er noe i seksjonen synlig, skjuler klikket alt')
+
+    def test_alle_bilene_skjult_sier_det_og_vis_alle_gir_alt_tilbake(self):
+        start, _, alle_av, _, tilbake = self._steg(
+            "vippSeksjon('biler')", "vippSeksjon('lag')", "visAlleGrupper()", "void 0")
+        self.assertIn('Alle bilene er skjult', alle_av['biler'])
+        self.assertEqual(alle_av['tall'], ' · 6 skjult')
+        self.assertEqual(tilbake, start)
+
+    def test_husket_noekkel_for_en_gruppe_som_ikke_er_paa_vakt_teller_ikke(self):
+        [start] = self._steg()
+        ut = json.loads(run_node(self.harness, self.LAGER + '''
+            _lager['tavle.grupper.skjult'] = JSON.stringify(['type:99', 'gruppe:42']);
+            tegnEnhetslistePaaNytt(); console.log(vis());
+        ''').splitlines()[0])
+        self.assertEqual(ut['tall'], '')
+        self.assertEqual(ut['biler'], start['biler'])
+
+    def test_valget_huskes_i_nettleseren(self):
+        ut = run_node(self.harness, self.LAGER + '''
+            vippSynlighet('type:2'); console.log(localStorage.getItem('tavle.grupper.skjult'));
         ''').splitlines()
-        self.assertEqual(ut[:4], ['false', 'true', '["type:1"]', 'false'])
+        self.assertEqual(ut[0], '["type:2"]')
 
-    def test_lukket_gruppe_viser_antall_og_skjuler_kortene(self):
-        ut = self._kjor('''
-            const el = { innerHTML: '' };
-            globalThis.document = { getElementById: (id) => id === 'enhetsliste' ? el : null };
-            const liste = [
-              {id: 1, navn: 'HGSD 56', pa_vakt: true, type: 1, status: 'ledig', status_navn: 'Ledig'},
-              {id: 2, navn: 'KARM 12', pa_vakt: true, type: 1, status: 'fremme', status_navn: 'Fremme'},
-              {id: 3, navn: 'Lag 3', pa_vakt: true, type: 2, status: 'ledig', status_navn: 'Ledig'},
-            ];
-            tegnEnhetsliste(liste);
-            console.log(JSON.stringify(el.innerHTML));
-            vippGruppe('type:1');
-            tegnEnhetsliste(liste);
-            console.log(JSON.stringify(el.innerHTML));
+    def test_i_oppdrag_tegner_lista_menyen_selv_og_uten_lag(self):
+        """`/oppdrag/` laster ikke `ko.js`: der er kallet i `tegnEnhetsliste`
+        det eneste som tegner menyen, og det finnes ingen Lag-seksjon."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_KORT_JS, self.OPPDRAG_KORT),
+        ))
+        ut = json.loads(run_node(harness, self.LAGER.replace(
+            'function koTegnRessurserPaaNytt() { koTegnRessurser(); koOppdaterSynlighet(); }', '') + '''
+            tegnEnhetsliste(LISTE); vippSynlighet('type:2'); console.log(vis());
+        ''').splitlines()[0])
+        self.assertIn('data-arg="type:1"', ut['meny'])
+        self.assertNotIn('data-arg="lag"', ut['meny'])
+        self.assertEqual(ut['tall'], ' · 1 skjult')
+
+    def test_lagene_kommer_inn_i_menyen_naar_de_er_hentet(self):
+        """Lagene hentes for seg (`koHentRessurser`), ofte etter at lista er
+        tegnet. Da må menyen få dem — ellers kan de ikke skjules."""
+        harness = self.harness + build_harness(((KO_JS, ('koHentRessurser',)),))
+        ut = json.loads(run_node(harness, self.LAGER + '''
+            const hentet = koRessurser; koRessurser = [];
+            tegnEnhetslistePaaNytt();
+            globalThis.apiFetch = async () => ({ ok: true, json: async () => ({ data: hentet }) });
+            await koHentRessurser();
+            console.log(vis());
+        ''').splitlines()[0])
+        self.assertIn('data-arg="gruppe:5"', ut['meny'])
+
+    def test_menyen_og_overskriften_escaper_navnet(self):
+        ut = run_node(self.harness, self.LAGER + '''
+            koRessurser[0].gruppe_navn = '<b>x</b>'; koRessurser[0].gruppe_id = '"><img src=x>';
+            tegnEnhetslistePaaNytt(); koTegnRessurserPaaNytt(); console.log(vis());
+            console.log(gruppehode('<b>y</b>'));
         ''').splitlines()
-        aapen, lukket = json.loads(ut[0]), json.loads(ut[1])
-        self.assertEqual(aapen.count('enhet-gruppe-blokk'), 2, 'én blokk per gruppe (to kolonner, 19. sep. 2026)')
-        self.assertIn('HGSD 56', aapen)
-        self.assertIn('data-action="vippGruppe"', aapen)
-        self.assertNotIn('HGSD 56', lukket, 'kortene i den lukkede gruppa er borte')
-        self.assertIn('Lag 3', lukket, 'den andre gruppa står')
-        self.assertIn('enhet-gruppe-lukket', lukket)
-        self.assertIn('2 · 1 ledig', lukket, 'antallet og sammendraget står i overskriften')
-
-    def test_overskriften_escaper_navnet(self):
-        ut = self._kjor('''console.log(gruppehode('type:1', '<b>x</b>', 2, ''));''')
-        self.assertIn('&lt;b&gt;x&lt;/b&gt;', ut)
-        self.assertNotIn('<b>x</b>', ut)
+        self.assertNotIn('<b>', ut[0] + ut[1])
+        self.assertNotIn('<img', ut[0])
+        self.assertIn('&lt;b&gt;y&lt;/b&gt;', ut[1])
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

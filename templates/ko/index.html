@@ -274,15 +274,10 @@
           <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
           <i class="bi bi-truck"></i><span class="ko-vindu-tittel">Ressursoversikt</span>
           <span class="ko-vindu-tall" id="ko-ressurser-antall"></span>
+          {% if kan_se_oppdrag %}
+          {% include "oppdrag/_synlighetsmeny.html" %}
+          {% endif %}
           {% if kan_se_oppdrag and kan_se_vaktliste %}
-          {# Alle | Biler | Lag (André, 19. sep. 2026). Huskes per nettleser; #}
-          {# det skjulte står som et tall, som gruppene på tavla. #}
-          <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Vis">
-            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="alle">Alle</button>
-            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="biler">Biler</button>
-            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="lag">Lag</button>
-          </div>
-          <span class="ko-vindu-tall" id="ko-ressurs-skjult"></span>
           {# Fargeforklaringen (19. sep. 2026): «i» folder den ut under hodet. #}
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-legende-knapp" id="ko-kolonner-knapp"
                   data-action="koVippKolonner" title="Én eller to kolonner" aria-pressed="false">

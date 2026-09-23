@@ -169,17 +169,6 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
       og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
       kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
-### KO-ressursoversikten: én synlighetsmeny i stedet for minimering — forslag 23. sep. 2026
-
-- [ ] **Et øye-/«Vis»-nedtrekk med en avkrysning per gruppe**, i stedet for at hver lukket
-      gruppe står igjen som en overskrift som tar plass. André: «istedenfor minimer som tar
-      plass at vi har en synlighetsknapp … Enig?» Forslaget er lagt fram, ikke besluttet.
-      Det kan også erstatte Alle | Biler | Lag, som er samme mekanisme i grovere utgave —
-      da blir to kontroller én. **Det skjulte må synes:** knappen bærer antallet skjulte
-      grupper, for en gruppe som er borte uten spor er en ambulanse ingen finner. Tilstanden
-      finnes alt (`tavle.grupper.lukket` i `oppdrag-kort.js`, `ko.ressursvisning`); det som
-      endres er flata, ikke mekanismen.
-
 ### Vaktlista: fjern «Sett i drift», la drift følge vakta — ønsket 14. sep. 2026
 
 **André:** «fjern i drift-knappen og heller ha det slik at når vaktlisten starter så er den

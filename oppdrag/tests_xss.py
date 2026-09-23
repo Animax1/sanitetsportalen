@@ -20,11 +20,19 @@ from patients.js_test_utils import (
     extract_function, node_available, read_js, run_node,
 )
 
+#: `tegnEnhetsliste` tegner «Vis»-menyen til slutt (23. sep. 2026). Testene her
+#: gjelder kortene, og stubbene deres svarer på alle ID-er — menyen har egne
+#: tester i `ko/tests_js.py` (`SynlighetsmenyTests`).
+SYNLIGHET_STUBB = 'function oppdaterSynlighetsmeny() {}\n'
+
+
 # Funksjonene som bygger HTML av data fra API-et, per fil. Den som legger til
 # en bygger, legger den til her — ellers skanner testen forbi den.
 HTML_BUILDERS_PER_FIL = {
     OPPDRAG_SENTRAL_JS: (
         'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde',
+        # «Vis»-menyen over ressurslista (23. sep. 2026).
+        'gruppehode', '_synlighetsvalg', 'synlighetsmenyHtml',
         # **Kortet ble hoistet ut av `renderEnheter` og falt ut av skanningen
         # med det samme** (funnet 16. sep. 2026, da `[object Object]` sto på
         # hver enhet i prod uten at noe var rødt). En utklipping flytter
@@ -438,7 +446,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
+        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
                               '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
@@ -459,7 +467,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         from .tests_runde_d import _konst
         self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
-                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + SYNLIGHET_STUBB + build_harness(self.HARNESS))
 
     def test_fritekst_med_markup_kommer_ut_som_tekst(self):
         """Det farligste feltet i modulen: en operatør skriver fritt."""
@@ -614,7 +622,7 @@ class EnhetskortetTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         from .tests_runde_d import _konst
         self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
-                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + SYNLIGHET_STUBB + build_harness(self.HARNESS))
 
     def _kort(self, enhet):
         import json
@@ -959,7 +967,7 @@ class SentralbordetsGrovmerkeTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         from .tests_runde_d import _konst
         self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
-                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + SYNLIGHET_STUBB + build_harness(self.HARNESS))
 
     def _rad(self, **felt):
         import json

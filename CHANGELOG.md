@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Ressursoversikten: «Vis»-meny (synlighetsknapp) i stedet for minimering og Alle | Biler | Lag  `#ko` `#oppdrag/sentralbord`
+
+André: «istedenfor minimer som tar plass at vi har en synlighetsknapp istedenfor på
+ressursoversikt», og etter forslaget: «ja jeg vil ha forslaget ditt i ressursoversikten».
+
+**Hva som er endret:** en **«Vis»-knapp med øye** over ressurslista, med en avkrysning per
+gruppe — Ambulanse, Mannskapsbil, Lag til fots, og vaktlistas grupper (Lag, Samleplass …).
+Gruppene står under to seksjoner, **«Biler» og «Lag»**, og et klikk på seksjonen skjuler
+eller viser hele — det er den gamle Alle | Biler | Lag, som er borte. Menyen blir stående
+åpen mens man krysser av, og «Vis alle» står nederst når noe er skjult.
+
+**En skjult gruppe tar null plass** — heller ikke overskriften står igjen, som den gjorde
+med minimering. **Men det skjulte synes:** knappen sier «Vis · 3 skjult» (antall
+*ressurser*, ikke grupper — det er ambulansen man leter etter) og er **gul** så lenge noe
+er skjult. Er alle bilene skjult, står «Alle bilene er skjult — se «Vis»» der lista var.
+
+**Samme meny i `/oppdrag/`**, ved «Ressurser», med bare «Biler» — lista er den samme
+funksjonen på begge sidene, og valget huskes felles per nettleser
+(`tavle.grupper.skjult`). **Tidligere lukkede grupper og Alle | Biler | Lag-valget er ikke
+tatt med over** — alt står synlig første gang, og de gamle nøklene leses ikke lenger.
+
+**Funnet underveis:** `portal.css` setter kant og tekst på alle `.btn-outline-secondary`
+med `!important`, så knappens gule «noe er skjult» ble slått ut og knappen så lik ut uansett
+— sett i skjermbildet, ikke av testene. `.ko-legende-knapp.aktiv` (kolonneknappen) har
+trolig samme feil; ikke rørt her.
+
+**Tilgang:** `oppdrag-kort.js` lastes bare med oppdragstilgang, men `ko.js` lastes alltid —
+`ko.js` kaller derfor menyen gjennom en vakt (`koOppdaterSynlighet`), ellers ville
+oppstarten kastet en `ReferenceError` for den som bare har vaktlista.
+
+**Mutasjonstesting: 19 mutanter** på reglene — filteret i begge listene, vippingen,
+seksjonsregelen (`some` → `every`), «Vis alle», tallet (ressurser, ikke grupper), gult merke,
+kallstedene og escapingen i menyen og overskriften. **To overlevde første runde**, og begge
+var ekte hull: kallet i `tegnEnhetsliste` er det *eneste* som tegner menyen i `/oppdrag/`,
+men testen hadde alltid KO-funksjonene til stede; og at lagene kommer inn i menyen når
+`koHentRessurser` henter dem, var ikke prøvd. Begge har egen test nå.
+
 ## 2026-09-23 — Opprydding: «Velg…» i nedtrekkene, hastegraden som forsvant, ledig i enhetsvalget, to kolonner som overlappet  `#oppdrag/sentralbord` `#ko` `#vaktliste`
 
 André: «Neste ledd er litt opprydning».

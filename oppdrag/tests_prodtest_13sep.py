@@ -18,13 +18,19 @@ from patients.js_test_utils import (
     node_available, read_js, run_node,
 )
 
+#: `tegnEnhetsliste` tegner «Vis»-menyen til slutt (23. sep. 2026). Testene her
+#: gjelder kortene, og stubbene deres svarer på alle ID-er — menyen har egne
+#: tester i `ko/tests_js.py` (`SynlighetsmenyTests`).
+SYNLIGHET_STUBB = 'function oppdaterSynlighetsmeny() {}\n'
+
+
 
 class SentralbordetsOppstartTests(SimpleTestCase):
     """3.1: listene tegnes uansett hvordan første henting gikk, og pollingen
     settes selv om oppstarten kastet."""
 
     HARNESS = ((OPPDRAG_SENTRAL_JS, ('_trygt', 'lastAlt', 'oppstart', '_visLastefeil', 'lastEnheter',
-                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste',
+                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode',
                                      'settEnhetslisteKilde', 'renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr')),)
 
     FORSPILL = '''
@@ -57,7 +63,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = _konst(OPPDRAG_SENTRAL_JS, 'LASTEFEIL') + build_harness(self.HARNESS)
+        self.harness = _konst(OPPDRAG_SENTRAL_JS, 'LASTEFEIL') + SYNLIGHET_STUBB + build_harness(self.HARNESS)
 
     def _kjor(self, snippet):
         ut = run_node(self.harness, self.FORSPILL + snippet)
@@ -230,7 +236,7 @@ class DenDelteListaLeserDenLevendeEnhetslistaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('renderEnheter', 'tegnEnhetsliste',
+        (OPPDRAG_SENTRAL_JS, ('renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode',
                               'tegnEnhetslistePaaNytt',
                               'settEnhetslisteKilde', '_grupperEnheter',
                               '_typeRekkefolge', '_enhetskort',
@@ -241,7 +247,7 @@ class DenDelteListaLeserDenLevendeEnhetslistaTests(SimpleTestCase):
     )
 
     def setUp(self):
-        self.harness = build_harness(self.HARNESS)
+        self.harness = SYNLIGHET_STUBB + build_harness(self.HARNESS)
 
     def test_ny_array_naas_uten_en_tegning_imellom(self):
         """**Gjennom `renderEnheter()`, ikke ved å sette kilden selv.**

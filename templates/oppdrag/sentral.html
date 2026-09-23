@@ -31,7 +31,10 @@
 {% include "oppdrag/_sentralbord_verktoy.html" %}
   <div class="row g-3">
     <div class="col-lg-4">
-      <h2 class="h6 text-muted mb-2">Ressurser</h2>
+      <div class="d-flex align-items-center mb-2">
+        <h2 class="h6 text-muted mb-0">Ressurser</h2>
+        {% include "oppdrag/_synlighetsmeny.html" %}
+      </div>
       <div id="enhetsliste" class="d-grid gap-2">
         <div class="tom-melding">Laster…</div>
       </div>

@@ -108,3 +108,8 @@ etter at en problemstilling var valgt, gjelder vinduets regel: beholdes om den k
 **Enhetsvalget i «Nytt oppdrag» viser statusen** ved navnet, ledig framhevet (André: «så kan
 du se hvem som er ledig»). Rekkefølgen er fortsatt typen og navnet — en liste som stokker seg
 om mens man krysser av, er verre enn en som må leses.
+
+**«Vis»-menyen over ressurslista er delt med `/ko/`** (23. sep. 2026) — malbiten
+`_synlighetsmeny.html` og `oppdaterSynlighetsmeny()` i `oppdrag-kort.js`, kalt til slutt i
+`tegnEnhetsliste()`. Her har den bare seksjonen «Biler». Hvordan den virker står i
+`templates/ko/CLAUDE.md`, under Ressursoversikten.

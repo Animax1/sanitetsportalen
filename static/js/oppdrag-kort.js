@@ -351,20 +351,26 @@ async function hentBesetning(enhetId) {
 // som vi hadde det i /oppdrag»).
 //
 // Begge sidene bruker `#enhetsliste` og `#av-vakt-teller`.
-// ── Minimerbare grupper (KO pulje 6, André 18. sep. 2026: «ressurstypene må
-// kunne minimeres») ─────────────────────────────────────────────────────────
+// ── Synlighet: «Vis»-menyen (André, 23. sep. 2026: «istedenfor minimer som
+// tar plass at vi har en synlighetsknapp») ────────────────────────────────
 //
-// Lukket-tilstanden huskes per nettleser: det er et visningsvalg, ikke data.
-// **En lukket gruppe skjuler ingenting stille** (§7.2 i KO-notatet):
-// overskriften står med antallet, og ett klikk åpner. Nøkkelen er
-// `type:<id>` for enhetstypene og `gruppe:<id>` for vaktlistas ressursgrupper,
-// så de to listene deler mekanismen uten å dele tilstand.
+// Erstatter to ting: de minimerbare gruppene fra pulje 6, der en lukket
+// gruppe sto igjen som en overskrift, og Alle | Biler | Lag i `/ko/`, som var
+// samme mekanisme i grovere utgave. Nå er det én meny med en avkrysning per
+// gruppe, og en skjult gruppe tar null plass.
+//
+// **Det skjulte skal fortsatt synes** (§7.2 i KO-notatet): knappen bærer
+// antallet ressurser som er skjult. En gruppe som er borte uten spor, er en
+// ambulanse ingen finner.
+//
+// Huskes per nettleser — et visningsvalg, ikke data. Nøkkelen er `type:<id>`
+// for enhetstypene og `gruppe:<id>` for vaktlistas ressursgrupper.
 
-const GRUPPER_LUKKET_NOKKEL = 'tavle.grupper.lukket';
+const GRUPPER_SKJULT_NOKKEL = 'tavle.grupper.skjult';
 
-function _lukkedeGrupper() {
+function _skjulteGrupper() {
   try {
-    const raa = globalThis.localStorage?.getItem(GRUPPER_LUKKET_NOKKEL);
+    const raa = globalThis.localStorage?.getItem(GRUPPER_SKJULT_NOKKEL);
     const liste = raa ? JSON.parse(raa) : [];
     return new Set(Array.isArray(liste) ? liste : []);
   } catch (e) {
@@ -372,37 +378,115 @@ function _lukkedeGrupper() {
   }
 }
 
-function gruppeErLukket(nokkel) {
-  return _lukkedeGrupper().has(nokkel);
+function gruppeErSkjult(nokkel) {
+  return _skjulteGrupper().has(nokkel);
 }
 
-function vippGruppe(nokkel) {
-  const lukkede = _lukkedeGrupper();
-  if (lukkede.has(nokkel)) lukkede.delete(nokkel); else lukkede.add(nokkel);
+function _lagreSkjulte(skjulte) {
   try {
-    globalThis.localStorage?.setItem(GRUPPER_LUKKET_NOKKEL, JSON.stringify(Array.from(lukkede)));
+    globalThis.localStorage?.setItem(GRUPPER_SKJULT_NOKKEL, JSON.stringify(Array.from(skjulte)));
   } catch (e) { /* privat modus e.l. — da huskes ikke valget, og det er alt */ }
   tegnEnhetslistePaaNytt();
   if (typeof koTegnRessurserPaaNytt === 'function') koTegnRessurserPaaNytt();
 }
 
-function gruppehode(nokkel, navn, antall, sammendrag) {
-  // Overskriften er knappen. Lukket: navn, antall og et kort sammendrag
-  // («2 ledig»), så det som er skjult likevel er lesbart.
-  const lukket = gruppeErLukket(nokkel);
-  const tall = lukket
-    ? ' <span class="enhet-gruppe-tall">' + escapeHtml(String(antall))
-      + (sammendrag ? ' · ' + escapeHtml(sammendrag) : '') + '</span>'
-    : '';
-  return '<div class="enhet-gruppe enhet-gruppe-knapp' + (lukket ? ' enhet-gruppe-lukket' : '')
-    + '" role="button" tabindex="0" data-action="vippGruppe" data-arg="' + escapeHtml(nokkel) + '">'
-    + '<i class="bi ' + (lukket ? 'bi-chevron-right' : 'bi-chevron-down') + ' me-1"></i>'
-    + escapeHtml(navn) + tall + '</div>';
+function vippSynlighet(nokkel) {
+  const skjulte = _skjulteGrupper();
+  if (skjulte.has(nokkel)) skjulte.delete(nokkel); else skjulte.add(nokkel);
+  _lagreSkjulte(skjulte);
 }
 
-function _ledigSammendrag(enheter) {
-  const ledige = enheter.filter((e) => e.status === 'ledig').length;
-  return ledige ? ledige + ' ledig' : '';
+// Seksjonen — «Biler» eller «Lag» — er snarveien Alle | Biler | Lag var:
+// er noe i den synlig, skjules alt; ellers vises alt.
+function vippSeksjon(id) {
+  const seksjon = synlighetsSeksjoner().find((s) => s.id === id);
+  if (!seksjon) return;
+  const skjulte = _skjulteGrupper();
+  const noeSynlig = seksjon.grupper.some((g) => !skjulte.has(g.nokkel));
+  seksjon.grupper.forEach((g) => { if (noeSynlig) skjulte.add(g.nokkel); else skjulte.delete(g.nokkel); });
+  _lagreSkjulte(skjulte);
+}
+
+function visAlleGrupper() {
+  _lagreSkjulte(new Set());
+}
+
+// Gruppene som finnes nå, i listas rekkefølge. Vaktlistas ressurser meldes
+// inn av `/ko/` gjennom `koSynlighetsgrupper` — sentralbordet i `/oppdrag/`
+// har dem ikke, og oppdragsmodulen importerer ikke vaktlista.
+function synlighetsSeksjoner() {
+  const paVakt = (sisteEnhetsliste || []).filter((e) => e.pa_vakt);
+  const seksjoner = [{
+    id: 'biler', navn: 'Biler',
+    grupper: _grupperEnheter(paVakt).map((g) => ({ nokkel: 'type:' + g.type, navn: g.navn, antall: g.enheter.length })),
+  }];
+  if (typeof koSynlighetsgrupper === 'function') {
+    seksjoner.push({ id: 'lag', navn: 'Lag', grupper: koSynlighetsgrupper() });
+  }
+  return seksjoner.filter((s) => s.grupper.length);
+}
+
+// Hvor mye som er skjult av det som finnes nå. En husket nøkkel for en
+// gruppe som ikke er på vakt, teller ikke.
+function skjultTall(seksjoner) {
+  const skjulte = _skjulteGrupper();
+  let grupper = 0;
+  let ressurser = 0;
+  seksjoner.forEach((s) => s.grupper.forEach((g) => {
+    if (skjulte.has(g.nokkel)) { grupper += 1; ressurser += g.antall; }
+  }));
+  return { grupper, ressurser };
+}
+
+function _synlighetsvalg(handling, arg, navn, synlig, seksjon, antall) {
+  // Alt går gjennom escaping, også de faste strengene: skanneren i
+  // oppdrag/tests_xss.py leser denne, og en kort liste over «gjennomgått»
+  // er verdt mer enn de få tegnene.
+  const klasse = 'dropdown-item synlighet-valg' + (seksjon ? ' synlighet-seksjon' : '') + (synlig ? '' : ' synlighet-skjult');
+  const merket = synlig ? 'true' : 'false';
+  const ikon = synlig ? 'bi-eye' : 'bi-eye-slash';
+  const tekst = antall === undefined ? '' : String(antall);
+  return `<button type="button" class="${escHtmlValue(klasse)}" role="menuitemcheckbox"
+    aria-checked="${escHtmlValue(merket)}" data-action="${escHtmlValue(handling)}" data-arg="${escHtmlValue(arg)}">`
+    + `<i class="bi ${escHtmlValue(ikon)}"></i><span class="flex-grow-1">${escapeHtml(navn)}</span>`
+    + `<span class="synlighet-antall">${escapeHtml(tekst)}</span></button>`;
+}
+
+function synlighetsmenyHtml(seksjoner) {
+  if (!seksjoner.length) return '<div class="dropdown-item-text small">Ingen ressurser på vakt.</div>';
+  const skjulte = _skjulteGrupper();
+  const deler = seksjoner.map((s) => {
+    const noeSynlig = s.grupper.some((g) => !skjulte.has(g.nokkel));
+    return _synlighetsvalg('vippSeksjon', s.id, s.navn, noeSynlig, true)
+      + s.grupper.map((g) => _synlighetsvalg('vippSynlighet', g.nokkel, g.navn, !skjulte.has(g.nokkel), false, g.antall)).join('');
+  });
+  const alle = skjultTall(seksjoner).grupper
+    ? '<div class="dropdown-divider"></div><button type="button" class="dropdown-item" data-action="visAlleGrupper">'
+      + '<i class="bi bi-eye me-2"></i>Vis alle</button>'
+    : '';
+  return deler.join('<div class="dropdown-divider"></div>') + alle;
+}
+
+// Tegner menyen og tallet på knappen. Kalt etter hver tegning av lista, så
+// menyen alltid kjenner gruppene som står der nå. Fokuset settes tilbake på
+// samme valg: menyen tegnes om ved hvert klikk, og uten det mister den som
+// bruker tastaturet plassen sin.
+function oppdaterSynlighetsmeny() {
+  const meny = document.getElementById('ressurs-vis-meny');
+  if (!meny) return;
+  const aktiv = document.activeElement;
+  const fokusArg = aktiv && meny.contains?.(aktiv) ? aktiv.dataset?.arg : null;
+  const seksjoner = synlighetsSeksjoner();
+  meny.innerHTML = synlighetsmenyHtml(seksjoner);
+  if (fokusArg) meny.querySelector?.('[data-arg="' + CSS.escape(fokusArg) + '"]')?.focus();
+  const { ressurser } = skjultTall(seksjoner);
+  const tall = document.getElementById('ressurs-vis-tall');
+  if (tall) tall.textContent = ressurser ? ' · ' + ressurser + ' skjult' : '';
+  document.getElementById('ressurs-vis-knapp')?.classList.toggle('aktiv', ressurser > 0);
+}
+
+function gruppehode(navn) {
+  return `<div class="enhet-gruppe">${escapeHtml(navn)}</div>`;
 }
 
 
@@ -420,20 +504,18 @@ function tegnEnhetsliste(liste) {
     el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
   } else {
     // Gruppert på enhetstype, ambulansene først (André, 12. sep. 2026).
-    // Overskriften står bare når det finnes mer enn én type å skille — og
-    // fra pulje 6 er den en knapp som lukker gruppa.
-    // Hver gruppe i sin egen blokk (19. sep. 2026): i to kolonner på /ko/
-    // skal en gruppe stå samlet — `break-inside: avoid` på blokka.
+    // Overskriften står bare når det finnes mer enn én type å skille. En
+    // skjult gruppe tas ikke med i det hele tatt — tallet står på «Vis».
     const grupper = _grupperEnheter(paVakt);
-    el.innerHTML = grupper.map((g) => {
-      const nokkel = 'type:' + g.type;
-      const hode = grupper.length > 1
-        ? gruppehode(nokkel, g.navn, g.enheter.length, _ledigSammendrag(g.enheter)) : '';
-      const kort = (grupper.length > 1 && gruppeErLukket(nokkel)) ? '' : g.enheter.map((e) => _enhetskort(e)).join('');
-      return '<div class="enhet-gruppe-blokk">' + hode + kort + '</div>';
-    }).join('');
+    const synlige = grupper.filter((g) => !gruppeErSkjult('type:' + g.type));
+    el.innerHTML = synlige.length
+      ? synlige.map((g) => '<div class="enhet-gruppe-blokk">'
+          + (grupper.length > 1 ? gruppehode(g.navn) : '')
+          + g.enheter.map((e) => _enhetskort(e)).join('') + '</div>').join('')
+      : '<div class="tom-melding">Alle bilene er skjult — se «Vis».</div>';
   }
 
   const teller = document.getElementById('av-vakt-teller');
   if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
+  oppdaterSynlighetsmeny();
 }

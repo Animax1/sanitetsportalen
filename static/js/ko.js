@@ -603,51 +603,9 @@ let koRessurser = [];
 //: sparer vi plass»).
 let koApenRessurs = null;
 
-//: Alle | Biler | Lag i vinduets hode, husket per nettleser som oppsettet.
-const KO_RESSURSVISNING_NOKKEL = 'ko.ressursvisning';
-const KO_RESSURSVISNINGER = ['alle', 'biler', 'lag'];
-let koRessursvisning = 'alle';
-
-function koLesRessursvisning() {
-  try {
-    const v = localStorage.getItem(KO_RESSURSVISNING_NOKKEL);
-    return KO_RESSURSVISNINGER.includes(v) ? v : 'alle';
-  } catch (e) { return 'alle'; }
-}
-
-function koSettRessursvisning(v) {
-  koRessursvisning = KO_RESSURSVISNINGER.includes(v) ? v : 'alle';
-  try { localStorage.setItem(KO_RESSURSVISNING_NOKKEL, koRessursvisning); } catch (e) { /* privat modus */ }
-  koBrukRessursvisning();
-}
-
-// Regelen: hva som skjules for hver visning, og tallet på det skjulte. Det
-// som er skjult skal være lesbart (samme prinsipp som gruppene på tavla).
-function koSkjultTall(visning, antallBiler, antallLag) {
-  if (visning === 'biler') return antallLag ? String(antallLag) + ' lag skjult' : '';
-  if (visning === 'lag') return antallBiler ? String(antallBiler) + ' biler skjult' : '';
-  return '';
-}
-
-function koBrukRessursvisning() {
-  const biler = document.getElementById('enhetsliste');
-  const lag = document.getElementById('vaktliste-ressurser');
-  if (biler) biler.classList.toggle('d-none', koRessursvisning === 'lag');
-  if (lag) lag.classList.toggle('d-none', koRessursvisning === 'biler');
-  document.querySelectorAll('[data-action="koVelgRessursvisning"]').forEach((k) => {
-    const valgt = k.dataset.arg === koRessursvisning;
-    k.classList.toggle('active', valgt);
-    k.classList.toggle('btn-secondary', valgt);
-    k.classList.toggle('btn-outline-secondary', !valgt);
-  });
-  const skjult = document.getElementById('ko-ressurs-skjult');
-  if (skjult) {
-    const antallBiler = (typeof sisteEnhetsliste !== 'undefined' && Array.isArray(sisteEnhetsliste)) ? sisteEnhetsliste.length : 0;
-    skjult.textContent = koSkjultTall(koRessursvisning, antallBiler, koRessurser.length);
-  }
-}
-
-function koVelgRessursvisning(v) { koSettRessursvisning(v); }
+//: Alle | Biler | Lag sto her til 23. sep. 2026. Den er nå seksjonene
+//: «Biler» og «Lag» i «Vis»-menyen (`oppdrag-kort.js`), der hver gruppe også
+//: kan skjules for seg.
 
 function koVippRessurs(id) {
   koApenRessurs = koApenRessurs === Number(id) ? null : Number(id);
@@ -724,22 +682,41 @@ function koGrupperRessurser(liste) {
 function koTegnRessurser() {
   const el = document.getElementById('vaktliste-ressurser');
   if (!el) return;
-  if (!koRessurser.length) { el.innerHTML = ''; return; }
-  el.innerHTML = koGrupperRessurser(koRessurser).map((g) => {
-    const nokkel = 'gruppe:' + escapeHtml(String(g.id));
-    const bemannet = g.ressurser.filter((r) => r.antall).length;
-    const hode = gruppehode(nokkel, g.navn, g.ressurser.length,
-                            bemannet ? String(bemannet) + ' bemannet' : '');
-    const kort = gruppeErLukket(nokkel) ? '' : g.ressurser.map(koRessurskort).join('');
-    return '<div class="enhet-gruppe-blokk">' + hode + kort + '</div>';
-  }).join('');
+  // En skjult gruppe tas ikke med; tallet står på «Vis» (23. sep. 2026).
+  el.innerHTML = koGrupperRessurser(koRessurser)
+    .filter((g) => !gruppeErSkjult(koGruppenokkel(g)))
+    .map((g) => {
+      const hode = gruppehode(g.navn);
+      const kort = g.ressurser.map(koRessurskort).join('');
+      return '<div class="enhet-gruppe-blokk">' + hode + kort + '</div>';
+    }).join('');
+}
+
+// «Vis»-menyen bor i `oppdrag-kort.js`, som bare lastes med tilgang til
+// oppdragsmodulen — kallet går derfor gjennom en vakt (CLAUDE.md).
+function koOppdaterSynlighet() {
+  if (typeof oppdaterSynlighetsmeny === 'function') oppdaterSynlighetsmeny();
+}
+
+// Vaktlistas grupper til «Vis»-menyen. Menyen bor i `oppdrag-kort.js` og
+// spør etter denne gjennom en vakt — sentralbordet i `/oppdrag/` har ingen
+// lag å vise.
+function koSynlighetsgrupper() {
+  return koGrupperRessurser(koRessurser)
+    .map((g) => ({ nokkel: koGruppenokkel(g), navn: g.navn, antall: g.ressurser.length }));
+}
+
+// Nøkkelen i «Vis»-menyen. Ett sted, så lista og menyen ikke kan komme til å
+// mene hver sin gruppe.
+function koGruppenokkel(g) {
+  return 'gruppe:' + g.id;
 }
 
 // ── Én eller to kolonner i ressursoversikten (André, 19. sep. 2026) ─────────
 //
-// Huskes per nettleser som Alle | Biler | Lag. Kolonnene er CSS (`columns`),
-// og gruppene er blokker med `break-inside: avoid`: «en gruppe som
-// mannskapsbil skal ikke begynne i kolonne 1 og så gå over i kolonne 2».
+// Huskes per nettleser. To spor inne i hver gruppe, gruppene under hverandre
+// (23. sep. 2026, se `ko.css`): «en gruppe som mannskapsbil skal ikke begynne
+// i kolonne 1 og så gå over i kolonne 2» holder fortsatt.
 const KO_KOLONNER_NOKKEL = 'ko.ressurskolonner';
 
 function koLesKolonner() {
@@ -770,7 +747,7 @@ function koVippKolonner() {
 // vakt), så gruppene under følger med — og tallet i vinduets hode.
 function koTegnRessurserPaaNytt() {
   koTegnRessurser();
-  koBrukRessursvisning();
+  koOppdaterSynlighet();
   const tall = document.getElementById('ko-ressurser-antall');
   const liste = (typeof sisteEnhetsliste !== 'undefined' && Array.isArray(sisteEnhetsliste)) ? sisteEnhetsliste : [];
   if (tall) {
@@ -786,7 +763,7 @@ async function koHentRessurser() {
     if (!res.ok) return;
     koRessurser = (await res.json()).data || [];
     koTegnRessurser();
-    koBrukRessursvisning();
+    koOppdaterSynlighet();
   } catch (e) {
     // Lista som alt står er fortsatt sann; feilen viser seg ved neste poll.
   }
@@ -844,8 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const nyttModal = document.getElementById('nyttOppdragModal');
   if (nyttModal) nyttModal.addEventListener('show.bs.modal', koNullstillHendelsevalg);
 
-  koRessursvisning = koLesRessursvisning();
-  koBrukRessursvisning();
+  koOppdaterSynlighet();
   koTegnLegende();
   koBrukKolonner();
 

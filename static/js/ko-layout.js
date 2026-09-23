@@ -17,8 +17,8 @@
 // borte. Vinduet kan fortsatt ikke legges oppå et annet eller dras forbi
 // gulvet (`min-width`/`min-height` i ko.css og `KO_MIN_PROSENT` her).
 //
-// **Oppsettet huskes per nettleser** (`localStorage`), som gruppene på tavla
-// (`tavle.grupper.lukket`). En KO-PC i kommandopunktet beholder da oppsettet
+// **Oppsettet huskes per nettleser** (`localStorage`), som «Vis»-menyen over
+// ressurslista (`tavle.grupper.skjult`). En KO-PC i kommandopunktet beholder da oppsettet
 // sitt uansett hvem som logger på — og det er PC-en som er hovedflata.
 // Prisen: oppsettet følger ikke deg til en annen maskin. Per bruker på
 // serveren kan komme om noen savner det.
