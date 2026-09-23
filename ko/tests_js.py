@@ -215,6 +215,8 @@ KO_LOGG_BYGGERE = (
     'koPlanListeHtml',
     'koPlanDognvalgHtml',
     'koPlanSkjemaHtml',
+    'koPlanTidslinjeHtml',
+    'koPlanDekningHtml',
     'koTavleRadHtml',
     'koTavleTimerHtml',
     'koTavleUtenPlassHtml',

@@ -265,6 +265,7 @@ docstring; kortversjonen:
 | Sted, type og gruppe fryses som navn; `lokasjon`, `endret_av` og `Programbehov.gruppe` strippes i backupen | Programmet skal leses år etter år. Samme sirkel som `HendelseLag.ressurs` |
 | **`Tavleplassering.folger`**: «følger konserten» — samme sted, samme vakt, ikke over. Aldri sammen med `planlagt_til`; tavlesvaret gir den gjeldende slutten | Konserten forsinkes, og lagenes slutt følger med uten at noen retter noe |
 | **KO-leder skriver** (`/ko/api/program/`), `les` ser | André: «KO-leder», før og under vakta |
+| **Dekningen** (`paa_vakt_per_time`, `/ko/api/program/dekning/?dogn=`): på vakt per gruppe, midt i hver time, fra `vaktliste.services.ressurser_med_skift` — **samme regel som resten av portalen, også for bilene**. Gaten er vaktlistas `les`, som tavla | Planleggeren skal ikke ha sin egen mening om hvem som er på vakt. Bilens `pa_vakt` er hva KO har skrudd på *nå*, ikke hva som er planlagt i kveld |
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
 oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.

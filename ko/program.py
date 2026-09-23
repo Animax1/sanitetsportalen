@@ -236,3 +236,50 @@ def folg(plassering, post, *, naa) -> Tavleplassering:
     plassering.planlagt_til = None
     plassering.save(update_fields=['folger', 'planlagt_til'])
     return plassering
+
+
+#: Dekningsstripa (steg 4) teller midt i hver time: et skift som begynner
+#: 22:15 dekker 22-timen, et som slutter 22:15 gjør det ikke.
+MIDT_I_TIMEN = timedelta(minutes=30)
+
+
+def dogn_start(dogn: str):
+    """Døgnets start som et tidspunkt — `YYYY-MM-DD` og tavlas døgnstart, i
+    portalens tidssone. `None` for noe som ikke er en dato."""
+    from datetime import date, datetime, time
+
+    from django.utils import timezone
+
+    from .tavle import dognstart
+    try:
+        d = date.fromisoformat(str(dogn))
+    except ValueError:
+        return None
+    t, m = (int(x) for x in dognstart().split(':'))
+    return timezone.make_aware(datetime.combine(d, time(t, m)), timezone.get_current_timezone())
+
+
+def paa_vakt_per_time(start) -> list[dict]:
+    """Hvor mange av hver ressursgruppe vaktlista har på vakt, time for time
+    i døgnet som begynner `start`. **Samme regel som resten av portalen**
+    (`vaktliste.services.ressurser_med_skift`) — planleggeren skal ikke ha sin
+    egen mening om hvem som er på vakt.
+
+    Tjuefire spørringer, én per time: svaret hentes når planleggeren åpnes
+    eller bytter døgn, ikke ved hver poll.
+    """
+    from django.db.models import Count
+
+    from vaktliste.services import ressurser_med_skift, vaktliste_i_bruk
+
+    liste = vaktliste_i_bruk()
+    ut = []
+    for i in range(24):
+        fra = start + timedelta(hours=i)
+        grupper = {}
+        if liste is not None:
+            grupper = {str(r['gruppe_id']): r['n'] for r in (
+                ressurser_med_skift(liste, fra + MIDT_I_TIMEN)
+                .values('gruppe_id').annotate(n=Count('pk')))}
+        ut.append({'fra': fra.isoformat(), 'grupper': grupper})
+    return ut

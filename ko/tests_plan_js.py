@@ -29,7 +29,10 @@ HARNESS = (
              'koPlanDognene', 'koPlanTid', 'koPlanTil', 'koPlanGruppert', 'koPlanBehovTekst',
              'koPlanKropp', 'koPlanBeredskapHtml', 'koPlanPostHtml', 'koPlanListeHtml',
              'koPlanDognvalgHtml', 'koPlanSkjemaData', 'koPlanSkjemaHtml', 'koPlanSteder',
-             'koPlanDognstart')),
+             'koPlanDognstart',
+             # Steg 4: tidslinja og dekningen.
+             'koPlanDognVindu', 'koPlanTimeStart', 'koPlanTidslinje', 'koPlanBehovPerTime', 'koPlanDekningForGruppe',
+             'koPlanDekningsgrupper', 'koPlanTidslinjeHtml', 'koPlanDekningHtml')),
 )
 
 FORSPILL = """
@@ -50,7 +53,8 @@ class PlanreglerTests(SimpleTestCase):
 
     def setUp(self):
         self.harness = build_harness(HARNESS)
-        self.pre = (_konst(PLAN_JS, 'KO_PLAN_DOGN') + _konst(TAVLE_JS, 'KO_TAVLE_LENGE_MIN')
+        self.pre = (_konst(PLAN_JS, 'KO_PLAN_DOGN') + _konst(PLAN_JS, 'KO_PLAN_TIME')
+                    + _konst(TAVLE_JS, 'KO_TAVLE_LENGE_MIN')
                     + _konst(TAVLE_JS, 'KO_TAVLE_BEHOV_FORVARSEL_MIN')
                     + _konst(TAVLE_JS, 'KO_TAVLE_PAUSE_FORVARSEL_MIN') + 'let koTavleValgt = null;\n' + FORSPILL)
 
@@ -354,3 +358,95 @@ class BehovIDriftJsTests(PlanreglerTests):
             console.log(koTavleBehovHtml([{navn: '<img src=x>', har: 1, trengs: 2, mangler: true, kommer: false}]));
         """)
         self.assertNotIn('<img', ut[0])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class TidslinjeOgDekningJsTests(PlanreglerTests):
+    """Steg 4: døgnet som tidslinje, og dekningsstripa — behovet time for time
+    mot vaktlistas tall."""
+
+    POSTER = """
+        const B = (lag, amb) => [{gruppe_id: 10, gruppe_navn: 'Lag', antall: lag}].concat(
+          amb ? [{gruppe_id: 20, gruppe_navn: 'Ambulanse', antall: amb}] : []);
+        const poster = [
+          POST(1, 'Scene 2', 2, L(25, 22), L(25, 23), {behov: B(2, 1)}),
+          POST(2, 'Hovedscene', 1, L(25, 22, 30), L(25, 23, 30), {behov: B(4)}),
+          POST(3, 'Hovedscene', 1, L(25, 23), L(26, 1), {behov: B(1)}),
+          POST(4, 'Hovedscene', 1, L(26, 7), L(26, 8), {behov: B(9)}),
+          POST(5, 'Teltet', 3, L(25, 20), L(25, 21), {behov: [{gruppe_id: null, gruppe_navn: 'Borte', antall: 5}]}),
+        ];
+        const steder = [{id: 1, navn: 'Hovedscene'}, {id: 2, navn: 'Scene 2'}, {id: 3, navn: 'Teltet'}];
+        const V = koPlanDognVindu('2026-09-25', '06:00');
+    """
+
+    def test_doegnvinduet(self):
+        ut = self._json("(() => { const v = koPlanDognVindu('2026-09-25', '06:00');"
+                        " return [v.fra === L(25, 6), v.til === L(26, 6), koPlanDognVindu('x', '06:00')]; })()")
+        self.assertEqual(ut, [True, True, None])
+
+    def test_radene_i_stedsrekkefolge_med_baner_og_bare_doegnet(self):
+        ut = self._json("(() => {" + self.POSTER + """
+            return koPlanTidslinje(poster, V, steder).map((r) => [r.sted, r.baner, r.poster.map((x) => [x.post.id, x.bane])]);
+        })()""")
+        self.assertEqual(ut, [['Hovedscene', 2, [[2, 0], [3, 1]]], ['Scene 2', 1, [[1, 0]]], ['Teltet', 1, [[5, 0]]]],
+                         '23:00 overlapper 22:30–23:30 og får ny bane; neste døgns 07:00 er ikke med')
+
+    def test_behovet_teller_i_hver_time_konserten_beroerer(self):
+        ut = self._json("(() => {" + self.POSTER + """
+            const t = koPlanBehovPerTime(poster, V);
+            return [16, 17, 18, 14].map((i) => [t[i].get('10') || 0, t[i].get('20') || 0]).concat([[t[14].size]]);
+        })()""")
+        # 22-timen: Scene 2 (2) + Hovedscene 22:30 (4). 23-timen: Hovedscene 22:30–23:30 (4) + 23:00 (1).
+        self.assertEqual(ut[:4], [[6, 1], [5, 0], [1, 0], [0, 0]])
+        self.assertEqual(ut[4], [0], 'en gruppe uten id telles ikke — heller ikke som «null»')
+
+    def test_stripa_er_for_faa_bare_naar_vaktlistas_tall_er_kjent(self):
+        ut = self._json("(() => {" + self.POSTER + """
+            const t = koPlanBehovPerTime(poster, V);
+            const timer = Array.from({length: 24}, (_, i) => ({grupper: i === 16 ? {'10': 5} : (i === 18 ? {'10': 1} : {'10': 9})}));
+            const med = koPlanDekningForGruppe(t, timer, 10);
+            const uten = koPlanDekningForGruppe(t, null, 10);
+            return [med[16], med[17], uten[16].kort, uten[16].har, med[18]];
+        })()""")
+        self.assertEqual(ut[0], {'i': 16, 'trengs': 6, 'har': 5, 'kort': True})
+        self.assertEqual(ut[1]['kort'], False)
+        self.assertEqual(ut[2:4], [False, None])
+        self.assertEqual(ut[4], {'i': 18, 'trengs': 1, 'har': 1, 'kort': False}, 'akkurat nok er nok')
+
+    def test_stripa_tilbyr_bare_grupper_med_behov(self):
+        ut = self._json("(() => {" + self.POSTER + """
+            const g = koPlanDekningsgrupper(koPlanBehovPerTime(poster, V),
+              [{id: 30, navn: 'Samleplass'}, {id: 20, navn: 'Ambulanse'}, {id: 10, navn: 'Lag'}]);
+            return g.map((x) => x.navn);
+        })()""")
+        self.assertEqual(ut, ['Ambulanse', 'Lag'])
+
+    def test_byggerne_naa_streken_lederen_og_meldingene(self):
+        ut = self._kjor(self.POSTER + """
+            const rader = koPlanTidslinje(poster, V, steder);
+            console.log(koPlanTidslinjeHtml(rader, V, true, L(25, 22)).includes('ko-plan-naa'));
+            console.log(koPlanTidslinjeHtml(rader, V, true, L(27, 22)).includes('ko-plan-naa'));
+            console.log(koPlanTidslinjeHtml(rader, V, false, L(25, 22)).includes('data-action'));
+            console.log(koPlanDekningHtml([], [], null, V, 'Krever vaktlista.'));
+            console.log(koPlanDekningHtml([], [], null, V, null).includes('Ingen behov'));
+            const s = koPlanDekningForGruppe(koPlanBehovPerTime(poster, V),
+              Array.from({length: 24}, () => ({grupper: {'10': 1}})), 10);
+            console.log(koPlanDekningHtml(s, [{id: 10, navn: 'Lag'}], 10, V, null).includes('ko-plan-kort'));
+        """)
+        self.assertEqual(ut[:3], ['true', 'false', 'false'])
+        self.assertIn('Krever vaktlista.', ut[3])
+        self.assertEqual(ut[4:6], ['true', 'true'])
+
+    def test_byggerne_escaper(self):
+        ond = '<img src=x onerror=alert(1)>'
+        ut = self._kjor(self.POSTER + f"""
+            const ond = {json.dumps(ond)};
+            poster[0].navn = ond; poster[0].lokasjon_navn = ond; poster[0].beredskap_navn = ond;
+            poster[0].behov = [{{gruppe_id: 10, gruppe_navn: ond, antall: 1}}];
+            console.log(koPlanTidslinjeHtml(koPlanTidslinje(poster, V, steder), V, true, L(25, 22))
+              + koPlanDekningHtml(koPlanDekningForGruppe(koPlanBehovPerTime(poster, V), null, 10),
+                                  [{{id: 10, navn: ond}}], 10, V, null)
+              + koPlanDekningHtml([], [], null, V, ond));
+        """)
+        self.assertNotIn('<img', ut[0])
+        self.assertIn('&lt;img', ut[0])

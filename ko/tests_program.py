@@ -362,3 +362,71 @@ class PorteneTests(_Program):
         les = self._klient('les').get('/ko/').content.decode()
         self.assertIn('data-vindu="plan"', les, 'alle med les ser planleggeren')
         self.assertNotIn('data-action="koPlanNy"', les, 'men bare lederen får «+ Konsert»')
+
+
+class DekningTests(_Program):
+    """Steg 4: vaktlistas tall per time, per gruppe — **samme regel som resten
+    av portalen** for hvem som er på vakt (`ressurser_med_skift`)."""
+
+    def setUp(self):
+        super().setUp()
+        from datetime import datetime, time
+        from vaktliste.models import Korps, Mannskap, Vaktpost
+        self.Vaktpost = Vaktpost
+        self.korps, _ = Korps.objects.get_or_create(navn='Testkorps')
+        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        tz = timezone.get_current_timezone()
+        self.dogn = '2026-10-02'
+        self.start = timezone.make_aware(datetime(2026, 10, 2, 6, 0), tz)
+        # Lag 1 og Lag 2 har skift fra _Grunnlag som dekker nå — fjern dem, så
+        # tellingen i oktober bare ser det testen setter opp.
+        Vaktpost.objects.all().delete()
+
+    def _skift(self, ressurs, fra_t, til_t, **kw):
+        return self.Vaktpost.objects.create(
+            ressurs=ressurs, mannskap=kw.pop('mannskap', self.person),
+            fra_tid=self.start + timedelta(hours=fra_t), til_tid=self.start + timedelta(hours=til_t), **kw)
+
+    def test_doegnet_begynner_ved_doegnstarten_i_portalens_tidssone(self):
+        self.assertEqual(program.dogn_start(self.dogn), self.start)
+        self.assertIsNone(program.dogn_start('i morgen'))
+
+    def test_midt_i_timen_teller_og_bilen_er_med(self):
+        self._skift(self.lag1, 16, 16.25)     # 22:00–22:15 → ikke i 22-timen
+        self._skift(self.lag2, 16.25, 18)     # 22:15–24:00 → i 22- og 23-timen
+        self._skift(self.bil, 15, 17)         # 21–23, bilen med
+        timer = program.paa_vakt_per_time(self.start)
+        self.assertEqual(len(timer), 24)
+        lag, amb = str(self.lag.pk), str(self.bil.gruppe_id)
+        self.assertEqual(timer[16]['grupper'].get(lag), 1, '22-timen: bare Lag 2')
+        self.assertEqual(timer[16]['grupper'].get(amb), 1, 'bilen teller, ut fra skiftet')
+        self.assertEqual(timer[17]['grupper'].get(lag), 1)
+        self.assertIsNone(timer[17]['grupper'].get(amb), 'bilen gikk av 23:00')
+        self.assertEqual(timer[0]['fra'], self.start.isoformat())
+
+    def test_ledig_plass_og_avmeldt_teller_ikke(self):
+        self._skift(self.lag1, 16, 18, mannskap=None)
+        self._skift(self.lag2, 16, 18, avmeldt_at=timezone.now())
+        self.assertEqual(program.paa_vakt_per_time(self.start)[16]['grupper'], {})
+
+    def test_samme_regel_som_vaktlista_og_lagene_er_fortsatt_uten_biler(self):
+        from vaktliste.services import ressurser_med_skift, ressurser_paa_vakt_naa
+        self._skift(self.lag1, 16, 18)
+        self._skift(self.bil, 16, 18)
+        t = self.start + timedelta(hours=17)
+        self.assertEqual({r.pk for r in ressurser_med_skift(self.vl, t)}, {self.lag1.pk, self.bil.pk})
+        self.assertEqual({r.pk for r in ressurser_paa_vakt_naa(self.vl, t)}, {self.lag1.pk},
+                         'ressursoversiktens lag har fortsatt ingen biler')
+
+    def test_porten_er_vaktlistas_og_doegnet_maa_vaere_en_dato(self):
+        url = '/ko/api/program/dekning/'
+        uten = _bruker('uten_vl')
+        _gi(uten, 'ko', 'les')
+        c = Client()
+        c.force_login(uten)
+        self.assertEqual(c.get(url, {'dogn': self.dogn}).status_code, 403)
+        _gi(uten, 'vaktliste', 'les')
+        self.assertEqual(c.get(url, {'dogn': 'fredag'}).status_code, 400)
+        r = c.get(url, {'dogn': self.dogn})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()['data']['timer']), 24)

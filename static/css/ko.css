@@ -542,3 +542,42 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
 }
 .ko-tavle-behov-mangler { border-color: #f59e0b; color: #fde68a; }
 .ko-tavle-behov-ok { border-color: #166534; color: #86efac; }
+
+/* Tidslinja og dekningsstripa (steg 4): hele døgnet, stedene som rader,
+   konsertene som bånd i beredskapsfargen — samme form som på tavla. */
+.ko-plan-tidslinje { margin-bottom: 0.6rem; }
+.ko-plan-rad { display: flex; border-bottom: 1px solid var(--portal-surface-2); }
+.ko-plan-radnavn { width: 120px; flex-shrink: 0; padding: 0.3rem 0.4rem 0.3rem 0; font-size: 0.82rem; font-weight: 600; }
+.ko-plan-spor { position: relative; flex-grow: 1; min-height: 22px; }
+.ko-plan-akse .ko-plan-spor { height: 20px; }
+.ko-plan-time { position: absolute; top: 2px; font-size: 0.7rem; color: var(--portal-text-muted, #94a3b8); padding-left: 2px; }
+.ko-plan-naa { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 2; }
+.ko-plan-baand {
+  position: absolute; height: 26px; box-sizing: border-box; overflow: hidden; white-space: nowrap;
+  font-size: 0.72rem; font-weight: 600; padding: 4px 6px; border-radius: 4px; z-index: 1;
+  color: var(--portal-text, #e2e8f0); border-top: 3px solid var(--bf, #64748b);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bf, #64748b) 26%, transparent) 0 6px,
+    color-mix(in srgb, var(--bf, #64748b) 12%, transparent) 6px 12px);
+}
+.ko-plan-baand[data-action] { cursor: pointer; }
+.ko-plan-dekning { padding-top: 0.3rem; }
+.ko-plan-soyler {
+  display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; align-items: end;
+  height: 90px; border-bottom: 1px solid var(--portal-border); margin-left: 120px;
+}
+.ko-plan-soyle { position: relative; height: 100%; }
+.ko-plan-har {
+  position: absolute; bottom: 0; left: 0; right: 0; background: var(--portal-surface-2);
+  border: 1px solid var(--portal-border); border-bottom: 0; border-radius: 3px 3px 0 0;
+}
+.ko-plan-trengs { position: absolute; bottom: 0; left: 25%; right: 25%; background: #3b82f6; border-radius: 2px 2px 0 0; }
+.ko-plan-kort .ko-plan-trengs { background: #ef4444; }
+.ko-plan-tall {
+  position: absolute; top: -1px; left: 0; right: 0; text-align: center; font-size: 0.6rem;
+  font-variant-numeric: tabular-nums; color: var(--portal-text-muted, #94a3b8);
+}
+.ko-plan-kort .ko-plan-tall { color: #fca5a5; font-weight: 700; }
+.ko-plan-timer {
+  display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-left: 120px;
+  font-size: 0.6rem; text-align: center; color: var(--portal-text-muted, #94a3b8);
+}

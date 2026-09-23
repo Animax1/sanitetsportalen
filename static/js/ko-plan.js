@@ -26,6 +26,12 @@ const KO_PLAN_DOGN = 5;
 let koPlan = null;           // svaret fra /ko/api/program/
 let koPlanDogn = null;       // valgt døgn, `YYYY-MM-DD`
 let koPlanSkjema = null;     // åpent skjema: {id} (null = ny)
+let koPlanVisning = 'tidslinje';  // 'tidslinje' | 'liste' (steg 4)
+let koPlanDekning = null;    // {dogn, timer} eller {dogn, feil} fra /ko/api/program/dekning/
+let koPlanDekningGruppe = null;   // gruppa stripa viser
+
+//: En time i millisekunder — tidslinja og stripa er døgnet i tjuefire.
+const KO_PLAN_TIME = 3600000;
 
 function koPlanKanLede() {
   return typeof koKanFjerne === 'function' ? koKanFjerne() : false;
@@ -122,6 +128,85 @@ function koPlanKropp(v, dognstart) {
   };
 }
 
+// ── Tidslinja og dekningen (steg 4) ──────────────────────────────────────────
+
+// Døgnet som et tidsvindu: fra døgnstarten, tjuefire timer. (En natt med
+// sommertid er en time kortere eller lengre; stripa har likevel 24 søyler.)
+function koPlanDognVindu(dogn, dognstart) {
+  const fra = koPlanTid(dogn, dognstart, dognstart);
+  return fra === null ? null : { fra, til: fra + 24 * KO_PLAN_TIME };
+}
+
+// Radene i tidslinja: **stedene som har noe i døgnet**, i stedslistas
+// rekkefølge — som tavla. Konserter som overlapper på samme sted får hver sin
+// bane, ellers ligger den ene oppå den andre.
+function koPlanTidslinje(poster, vindu, steder) {
+  const orden = new Map((steder || []).map((l, i) => [l.id, i]));
+  const rader = new Map();
+  (poster || []).map((p) => ({ p, fra: Date.parse(p.fra), til: Date.parse(p.til) }))
+    .filter((x) => x.fra < vindu.til && x.til > vindu.fra)
+    .sort((a, b) => a.fra - b.fra)
+    .forEach((x) => {
+      const nokkel = x.p.lokasjon_id ? 'id:' + x.p.lokasjon_id : 'navn:' + x.p.lokasjon_navn;
+      if (!rader.has(nokkel)) {
+        rader.set(nokkel, { sted: x.p.lokasjon_navn, rekke: orden.has(x.p.lokasjon_id) ? orden.get(x.p.lokasjon_id) : 1e6,
+                            baner: [], poster: [] });
+      }
+      const r = rader.get(nokkel);
+      let bane = r.baner.findIndex((slutt) => slutt <= x.fra);
+      if (bane < 0) { bane = r.baner.length; r.baner.push(0); }
+      r.baner[bane] = x.til;
+      r.poster.push({ post: x.p, bane, venstre: koTavleProsent(x.fra, vindu), hoyre: 100 - koTavleProsent(x.til, vindu) });
+    });
+  return Array.from(rader.values()).sort((a, b) => a.rekke - b.rekke || a.sted.localeCompare(b.sted))
+    .map((r) => ({ sted: r.sted, poster: r.poster, baner: Math.max(1, r.baner.length) }));
+}
+
+// Behovet time for time, per gruppe: **en konsert teller i hver time den
+// berører** — 22:30–23:30 trenger folk i både 22- og 23-timen. Det er
+// forsiktig med vilje: to konserter som bare deler et kvarter, telles begge
+// i den timen, og stripa sier heller «for få» enn «nok» når den er i tvil.
+function koPlanBehovPerTime(poster, vindu) {
+  const timer = Array.from({ length: 24 }, () => new Map());
+  (poster || []).forEach((p) => {
+    const fra = Date.parse(p.fra);
+    const til = Date.parse(p.til);
+    for (let i = 0; i < 24; i += 1) {
+      const a = vindu.fra + i * KO_PLAN_TIME;
+      if (!(fra < a + KO_PLAN_TIME && til > a)) continue;
+      (p.behov || []).forEach((b) => {
+        if (!b.gruppe_id) return;
+        const k = String(b.gruppe_id);
+        timer[i].set(k, (timer[i].get(k) || 0) + b.antall);
+      });
+    }
+  });
+  return timer;
+}
+
+// Starten på time `i` i døgnet.
+function koPlanTimeStart(vindu, i) {
+  return vindu.fra + i * KO_PLAN_TIME;
+}
+
+// Stripa for én gruppe: trengs mot på vakt, per time. `har` er `null` når
+// vaktlistas tall ikke er hentet — da er ingenting «for få».
+function koPlanDekningForGruppe(behovPerTime, timer, gruppeId) {
+  return behovPerTime.map((m, i) => {
+    const trengs = m.get(String(gruppeId)) || 0;
+    const har = timer && timer[i] ? (timer[i].grupper[String(gruppeId)] || 0) : null;
+    return { i, trengs, har, kort: har !== null && trengs > har };
+  });
+}
+
+// Gruppene stripa kan vise: dem som har et behov i døgnet, i gruppenes
+// rekkefølge. Uten behov er det ingenting å sammenligne.
+function koPlanDekningsgrupper(behovPerTime, grupper) {
+  const med = new Set();
+  behovPerTime.forEach((m) => m.forEach((antall, k) => { if (antall > 0) med.add(k); }));
+  return (grupper || []).filter((g) => med.has(String(g.id)));
+}
+
 // ── Byggerne ─────────────────────────────────────────────────────────────────
 
 function koPlanBeredskapHtml(p) {
@@ -165,6 +250,64 @@ function koPlanDognvalgHtml(dognene, valgt) {
   return dognene.map((k) => '<button type="button" class="btn btn-outline-secondary'
     + (k === valgt ? ' active' : '') + '" data-action="koPlanVelgDogn" data-arg="' + escapeHtml(k) + '">'
     + escapeHtml(koTavleDognnavn(k)) + '</button>').join('');
+}
+
+function koPlanTidslinjeHtml(rader, vindu, kanLede, naaMs) {
+  const timer = [];
+  for (let i = 0; i < 24; i += 2) {
+    const t = vindu.fra + i * KO_PLAN_TIME;
+    timer.push('<span class="ko-plan-time" style="left:' + escapeHtml(koTavleProsent(t, vindu).toFixed(2)) + '%">'
+      + escapeHtml(koTavleHHMM(t).slice(0, 2)) + '</span>');
+  }
+  const naa = naaMs >= vindu.fra && naaMs < vindu.til
+    ? '<div class="ko-plan-naa" style="left:' + escapeHtml(koTavleProsent(naaMs, vindu).toFixed(2)) + '%"></div>' : '';
+  const radHtml = rader.map((r) => {
+    const baand = r.poster.map((x) => {
+      const p = x.post;
+      const behov = koPlanBehovTekst(p.behov);
+      const tekst = p.navn + (behov ? ' · ' + behov : '');
+      const tittel = [p.navn, koTavleHHMM(Date.parse(p.fra)) + '–' + koTavleHHMM(Date.parse(p.til)),
+                      p.beredskap_navn ? ['Beredskap', p.beredskap_navn.toLowerCase()].join(' ') : '', behov]
+        .filter(Boolean).join(' · ');
+      const aapne = kanLede ? ' data-action="koPlanApne" data-arg="' + escapeHtml(p.id) + '" role="button" tabindex="0"' : '';
+      return '<div class="ko-plan-baand' + (['gronn', 'gul', 'oransje', 'rod'].includes(p.beredskap)
+        ? ' ko-beredskap-' + escapeHtml(p.beredskap) : '') + '" style="left:' + escapeHtml(x.venstre.toFixed(2))
+        + '%;right:' + escapeHtml(x.hoyre.toFixed(2)) + '%;top:' + escapeHtml(String(x.bane * 30 + 3)) + 'px"'
+        + aapne + ' title="' + escapeHtml(tittel) + '">' + escapeHtml(tekst) + '</div>';
+    }).join('');
+    return '<div class="ko-plan-rad"><div class="ko-plan-radnavn">' + escapeHtml(r.sted) + '</div>'
+      + '<div class="ko-plan-spor" style="height:' + escapeHtml(String(r.baner * 30 + 6)) + 'px">' + naa + baand + '</div></div>';
+  }).join('');
+  return '<div class="ko-plan-tidslinje"><div class="ko-plan-rad ko-plan-akse"><div class="ko-plan-radnavn"></div>'
+    + '<div class="ko-plan-spor">' + timer.join('') + '</div></div>'
+    + (radHtml || '<div class="tom-melding">Ingen konserter dette døgnet.</div>') + '</div>';
+}
+
+function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil) {
+  if (feil) return '<div class="ko-plan-dekning"><div class="ko-plan-dempet small">' + escapeHtml(feil) + '</div></div>';
+  if (!grupper.length) {
+    return '<div class="ko-plan-dekning"><div class="ko-plan-dempet small">Ingen behov satt dette døgnet — '
+      + 'stripa sammenligner behovet med vaktlista når det finnes.</div></div>';
+  }
+  const faner = grupper.map((g) => '<button type="button" class="btn btn-outline-secondary'
+    + (String(g.id) === String(valgt) ? ' active' : '') + '" data-action="koPlanVelgDekning" data-arg="'
+    + escapeHtml(g.id) + '">' + escapeHtml(g.navn) + '</button>').join('');
+  const hoyest = Math.max(1, ...stripe.map((s) => Math.max(s.trengs, s.har || 0)));
+  const soyler = stripe.map((s) => {
+    const kl = koTavleHHMM(koPlanTimeStart(vindu, s.i)).slice(0, 2);
+    const tittel = [kl, ': ', s.trengs, ' trengs, ', s.har === null ? '?' : s.har, ' på vakt'].join('');
+    return '<div class="ko-plan-soyle' + (s.kort ? ' ko-plan-kort' : '') + '" title="' + escapeHtml(tittel) + '">'
+      + '<div class="ko-plan-har" style="height:' + escapeHtml(((s.har || 0) / hoyest * 100).toFixed(1)) + '%"></div>'
+      + '<div class="ko-plan-trengs" style="height:' + escapeHtml((s.trengs / hoyest * 100).toFixed(1)) + '%"></div>'
+      + '<span class="ko-plan-tall">' + escapeHtml(s.trengs ? String(s.trengs) + '/' + (s.har === null ? '?' : String(s.har)) : '')
+      + '</span></div>';
+  }).join('');
+  const timer = stripe.map((s) => '<span>' + escapeHtml(koTavleHHMM(koPlanTimeStart(vindu, s.i)).slice(0, 2))
+    + '</span>').join('');
+  return '<div class="ko-plan-dekning"><div class="d-flex flex-wrap align-items-center gap-2 mb-1">'
+    + '<span class="small fw-semibold">Dekning</span><div class="btn-group btn-group-sm flex-wrap">' + faner + '</div>'
+    + '<span class="small ko-plan-dempet">trengs / på vakt i vaktlista</span></div>'
+    + '<div class="ko-plan-soyler">' + soyler + '</div><div class="ko-plan-timer">' + timer + '</div></div>';
 }
 
 // Hva skjemaet skal vise: den valgte posten, eller en ny i valgt døgn.
@@ -269,7 +412,25 @@ function koTegnPlan() {
       skjema.innerHTML = d ? koPlanSkjemaHtml(d, koPlan, koPlanSteder(koPlan, d.lokasjon_id), dognene) : '';
     }
   }
-  boks.innerHTML = koPlanListeHtml(koPlanGruppert(koPlan.poster, koPlanDogn, koPlanDognstart()), koPlanKanLede());
+  document.querySelectorAll('[data-action="koPlanVelgVisning"]').forEach((k) => {
+    k.classList.toggle('active', k.getAttribute('data-arg') === koPlanVisning);
+  });
+  if (koPlanVisning === 'liste') {
+    boks.innerHTML = koPlanListeHtml(koPlanGruppert(koPlan.poster, koPlanDogn, koPlanDognstart()), koPlanKanLede());
+    return;
+  }
+  const vindu = koPlanDognVindu(koPlanDogn, koPlanDognstart());
+  if (!vindu) { boks.innerHTML = ''; return; }
+  const perTime = koPlanBehovPerTime(koPlan.poster, vindu);
+  const grupper = koPlanDekningsgrupper(perTime, koPlan.grupper);
+  if (!grupper.some((g) => String(g.id) === String(koPlanDekningGruppe))) {
+    koPlanDekningGruppe = grupper.length ? grupper[0].id : null;
+  }
+  const dekning = koPlanDekning && koPlanDekning.dogn === koPlanDogn ? koPlanDekning : null;
+  const stripe = koPlanDekningForGruppe(perTime, dekning && dekning.timer, koPlanDekningGruppe);
+  boks.innerHTML = koPlanTidslinjeHtml(koPlanTidslinje(koPlan.poster, vindu, koPlan.steder), vindu, koPlanKanLede(), naa)
+    + koPlanDekningHtml(stripe, grupper, koPlanDekningGruppe, vindu, dekning && dekning.feil);
+  if (!dekning) koHentDekning(koPlanDogn);
 }
 
 function koPlanVisFeil(melding) {
@@ -282,6 +443,37 @@ function koPlanVisFeil(melding) {
 function koPlanVelgDogn(k) {
   koPlanDogn = String(k);
   koTegnPlan();
+}
+
+function koPlanVelgVisning(v) {
+  koPlanVisning = v === 'liste' ? 'liste' : 'tidslinje';
+  koTegnPlan();
+}
+
+function koPlanVelgDekning(id) {
+  koPlanDekningGruppe = Number(id);
+  koTegnPlan();
+}
+
+// Vaktlistas tall for døgnet. **Hentes ett døgn om gangen**, når døgnet
+// vises og ved hver runde — tjuefire tellinger er for mye å gjøre ved hver
+// tegning. Uten vaktlistetilgang sier stripa hvorfor, i stedet for å vise null.
+let koPlanDekningHenter = null;
+async function koHentDekning(dogn) {
+  if (!dogn || koPlanDekningHenter === dogn) return;
+  koPlanDekningHenter = dogn;
+  try {
+    const res = await apiFetch('/ko/api/program/dekning/?dogn=' + encodeURIComponent(dogn));
+    const d = await res.json().catch(() => ({}));
+    koPlanDekning = res.ok ? { dogn, timer: (d.data || {}).timer || [] }
+      : { dogn, feil: res.status === 403 ? 'Dekningen er vaktlistas tall, og krever lesetilgang i vaktlista.'
+        : (d.message || 'Kunne ikke hente dekningen.') };
+  } catch (e) {
+    koPlanDekning = null;
+  } finally {
+    koPlanDekningHenter = null;
+  }
+  if (koPlanDogn === dogn) koTegnPlan();
 }
 
 function koPlanNy() {
@@ -359,6 +551,8 @@ async function koHentPlan() {
     const res = await apiFetch('/ko/api/program/');
     if (!res.ok) return;
     koPlan = (await res.json()).data || null;
+    // Vaktlistas tall kan ha endret seg siden sist — hent dem på nytt.
+    koPlanDekning = null;
     koTegnPlan();
   } catch (e) {
     // Neste runde prøver igjen; planen står som den sto.

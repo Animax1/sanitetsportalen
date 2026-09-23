@@ -1492,15 +1492,27 @@ def ressurser_paa_vakt_naa(vaktliste, naa=None):
     man kan se — og var regelen skrevet to ganger, ville de gledet fra
     hverandre ved neste endring.
     """
+    return ressurser_med_skift(vaktliste, naa or timezone.now()).filter(enhet__isnull=True)
+
+
+def ressurser_med_skift(vaktliste, tidspunkt):
+    """Alle ressursene — **også bilene** — som har et skift som dekker
+    `tidspunkt`: med mannskap, ikke avmeldt. Selve regelen for «på vakt»;
+    `ressurser_paa_vakt_naa` er den samme for lagene, nå.
+
+    Skilt ut 23. sep. 2026 for tavleplanleggeren i KO, som teller hvor mange
+    av hver gruppe vaktlista har på vakt time for time — også fram i tid, og
+    også ambulansene. Der er bilens `pa_vakt` ikke svaret: den sier hva KO har
+    skrudd på *nå*, ikke hva som er planlagt i kveld. Én regel, to lesere.
+    """
     from django.db.models import Exists, OuterRef
 
     from .models import Vaktpost
 
-    naa = naa or timezone.now()
     dekker = Vaktpost.objects.filter(
         ressurs=OuterRef('pk'), mannskap__isnull=False, avmeldt_at__isnull=True,
-        fra_tid__lte=naa, til_tid__gte=naa)
-    return (Ressurs.objects.filter(vaktliste=vaktliste, enhet__isnull=True)
+        fra_tid__lte=tidspunkt, til_tid__gte=tidspunkt)
+    return (Ressurs.objects.filter(vaktliste=vaktliste)
             .annotate(_paa_vakt=Exists(dekker)).filter(_paa_vakt=True))
 
 

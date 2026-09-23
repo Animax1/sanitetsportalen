@@ -148,15 +148,10 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
 ### KO: tavleplanleggeren — under bygging (23. sep. 2026)
 
 *Skissene og svarene står i Artifact «Tavleplanleggeren» og i CHANGELOG. Steg 1 (planlagt
-slutt og overtid), steg 2 (programmet, og planleggervinduet med liste og skjema) og steg 3
-(behov i drift) er levert.
+slutt og overtid), steg 2 (programmet og planleggervinduet), steg 3 (behov i drift) og steg 4
+(tidslinja og dekningsstripa) er levert.
 Hvert steg slettes herfra når det er levert.*
 
-- [ ] **Steg 4 — tidslinja og dekningsstripa i planleggeren.** Vinduet finnes (steg 2, deler
-      plass med oppdragslista, parkert som standard) med liste per døgn og sted og skjema.
-      Mangler: programmet som tidslinje over hele døgnet, med samme rader som tavla, og en
-      dekningsstripe per ressursgruppe — behovet time for time mot lagene vaktlista har på
-      vakt.
 - [ ] **Steg 5 — endringer og plan mot faktisk.** Systemlinje ved hver programendring,
       plan mot faktisk per konsert (også tidligere år), og «kopier programmet» til ny vakt.
 - [ ] **Ekstra: planleggeren i eget nettleservindu på skjerm to** (André, 23. sep. 2026:

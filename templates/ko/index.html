@@ -459,6 +459,16 @@
           <i class="bi bi-calendar-range"></i><span class="ko-vindu-tittel">Planlegger</span>
           <span class="ko-vindu-tall" id="ko-plan-antall"></span>
           <div class="btn-group btn-group-sm ms-2 flex-wrap" role="group" aria-label="Døgn" id="ko-plan-dogn-valg"></div>
+          <div class="btn-group btn-group-sm ms-1" role="group" aria-label="Visning">
+            <button type="button" class="btn btn-outline-secondary active" data-action="koPlanVelgVisning"
+                    data-arg="tidslinje" title="Døgnet som tidslinje, med dekningen under">
+              <i class="bi bi-bar-chart-steps"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-action="koPlanVelgVisning"
+                    data-arg="liste" title="Konsertene som liste">
+              <i class="bi bi-list-ul"></i>
+            </button>
+          </div>
           <span class="ms-auto d-flex align-items-center gap-1">
             {% if kan_lede_ko %}
             <button type="button" class="btn btn-primary btn-sm" data-action="koPlanNy">

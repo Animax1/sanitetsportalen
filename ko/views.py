@@ -1230,3 +1230,22 @@ def program_post_view(request, pk):
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok', 'data': program.til_dict(post)})
+
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET'])
+@rate_limit(group='ko:program_dekning', rate='60/m', method='GET')
+def program_dekning_view(request):
+    """Dekningsstripa i planleggeren (steg 4): på vakt per ressursgruppe, time
+    for time, i døgnet `?dogn=YYYY-MM-DD`. **Tallene er vaktlistas**, så
+    gaten er vaktlistas også — som tavla."""
+    from . import program
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    start = program.dogn_start(request.GET.get('dogn', ''))
+    if start is None:
+        return _feil('Oppgi døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
+    return JsonResponse({'status': 'ok', 'data': {'timer': program.paa_vakt_per_time(start)}})

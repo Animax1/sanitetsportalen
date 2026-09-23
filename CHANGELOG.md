@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Planleggeren: tidslinja over døgnet, og dekningen mot vaktlista  `#ko` `#planlegger`
+
+Steg 4 av tavleplanleggeren — «tabletoppen» fra skissene: **hvor mange trengs, og har vi
+dem?**
+
+- **Tidslinja** er nå standardvisningen i planleggeren (listen er den andre, knappene i
+  hodet). Hele døgnet fra døgnstarten, **stedene som har noe det døgnet som rader**, i samme
+  rekkefølge som på tavla, og konsertene som bånd i beredskapsfargen med navn og behov.
+  Konserter som overlapper på samme sted får hver sin bane. Nå-streken når døgnet er i dag.
+  KO-leder klikker et bånd for å endre konserten.
+- **Dekningsstripa** under: én søyle per time, **behovet mot hvor mange vaktlista har på
+  vakt** i den gruppa — «7/6» — med én fane per ressursgruppe som har et behov det døgnet.
+  **Rød når det trengs flere enn det er på vakt.**
+- **«På vakt» er vaktlistas regel, og ingen egen**: et skift med mannskap, ikke avmeldt,
+  som dekker midten av timen. Regelen er skilt ut som
+  `vaktliste.services.ressurser_med_skift` og brukes nå av både ressursoversikten og
+  planleggeren — **og den teller bilene ut fra skiftene deres**, fordi bilens «på vakt»-bryter
+  er hva KO har skrudd på *nå*, ikke hva som er planlagt i kveld.
+- **En konsert teller i hver time den berører** — 22:30–23:30 trenger folk i både 22- og
+  23-timen. Forsiktig med vilje: stripa sier heller «for få» enn «nok» når den er i tvil.
+- Tallene er vaktlistas, så porten er vaktlistas `les` (som tavla). Uten den sier stripa
+  hvorfor, i stedet for å vise null.
+
+**Mutasjonstesting: 22 mutanter** — midten av timen, døgnstarten, begge vilkårene i «på vakt»
+(mannskap, avmeldt), at lagene i ressursoversikten fortsatt er uten biler, porten,
+overlappen i timen (`<` mot `<=` i begge ender), summeringen, «for få» bare med kjente tall,
+fanene, vinduet, banene, radrekkefølgen, nå-streken, ledergaten og escapingen. **To
+overlevde**, begge grensetilfeller testen ikke berørte: en gruppe uten id (ble til nøkkelen
+«null»), og *akkurat nok* — trengs lik på vakt skal ikke være «for få». Tettet.
+
+**Underveis:** en gammel testserver fra forrige runde sto fortsatt på porten, så det første
+skjermbildet viste gammel kode («Kunne ikke hente dekningen», knappene manglet). Ikke en feil
+i koden, men verdt å vite neste gang et skjermbilde ser rart ut.
+
 ## 2026-09-23 — Tavla: behovet i drift, «Lag 2/4» per sted  `#ko` `#tavle`
 
 Steg 3 av tavleplanleggeren. Under stedsnavnet på tavla står nå **behovet til konserten
