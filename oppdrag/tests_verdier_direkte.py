@@ -101,7 +101,7 @@ class VerdiReglerJsTests(SimpleTestCase):
                         + _konst(OPPDRAG_SENTRAL_JS, 'VERDIFELT')
                         + _konst(OPPDRAG_SENTRAL_JS, 'VERDIFELT_NAVN')
                         + build_harness((
-                            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+                            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
                             (OPPDRAG_SENTRAL_JS, (
                                 '_verdiKanEndres', '_verdiValg', '_verdiForesporsel', '_verdiTekst',
                                 '_verdiBrikke', '_verdiVelgerHtml', '_verdierHtml', '_notatHtml',
@@ -139,6 +139,10 @@ class VerdiReglerJsTests(SimpleTestCase):
             _verdiForesporsel(O(1), 'ressurs', '11'),
             _verdiForesporsel(O(2), 'ressurs', '11'),
             _verdiForesporsel(O(0), 'ressurs', ''),
+            _verdiForesporsel(O(1), 'ressurs', ''),
+            _verdiForesporsel(O(1), 'hastegrad', ''),
+            _verdiForesporsel(O(1), 'problemstilling', ''),
+            _verdiForesporsel(O(1), 'lokasjon', ''),
         ]""")
         self.assertEqual(ut[0], {'url': '/oppdrag/api/oppdrag/7/', 'method': 'PUT', 'body': {'hastegrad': 'Drift'}})
         self.assertEqual(ut[1]['body'], {'lokasjon_id': 1})
@@ -147,7 +151,12 @@ class VerdiReglerJsTests(SimpleTestCase):
         self.assertEqual(ut[3], {'url': '/oppdrag/api/oppdrag/7/flytt/', 'method': 'POST', 'body': {'enhet_id': 11}},
                          'med én: oppdraget flyttes')
         self.assertIsNone(ut[4], 'med flere: ingenting — det er «Flytt»')
-        self.assertIsNone(ut[5])
+        self.assertIsNone(ut[5], 'uten enhet er «Velg…» ingen handling — ressursen er ikke obligatorisk')
+        # «Velg…» på et obligatorisk felt er en feilmelding, ikke en
+        # forespørsel (André, 23. sep. 2026).
+        self.assertEqual(ut[6], {'feil': 'Oppdraget har én enhet — velg en annen for å flytte det.'})
+        self.assertEqual([u.get('feil') for u in ut[7:]], [
+            'Hastegrad må ha en verdi.', 'Problemstilling må ha en verdi.', 'Lokasjon må ha en verdi.'])
 
     def test_valgene_har_den_gjeldende_valgt(self):
         ut = self._json("""[
@@ -155,11 +164,35 @@ class VerdiReglerJsTests(SimpleTestCase):
             _verdiValg({...O(1), problemstilling: 'Deaktivert'}, 'problemstilling').map((v) => v.verdi),
             _verdiValg(O(1), 'lokasjon').map((v) => v.tekst),
             _verdiValg(O(0), 'ressurs').map((v) => v.tekst),
+            _verdiValg(O(1), 'hastegrad').filter((v) => v.valgt).map((v) => v.verdi),
+            _verdiValg({...O(1), hastegrad: ''}, 'hastegrad').filter((v) => v.valgt).map((v) => v.verdi),
         ]""")
-        self.assertEqual(ut[0], ['Pustevansker'])
-        self.assertEqual(ut[1][0], 'Deaktivert', 'en deaktivert gjeldende verdi står med')
-        self.assertEqual(ut[2], ['Hovedscene'], 'inaktive lokasjoner tilbys ikke')
-        self.assertEqual(ut[3], ['Velg enhet', 'Amb 1', 'Amb 2'], 'bare de på vakt')
+        self.assertEqual(ut[0], ['Pustevansker'], 'den lagrede står valgt, ikke «Velg…»')
+        self.assertEqual(ut[1][:2], ['', 'Deaktivert'], '«Velg…» øverst, og en deaktivert gjeldende verdi står med')
+        self.assertEqual(ut[2], ['Velg…', 'Hovedscene'], 'inaktive lokasjoner tilbys ikke')
+        self.assertEqual(ut[3], ['Velg…', 'Amb 1', 'Amb 2'], 'bare de på vakt')
+        self.assertEqual(ut[4], ['Akutt'], 'den lagrede hastegraden står valgt, ikke «Velg…»')
+        self.assertEqual(ut[5], [''], 'uten lagret verdi står «Velg…» valgt')
+
+    def test_lagre_med_velg_viser_feilen_og_sender_ingenting(self):
+        """**Kallstedet**: `_verdiForesporsel` gir `{feil}`, men det er
+        `lagreVerdi` som må vise den og la være å sende."""
+        ut = run_node(self.harness + build_harness(((OPPDRAG_SENTRAL_JS, (
+            'lagreVerdi', '_visVerdifeil')),)), self.PRE + """
+            let sendt = 0;
+            globalThis._sendVerdi = async () => { sendt += 1; };
+            const feil = { textContent: '', skjult: true, classList: { toggle(k, v) { feil.skjult = v; } } };
+            const valg = { value: '' };
+            globalThis.document = { getElementById: (id) => ({ 'verdi-feil': feil, 'verdi-valg': valg })[id] || null };
+            globalThis.apentOppdrag = O(1);
+            await lagreVerdi('hastegrad');
+            console.log(JSON.stringify([feil.textContent, feil.skjult, sendt]));
+            valg.value = 'Drift';
+            await lagreVerdi('hastegrad');
+            console.log(JSON.stringify(sendt));
+        """).splitlines()
+        self.assertEqual(json.loads(ut[0]), ['Hastegrad må ha en verdi.', False, 0])
+        self.assertEqual(json.loads(ut[1]), 1)
 
     def test_endringsteksten(self):
         ut = self._json("""[

@@ -1057,7 +1057,7 @@ class SentralbordetsMatriseTests(TestCase):
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
             OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + _konst(
             OPPDRAG_SENTRAL_JS, 'STATUS_RANG') + build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', 'enhetAvventer', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
@@ -1280,7 +1280,7 @@ class InnlinjeskjemaeneTests(TestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
             (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_statusvalg', '_nesteStatus',
                                   '_forrigeStatus', '_trengerTid', '_lokalNaa')),
         ))
@@ -1476,7 +1476,7 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
                                   'tidslinjeHtml', 'enhetshendelseTekst', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
                                   'flyttFraEnheter', 'enhetAvventer',
@@ -1542,7 +1542,7 @@ class StedOgGrovKnappeneTests(TestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', '_handlerArgument')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', '_handlerArgument')),
             (OPPDRAG_ENHET_JS, ('_stedvalg', '_grovsorteringsrad', '_kanGrovsortere')),
         ))
 
@@ -1684,7 +1684,7 @@ class TidslinjeMedVarsletOgTilbaketrukketTests(TestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('tidslinjeHtml', 'enhetshendelseTekst')),
         ))
 
@@ -1963,7 +1963,7 @@ class FlyttValgetTests(TestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
             (OPPDRAG_SENTRAL_JS, ('_flyttValg', 'flyttFraEnheter')),
         ))
 

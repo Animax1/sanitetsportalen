@@ -100,7 +100,7 @@ class SorteringJsTests(SimpleTestCase):
 
 class ManglerTrinnJsTests(SimpleTestCase):
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
         (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'enhetAvventer', '_manglerTrinn', '_manglerMinutter', 'tidSiden')),
     )
 
@@ -148,7 +148,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
     nedtrekkene øverst."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (OPPDRAG_SENTRAL_JS, ('fyllNedtrekk', 'mkEnhetsvalg', '_valgteEnheter',
                               '_grupperEnheter', '_typeRekkefolge',
                               'nullstillNyttOppdrag', 'hastegradEndret',
@@ -183,8 +183,9 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
         const felter = {
           'nytt-enheter': enhetsvalg,
           'nytt-lokasjon': nedtrekk([]),
-          'nytt-hastegrad': nedtrekk(['Akutt', 'Haster', 'Vanlig', 'Drift']),
-          'nytt-problemstilling': nedtrekk(['Udefinert', 'Transport']),
+          // Som i malen: det tomme valget står øverst i begge (23. sep. 2026).
+          'nytt-hastegrad': nedtrekk(['', 'Akutt', 'Haster', 'Vanlig', 'Drift']),
+          'nytt-problemstilling': nedtrekk(['', 'Udefinert', 'Transport']),
           'nytt-fritekst': { value: '' },
           'nytt-feil': { classList: { add() {} } },
         };
@@ -286,13 +287,15 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
               felter['nytt-problemstilling'].value, felter['nytt-fritekst'].value,
               globalThis.sisteFyll]));
         """)
+        # Øverst er «Velg…» — tomt — i alle tre (23. sep. 2026). Før var det
+        # «Akutt», den første lokasjonen og «Udefinert», som så ut som valg.
         self.assertEqual(ut.strip().splitlines()[0],
-                         '[[],"Akutt","10","Udefinert","",["Akutt","Udefinert"]]')
+                         '[[],"","","","",["",""]]')
 
 
 class EnhetsskjermJsTests(SimpleTestCase):
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAvsluttet', 'oppdragsnr', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
                             'koLes', 'koSkriv', 'koFjern', 'koNokkel', 'synk')),
     )
@@ -369,27 +372,44 @@ class HastegradknappeneTests(SimpleTestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
             (OPPDRAG_SENTRAL_JS, ('velgHastegrad', 'hastegradEndret',
-                                  'fyllProblemstillinger', 'problemstillingerFor')),
+                                  'fyllProblemstillinger', 'problemstillingEtterBytte', 'problemstillingerFor')),
         ))
 
     def test_uten_hastegrad_stopper_opprettelsen_ved_knappen(self):
         """Ingen hastegrad er valgt fra start (19. sep. 2026), og det skal
         sies ved knappen — ikke som en 400 fra serveren. **Kallstedet**:
-        `apiFetch` skal ikke nås."""
-        harness = build_harness(((OPPDRAG_SENTRAL_JS, ('opprettOppdrag', '_valgteEnheter')),))
+        `apiFetch` skal ikke nås.
+
+        Fra 23. sep. 2026 står lokasjon og problemstilling på «Velg…» også,
+        og samme regel gjelder dem: hvert obligatorisk felt stopper for seg,
+        i skjemaets rekkefølge, og først når alle er valgt går kallet."""
+        harness = build_harness(((OPPDRAG_SENTRAL_JS, ('opprettOppdrag', '_valgteEnheter',
+                                                        'nyttOppdragMangler')),))
         ut = run_node(harness, """
             let kall = 0;
             globalThis.apiFetch = async () => { kall += 1; return { ok: true, json: async () => ({ status: 'ok', data: { id: 1 } }) }; };
+            globalThis.nullstillNyttOppdrag = () => {}; globalThis.lastAlt = async () => {};
+            globalThis.bootstrap = { Modal: { getInstance: () => ({ hide() {} }) } };
             const feil = { textContent: '', skjult: true, classList: { add() { feil.skjult = true; }, remove() { feil.skjult = false; } } };
-            const felter = { 'nytt-feil': feil, 'nytt-hastegrad': { value: '' } };
+            const felter = { 'nytt-feil': feil, 'nytt-hastegrad': { value: '' }, 'nytt-lokasjon': { value: '10' },
+                             'nytt-problemstilling': { value: 'Fall' }, 'nytt-fritekst': { value: '' } };
             globalThis.document = { getElementById: (id) => felter[id] || null,
                                     querySelectorAll: () => [{ value: '7' }] };
-            await opprettOppdrag();
-            console.log(JSON.stringify([feil.textContent, feil.skjult, kall]));
-        """).splitlines()[0]
-        self.assertEqual(ut, '["Velg hastegrad.",false,0]')
+            for (const [lok, h, p] of [['10', '', 'Fall'], ['', 'Akutt', 'Fall'], ['10', 'Akutt', ''],
+                                       ['', '', ''], ['10', 'Akutt', 'Fall']]) {
+              felter['nytt-lokasjon'].value = lok; felter['nytt-hastegrad'].value = h;
+              felter['nytt-problemstilling'].value = p; feil.textContent = '';
+              await opprettOppdrag();
+              console.log(JSON.stringify([feil.textContent, kall, feil.skjult]));
+            }
+        """).splitlines()
+        # Tredje ledd: meldingen er *synlig* — en tekst i et skjult element
+        # sier ingenting.
+        self.assertEqual(ut[:5], [
+            '["Velg hastegrad.",0,false]', '["Velg hvor.",0,false]', '["Velg problemstilling.",0,false]',
+            '["Velg hvor.",0,false]', '["",1,true]'])
 
     def test_problemstillingene_venter_paa_hastegraden(self):
         """Uten hastegrad finnes ingen liste — ett tomt valg som sier hvorfor."""

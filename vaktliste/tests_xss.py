@@ -308,7 +308,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     """Kjør byggerne i node og se at markup i data kommer ut som tekst."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', 'ressursErApen', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
@@ -501,7 +501,7 @@ class VaktlisteLogikkTests(SimpleTestCase):
     """Utvalgsfunksjonene, kjørt i node — de avgjør hva fanene teller."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
         (VAKTLISTE_JS, ('_posterFor', '_ikkePlassert')),
     )
 
@@ -641,7 +641,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
         (VAKTLISTE_JS, ('mkMannskap', 'mkVerdiliste', '_personKolonne',
                         '_passerPersonsok', '_sorterMannskap', '_nivaa',
                         '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanSkriveNoe',
@@ -1355,7 +1355,7 @@ class RollenedtrekketTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_rolleValg', 'rollerForGruppe')),
     )
 
@@ -1524,7 +1524,7 @@ class OversiktUtenKurveTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
@@ -1571,7 +1571,7 @@ class KurvePerGruppeTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
@@ -1675,7 +1675,7 @@ class TimeaksenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_mkEnKurve', '_timesteg', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
@@ -1800,7 +1800,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
                         '_mkEnKurve', '_timesteg',
@@ -1887,7 +1887,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
                         '_mittKorpsId', '_synligePoster',
                         'iDrift', '_tilstede', '_posterFor',
@@ -1980,7 +1980,7 @@ class FanenErGruppaTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
                         'mkRessurs', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
@@ -2207,7 +2207,7 @@ class UtskriftslistaTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
@@ -2357,7 +2357,7 @@ class EnkeltgruppeTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', '_sumTimer', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
@@ -2713,7 +2713,7 @@ class NyRessursSkjemaetTests(SimpleTestCase):
 
     HARNESS = ((VAKTLISTE_JS, ('opprettRessurs', 'apneNyRessurs', '_fyll',
                               'gruppaHarPlass', '_ressurserIGruppe')),
-               (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')))
+               (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')))
 
     PREAMBLE = """
       globalThis.sendtBody = null;
@@ -2812,6 +2812,26 @@ class NyRessursSkjemaetTests(SimpleTestCase):
         """)
 
 
+    def test_gruppa_er_paakrevd(self):
+        """«Velg…» står først i nedtrekket (23. sep. 2026). Sendes den, er
+        det en feilmelding ved knappen — ikke `gruppe_id: 0` til serveren."""
+        self._kjor("""
+          felter['ny-ressurs-gruppe'].value = '';
+          await opprettRessurs();
+          assert(sendtBody === null, 'en ressurs uten gruppe ble sendt til serveren');
+          assert(globalThis.feilmelding === 'Velg hvilken gruppe ressursen hører til.',
+                 'feil melding: ' + globalThis.feilmelding);
+        """)
+
+    def test_velg_staar_foerst_og_malgruppa_er_valgt(self):
+        self._kjor(self.NEDTREKK + """
+          apneNyRessurs(2);
+          const valg = felter['ny-ressurs-gruppe'].innerHTML;
+          assert(valg.startsWith('<option value="">Velg…</option>'), '«Velg…» står ikke først: ' + valg);
+          assert(felter['ny-ressurs-gruppe'].value === '2', 'fanens gruppe ble ikke valgt');
+        """)
+
+
 class MannskapsfanenTests(SimpleTestCase):
     """Registeret er en fane på planleggingssiden (30. aug. 2026).
 
@@ -2822,7 +2842,7 @@ class MannskapsfanenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkMannskap', '_personKolonne', '_passerPersonsok',
                         '_sorterMannskap', 'kanRedigerePerson',
                         'tegnPanel', 'apneVakt', '_apneModal',
@@ -3054,7 +3074,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('apneVaktpost', 'ressursErApen', '_settTid', '_iso16', '_d',
                         '_fyll', '_skjulFeil', '_vaktpostModusSkifte',
                         'rollerForGruppe', '_plussTimer')),
@@ -3181,7 +3201,7 @@ class DriftflatenTests(SimpleTestCase):
     """Stemplene i raden, og «Tilstede nå»."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_stempelknapper', '_radklasse', 'kanStemple',
                         'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin',
                         'mkTilstede', '_tilstede', '_kl', '_d', '_dag',
@@ -3365,7 +3385,7 @@ class PlanleggerfanenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (PORTAL_UTILS_JS, ('hendelseArgumenter', '_handlerArgument',
                            'klikkSkalKjore')),
         (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
@@ -4086,7 +4106,7 @@ class GenererbekreftelsenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_genererFasit', '_genererRadmerke', '_tall')),
     )
 
@@ -4169,7 +4189,7 @@ class PlanleggerenTegnesMedOppsettetTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnPanel', 'mkPlanlegger', '_planleggerLinje',
                         '_planleggerVindu', '_planleggerHode',
                         '_planleggerStaar', 'planleggerLesTilbake',
@@ -4235,7 +4255,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkBelastning', 'mkBudsjett', 'mkDagslinje',
                         '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
                         '_tall', '_kolonneandeler', 'kanLede',
@@ -4699,7 +4719,7 @@ class TidsblokkerTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
@@ -5281,7 +5301,7 @@ class BelastningstabellensBreddeTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkBelastning', 'mkBudsjett', 'mkDagslinje',
                         '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
                         '_tall', '_kolonneandeler', 'kanLede',
@@ -5348,7 +5368,7 @@ class KorpsvelgerenTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_synligePoster', 'brukKorpsfilter', 'fyllKorpsvelger',
                         '_fyll')),
     )
@@ -5732,7 +5752,7 @@ class MittKorpsTests(SimpleTestCase):
     på tvers av ressursene — tildelte og universale, ledige først."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkMittKorps', '_mittKorpsId', '_synligePoster',
                         'kanBemannePlass', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin',
                         '_fyllValgFor', 'opptattPaaPlassen', '_probonoMerke', '_tidsblokker',
@@ -6020,7 +6040,7 @@ class EgenPersonPaaAndresPlassJsTests(SimpleTestCase):
     """`kanRoreRad` speiler `services.kan_rore_vaktpost` (12. sep. 2026)."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('kanRoreRad', 'kanBemannePlass', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin')),
     )
 
@@ -6124,7 +6144,7 @@ class MittKorpsTimerTests(SimpleTestCase):
 
 class ArkiverteVaktlisterTests(SimpleTestCase):
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkArkiverteVaktlister', '_dag', '_kl', '_d')),
     )
 

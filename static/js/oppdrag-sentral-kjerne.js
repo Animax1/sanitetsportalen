@@ -58,11 +58,17 @@ function problemstillingerFor(hastegrad) {
 }
 
 
+function problemstillingEtterBytte(liste, valgt) {
+  if (!valgt) return '';
+  if (liste.includes(valgt)) return valgt;
+  return liste.includes('Udefinert') ? 'Udefinert' : '';
+}
+
+
 function fyllProblemstillinger(prefiks, hastegrad, valgt) {
   // Nedtrekket bygges om av hastegraden (André, 12. sep. 2026: «teknisk [nå Drift]
-  // hastegrad endrer innholdet i problemstillinger»). Står den valgte ikke
-  // i den nye lista, velges den første — «Udefinert». Antallet settes av
-  // bilen, ikke her (12. sep. 2026).
+  // hastegrad endrer innholdet i problemstillinger»). Antallet settes av bilen,
+  // ikke her (12. sep. 2026).
   const sel = document.getElementById(`${prefiks}-problemstilling`);
   if (!sel) return;
   // Uten hastegrad finnes ingen liste (19. sep. 2026: «nytt oppdrag uten
@@ -72,9 +78,15 @@ function fyllProblemstillinger(prefiks, hastegrad, valgt) {
     sel.innerHTML = '<option value="">Velg hastegrad først</option>';
     return;
   }
+  // «Velg…» først (23. sep. 2026). Før ble den første — «Udefinert» — valgt
+  // selv når ingen hadde valgt noe, og det så ut som et valg noen hadde gjort.
+  // *Var* det valgt noe som ikke finnes i den nye lista, gjelder samme regel
+  // som i oppdragsvinduet (`services.problemstilling_etter_hastegrad`): beholdes om den kan,
+  // ellers «Udefinert» — ikke tilbake til «Velg…», for da forsvinner et valg
+  // hun faktisk gjorde.
   const liste = problemstillingerFor(hastegrad);
-  const ny = liste.includes(valgt) ? valgt : (liste[0] || '');
-  sel.innerHTML = liste.map((p) =>
+  const ny = problemstillingEtterBytte(liste, valgt);
+  sel.innerHTML = velgValg(ny) + liste.map((p) =>
     `<option value="${escHtmlValue(p)}"${p === ny ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
 }
 

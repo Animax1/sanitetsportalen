@@ -4,6 +4,75 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Opprydding: «Velg…» i nedtrekkene, hastegraden som forsvant, ledig i enhetsvalget, to kolonner som overlappet  `#oppdrag/sentralbord` `#ko` `#vaktliste`
+
+André: «Neste ledd er litt opprydning».
+
+**Bug: «når du trykker at opprett så mister en hastegraden sin».** Rotårsak funnet og
+gjenskapt i Chromium. «Nytt oppdrag» i `/ko/` har en hendelsesvelger som arver
+hendelsens hastegrad, og den pollet hvert 15. sekund (`koFyllHendelsevalg` →
+`koHendelsevalgEndret`). Når skjemaet ble åpnet, **slettet** `koNullstillHendelsevalg`
+merket for hva som sist var arvet i stedet for å sette det til «ingen hendelse». Den
+første pollen etter åpningen så da «uten hendelse» som et *nytt* valg, arvet ingenting
+— og kalte `velgHastegrad('')`, som tømte hastegraden operatøren nettopp hadde valgt.
+**«Hender det at»** fordi det kom an på om pollen rakk å gå før «Opprett». To rettinger,
+hver av dem nok alene: merket settes til `''`, og det arves bare når det faktisk er en
+hendelse (`h &&`). Skjer det at en hendelse tas bort eller lukkes mens skjemaet står
+åpent, står hastegraden som den står. Test:
+`test_pollen_etter_aapning_tommer_ikke_hastegraden`.
+
+**«Velg…» øverst i nedtrekkene uten lagret verdi.** André: «Hvis man har valgt og lagret
+en verdi så må jo den så klart være selected … Hvis obligatorisk felt så feilmelding om
+man lagrer med "Velg..." selected.» `velgValg(valgt)` og `velgTekst()` i
+`portal-utils.js` er den ene kilden. Nedtrekkene det gjelder:
+- **Nytt oppdrag:** lokasjon og problemstilling. Før sto første lokasjon og «Udefinert»
+  valgt, og det så ut som valg noen hadde gjort. `nyttOppdragMangler()` sier «Velg hvor.»,
+  «Velg hastegrad.» eller «Velg problemstilling.» ved knappen, i skjemaets rekkefølge.
+  Byttes hastegraden etter at en problemstilling var valgt, gjelder vinduets regel —
+  beholdes om den kan, ellers «Udefinert» — ikke tilbake til «Velg…».
+- **Oppdragsvinduet:** brikkenes nedtrekk (hastegrad, problemstilling, lokasjon, ressurs),
+  «Legg til» og «Flytt» (fra og til). «Velg…» lagret er en feilmelding, ingen forespørsel.
+  **Ressursen er ikke obligatorisk** — «Opprett uten enhet» finnes — så på et oppdrag uten
+  enhet er «Velg…» ingen handling. Med én enhet: «Oppdraget har én enhet — velg en annen
+  for å flytte det».
+- **KO:** «Knytt eksisterende oppdrag» og lag-valget i «Planlegg pause» på tavla.
+- **Vaktlista:** gruppe i «Ny ressurs» («Velg hvilken gruppe ressursen hører til.») og
+  korps i personskjemaet.
+- **Ikke endret, med vilje:** nedtrekk der det tomme valget *er* en verdi med navn —
+  «— ledig plass —» i vaktlista, «Uten hendelse», «Hele vakten», «Alle» i backlogfilteret,
+  «Legg til lag …». Å kalle dem «Velg…» ville sagt at noe mangler når det ikke gjør det.
+  De som alt sto med «—» (pasientskjemaet, lokasjon i ny hendelse) oppfyller «"Velg..."
+  eller "-"» og står som før.
+
+**Ønske: «Ledig i nedtrekkslista».** Enhetsvalget i «Nytt oppdrag» viser statusen ved
+navnet — prikken og «Ledig»/«Fremme» osv. — og ledig står grønt og uthevet. Rekkefølgen er
+fortsatt type og navn: en liste som stokker seg om mens man krysser av, er verre.
+
+**Bug: «Overlapp kolonne visning ressursoversikt».** **Ikke gjenskapt** — i Chromium på
+340, 463 og 626 px bredde var det null overlapp før og etter. Men oppsettet var skjørt:
+CSS-`columns: 2` på beholderen med `break-inside: avoid` på hver gruppe. En gruppe kunne
+ikke deles, så **alle lagene sto i én kolonne med den andre tom**, og multikolonne rundt
+rutenett er der nettleserne fragmenterer ulikt. Nå er det **to spor inne i hver gruppe**,
+gruppene under hverandre i full bredde, og `minmax(0, 1fr)` lar ikke et langt navn dytte
+sporet ut i naboen. Et rutenett fragmenterer ikke. Ser André overlappet igjen, trengs et
+skjermbilde og nettleseren.
+
+**Ønske: synlighetsknapp i stedet for minimering** — besvart, ikke bygget. Står i TODO.
+
+**Også:** `sentralbordkontekst` sendte `problemstillinger` for første hastegrad til malen,
+som ikke lenger brukte den — fjernet. `flyttOppdrag` fikk vist sin egen feil (teksten ble
+satt i et skjult element; funnet ved mutasjon).
+
+**Mutasjonstesting: 33 mutanter.** 32 på reglene: `velgValg`, `nyttOppdragMangler` (hvert
+ledd og synligheten), `problemstillingEtterBytte` (hvert ledd og kallstedet),
+`_verdiValg`/`_verdiForesporsel`/`lagreVerdi`, vaktene i `varsleEnhet`/`flyttOppdrag`,
+«Velg…» i `_varsleValg`/`_flyttValg`, ledig-merket og escapingen i `mkEnhetsvalg`, tavlas
+lag-vakt, «Knytt», hastegradsrettingen og vaktlistas gruppevakt. **Tre overlevde første
+runde**, og alle tre var hull i testene: at feilteksten i «Nytt oppdrag» blir *synlig*,
+kallstedet i `lagreVerdi`, og «Velg…»-markeringen på hastegrad. Tettet. Den 33. —
+`delete sel.dataset.arvet` tilbake — overlever og er **ekvivalent**: `h &&`-vakten alene
+hindrer feilen. Begge står, fordi hver av dem alene er nok.
+
 ## 2026-09-23 — Oppdraget: verdiene endres rett i vinduet, uten «Rediger», og står i tidslinjen  `#oppdrag/sentralbord`
 
 Backlog punkt 4 og 5. André: «klikke på disse verdiene når de er skrevet ut gir en liten

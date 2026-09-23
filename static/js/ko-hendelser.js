@@ -658,7 +658,7 @@ function koTegnDetalj() {
   const knyttValg = kanOppdrag && uten.length
     ? '<span class="input-group input-group-sm w-auto">'
       + '<select id="ko-knytt-valg" class="form-select" aria-label="Knytt eksisterende oppdrag">'
-      + uten.map((o) => '<option value="' + escapeHtml(o.id) + '">' + escapeHtml(oppdragsnr(o.nummer))
+      + velgValg('') + uten.map((o) => '<option value="' + escapeHtml(o.id) + '">' + escapeHtml(oppdragsnr(o.nummer))
         + ' ' + escapeHtml(o.problemstilling || '') + '</option>').join('')
       + '</select><button type="button" class="btn btn-outline-secondary" data-action="koKnyttEksisterende"'
       + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-link-45deg me-1"></i>Knytt</button></span>'
@@ -1072,7 +1072,8 @@ function koNyttOppdragFraHendelse(id) {
 
 async function koKnyttEksisterende(id) {
   const sel = document.getElementById('ko-knytt-valg');
-  if (!sel || !sel.value) return;
+  if (!sel) return;
+  if (!sel.value) { window.alert('Velg oppdraget som skal knyttes til hendelsen.'); return; }
   await _koSettHendelsePaaOppdrag(Number(sel.value), Number(id));
 }
 
@@ -1177,7 +1178,9 @@ function koHendelsevalgEndret() {
   if ((sel.dataset || {}).arvet === valgt) return;
   if (sel.dataset) sel.dataset.arvet = valgt;
   const h = koHendelser.get(Number(valgt));
-  if (typeof velgHastegrad === 'function') velgHastegrad(koHastegradForHendelse(h));
+  // Bare en hendelse gir noe å arve. Tas hendelsen bort igjen — eller lukkes
+  // den mens skjemaet står åpent — står hastegraden som den står.
+  if (h && typeof velgHastegrad === 'function') velgHastegrad(koHastegradForHendelse(h));
   const notat = document.getElementById('nytt-fritekst');
   if (notat) {
     const forrige = (notat.dataset || {}).arvet || '';
@@ -1199,7 +1202,12 @@ function koNullstillHendelsevalg() {
   const sel = document.getElementById('nytt-hendelse');
   if (!sel) return;
   sel.value = '';
-  if (sel.dataset) delete sel.dataset.arvet;
+  // **«Uten hendelse» er alt arvet** (23. sep. 2026, André: «hender det at
+  // når du trykker at opprett så mister en hastegraden sin»). Sto `arvet`
+  // tomt, så den første pollen etter åpningen `''` som et nytt valg, arvet
+  // «ingen hendelse» — og tømte hastegraden operatøren nettopp hadde valgt.
+  // Av og til, fordi det kom an på om pollen rakk å gå før «Opprett».
+  if (sel.dataset) sel.dataset.arvet = '';
   const notat = document.getElementById('nytt-fritekst');
   if (notat && notat.dataset) delete notat.dataset.arvet;
   const info = document.getElementById('nytt-hendelse-info');

@@ -33,7 +33,7 @@ HTML_BUILDERS_PER_FIL = {
         '_enhetskort', 'enhetskortInnmat',
         # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
         # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
-        'fyllProblemstillinger', 'visFoerStatus',
+        'fyllProblemstillinger', 'problemstillingEtterBytte', 'visFoerStatus',
         # Verdiene rett i vinduet (23. sep. 2026) — erstatter
         # `visRedigerOppdrag`: brikkene, nedtrekket, notatet og raden i
         # tidslinjen.
@@ -92,6 +92,8 @@ REVIEWED_INTERPOLATIONS = {
     'notatTekst': 'markup bygget rett over, notatet escapet der',
     'hvorfor': 'fast attributt fra en ternær, ingen data i',
     "v.valgt ? ' selected' : ''": 'fast attributt fra en ternær',
+    # Ledig i nedtrekkslista (23. sep. 2026): klassen er en av to faste strenger.
+    "e.status === 'ledig' ? ' er-ledig' : ''": 'fast klasse fra en ternær, ingen data i',
     'brikker': 'markup fra _verdiBrikke()/_verdiVelgerHtml(), som skannes for seg',
     "o.fritekst ? 'Endre' : 'Legg til'": 'fast tekst fra en ternær',
     # «Fra loggen i H14» (19. sep. 2026): blokka i bilen bygges av

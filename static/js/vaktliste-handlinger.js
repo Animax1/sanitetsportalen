@@ -200,7 +200,7 @@ function apneNyRessurs(gruppeId) {
   const maal = gruppeId != null && gruppeId !== '' ? gruppeId : aktivFane;
   const valgbare = (aktivListe?.grupper || [])
     .filter((g) => g.er_aktiv && gruppaHarPlass(g));
-  _fyll('ny-ressurs-gruppe', valgbare, null);
+  _fyll('ny-ressurs-gruppe', valgbare, velgTekst());
   const gruppe = valgbare.find((g) => String(g.id) === String(maal));
   if (felt && gruppe) {
     felt.value = String(gruppe.id);
@@ -217,6 +217,10 @@ async function opprettRessurs() {
   await withSubmitGuard('ny-ressurs-knapp', async () => {
     const navn = (document.getElementById('ny-ressurs-navn')?.value || '').trim();
     if (!navn) { _visFeil('ny-ressurs-feil', 'Ressursen må ha et navn.'); return; }
+    if (!document.getElementById('ny-ressurs-gruppe')?.value) {
+      _visFeil('ny-ressurs-feil', 'Velg hvilken gruppe ressursen hører til.');
+      return;
+    }
 
     const res = await apiFetch(
       `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/ressurser/`, {

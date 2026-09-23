@@ -20,7 +20,7 @@
         {# «Drift» bytter ut lista over problemstillinger, så den må velges først. #}
         <div class="mb-3">
           <label class="form-label" for="nytt-lokasjon">Hvor</label>
-          <select id="nytt-lokasjon" class="form-select"></select>
+          <select id="nytt-lokasjon" class="form-select"><option value="">Velg…</option></select>
           <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
         </div>
         <div class="mb-3">
@@ -46,7 +46,7 @@
         <div class="mb-3">
           <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
           <select id="nytt-problemstilling" class="form-select">
-            {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
+            <option value="">Velg hastegrad først</option>
           </select>
         </div>
         <div class="mb-3">

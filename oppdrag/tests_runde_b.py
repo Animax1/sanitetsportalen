@@ -234,9 +234,9 @@ class EnhetstypeTests(OppdragBasis):
 
 class GrupperingJsTests(SimpleTestCase):
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (OPPDRAG_SENTRAL_JS, ('_grupperEnheter', '_typeRekkefolge', 'mkEnhetsvalg',
-                              '_problemMedAntall', 'fyllProblemstillinger', 'hastegradEndret',
+                              '_problemMedAntall', 'fyllProblemstillinger', 'problemstillingEtterBytte', 'hastegradEndret',
                               'problemstillingerFor', '_medAntall')),
     )
     VINDU = ("globalThis.window = { OPPDRAG_ENHETSTYPER: [[1,'Ambulanse'],[2,'Mannskapsbil'],"

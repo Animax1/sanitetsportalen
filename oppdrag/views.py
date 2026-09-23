@@ -117,7 +117,6 @@ def sentralbordkontekst(request) -> dict:
         # panelet ikke i det hele tatt, framfor å gi avledet innsyn i hvem som
         # går vakt.
         'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
-        'problemstillinger': verdier.problemstillinger_for(choices.HASTEGRAD[0]),
         # Hvilke problemstillinger som hører til hver hastegrad, og hvilke
         # som bærer et antall — skjemaet bygger nedtrekket om når hastegraden
         # endres (André, 12. sep. 2026). Én kilde: tabellene, gjennom

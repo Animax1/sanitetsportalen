@@ -166,6 +166,20 @@ function _escHtml(str) {
 // tomme felt blir borte i stedet for å vises som "null". I tabellceller er
 // det feil: tallet 0 er en helt gyldig verdi som skal vises. escHtmlValue()
 // skiller derfor på «ikke satt» (null/undefined) og «falsy, men en verdi».
+// **Det tomme førstevalget i et nedtrekk** (André, 23. sep. 2026): «øverste
+// valg [bør] være "Velg..." fremfor at første verdi er synlig. Da ser det ut
+// som det er dette som er lagret». Verdien er tom; et obligatorisk felt sier
+// fra ved lagring, et valgfritt lagrer null. Én tekst for hele portalen.
+// En funksjon og ikke en konstant: testharnessene henter funksjoner.
+function velgTekst() {
+  return 'Velg…';
+}
+
+function velgValg(valgt) {
+  return `<option value=""${valgt ? '' : ' selected'}>${velgTekst()}</option>`;
+}
+
+
 function escHtmlValue(v) {
   if (v === null || v === undefined) return '';
   return String(v).replace(/[&<>"']/g, c => ({

@@ -249,7 +249,7 @@ function _fyllPersonskjema(person) {
   // dem som alt har dem — derfor filtreres det bare når feltet er tomt.
   const korps = register.korps.filter(
     (k) => k.er_aktiv || (person && person.korps_id === k.id));
-  _fyll('person-korps', korps, '');
+  _fyll('person-korps', korps, velgTekst());
   _fyll('person-kompetanser', register.kompetanser.filter(
     (k) => k.er_aktiv || (person && person.kompetanser.some((x) => x.id === k.id))), '');
 

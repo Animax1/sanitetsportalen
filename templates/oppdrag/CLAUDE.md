@@ -94,3 +94,17 @@ tildelt ressurs står som brikker; et klikk gir et nedtrekk, og valget lagres me
 flyttes oppdraget, med flere er brikken låst og «Flytt»/«Legg til» under gjelder. Notatet står
 alltid framme. **Inne i oppdraget, ikke i lista** — André: «avvent litt»; fellene står i TODO.
 
+**«Velg…» står øverst i hvert nedtrekk uten lagret verdi** (23. sep. 2026, André: «Hvis man
+har valgt og lagret en verdi så må jo den så klart være selected … Hvis obligatorisk felt så
+feilmelding»). `velgValg(valgt)` i `portal-utils.js` bygger valget — valgt bare når ingenting
+er lagret — og `velgTekst()` er teksten, en funksjon fordi harnessene henter funksjoner og
+ikke konstanter. Å lagre «Velg…» gir en melding ved knappen, aldri en forespørsel:
+`nyttOppdragMangler()` (i skjemaets rekkefølge), `{feil}` fra `_verdiForesporsel`, og vaktene
+i `varsleEnhet`/`flyttOppdrag`. **Ressursen er ikke obligatorisk** — «Opprett uten enhet»
+finnes — så uten enhet er «Velg…» der ingen handling. Bytter hastegraden i «Nytt oppdrag»
+etter at en problemstilling var valgt, gjelder vinduets regel: beholdes om den kan, ellers
+«Udefinert» (`problemstillingEtterBytte`), ikke tilbake til «Velg…».
+
+**Enhetsvalget i «Nytt oppdrag» viser statusen** ved navnet, ledig framhevet (André: «så kan
+du se hvem som er ledig»). Rekkefølgen er fortsatt typen og navnet — en liste som stokker seg
+om mens man krysser av, er verre enn en som må leses.

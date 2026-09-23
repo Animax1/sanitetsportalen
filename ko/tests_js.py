@@ -1368,9 +1368,56 @@ class DelingOgLagTests(SimpleTestCase):
         self.assertEqual(json.loads(ut[0]), ['Haster', 'Mann ca. 40', True])
         self.assertEqual(json.loads(ut[1]), ['Haster', 'Mann ca. 40, våken', True], 'samme valg igjen rører ingenting')
         self.assertEqual(json.loads(ut[2]), ['Haster,Akutt', 'Mann ca. 40, våken', False], 'ny hendelse: hastegrad arves, egen tekst står')
-        self.assertEqual(json.loads(ut[3]), ['Haster,Akutt,', 'Mann ca. 40, våken', False], 'uten hendelse: ingen hastegrad, egen tekst står')
-        self.assertEqual(json.loads(ut[4]), ['Haster,Akutt,,Haster,', '', False], 'et arvet notat tas bort igjen med hendelsen')
-        self.assertEqual(json.loads(ut[5]), ['Haster,Akutt,,Haster,,Haster', 'Mann ca. 40', True], 'etter nullstilling arves det på nytt')
+        # Uten hendelse er det ingenting å arve, og hastegraden står (23. sep.
+        # 2026) — før ble den tømt, og det var halve feilen «mister
+        # hastegraden sin».
+        self.assertEqual(json.loads(ut[3]), ['Haster,Akutt', 'Mann ca. 40, våken', False], 'uten hendelse: hastegraden står, egen tekst står')
+        self.assertEqual(json.loads(ut[4]), ['Haster,Akutt,Haster', '', False], 'et arvet notat tas bort igjen med hendelsen')
+        self.assertEqual(json.loads(ut[5]), ['Haster,Akutt,Haster,Haster', 'Mann ca. 40', True], 'etter nullstilling arves det på nytt')
+
+    def test_pollen_etter_aapning_tommer_ikke_hastegraden(self):
+        """**Feilen André meldte 23. sep. 2026:** «hender det at når du
+        trykker at opprett så mister en hastegraden sin». Skjemaet åpnes
+        (`koNullstillHendelsevalg`), operatøren velger hastegrad, og pollen
+        (`koFyllHendelsevalg` → `koHendelsevalgEndret`) kommer før «Opprett».
+        Sto «uten hendelse» som et nytt valg, arvet den ingenting — og tømte
+        hastegraden."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koHendelsevalgEndret', 'koHastegradForHendelse', 'koNotatForHendelse',
+                     'koOperatorlinjer', 'koHendelseLinjer', 'koNullstillHendelsevalg')),
+        ))
+        ut = run_node(harness, self.PRE + '''
+            koHendelser = new Map(); koLinjer = new Map();
+            const kall = [];
+            globalThis.velgHastegrad = (v) => kall.push(v);
+            const felter = {
+              'nytt-hendelse': { value: '', dataset: {} }, 'nytt-hendelse-info': { innerHTML: '' },
+              'nytt-fritekst': { value: '', dataset: {} },
+            };
+            globalThis.document = { getElementById: (id) => felter[id] || null };
+            koNullstillHendelsevalg();
+            koHendelsevalgEndret(); koHendelsevalgEndret();
+            console.log(JSON.stringify(kall));
+        ''').splitlines()
+        self.assertEqual(json.loads(ut[0]), [], 'pollen rørte hastegraden')
+
+    def test_knytt_uten_valgt_oppdrag_sier_fra(self):
+        """«Velg…» står først i «Knytt eksisterende oppdrag» (23. sep. 2026).
+        Et klikk uten valg sier fra, og ingenting sendes."""
+        harness = build_harness(((KO_JS, ('koKnyttEksisterende',)),))
+        ut = run_node(harness, '''
+            const kall = [], varsler = [];
+            globalThis._koSettHendelsePaaOppdrag = async (o, h) => kall.push([o, h]);
+            globalThis.window = { alert: (m) => varsler.push(m) };
+            const sel = { value: '' };
+            globalThis.document = { getElementById: (id) => id === 'ko-knytt-valg' ? sel : null };
+            await koKnyttEksisterende('3');
+            sel.value = '12';
+            await koKnyttEksisterende('3');
+            console.log(JSON.stringify([varsler, kall]));
+        ''').splitlines()
+        self.assertEqual(json.loads(ut[0]), [['Velg oppdraget som skal knyttes til hendelsen.'], [[12, 3]]])
 
     def test_escaper_tekst_navn_og_lagnavn(self):
         ond = '<img src=x onerror=alert(1)>'

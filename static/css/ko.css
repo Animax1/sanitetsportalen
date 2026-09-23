@@ -300,13 +300,17 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-legende .bi-exclamation-triangle-fill { color: #f59e0b; }
 .ko-legende-knapp { padding: 0 0.4rem; }
 .ko-legende-knapp.aktiv { border-color: var(--portal-accent); color: var(--portal-accent); }
-/* To kolonner i ressursoversikten (19. sep. 2026): gruppene er blokker som
-   ikke deles over kolonneskillet. */
-/* `!important` fordi beholderne bærer Bootstraps `.d-grid`, som også er
-   `!important` — og et grid er ikke en multikolonne-beholder. */
-.ko-to-kolonner #enhetsliste, .ko-to-kolonner #vaktliste-ressurser { display: block !important; columns: 2; column-gap: 0.6rem; }
+/* To kolonner i ressursoversikten (19. sep. 2026, omgjort 23. sep. 2026 —
+   André: «det overlappes litt»). **Kortene i hver gruppe står i et rutenett
+   med to spor; gruppene står under hverandre i full bredde.** Før var det CSS-
+   kolonner (`columns: 2`) med `break-inside: avoid` på hver gruppe: en gruppe
+   kunne ikke deles, så alle lagene sto i én kolonne med den andre tom under,
+   og en multikolonne som ikke får dele et rutenett er der nettleserne
+   fragmenterer ulikt. Et rutenett har ingen fragmentering, og `minmax(0, 1fr)`
+   lar ikke et langt navn dytte sporet ut i naboen. */
 .enhet-gruppe-blokk { display: grid; gap: 0.5rem; margin-bottom: 0.5rem; }
-.ko-to-kolonner .enhet-gruppe-blokk { break-inside: avoid; page-break-inside: avoid; }
+.ko-to-kolonner .enhet-gruppe-blokk { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.ko-to-kolonner .enhet-gruppe-blokk > .enhet-gruppe { grid-column: 1 / -1; }
 /* Filteret «Ventende» i oppdragslistas hode. */
 .ko-filter-knapp.aktiv { background: #78350f; border-color: #f59e0b; color: #fde68a; }
 .ko-filter-knapp.tildelt.aktiv { background: #164e63; border-color: #22d3ee; color: #cffafe; }

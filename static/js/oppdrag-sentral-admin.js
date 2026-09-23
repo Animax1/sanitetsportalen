@@ -109,8 +109,15 @@ async function opprettOppdrag() {
 
   // Ingen hastegrad er valgt fra start (19. sep. 2026), og serveren
   // avviser tom — men det skal sies her, ved knappen, ikke som en 400.
-  if (!document.getElementById('nytt-hastegrad').value) {
-    feil.textContent = 'Velg hastegrad.';
+  // Samme for de andre obligatoriske feltene, som nå står på «Velg…» til
+  // noen har valgt (23. sep. 2026).
+  const mangler = nyttOppdragMangler({
+    hastegrad: document.getElementById('nytt-hastegrad').value,
+    lokasjon: document.getElementById('nytt-lokasjon').value,
+    problemstilling: document.getElementById('nytt-problemstilling').value,
+  });
+  if (mangler) {
+    feil.textContent = mangler;
     feil.classList.remove('d-none');
     return;
   }
@@ -143,6 +150,16 @@ async function opprettOppdrag() {
   // finnes verken nedtrekket eller funksjonen.
   if (typeof koEtterOpprettet === 'function') await koEtterOpprettet(d.data.id);
   await lastAlt();
+}
+
+
+// Hva som mangler før «Opprett» kan sendes, i skjemaets rekkefølge — eller
+// `null`. En regel og ikke tre `if`-er i handlingen, så den lar seg prøve.
+function nyttOppdragMangler(verdier) {
+  if (!verdier.lokasjon) return 'Velg hvor.';
+  if (!verdier.hastegrad) return 'Velg hastegrad.';
+  if (!verdier.problemstilling) return 'Velg problemstilling.';
+  return null;
 }
 
 
@@ -196,10 +213,13 @@ function mkEnhetsvalg() {
   return grupper.map((g) => {
     const hode = grupper.length > 1
       ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
+    // **Statusen står ved navnet** (André, 23. sep. 2026: «så kan du se hvem
+    // som er ledig»), med samme prikk og farge som ressurslista.
     return hode + g.enheter.map((e) => `
     <label class="form-check nytt-enhet-valg">
       <input class="form-check-input" type="checkbox" name="nytt-enhet" value="${escHtmlValue(e.id)}">
       <span class="form-check-label">${escapeHtml(e.navn)}</span>
+      <span class="nytt-enhet-status${e.status === 'ledig' ? ' er-ledig' : ''}"><span class="status-prikk status-${escHtmlValue(e.status || '')}"></span>${escapeHtml(e.status_navn || '')}</span>
     </label>`).join('');
   }).join('');
 }

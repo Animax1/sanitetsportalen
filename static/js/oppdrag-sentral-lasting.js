@@ -84,7 +84,7 @@ function fyllNedtrekk() {
   if (lokvalg) {
     const valgt = lokvalg.value;
     const aktive = lokasjoner.filter((l) => l.er_aktiv);
-    const ny = (aktive.map(
+    const ny = velgValg('') + (aktive.map(
       (l) => `<option value="${escHtmlValue(l.id)}">${escapeHtml(l.navn)}</option>`).join(''));
     if (lokvalg.innerHTML !== ny) {
       lokvalg.innerHTML = ny;

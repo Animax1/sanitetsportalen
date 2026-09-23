@@ -553,7 +553,7 @@ function koTavleSkjemaData(skjema, data, naaMs) {
 }
 
 function koTavleSkjemaHtml(d) {
-  const valg = (d.ressurser || [])
+  const valg = velgValg('') + (d.ressurser || [])
     .map((r) => '<option value="' + escapeHtml(r.id) + '">' + escapeHtml(r.navn) + '</option>').join('');
   const velger = d.ressurser
     ? '<label class="small">Lag <select class="form-select form-select-sm" id="ko-tavle-skjema-ressurs">'
@@ -716,7 +716,11 @@ function koTavleSkjemaKropp(skjema, data, verdier, naaMs) {
   const til = fra === null ? null : koTavleTidNaer(fra, verdier.til);
   if (fra === null || til === null) return null;
   const kropp = { fra: new Date(fra).toISOString(), til: new Date(til).toISOString() };
-  if (!skjema.id) kropp.ressurs_id = Number(verdier.ressurs);
+  if (!skjema.id) {
+    // «Velg…» står først (23. sep. 2026): uten lag er det ingen pause å planlegge.
+    if (!verdier.ressurs) return null;
+    kropp.ressurs_id = Number(verdier.ressurs);
+  }
   return kropp;
 }
 
@@ -735,7 +739,11 @@ async function koTavleLagreSkjema() {
   const kropp = koTavleSkjemaKropp(s, koTavle, {
     fra: verdi('ko-tavle-skjema-fra'), til: verdi('ko-tavle-skjema-til'), ressurs: verdi('ko-tavle-skjema-ressurs'),
   }, Date.now() + koTavleKlokkeavvik);
-  if (!kropp) { koTavleVisFeil('Fyll inn klokkeslettene som TT:MM.'); return; }
+  if (!kropp) {
+    koTavleVisFeil(s.type === 'pause' && !s.id && !verdi('ko-tavle-skjema-ressurs')
+      ? 'Velg laget pausen gjelder.' : 'Fyll inn klokkeslettene som TT:MM.');
+    return;
+  }
   const url = s.type === 'rett' ? '/ko/api/tavle/plasseringer/' + s.id + '/'
     : (s.id ? '/ko/api/tavle/pauser/' + s.id + '/' : '/ko/api/tavle/pauser/');
   const metode = s.type === 'pause' && !s.id ? 'POST' : 'PUT';

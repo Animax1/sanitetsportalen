@@ -19,7 +19,7 @@ from patients.js_test_utils import (KO_JS, PORTAL_UTILS_JS, build_harness,
 TAVLE_JS = KO_JS[2]
 
 HARNESS = (
-    (PORTAL_UTILS_JS, ('escapeHtml',)),
+    (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml',)),
     (KO_JS, ('koTavleKanSkrive', 'koTavleVindu', 'koTavleProsent', 'koTavleSynlig',
              'koTavleKanDras', 'koTavleMaal', 'koTavleVarighet', 'koTavleRader',
              'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleRadHtml',
@@ -405,6 +405,8 @@ class Steg2Tests(TavlereglerTests):
             koTavleSkjemaKropp({type: 'rett', id: 4}, D2, {fra: '00:55', til: ''}, NAA2),
             koTavleSkjemaKropp({type: 'pause', id: null}, D2, {fra: '23:50', til: '00:20', ressurs: '102'}, L(23, 23)),
             koTavleSkjemaKropp({type: 'rett', id: 2}, D2, {fra: 'x', til: '00:30'}, NAA2),
+            koTavleSkjemaKropp({type: 'pause', id: null}, D2, {fra: '23:50', til: '00:20', ressurs: ''}, L(23, 23)),
+            koTavleSkjemaKropp({type: 'pause', id: 5}, D2, {fra: '23:50', til: '00:20', ressurs: ''}, L(23, 23)),
         ].map((k) => k && Object.fromEntries(Object.entries(k).map(([n, v]) => [n, typeof v === 'string' ? Date.parse(v) : v])))""")
         L = lambda d, t, m=0: self._json(f'L({d}, {t}, {m})')
         self.assertEqual(ut[0], {'fra': L(23, 22, 50), 'til': L(24, 0, 30)})
@@ -412,6 +414,10 @@ class Steg2Tests(TavlereglerTests):
         self.assertEqual(ut[2], {'fra': L(23, 23, 50), 'til': L(24, 0, 20), 'ressurs_id': 102},
                          '«23:50–00:20» går over midnatt')
         self.assertIsNone(ut[3])
+        # «Velg…» står først i lag-nedtrekket (23. sep. 2026): en ny pause
+        # uten lag sendes ikke. En pause som finnes, har laget sitt alt.
+        self.assertIsNone(ut[4], 'ny pause uten lag')
+        self.assertEqual(ut[5], {'fra': L(23, 23, 50), 'til': L(24, 0, 20)})
 
     def test_steg2_byggerne_escaper(self):
         ut = self._kjor("""

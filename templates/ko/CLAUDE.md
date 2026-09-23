@@ -84,8 +84,9 @@ om igjen ved hver poll). Fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av va
 **bare ressurser med et skift som dekker nå** (`ressurser_paa_vakt_naa`, samme regel som
 lagvelgeren) — tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · Hovedscene
 · 23 min» når laget står på en åpen hendelse; biler viser oppdragets sted. «i» folder ut
-fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner, hele grupper per kolonne
-(`ko.ressurskolonner`). Oppdragslistas hode teller aktive · ferdig (historikken
+fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner **inne i hver gruppe** — gruppene står under hverandre
+(`ko.ressurskolonner`; 23. sep. 2026, «det overlappes litt»: CSS-`columns` med udelelige grupper
+la alle lagene i én kolonne, og et rutenett fragmenterer ikke). Oppdragslistas hode teller aktive · ferdig (historikken
 med); «Oppdrag uten ressurs» og «Tildelt» filtrerer, ett om gangen (`koOppdragFilter`).
 **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om gangen som bilens.
 Alle | Biler | Lag huskes per nettleser (`ko.ressursvisning`); det skjulte står som et tall.

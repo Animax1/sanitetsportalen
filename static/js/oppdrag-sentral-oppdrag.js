@@ -597,8 +597,8 @@ function _flyttValg(o) {
   }
   // Valgene bygges før mal-strengene — en nøstet mal-streng er usynlig for
   // XSS-skanneren (oppdrag/tests_xss.py).
-  const fraValg = paaOppdraget.map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('');
-  const tilValg = kandidater.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
+  const fraValg = velgValg('') + paaOppdraget.map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('');
+  const tilValg = velgValg('') + kandidater.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
   const fra = paaOppdraget.length > 1
     ? `<select id="flytt-fra" class="form-select" aria-label="Flytt fra enhet">${fraValg}</select>`
     : `<span class="input-group-text fw-semibold">${escapeHtml(paaOppdraget[0]?.enhet_navn || o.enhet_navn || '')}</span>`;
@@ -638,7 +638,7 @@ function _varsleValg(o) {
   const paa = new Set((o.enheter || []).map((e) => e.enhet_id));
   const ledige = enheter.filter((e) => e.pa_vakt && !paa.has(e.id));
   if (!ledige.length) return '';
-  const valg = ledige.map(
+  const valg = velgValg('') + ledige.map(
     (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
   return `
     <div class="input-group input-group-sm mt-2">
@@ -730,7 +730,8 @@ async function _enhetshandling(url, metode, feiltekst) {
 
 async function varsleEnhet(oppdragId) {
   const valg = document.getElementById('varsle-enhet');
-  if (!valg || !valg.value) return;
+  if (!valg) return;
+  if (!valg.value) { _visEnhetsfeil('Velg en enhet å legge til.'); return; }
   await _enhetshandling(
     `/oppdrag/api/oppdrag/${oppdragId}/enheter/${Number(valg.value)}/`, 'POST',
     'Kunne ikke varsle enheten.');
@@ -868,23 +869,28 @@ function _verdiKanEndres(o, felt, kanSkrive) {
 // Valgene i nedtrekket, med den gjeldende verdien først valgt — så `change`
 // bare fyrer på et ekte bytte.
 function _verdiValg(o, felt) {
+  // **«Velg…» først i alle** (23. sep. 2026). Den lagrede verdien står
+  // valgt; velges «Velg…», er det en feilmelding for de obligatoriske.
+  const velg = (valgt) => ({ verdi: '', tekst: velgTekst(), valgt });
   if (felt === 'hastegrad') {
-    return HASTEGRAD_REKKEFOLGE.map((h) => ({ verdi: h, tekst: h, valgt: h === o.hastegrad }));
+    return [velg(!o.hastegrad)].concat(
+      HASTEGRAD_REKKEFOLGE.map((h) => ({ verdi: h, tekst: h, valgt: h === o.hastegrad })));
   }
   if (felt === 'problemstilling') {
     const liste = problemstillingerFor(o.hastegrad);
-    if (!liste.includes(o.problemstilling)) liste.unshift(o.problemstilling);
-    return liste.map((p) => ({ verdi: p, tekst: p, valgt: p === o.problemstilling }));
+    if (o.problemstilling && !liste.includes(o.problemstilling)) liste.unshift(o.problemstilling);
+    return [velg(!o.problemstilling)].concat(
+      liste.map((p) => ({ verdi: p, tekst: p, valgt: p === o.problemstilling })));
   }
   if (felt === 'lokasjon') {
-    return lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id)
-      .map((l) => ({ verdi: String(l.id), tekst: l.navn, valgt: l.id === o.lokasjon_id }));
+    return [velg(!o.lokasjon_id)].concat(lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id)
+      .map((l) => ({ verdi: String(l.id), tekst: l.navn, valgt: l.id === o.lokasjon_id })));
   }
   if (felt === 'ressurs') {
     const naa = (o.enheter || [])[0];
     const valg = enheter.filter((e) => e.pa_vakt || (naa && e.id === naa.enhet_id))
       .map((e) => ({ verdi: String(e.id), tekst: e.navn, valgt: Boolean(naa) && e.id === naa.enhet_id }));
-    return naa ? valg : [{ verdi: '', tekst: 'Velg enhet', valgt: true }].concat(valg);
+    return [velg(!naa)].concat(valg);
   }
   return [];
 }
@@ -894,10 +900,21 @@ function _verdiValg(o, felt) {
 // oppdraget (`flytt_til_enhet`, som står i tidslinjen som før).
 function _verdiForesporsel(o, felt, verdi) {
   const url = `/oppdrag/api/oppdrag/${Number(o.id)}/`;
+  // «Velg…» er en feilmelding og ingen forespørsel for de obligatoriske
+  // (André, 23. sep. 2026: «feilmelding om man lagrer med "Velg..." selected»).
+  // Ressursen er ikke obligatorisk — «Opprett uten enhet» finnes — så uten
+  // enhet er «Velg…» bare ingenting. Med én kan den ikke fjernes herfra.
+  if (!verdi) {
+    if (felt === 'ressurs') {
+      return (o.enheter || []).length === 1
+        ? { feil: 'Oppdraget har én enhet — velg en annen for å flytte det.' } : null;
+    }
+    return { feil: `${VERDIFELT_NAVN[felt] || 'Feltet'} må ha en verdi.` };
+  }
   if (felt === 'hastegrad') return { url, method: 'PUT', body: { hastegrad: verdi } };
   if (felt === 'problemstilling') return { url, method: 'PUT', body: { problemstilling: verdi } };
   if (felt === 'lokasjon') return { url, method: 'PUT', body: { lokasjon_id: Number(verdi) } };
-  if (felt === 'ressurs' && verdi) {
+  if (felt === 'ressurs') {
     const antall = (o.enheter || []).length;
     if (antall === 0) return { url: `${url}enheter/${Number(verdi)}/`, method: 'POST', body: {} };
     if (antall === 1) return { url: `${url}flytt/`, method: 'POST', body: { enhet_id: Number(verdi) } };
@@ -990,6 +1007,7 @@ async function lagreVerdi(felt) {
   if (!valg || !apentOppdrag) return;
   const foresporsel = _verdiForesporsel(apentOppdrag, felt, valg.value);
   if (!foresporsel) return;
+  if (foresporsel.feil) { _visVerdifeil(foresporsel.feil); return; }
   await _sendVerdi(foresporsel);
 }
 
@@ -1173,6 +1191,11 @@ async function flyttOppdrag(id) {
   const valg = document.getElementById('flytt-enhet');
   const fra = document.getElementById('flytt-fra');
   const feil = document.getElementById('flytt-feil');
+  if ((fra && !fra.value) || !valg.value) {
+    feil.textContent = fra && !fra.value ? 'Velg hvilken enhet oppdraget flyttes fra.' : 'Velg enheten oppdraget flyttes til.';
+    feil.classList.remove('d-none');
+    return;
+  }
   const kropp = { enhet_id: Number(valg.value) };
   if (fra) kropp.fra_enhet_id = Number(fra.value);
   const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/flytt/`, {
