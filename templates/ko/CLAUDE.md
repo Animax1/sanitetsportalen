@@ -147,6 +147,7 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 | «Til» er låst på den åpne og der en hendelse tok over (`koTavleSkjemaData`) | Hendelsen eier tida videre |
 | Et åpent skjema tegnes ikke om av pollen | Ellers tømmes feltet under fingrene |
 | Planlagt pause: stiplet i Pause-raden, «Pause nå» fra ti minutter før (`koTavlePauseStatus`), på stolpen og på kortet i «Uten plass» | KO starter den; tavla flytter ingen av seg selv. Rød kant når tida gikk uten at den ble tatt |
+| **Planlagt slutt**: stiplet fra nå til slutten (`koTavleSluttHtml`), klikk åpner skjemaet; ute av tida gir rød kant, «N min over» og «N over» på raden. `koTavleSlutt` er regelen. Feltet står i «Tider og slutt» for den åpne, og tomt er ingen plan | Overtid er et tegn, ikke en handling. Den stiplede holder banen, så neste stolpe ikke legges oppå |
 | **«Besøk»** er en visning i samme vindu, regnet i nettleseren av vaktas plasseringer (`koTavleBesok`). Døgnet fra døgnstarten; nuller øverst på et fulgt sted | Alt ligger alt i svaret — ingen egen spørring å holde i takt |
 | «Ikke vært på \<fulgt sted\>» under tavla (`koTavleIkkeVaert`) | «Hvem skal få gå neste» uten å åpne noe |
 | Fanen «Tavla» i KO-innstillinger tegnes av `koTegnTavleOppsett` gjennom kroken `tegn` | Oppdragsmodulens JS kjenner ikke KO |

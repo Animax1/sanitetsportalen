@@ -449,6 +449,22 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
 .ko-tavle-stolpe.ko-tavle-pause-ikke_tatt { border-color: #f87171; color: #fecaca; }
 .ko-tavle-pause-knapp { --bs-btn-padding-y: 0; --bs-btn-padding-x: 0.35rem; --bs-btn-font-size: 0.7rem; }
 .ko-tavle-stolpe[data-tavle-plassering] { cursor: pointer; }
+/* Planlagt slutt (23. sep. 2026): stiplet fra nå til slutten — en plan, som
+   pausene. Når tida er ute: rød kant på laget, og en rød strek der det
+   skulle sluttet. Tavla flytter ingen; overtid er et tegn. */
+.ko-tavle-slutt-plan {
+  position: absolute; height: 24px; box-sizing: border-box; border-radius: 0 5px 5px 0;
+  border: 1px dashed #93c5fd; border-left: 0; color: #bfdbfe; font-size: 0.7rem;
+  padding: 4px 6px; overflow: hidden; white-space: nowrap; text-align: right;
+}
+.ko-tavle-slutt-plan[data-tavle-plassering] { cursor: pointer; }
+.ko-tavle-stolpe.ko-tavle-over { border: 2px solid #ef4444; box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35); }
+.ko-tavle-over-tekst { font-weight: 700; color: #fecaca; }
+.ko-tavle-slutt-merke { position: absolute; width: 0; height: 24px; border-left: 2px solid #ef4444; z-index: 1; }
+.ko-tavle-over-tall {
+  font-size: 0.7rem; font-weight: 700; color: #fecaca; border: 1px solid #ef4444;
+  border-radius: 999px; padding: 0 0.4rem; margin-left: 0.3rem; white-space: nowrap;
+}
 .ko-tavle-skjema {
   padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--portal-border); background: var(--portal-surface-2);
 }

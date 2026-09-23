@@ -671,6 +671,11 @@ class Tavleplassering(models.Model):
         null=True, blank=True, verbose_name='Hendelse')
     fra = models.DateTimeField(verbose_name='Fra')
     til = models.DateTimeField(null=True, blank=True, verbose_name='Til')
+    #: Hvor lenge laget skal stå der (André, 23. sep. 2026: «planlegge tid per
+    #: plassering med beskjed/tegn på overtid»). **Flytter ingen**: når tida er
+    #: ute, står laget der med rød kant til KO flytter det. Står igjen når
+    #: plasseringen lukkes — «planlagt til 23:45, gikk 00:10» er historikk.
+    planlagt_til = models.DateTimeField(null=True, blank=True, verbose_name='Planlagt til')
     av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='ko_tavleplasseringer',

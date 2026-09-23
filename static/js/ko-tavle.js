@@ -136,6 +136,19 @@ function koTavlePauseStatus(q, naaMs) {
   return 'kommer';
 }
 
+// Den planlagte slutten på en åpen plassering (23. sep. 2026, André:
+// «planlegge tid per plassering med beskjed/tegn på overtid»). `null` uten
+// plan og på en lukket plassering; ellers om tida er ute, og hvor mange
+// minutter over eller igjen. **Tavla flytter ingen** — overtid er et tegn,
+// ikke en handling.
+function koTavleSlutt(p, naaMs) {
+  if (!p || p.til || !p.planlagt_til) return null;
+  const til = Date.parse(p.planlagt_til);
+  if (!Number.isFinite(til)) return null;
+  const over = naaMs > til;
+  return { til, over, min: Math.round(Math.abs(naaMs - til) / 60000) };
+}
+
 // Radene med stolpene sine. **Pause-raden står øverst og er ikke en
 // lokasjon.** En stolpe er en plassering som overlapper vinduet, eller en
 // ressurs som er opptatt på en hendelse eller et oppdrag med lokasjon —
@@ -157,7 +170,7 @@ function koTavleRader(data, vindu, filter) {
       const fra = Date.parse(p.fra);
       const til = p.til ? Date.parse(p.til) : vindu.naa;
       if (!(fra < vindu.til && til > vindu.fra)) return;
-      treff.push({ p, r, fra, til, aapen: !p.til, opptatt: false });
+      treff.push({ p, r, fra, til, aapen: !p.til, opptatt: false, slutt: koTavleSlutt(p, vindu.naa) });
     });
     if (rad.pause) {
       // De planlagte pausene som ikke er startet. Den startede står som
@@ -185,7 +198,10 @@ function koTavleRader(data, vindu, filter) {
       // En planlagt pause tegnes bredere enn tida si (navnet og knappen skal
       // få plass), så banen holdes opptatt litt lenger — ellers havner neste
       // stolpe oppå knappen.
-      baner[bane] = t.q ? Math.max(t.til, t.fra + 2.5 * 3600000) : t.til;
+      // Den stiplede slutten står i banen også, ellers tegnes neste stolpe
+      // oppå den.
+      baner[bane] = t.q ? Math.max(t.til, t.fra + 2.5 * 3600000)
+        : (t.slutt && !t.slutt.over ? Math.max(t.til, t.slutt.til) : t.til);
       const navn = t.r ? t.r.navn : (t.p ? t.p.ressurs_navn : (t.q ? t.q.ressurs_navn : ''));
       const min = (t.til - t.fra) / 60000;
       let merke = '';
@@ -210,10 +226,13 @@ function koTavleRader(data, vindu, filter) {
         plassering_id: t.p && !t.p.hendelse_nummer ? t.p.id : null,
         pause_id: t.q ? t.q.id : null,
         pause_status: t.q ? koTavlePauseStatus(t.q, vindu.naa) : '',
+        slutt: t.slutt ? { over: t.slutt.over, min: t.slutt.min, kl: koTavleHHMM(t.slutt.til),
+                           prosent: koTavleProsent(t.slutt.til, vindu) } : null,
       };
     });
     return { id: rad.id, navn: rad.navn, pause: rad.pause, stolper, baner: Math.max(1, baner.length),
              naa: treff.filter((t) => t.aapen || t.opptatt).length,
+             over: stolper.filter((s) => s.slutt && s.slutt.over).length,
              fulgt: !rad.pause && (data.fulgte || []).includes(rad.id) };
   });
 }
@@ -264,10 +283,13 @@ function koTavleStolpeHtml(s) {
   if (s.dras) klasser.push('ko-tavle-dras');
   if (s.ressurs_id !== null && s.ressurs_id === koTavleValgt && !s.pause_id) klasser.push('ko-tavle-valgt');
   if (s.pause_id) klasser.push('ko-tavle-planlagt', 'ko-tavle-pause-' + escapeHtml(s.pause_status));
+  if (s.slutt && s.slutt.over) klasser.push('ko-tavle-over');
   // Den planlagte er kort og står tett: bare navnet, tida i `title`.
   const etikett = escapeHtml(s.navn) + (s.merke && !s.pause_id ? ' · ' + escapeHtml(s.merke) : '')
     + (s.varighet ? ' <span class="ko-tavle-tid-tekst">' + escapeHtml(s.varighet) + '</span>' : '')
-    + (s.lenge ? ' <span title="Samme sted over 3 timer">⏱</span>' : '');
+    + (s.lenge ? ' <span title="Samme sted over 3 timer">⏱</span>' : '')
+    + (s.slutt && s.slutt.over ? ' <span class="ko-tavle-over-tekst">' + escapeHtml(koTavleVarighet(s.slutt.min))
+      + ' over</span>' : '');
   // Den åpne (og den opptatte) slutter ved nå og vokser **bakover** til lesbar
   // bredde — en stolpe som stakk forbi nå-streken ville sett ut som en plan.
   const bredde = Math.max(0, 100 - s.venstre - s.hoyre).toFixed(2);
@@ -299,7 +321,27 @@ function koTavleStolpeHtml(s) {
     ? ' <button type="button" class="btn btn-sm btn-warning ko-tavle-pause-knapp" data-action="koTavleStartPause"'
       + ' data-arg="' + escapeHtml(s.pause_id) + '">Pause nå</button>'
     : '';
-  return '<div class="' + klasser.join(' ') + '" style="' + plass + '"' + dra + '>' + etikett + start + '</div>';
+  return '<div class="' + klasser.join(' ') + '" style="' + plass + '"' + dra + '>' + etikett + start + '</div>'
+    + koTavleSluttHtml(s, skriv);
+}
+
+// Den planlagte slutten ved siden av den åpne stolpen: **stiplet fra nå** og
+// fram til slutten, eller — når tida er ute — en rød strek der den skulle
+// sluttet. Et klikk på den stiplede åpner skjemaet, for den som skriver.
+function koTavleSluttHtml(s, skriv) {
+  if (!s.slutt) return '';
+  const topp = 'top:' + escapeHtml(String(s.bane * 28 + 4)) + 'px';
+  if (s.slutt.over) {
+    return '<div class="ko-tavle-slutt-merke" style="left:' + escapeHtml(s.slutt.prosent.toFixed(2)) + '%;' + topp
+      + '" title="Planlagt slutt ' + escapeHtml(s.slutt.kl) + '"></div>';
+  }
+  const aapne = skriv && s.plassering_id
+    ? ' data-tavle-plassering="' + escapeHtml(s.plassering_id) + '" tabindex="0" role="button"'
+      + ' title="Planlagt slutt ' + escapeHtml(s.slutt.kl) + ' — klikk for å endre"'
+    : ' title="Planlagt slutt ' + escapeHtml(s.slutt.kl) + '"';
+  return '<div class="ko-tavle-slutt-plan" style="left:' + escapeHtml((100 - s.hoyre).toFixed(2)) + '%;right:'
+    + escapeHtml((100 - s.slutt.prosent).toFixed(2)) + '%;' + topp + '"' + aapne + '>til '
+    + escapeHtml(s.slutt.kl) + '</div>';
 }
 
 function koTavleRadHtml(rad) {
@@ -313,6 +355,8 @@ function koTavleRadHtml(rad) {
       ? '<button type="button" class="btn btn-sm btn-outline-secondary ko-tavle-planlegg"'
         + ' data-action="koTavlePlanlegg" title="Planlegg en pause for et lag">+ Planlegg</button>'
       : '')
+    + (rad.over ? '<span class="ko-tavle-over-tall" title="Står over planlagt slutt">' + escapeHtml(String(rad.over))
+      + ' over</span>' : '')
     + '<span class="ko-tavle-radtall">' + escapeHtml(rad.naa ? String(rad.naa) : '–') + '</span></div>'
     + '<div class="ko-tavle-spor" style="height:' + escapeHtml(String(hoyde)) + 'px">'
     + stolper + '</div></div>';
@@ -361,7 +405,7 @@ function koTavleValgtHtml(r, aapen) {
   const tekst = `Velg raden ${r.navn} skal til — eller «Uten plass». Esc avbryter.`;
   return escapeHtml(tekst)
     + (aapen ? ' <button type="button" class="btn btn-sm btn-outline-light ms-2" data-action="koTavleRettValgt"'
-      + ' data-arg="' + escapeHtml(aapen.id) + '">Rett tidene</button>' : '');
+      + ' data-arg="' + escapeHtml(aapen.id) + '">Tider og slutt</button>' : '');
 }
 
 function koTavleFilterHtml(data, filter) {
@@ -530,7 +574,11 @@ function koTavleSkjemaData(skjema, data, naaMs) {
       fra: koTavleHHMM(Date.parse(p.fra)),
       til: p.til ? koTavleHHMM(Date.parse(p.til)) : '',
       tilLaast: !p.til || hendelseTok,
-      hint: !p.til ? '«Til» er nå: plasseringen er åpen.'
+      // Den planlagte slutten hører bare til den åpne.
+      harSlutt: !p.til,
+      slutt: p.planlagt_til ? koTavleHHMM(Date.parse(p.planlagt_til)) : '',
+      hint: !p.til ? '«Til» er nå: plasseringen er åpen. Planlagt slutt flytter ingen — når tida er ute, '
+        + 'får laget rød kant til det flyttes. Tomt felt er ingen plan.'
         : (hendelseTok ? '«Til» er låst: laget gikk på H' + neste.hendelse_nummer + ', og hendelsen eier tida videre.'
           : 'Naboplasseringene tilpasses i samme lagring — laget står aldri to steder samtidig.'),
       kanFjerne: true,
@@ -565,6 +613,8 @@ function koTavleSkjemaHtml(d) {
     + escapeHtml(d.fra) + '"></label>'
     + '<label class="small">Til <input type="time" class="form-control form-control-sm" id="ko-tavle-skjema-til" value="'
     + escapeHtml(d.til) + '"' + (d.tilLaast ? ' disabled' : '') + '></label>'
+    + (d.harSlutt ? '<label class="small">Planlagt slutt <input type="time" class="form-control form-control-sm"'
+      + ' id="ko-tavle-skjema-slutt" value="' + escapeHtml(d.slutt) + '"></label>' : '')
     + '<button type="button" class="btn btn-sm btn-primary" data-action="koTavleLagreSkjema">Lagre</button>'
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koTavleLukkSkjema">Avbryt</button>'
     + (d.kanFjerne ? '<button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-action="koTavleFjernISkjema">'
@@ -708,6 +758,18 @@ function koTavleSkjemaKropp(skjema, data, verdier, naaMs) {
       const til = koTavleTidNaer(Date.parse(p.til), verdier.til);
       if (til === null) return null;
       kropp.til = new Date(til).toISOString();
+    } else {
+      // Den planlagte slutten leses nær **nå**: «00:30» kl. 22 er i natt.
+      // Tomt er ingen plan, og sendes som det — ikke utelatt, ellers kunne
+      // en plan aldri tas bort.
+      const slutt = String(verdier.slutt || '').trim();
+      if (slutt) {
+        const t = koTavleTidNaer(naaMs, slutt);
+        if (t === null) return null;
+        kropp.planlagt_til = new Date(t).toISOString();
+      } else {
+        kropp.planlagt_til = null;
+      }
     }
     return kropp;
   }
@@ -738,6 +800,7 @@ async function koTavleLagreSkjema() {
   const verdi = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
   const kropp = koTavleSkjemaKropp(s, koTavle, {
     fra: verdi('ko-tavle-skjema-fra'), til: verdi('ko-tavle-skjema-til'), ressurs: verdi('ko-tavle-skjema-ressurs'),
+    slutt: verdi('ko-tavle-skjema-slutt'),
   }, Date.now() + koTavleKlokkeavvik);
   if (!kropp) {
     koTavleVisFeil(s.type === 'pause' && !s.id && !verdi('ko-tavle-skjema-ressurs')

@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Tavla: planlagt slutt på plasseringen, og overtid  `#ko` `#tavle`
+
+Steg 1 av tavleplanleggeren. André: «planlegge tid per plassering med beskjed/tegn på
+overtid i faktisk drift. Både i planlegger men og generelt i tavlen.» Skissene
+(Artifact «Tavleplanleggeren») ble avtalt før koden; resten av stegene står i TODO.
+
+**Hva er nytt:** en plassering kan få en **planlagt slutt** — «Lag 1 står på Parkscene
+til 23:45». Den settes i skjemaet «Tider og slutt» (knappen i linja når laget er valgt,
+eller klikk på den stiplede slutten), og tomt felt er ingen plan.
+
+- **Stiplet fra nå og fram til slutten** på tavla, med «til 23:45».
+- **Når tida er ute: rød kant på laget og «26 min over»**, en rød strek der det skulle
+  sluttet, og «1 over» i radhodet.
+- **Planen flytter ingen.** Samme regel som de planlagte pausene: et lag midt i noe skal
+  ikke forsvinne fra raden sin fordi klokka sa det. KO flytter det.
+- **Bare på den åpne plasseringen, fram i tid, høyst et døgn** (`sett_planlagt_slutt`).
+  Planen står igjen på den lukkede plasseringen — «planlagt til 23:45, gikk 00:10» er
+  grunnlaget for plan mot faktisk i steg 5 — og en ny plassering arver den ikke.
+- **Tidene og slutten lagres som én ting**: PUT på plasseringen tar `fra` og
+  `planlagt_til` i samme transaksjon. Feiler slutten, er heller ikke «fra» rettet.
+- `skriv_full` i KO setter og endrer, `les` ser. Tida på en plassering er drift og
+  hører til operatøren.
+
+**Mutasjonstesting: 20 mutanter.** Tjenesten tungt (hver grense: `<=` mot `<` på «fram
+i tid», `>` mot `>=` på døgnet, sperren på den lukkede, lagringen), porten (transaksjonen,
+tolkningen av `planlagt_til`, «ingenting å endre») og JS-reglene (over/ikke over på
+minuttet, banen som holdes av den stiplede, kallstedet for byggeren, skrivegaten, escaping).
+**Én overlevde**, og den var en test som løy: den lette etter `ko-tavle-over` og fant
+strengen inne i `ko-tavle-over-tekst`, så klassen kunne fjernes. Testen leser nå klassen
+alene. Én mutant jeg skrev var en no-op, og er ikke talt med. **Én test jeg skrev påsto
+ingenting** (`all(True for _ in …)`) — skrevet om til den ene situasjonen der noe står fram
+i tid i samme rad: en planlagt pause i Pause-raden.
+
 ## 2026-09-23 — Ressursoversikten: «Vis»-meny (synlighetsknapp) i stedet for minimering og Alle | Biler | Lag  `#ko` `#oppdrag/sentralbord`
 
 André: «istedenfor minimer som tar plass at vi har en synlighetsknapp istedenfor på

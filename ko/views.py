@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import json
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -1005,7 +1005,8 @@ def _bil_skjult(request, ressurs_id) -> bool:
 @require_http_methods(['PUT', 'DELETE'])
 @rate_limit(group='ko:tavle_rett', rate='60/m', method=['PUT', 'DELETE'])
 def tavle_plassering_view(request, pk):
-    """Rett tidene på en plassering, eller fjern den (skisse 3)."""
+    """Rett tidene på en plassering, sett den planlagte slutten, eller fjern
+    den (skisse 3; planlagt slutt 23. sep. 2026)."""
     from . import tavle
     from .models import Tavleplassering
 
@@ -1020,9 +1021,20 @@ def tavle_plassering_view(request, pk):
         if request.method == 'DELETE':
             tavle.fjern(p, bruker=request.user)
             return JsonResponse({'status': 'ok'})
-        fra = _tavle_tid(data.get('fra'), 'Fra')
-        til = _tavle_tid(data.get('til'), 'Til') if p.til is not None else None
-        tavle.rett(p, fra=fra, til=til, bruker=request.user)
+        if 'fra' not in data and 'planlagt_til' not in data:
+            raise services.Ugyldig('Ingenting å endre.')
+        # Tidene og den planlagte slutten i ett: feiler den ene, er heller
+        # ikke den andre lagret — skjemaet sendte dem som én ting.
+        with transaction.atomic():
+            if 'fra' in data:
+                fra = _tavle_tid(data.get('fra'), 'Fra')
+                til = _tavle_tid(data.get('til'), 'Til') if p.til is not None else None
+                tavle.rett(p, fra=fra, til=til, bruker=request.user)
+            if 'planlagt_til' in data:
+                # Tomt er «ingen plan»; noe annet enn et tidspunkt er en feil.
+                raa = data.get('planlagt_til')
+                slutt = _tavle_tid(raa, 'Planlagt slutt') if raa else None
+                tavle.sett_planlagt_slutt(p, slutt)
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok'})

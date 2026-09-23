@@ -29,7 +29,9 @@ HARNESS = (
              'koTavlePlanlagtHtml', 'koTavleValgtHtml', 'koTavleDognnokkel', 'koTavleDognene',
              'koTavleBesok', 'koTavleIkkeVaert', 'koTavleDognnavn', 'koTavleSistHtml',
              'koTavleBesokHtml', 'koTavleIkkeVaertHtml', 'koTavleSkjemaData',
-             'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleOppsettHtml')),
+             'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleOppsettHtml',
+             # Planlagt slutt (23. sep. 2026).
+             'koTavleSlutt', 'koTavleSluttHtml')),
 )
 
 #: Klokka i testene: 22. sep. 2026 kl. 20:00 UTC.
@@ -410,7 +412,8 @@ class Steg2Tests(TavlereglerTests):
         ].map((k) => k && Object.fromEntries(Object.entries(k).map(([n, v]) => [n, typeof v === 'string' ? Date.parse(v) : v])))""")
         L = lambda d, t, m=0: self._json(f'L({d}, {t}, {m})')
         self.assertEqual(ut[0], {'fra': L(23, 22, 50), 'til': L(24, 0, 30)})
-        self.assertEqual(ut[1], {'fra': L(24, 0, 55)}, 'den åpne sender ingen «til»')
+        self.assertEqual(ut[1], {'fra': L(24, 0, 55), 'planlagt_til': None},
+                         'den åpne sender ingen «til» — og tomt «planlagt slutt» er ingen plan')
         self.assertEqual(ut[2], {'fra': L(23, 23, 50), 'til': L(24, 0, 20), 'ressurs_id': 102},
                          '«23:50–00:20» går over midnatt')
         self.assertIsNone(ut[3])
@@ -460,3 +463,117 @@ class Steg2Tests(TavlereglerTests):
         """)
         self.assertEqual(ut[0], '[["pause",50],["rett",2]] null', 'knappen velger ingenting')
         self.assertEqual(json.loads(ut[1]), [['pause', 50], ['rett', 2], 'flytt'])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class PlanlagtSluttJsTests(TavlereglerTests):
+    """Planlagt slutt i nettleseren (23. sep. 2026): stiplet fram til
+    slutten, rød kant og «over» når tida er ute. Arver harness og data —
+    Lag 1 står åpen på Parkscene fra 16:00, og klokka er 20:00 UTC."""
+
+    def _med_slutt(self, slutt_iso):
+        return (f"const D = JSON.parse(JSON.stringify(DATA)); D.plasseringer[0].planlagt_til = '{slutt_iso}';\n")
+
+    def test_regelen_sier_over_eller_igjen_og_ingenting_uten_plan(self):
+        ut = self._json("""[
+            koTavleSlutt({til: null, planlagt_til: '2026-09-22T21:30:00Z'}, NAA),
+            koTavleSlutt({til: null, planlagt_til: '2026-09-22T19:45:00Z'}, NAA),
+            koTavleSlutt({til: null, planlagt_til: null}, NAA),
+            koTavleSlutt({til: '2026-09-22T19:00:00Z', planlagt_til: '2026-09-22T18:00:00Z'}, NAA),
+            koTavleSlutt({til: null, planlagt_til: '2026-09-22T20:00:00Z'}, NAA),
+        ]""")
+        self.assertEqual(ut[0]['over'], False)
+        self.assertEqual(ut[0]['min'], 90)
+        self.assertEqual((ut[1]['over'], ut[1]['min']), (True, 15))
+        self.assertIsNone(ut[2])
+        self.assertIsNone(ut[3], 'en lukket plassering har ingen plan å vise')
+        self.assertEqual(ut[4]['over'], False, 'akkurat på tida er ikke over')
+
+    def test_stiplet_fram_til_slutten_og_banen_holdes(self):
+        ut = self._kjor(self._med_slutt('2026-09-22T22:00:00Z') + """
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            const s = rad.stolper.find((x) => x.navn === 'Lag 1');
+            console.log(JSON.stringify(s.slutt));
+            console.log(koTavleStolpeHtml(s));
+            console.log(rad.over);
+        """)
+        slutt = json.loads(ut[0])
+        self.assertFalse(slutt['over'])
+        self.assertIn('ko-tavle-slutt-plan', ut[1])
+        self.assertIn('til ', ut[1])
+        self.assertIn('data-tavle-plassering="1"', ut[1], 'klikk på den stiplede åpner skjemaet')
+        self.assertNotIn('ko-tavle-over', ut[1])
+        self.assertEqual(ut[2], '0')
+
+    def test_over_tida_gir_rod_kant_minutter_og_tall_paa_raden(self):
+        ut = self._kjor(self._med_slutt('2026-09-22T19:40:00Z') + """
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            const s = rad.stolper.find((x) => x.navn === 'Lag 1');
+            console.log(koTavleStolpeHtml(s));
+            console.log(koTavleRadHtml(rad));
+        """)
+        # Klassen alene — `ko-tavle-over-tekst` inneholder den samme strengen.
+        self.assertRegex(ut[0], r'class="[^"]*\bko-tavle-over(?=[ "])')
+        self.assertIn('20 min over', ut[0])
+        self.assertIn('ko-tavle-slutt-merke', ut[0])
+        self.assertNotIn('ko-tavle-slutt-plan', ut[0], 'ingen stiplet framtid når tida er ute')
+        self.assertIn('1 over', ut[1])
+
+    def test_uten_skrivetilgang_aapner_den_stiplede_ingenting(self):
+        ut = self._kjor(self._med_slutt('2026-09-22T22:00:00Z') + """
+            koKanSkriveSvar = false;
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            console.log(koTavleStolpeHtml(rad.stolper.find((x) => x.navn === 'Lag 1')));
+        """)
+        self.assertIn('ko-tavle-slutt-plan', ut[0])
+        self.assertNotIn('data-tavle-plassering', ut[0])
+
+    def test_neste_stolpe_legges_ikke_oppaa_den_stiplede(self):
+        """Det eneste som står fram i tid i samme rad, er en planlagt pause i
+        Pause-raden. Lag 1 står i pause til 22:00; Lag 2 har pause planlagt
+        21:00 — da må de ha hver sin bane, ellers ligger den ene oppå den andre."""
+        ut = self._kjor("""
+            const D = JSON.parse(JSON.stringify(DATA));
+            D.plasseringer[0].pause = true; D.plasseringer[0].lokasjon_id = null;
+            D.plasseringer[0].fra = '2026-09-22T19:30:00Z';
+            D.plasseringer[0].planlagt_til = '2026-09-22T22:00:00Z';
+            D.plasseringer = D.plasseringer.filter((p) => p.id !== 3);
+            D.pauser = [{id: 50, ressurs_id: 102, ressurs_navn: 'Lag 2', fra: '2026-09-22T21:00:00Z',
+                         til: '2026-09-22T21:30:00Z', startet: false}];
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.pause);
+            console.log(JSON.stringify(rad.stolper.map((s) => [s.navn, s.bane])));
+        """)
+        baner = dict(json.loads(ut[0]))
+        self.assertNotEqual(baner['Lag 1'], baner['Lag 2'])
+
+    def test_skjemaet_viser_og_sender_slutten_naer_naa(self):
+        ut = self._kjor(STEG2 + """
+            const d = JSON.parse(JSON.stringify(D2));
+            d.plasseringer[3].planlagt_til = I(L(24, 3, 30));
+            const s = koTavleSkjemaData({type: 'rett', id: 4}, d, NAA2);
+            console.log(JSON.stringify([s.harSlutt, s.slutt]));
+            console.log(koTavleSkjemaHtml(s).includes('id="ko-tavle-skjema-slutt"'));
+            const lukket = koTavleSkjemaData({type: 'rett', id: 1}, d, NAA2);
+            console.log(JSON.stringify([lukket.harSlutt, koTavleSkjemaHtml(lukket).includes('ko-tavle-skjema-slutt')]));
+            const k = koTavleSkjemaKropp({type: 'rett', id: 4}, d, {fra: '01:00', slutt: '02:30'}, NAA2);
+            console.log(JSON.stringify([Date.parse(k.planlagt_til) === L(24, 2, 30), k.til === undefined]));
+            console.log(JSON.stringify(koTavleSkjemaKropp({type: 'rett', id: 4}, d, {fra: '01:00', slutt: 'tull'}, NAA2)));
+            const kl = koTavleSkjemaKropp({type: 'rett', id: 1}, d, {fra: '15:00', til: '16:00', slutt: '02:30'}, NAA2);
+            console.log('planlagt_til' in kl);
+        """)
+        self.assertEqual(json.loads(ut[0]), [True, '03:30'])
+        self.assertEqual(ut[1], 'true')
+        self.assertEqual(json.loads(ut[2]), [False, False], 'bare den åpne har en planlagt slutt')
+        self.assertEqual(json.loads(ut[3]), [True, True])
+        self.assertEqual(ut[4], 'null', 'et felt som ikke er et klokkeslett sendes ikke')
+        self.assertEqual(ut[5], 'false', 'en lukket plassering sender ingen plan')
+
+    def test_slutten_escapes(self):
+        ut = self._kjor(self._med_slutt('2026-09-22T22:00:00Z') + """
+            const s = {slutt: {over: false, min: 5, kl: '<img src=x>', prosent: 80}, bane: 0, hoyre: 33.3,
+                       plassering_id: '"><img src=y>'};
+            console.log(koTavleSluttHtml(s, true));
+            s.slutt.over = true;
+            console.log(koTavleSluttHtml(s, true));
+        """)
+        self.assertNotIn('<img', ut[0] + ut[1])

@@ -206,6 +206,7 @@ KO_LOGG_BYGGERE = (
     # ko-tavle.js (22. sep. 2026): stolpene, radene, timene, «Uten plass»,
     # filteret og funksjonen som setter dem sammen.
     'koTavleStolpeHtml',
+    'koTavleSluttHtml',
     'koTavleRadHtml',
     'koTavleTimerHtml',
     'koTavleUtenPlassHtml',

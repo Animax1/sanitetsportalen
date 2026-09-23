@@ -628,3 +628,95 @@ class PorteneSteg2Tests(PorteneTests):
         self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in r.json()['data']],
                          [('Club Venue', False, False), ('Parkscene', True, True)])
         self.assertEqual(self._klient(None).get(url).status_code, 403)
+
+
+class PlanlagtSluttTests(_Grunnlag):
+    """Planlagt slutt på plasseringen (23. sep. 2026, André: «planlegge tid
+    per plassering med beskjed/tegn på overtid»). Planen flytter ingen."""
+
+    def test_settes_og_tas_bort_paa_den_aapne(self):
+        p = self._plasser(self.lag1, self.park)
+        slutt = timezone.now() + timedelta(hours=2)
+        tavle.sett_planlagt_slutt(p, slutt)
+        p.refresh_from_db()
+        self.assertEqual(p.planlagt_til, slutt)
+        tavle.sett_planlagt_slutt(p, None)
+        p.refresh_from_db()
+        self.assertIsNone(p.planlagt_til, 'tomt er ingen plan')
+
+    def test_bare_fram_i_tid_og_hoyst_et_doegn(self):
+        naa = timezone.now()
+        p = self._plasser(self.lag1, self.park, naa=naa - timedelta(minutes=5))
+        for ugyldig in (naa - timedelta(minutes=1), naa, naa + timedelta(hours=24, minutes=1)):
+            with self.assertRaises(services.Ugyldig, msg=str(ugyldig)):
+                tavle.sett_planlagt_slutt(p, ugyldig, naa=naa)
+        tavle.sett_planlagt_slutt(p, naa + timedelta(hours=24), naa=naa)
+        p.refresh_from_db()
+        self.assertEqual(p.planlagt_til, naa + timedelta(hours=24), 'et døgn er grensa, og den er med')
+
+    def test_en_lukket_plassering_faar_ingen_plan(self):
+        p = self._plasser(self.lag1, self.park, naa=timezone.now() - timedelta(minutes=30))
+        self._plasser(self.lag1, self.club)
+        p.refresh_from_db()
+        with self.assertRaises(services.Ugyldig):
+            tavle.sett_planlagt_slutt(p, timezone.now() + timedelta(hours=1))
+
+    def test_planen_flytter_ingen_og_blir_staaende_som_historikk(self):
+        naa = timezone.now()
+        p = self._plasser(self.lag1, self.park, naa=naa - timedelta(hours=1))
+        tavle.sett_planlagt_slutt(p, naa + timedelta(minutes=10), naa=naa)
+        # Tida går ut, og ingenting skjer med plasseringen.
+        data = tavle.tavle_data(self.vakt, naa + timedelta(minutes=40))
+        rad = next(x for x in data['plasseringer'] if x['id'] == p.pk)
+        self.assertIsNone(rad['til'], 'laget står der fortsatt')
+        self.assertEqual(rad['planlagt_til'], (naa + timedelta(minutes=10)).isoformat())
+        self._plasser(self.lag1, self.club)
+        p.refresh_from_db()
+        self.assertIsNotNone(p.til)
+        self.assertEqual(p.planlagt_til, naa + timedelta(minutes=10), 'planen står igjen på den lukkede')
+
+    def test_ny_plassering_arver_ikke_planen(self):
+        naa = timezone.now()
+        p = self._plasser(self.lag1, self.park, naa=naa - timedelta(minutes=10))
+        tavle.sett_planlagt_slutt(p, naa + timedelta(hours=1))
+        ny = self._plasser(self.lag1, self.club)
+        self.assertIsNone(ny.planlagt_til)
+
+
+class PlanlagtSluttPorteneTests(PorteneTests):
+
+    def _url(self, p):
+        return f'/ko/api/tavle/plasseringer/{p.pk}/'
+
+    def test_planen_settes_av_skriv_full_og_leses_av_les(self):
+        p = self._plasser(self.lag1, self.park)
+        slutt = (timezone.now() + timedelta(hours=1)).isoformat()
+        self.assertEqual(self._klient('les').put(self._url(p), {'planlagt_til': slutt},
+                                                  content_type='application/json').status_code, 403)
+        c = self._klient('skriv_full')
+        r = c.put(self._url(p), {'planlagt_til': slutt}, content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        data = self._klient('les').get('/ko/api/tavle/').json()['data']
+        self.assertEqual(next(x for x in data['plasseringer'] if x['id'] == p.pk)['planlagt_til'][:16], slutt[:16])
+        self.assertEqual(c.put(self._url(p), {'planlagt_til': None},
+                               content_type='application/json').status_code, 200)
+        p.refresh_from_db()
+        self.assertIsNone(p.planlagt_til)
+
+    def test_ugyldig_slutt_er_400_og_tidene_blir_ikke_lagret_heller(self):
+        """Skjemaet sender fra og slutt som én ting — feiler slutten, er
+        heller ikke «fra» rettet."""
+        naa = timezone.now()
+        p = self._plasser(self.lag1, self.park, naa=naa - timedelta(minutes=30))
+        foer = p.fra
+        c = self._klient('skriv_full')
+        r = c.put(self._url(p), {'fra': (foer - timedelta(minutes=10)).isoformat(),
+                                 'planlagt_til': (naa - timedelta(minutes=1)).isoformat()},
+                  content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+        p.refresh_from_db()
+        self.assertEqual(p.fra, foer, 'retting rullet tilbake sammen med den ugyldige slutten')
+        self.assertEqual(c.put(self._url(p), {'planlagt_til': 'tull'},
+                               content_type='application/json').status_code, 400)
+        self.assertEqual(c.put(self._url(p), {}, content_type='application/json').status_code, 400,
+                         'ingenting å endre')

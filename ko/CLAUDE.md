@@ -247,6 +247,7 @@ hvilke rader som finnes er projeksjon — `opptatt()` utleder det ved hver lesin
 | Hver flytting er en systemlinje (`TAVLE_FLYTTET`) med hvem | Å gå på en hendelse har alt sin linje |
 | **Retting** (`rett`, `fjern`): naboene tilpasses i samme lagring, men **en nabo forsvinner aldri**, og tida på en hendelse rettes ikke og gås ikke inn i. Systemlinje `TAVLE_RETTET` | Historikken «Besøk» teller skal ikke endre seg uten et spor |
 | **Planlagt pause** (`PlanlagtPause`): KOs egen, maks fire timer, ikke i fortida, aldri to over hverandre — heller ikke oppå en startet. «Pause nå» (`start_pause`) plasserer i Pause-raden, eller knytter til pausen laget alt har | Planen flytter ingen. Vaktlistas pauser (TODO) blir utgangspunktet; da trengs et kildefelt |
+| **Planlagt slutt** (`Tavleplassering.planlagt_til`, 23. sep. 2026): bare på den åpne, fram i tid, høyst et døgn. `sett_planlagt_slutt`; PUT på plasseringen tar `fra` og `planlagt_til` i én transaksjon. **Flytter ingen** — når tida er ute, får laget rød kant. Står igjen på den lukkede, arves ikke av neste plassering | André: «planlegge tid per plassering med beskjed/tegn på overtid». Samme regel som pausene: et lag midt i noe skal ikke forsvinne fordi klokka sa det |
 | **Innstillingene**: tidsvindu 12–24 t og døgnstart (portalinnstilling, global admin); «På tavla» og «Følg besøk ★» per lokasjon (`skriv_leder`) — ID-lister i `AppSetting`, auditlogget | KO eier avkryssingene, ikke lokasjonene |
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i

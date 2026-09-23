@@ -327,6 +327,37 @@ def fjern(plassering, *, bruker, naa=None) -> None:
     systemlinje(vakt, systemlinjer.TAVLE_RETTET, data, tidspunkt=naa, bruker=bruker)
 
 
+# ── Planlagt slutt (23. sep. 2026) ────────────────────────────────────────────
+
+#: En planlagt slutt lenger fram enn dette er nesten sikkert en skrivefeil —
+#: et døgn er lengre enn noen konsert og noe skift.
+MAKS_PLANLAGT = timedelta(hours=24)
+
+
+@transaction.atomic
+def sett_planlagt_slutt(plassering, til, *, naa=None) -> Tavleplassering:
+    """Hvor lenge laget skal stå der det står nå, eller ``None`` for ingen plan.
+
+    **Bare på den åpne plasseringen** — en plan gjelder det som kommer. Og
+    **planen flytter ingen**, samme regel som `PlanlagtPause`: når tida er ute,
+    blir laget stående med rød kant på tavla til KO flytter det. Et lag midt i
+    noe skal ikke forsvinne fra raden sin fordi klokka sa det.
+    """
+    naa = naa or timezone.now()
+    plassering = Tavleplassering.objects.select_for_update().get(pk=plassering.pk)
+    if plassering.til is not None:
+        raise Ugyldig('Plasseringen er avsluttet — en planlagt slutt gjelder der laget står nå.')
+    if til is not None:
+        if til <= naa:
+            raise Ugyldig('Planlagt slutt må være fram i tid.')
+        if til - naa > MAKS_PLANLAGT:
+            raise Ugyldig('Planlagt slutt kan ikke være mer enn et døgn fram.')
+    if plassering.planlagt_til != til:
+        plassering.planlagt_til = til
+        plassering.save(update_fields=['planlagt_til'])
+    return plassering
+
+
 # ── Planlagte pauser (steg 2) ─────────────────────────────────────────────────
 
 #: En pause er ikke et skift. Lengre enn dette er nesten sikkert en
@@ -541,6 +572,7 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
             'hendelse_nummer': p.hendelse_nummer,
             'fra': _iso(p.fra),
             'til': _iso(p.til),
+            'planlagt_til': _iso(p.planlagt_til),
         } for p in plasseringer],
     }
 

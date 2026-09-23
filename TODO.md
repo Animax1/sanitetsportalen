@@ -145,6 +145,28 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
+### KO: tavleplanleggeren — under bygging (23. sep. 2026)
+
+*Skissene og svarene står i Artifact «Tavleplanleggeren» og i CHANGELOG. Steg 1 (planlagt
+slutt og overtid) er levert. Hvert steg slettes herfra når det er levert.*
+
+- [ ] **Steg 2 — program og beredskapsnivå.** Konserttyper og kjennetegn som lister
+      KO-leder setter opp (pyro først); konserter og faste behov per sted og vakt, med
+      beredskapsnivå grønn/gul/oransje/rød og behov per ressursgruppe skrevet inn for
+      hånd — **typen setter ingen ressurser** (André). Bånd bak radene på tavla, og
+      «følger konserten» på plasseringen.
+- [ ] **Steg 3 — behov i drift.** «2 / 4 lag» per rad og ressursgruppe mens en konsert
+      pågår, fra programmet mot plasseringene.
+- [ ] **Steg 4 — planleggervindu i KO-rutenettet.** Eget vindu som deler plass med
+      oppdragslista og står parkert som standard (André: «inni i ko rutenettet med samme
+      løsning som tavlen, at den er minimert»). Hele døgnet, programmet redigeres av
+      KO-leder, dekningsstripe per ressursgruppe mot vaktlistas skift.
+- [ ] **Steg 5 — endringer og plan mot faktisk.** Systemlinje ved hver programendring,
+      plan mot faktisk per konsert (også tidligere år), og «kopier programmet» til ny vakt.
+- [ ] **Ekstra: planleggeren i eget nettleservindu på skjerm to** (André, 23. sep. 2026:
+      «la oss ta ditt forslag som en ekstra ting»). /ko/ tar en hel skjerm; planleggeren
+      som egen side med samme tidslinje som tavla. Etter steg 4.
+
 ### Vaktlista: avtalte pauser — ønsket 22. sep. 2026
 
 - [ ] **Avtalte pauser i vaktlista, som tavla i `/ko/` henter.** André: «vi har planer om
