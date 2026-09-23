@@ -57,7 +57,12 @@ ROT = Path(settings.BASE_DIR)
 #: Settes et tak fra `wc -c`, er det slakt fra fødselen, og det ble det: den
 #: første pinnen under sto 1 450 for høyt og lot fila vokse. Funnet ved
 #: mutasjonstesting 17. sep. 2026.
-ROT_TEGNGRENSE = 65_500
+#:
+#: **Hevet til 65 700 den 23. sep. 2026, bevisst:** rota sto 17 tegn under, og
+#: delingen av vaktlistefila la én rad i kartet over modulfilene. Kartet *er*
+#: rammeverk — testen under krever at hver modulfil står der — og raden er det
+#: eneste som kom til; selve innholdet flyttet ut av rota, ikke inn.
+ROT_TEGNGRENSE = 65_700
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer
@@ -82,7 +87,13 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # til å feste seg. Å hente tusen tegn ved å stryke «hvorfor» ville gjort
     # fila kortere og dokumentasjonen dårligere. Se `TODO.md` for hva som
     # faktisk kan gjøres: seksjonene er nå små nok til å vurderes hver for seg.
-    'vaktliste/CLAUDE.md': 56_900,
+    #
+    # **Delt 23. sep. 2026**, da pausene trengte plass og fila sto 32 tegn under
+    # taket: flaten (planleggingsflatene, tabellene og tidsfeltene, JS-filene)
+    # flyttet uendret til `templates/vaktliste/CLAUDE.md`, som KO og oppdrag
+    # før den. 43 843 tegn med pauseseksjonen; taket følger ned, med samme
+    # slakk, så delingen ikke gror igjen.
+    'vaktliste/CLAUDE.md': 43_950,
     # 22 615 tegn 21. sep. 2026, og `ko/CLAUDE.md` 22 249. **Begge var på
     # taket, og det er taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
     # og `oppdrag/CLAUDE.md` 11, så kvelden med sju punkter fra André kostet

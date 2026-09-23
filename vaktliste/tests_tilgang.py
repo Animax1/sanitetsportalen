@@ -982,7 +982,7 @@ class MalensGatingTests(TestCase):
         harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                                '_escHtml', 'klokke')),
-            (VAKTLISTE_JS, ('mkRessurs', 'ressursErApen', '_radklasse', '_stempelknapper',
+            (VAKTLISTE_JS, ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
                             'kanStemple', 'iDrift', '_rolleValg',
                             'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                             '_planrad', '_plancellene', '_driftrad',

@@ -56,8 +56,8 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.ratelimit import rate_limit
 
-from . import choices, fil, services
-from .models import (Belastningsgrenser, Korps, Mannskap, Ressurs, Utsending,
+from . import choices, fil, pauser, services
+from .models import (Belastningsgrenser, Korps, Mannskap, Pause, Ressurs, Utsending,
                      Ressursgruppe, Ressursrolle, Vaktliste, Vaktpost)
 
 
@@ -172,6 +172,9 @@ def _vaktliste_til_dict(vl):
         'fil_ved_drift': fil.sendes_ved_drift(),
         'fil_intervall_min': fil.intervall_minutter(),
         'fil_bare_endret': fil.bare_ved_endring(),
+        # Står pausene på utskriften? Admin kan skjule dem der (André, 23.
+        # sep. 2026); på skjermen står de uansett for den som planlegger.
+        'pauser_paa_utskrift': pauser.vises_for_mannskapet(),
     }
 
 
@@ -187,6 +190,10 @@ def _ressurs_til_dict(r):
         'enhet_id': r.enhet_id,
         'enhet_navn': r.enhet.navn if r.enhet else '',
         'rekkefolge': r.rekkefolge,
+        # Planleggerens pauseregel, så oppsettet kan leses tilbake.
+        'pause_etter_min': r.pause_etter_min,
+        'pause_min': r.pause_min,
+        'pause_forskyv': r.pause_forskyv,
     }
 
 
@@ -458,6 +465,10 @@ def vaktliste_detalj_view(request, pk):
         'vaktliste': _vaktliste_til_dict(vl),
         'ressurser': [_ressurs_til_dict(r) for r in ressurser],
         'vaktposter': [_vaktpost_til_dict(vp, foreldre) for vp in poster],
+        # **Pausene sendes alle, uten korpsfilter** — de hører til ressursen,
+        # og ressursene er infrastruktur som sendes alle.
+        'pauser': [pauser.til_dict(p) for p in
+                   Pause.objects.filter(ressurs__vaktliste=vl).order_by('fra', 'id')],
         'korps': [
             {'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn}
             for k in Korps.objects.filter(er_aktiv=True)
@@ -865,6 +876,11 @@ def _planleggerlinjer(data):
             'gruppe_id': _int(raa.get('gruppe_id')),
             'antall': _int(raa.get('antall')) or 1,
             'vinduer': lest,
+            # Pauseregelen, rå: `pauser.les_regel()` eier tolkningen, som
+            # `plasser` over.
+            'pause_etter_min': raa.get('pause_etter_min'),
+            'pause_min': raa.get('pause_min'),
+            'pause_forskyv': raa.get('pause_forskyv', True) is not False,
         })
     return ut
 
@@ -1382,6 +1398,52 @@ def vaktposter_view(request, pk):
     svar = _vaktpost_til_dict(vaktpost, services.foreldrekart())
     svar['antall_opprettet'] = len(lagde)
     return JsonResponse({'status': 'ok', 'data': svar}, status=201)
+
+
+# ── Pauser (23. sep. 2026) ──────────────────────────────────────────────────
+
+def _pausetider(data):
+    return _tid(data.get('fra')), _tid(data.get('til'))
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:pauser', rate='120/m', method='POST')
+def pauser_view(request, pk):
+    """Ny pause på en ressurs. **Lederens** (André, 23. sep. 2026: «leder») —
+    samme terskel som planleggeren og resten av oppsettet."""
+    if not services.kan_lede(request.user):
+        return _nektet('Pausene settes av den som setter opp vakta.')
+    ressurs = Ressurs.objects.filter(pk=pk).first()
+    if ressurs is None:
+        return _feil('Ressurs ikke funnet', status=404)
+    fra, til = _pausetider(_json_body(request))
+    try:
+        pause = pauser.lagre(ressurs, fra, til)
+    except pauser.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': pauser.til_dict(pause)}, status=201)
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:pause-skriv', rate='120/m', method=['PUT', 'DELETE'])
+def pause_detalj_view(request, pk):
+    """Flytt eller fjern en pause. Lederens, som opprettingen."""
+    if not services.kan_lede(request.user):
+        return _nektet('Pausene settes av den som setter opp vakta.')
+    pause = Pause.objects.select_related('ressurs').filter(pk=pk).first()
+    if pause is None:
+        return _feil('Pausen finnes ikke', status=404)
+    if request.method == 'DELETE':
+        pauser.slett(pause)
+        return JsonResponse({'status': 'ok'})
+    fra, til = _pausetider(_json_body(request))
+    try:
+        pause = pauser.lagre(pause.ressurs, fra, til, pause=pause)
+    except pauser.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': pauser.til_dict(pause)})
 
 
 @modul_kreves('vaktliste', 'les', svar='json')

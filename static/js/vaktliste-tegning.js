@@ -832,6 +832,37 @@ function ressursErApen(r) {
 }
 
 
+function _pauselinje(r, egne) {
+  // **Pausene står i hodet på kortet, ikke som rader i tabellen** (23. sep.
+  // 2026): de gjelder laget, ikke én person, og en rad blant skiftene ville
+  // lest som en plass. Lederen klikker en pause for å flytte den, og legger
+  // til med «+ Pause»; alle andre ser dem som tekst.
+  const pauser = _pauserFor(r.id, egne);
+  const leder = kanLede();
+  if (!pauser.length && !leder) return '';
+  const brikker = pauser.map((p) => (leder
+    ? `<button type="button" class="vl-pause" data-action="apnePause"
+               data-id="${escHtmlValue(p.id)}"
+               title="${escHtmlValue(p.fra_regel ? 'Fra planleggerens regel — klikk for å endre' : 'Klikk for å endre')}">${escapeHtml(_pausetekst(p))}</button>`
+    : `<span class="vl-pause">${escapeHtml(_pausetekst(p))}</span>`)).join('');
+  const innhold = brikker || '<span class="vl-meta">ingen</span>';
+  const ny = leder
+    ? `<button type="button" class="btn btn-sm btn-link vl-pause-ny"
+               data-action="apneNyPause" data-id="${escHtmlValue(r.id)}">
+         <i class="bi bi-plus-lg"></i> Pause
+       </button>` : '';
+  // Klassen skjuler linja på papiret når admin har slått det av. Tom linje
+  // (ingen pauser) skal heller ikke ut på papiret — «Pauser: ingen» er en
+  // linje man må lese for å se at det ikke står noe der.
+  const papir = _pauserPaaUtskrift() && pauser.length ? '' : ' vl-skjul-utskrift';
+  return `
+      <div class="vl-pauselinje${escHtmlValue(papir)}">
+        <span class="vl-meta"><i class="bi bi-cup-hot me-1"></i>Pauser</span>
+        ${innhold}${ny}
+      </div>`;
+}
+
+
 function mkRessurs(r, apen = true, egne = null) {
   // `apen` er gruppas avgjørelse, ikke ressursens — `mkGruppe()` vet hvor
   // mange søsken kortet har. Standardverdien `true` er for de stedene som
@@ -992,6 +1023,7 @@ function mkRessurs(r, apen = true, egne = null) {
         </div>
         <div class="d-flex gap-2">${knapper}</div>
       </div>
+      ${_pauselinje(r, egne)}
       ${tabell}
     </div>`;
 }

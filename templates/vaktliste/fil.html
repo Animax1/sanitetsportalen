@@ -38,7 +38,8 @@
 <h2>{{ g.navn }}</h2>
 {% for r in g.ressurser %}
 <h3>{{ r.navn }} <small>· {{ r.antall }} satt opp{% if r.ledige %} · {{ r.ledige }} ledig{{ r.ledige|pluralize:"e" }}{% endif %}</small></h3>
-<table>
+{% if r.pauser %}<p class="meta">Pause: {{ r.pauser|join:" · " }}</p>
+{% endif %}<table>
   <thead><tr><th>Tid</th><th>Navn</th><th>Korps</th><th>Rolle</th><th>Telefon</th><th>ISSI</th></tr></thead>
   <tbody>
   {% for s in r.skift %}

@@ -57,6 +57,7 @@ DOKUMENTER = [
     'ko/CLAUDE.md',
     'templates/ko/CLAUDE.md',
     'templates/oppdrag/CLAUDE.md',
+    'templates/vaktliste/CLAUDE.md',
     'backlog/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',

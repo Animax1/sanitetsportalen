@@ -44,6 +44,10 @@ urlpatterns = [
          name='vaktliste_api_ressurs_detalj'),
     path('api/ressurser/<int:pk>/vaktposter/', views.vaktposter_view,
          name='vaktliste_api_vaktposter'),
+    path('api/ressurser/<int:pk>/pauser/', views.pauser_view,
+         name='vaktliste_api_pauser'),
+    path('api/pauser/<int:pk>/', views.pause_detalj_view,
+         name='vaktliste_api_pause_detalj'),
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 

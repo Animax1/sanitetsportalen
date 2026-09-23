@@ -389,6 +389,41 @@ function _vaktspenn() {
 }
 
 
+function _pauserFor(ressursId, poster) {
+  // **Pausene til én ressurs** (23. sep. 2026). Med `poster` — dagbolkens
+  // skift — bare dem som berører de skiftene: kortet for fredag skal ikke
+  // vise lørdagens pause. Overlapp og ikke «innenfor», fordi en pause kan
+  // ligge over et skiftbytte (21:45–22:15 mellom 14–22 og 22–06).
+  const alle = ((aktivListe && aktivListe.pauser) || [])
+    .filter((p) => p.ressurs_id === ressursId);
+  if (!poster) return alle;
+  const spenn = poster.map((vp) => [_d(vp.fra_tid), _d(vp.til_tid)])
+    .filter(([a, b]) => a && b);
+  return alle.filter((p) => {
+    const fra = _d(p.fra);
+    const til = _d(p.til);
+    return fra && til && spenn.some(([a, b]) => a < til && fra < b);
+  });
+}
+
+
+function _pausetekst(p) {
+  // Kortet står alt under en dagoverskrift, så klokkeslettet holder —
+  // unntatt når pausen krysser midnatt.
+  return _sammeDag(p.fra, p.til)
+    ? `${_kl(p.fra)}–${_kl(p.til)}`
+    : `${_kl(p.fra)}–${_dag(p.til)} ${_kl(p.til)}`;
+}
+
+
+function _pauserPaaUtskrift() {
+  // Admin kan skjule pausene på utskriften (André, 23. sep. 2026: «ja men
+  // admin kan skjule det i innstillinger»). På skjermen står de uansett.
+  return !(aktivListe && aktivListe.vaktliste
+           && aktivListe.vaktliste.pauser_paa_utskrift === false);
+}
+
+
 // ── Henting ──────────────────────────────────────────────────────────────
 
 //: Hvilken vaktliste man sto på sist. Per nettleser, ikke per konto — det er

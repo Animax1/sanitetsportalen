@@ -592,6 +592,20 @@ class Ressurs(BaseTimeStampedModel):
         default=100, verbose_name='Rekkefølge',
         help_text='Styrer fanerekkefølgen. Settes automatisk til '
                   'opprettelsesrekkefølgen — se services.neste_rekkefolge().')
+    # **Planleggerens pauseregel** (André, 23. sep. 2026). Står på ressursen
+    # og ikke bare i pausene den laget, fordi planleggeren leser oppsettet
+    # tilbake fra det som står: en regel som bare fantes som resultat, kunne
+    # ikke leses tilbake — pausene er forskjøvet per lag, og hva som var
+    # regelen og hva som var forskyvningen lar seg ikke skille etterpå.
+    pause_etter_min = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Pause etter (min)',
+        help_text='Minutter fra skiftets start til pausen. Tom = ingen regel.')
+    pause_min = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Pauselengde (min)')
+    pause_forskyv = models.BooleanField(
+        default=True, verbose_name='Forskyv pausene',
+        help_text='Lag i samme gruppe med samme skiftstart tar pause etter '
+                  'hverandre, ikke samtidig.')
 
     class Meta:
         verbose_name = 'Ressurs'
@@ -757,6 +771,45 @@ class Vaktpost(BaseTimeStampedModel):
         return (self.mannskap_id is not None
                 and self.mott_at is not None
                 and self.av_vakt_at is None)
+
+
+class Pause(BaseTimeStampedModel):
+    """En avtalt pause for en ressurs (André, 22.–23. sep. 2026).
+
+    **Per ressurs, ikke per person.** Tavla i `/ko/` flytter lag og biler, ikke
+    folk: et lag i pause er fire personer ute av drift samtidig. Pause per
+    plass (samleplassen der seks tar pause én og én) er en annen modell og
+    kommer bare om den meldes fra en ekte vakt.
+
+    **Teller i timene, uten fratrekk** (André: «ja»). Mannskapet er på vakt og
+    kan kalles inn; derfor rører pausen verken budsjettet, timeoversikten eller
+    belastningen.
+
+    `fra_regel` er pausene planleggerens regel laget. De lages på nytt når
+    grunnlaget genereres; en pause lederen har lagt inn eller rettet for hånd
+    står — samme skille som kladden og det som er delt ut.
+
+    KO leser disse som utgangspunktet for Pause-raden på tavla, og en endring
+    KO gjør i drift vinner resten av vakta (`ko.PlanlagtPause.fra_vaktliste`).
+    Retningen er `ko` → `vaktliste`: vaktlista vet ingenting om det.
+    """
+
+    ressurs = models.ForeignKey(
+        Ressurs, on_delete=models.CASCADE, related_name='pauser',
+        verbose_name='Ressurs')
+    fra = models.DateTimeField(verbose_name='Fra')
+    til = models.DateTimeField(verbose_name='Til')
+    fra_regel = models.BooleanField(
+        default=False, verbose_name='Fra planleggerens regel')
+
+    class Meta:
+        verbose_name = 'Pause'
+        verbose_name_plural = 'Pauser'
+        ordering = ['fra', 'id']
+        indexes = [models.Index(fields=['ressurs', 'fra'], name='pause_ress_fra_idx')]
+
+    def __str__(self) -> str:
+        return f'{self.ressurs.navn} · pause'
 
 
 class Utsending(BaseTimeStampedModel):

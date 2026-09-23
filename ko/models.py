@@ -711,10 +711,15 @@ class PlanlagtPause(models.Model):
 
     «La oss kunne sette en pause rad og legge inn pauser der for lagene. Som
     skal overstyres av /vaktliste men kunne endres på i drift og hvis lag
-    ikke har fått planlagt pause i /vaktliste.» **Vaktlista har ingen pauser
-    ennå** (TODO): i dag er alle planlagte pauser KOs egne. Den dagen
-    vaktlista får dem, blir de utgangspunktet, og en KO-endring i drift vinner
-    — det trenger et felt for kilden, og det legges til da, ikke nå.
+    ikke har fått planlagt pause i /vaktliste.»
+
+    **Vaktlistas pauser er utgangspunktet** (23. sep. 2026): tavla viser dem
+    uten å kopiere dem hit (`tavle.effektive_pauser`). Først når KO endrer,
+    starter eller fjerner en av dem, blir det en rad her med `fra_vaktliste`
+    satt — og da vinner KOs versjon resten av vakta; vaktlista overstyrer den
+    ikke lenger. `endret` merker «endret i drift», og `avlyst` er en
+    vaktlistepause KO har tatt bort (raden står, ellers ville vaktlistas
+    kommet tilbake ved neste poll).
 
     **Planen flytter ingen.** Når tiden er inne, får laget «Pause nå», og KO
     starter den; da blir det en vanlig plassering i Pause-raden, og `startet`
@@ -740,6 +745,11 @@ class PlanlagtPause(models.Model):
         verbose_name='Planlagt av')
     av_navn = models.CharField(
         max_length=150, blank=True, default='', verbose_name='Planlagt av (navn)')
+    fra_vaktliste = models.ForeignKey(
+        'vaktliste.Pause', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_overtatt', verbose_name='Fra vaktlistas pause')
+    endret = models.BooleanField(default=False, verbose_name='Endret i drift')
+    avlyst = models.BooleanField(default=False, verbose_name='Tatt bort i drift')
 
     class Meta:
         verbose_name = 'Planlagt pause'

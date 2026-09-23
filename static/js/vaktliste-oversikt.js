@@ -463,11 +463,18 @@ function mkOversikt() {
     // forbi, og det er nettopp de som *ikke* er null man leter etter.
     const ledigcelle = ledige
       ? `<td class="vl-ledigtall">${escHtmlValue(ledige)}</td>` : '<td>—</td>';
+    // **Pausene står under tida** (23. sep. 2026) — det er arket som henges
+    // opp, og «når har laget pause» er et spørsmål den som møter stiller.
+    // Admin kan skjule dem på papiret; på skjermen står de.
+    const pausetekst = _pauserFor(ressurs.id, blokk.poster).map(_pausetekst).join(', ');
+    const pausemerke = pausetekst
+      ? `<span class="vl-meta d-block${escHtmlValue(_pauserPaaUtskrift() ? '' : ' vl-skjul-utskrift')}">pause ${escapeHtml(pausetekst)}</span>`
+      : '';
     return `
         <tr class="${escHtmlValue(ledige ? 'vl-har-ledige' : '')}">
           <td class="vl-navn">${escapeHtml(ressurs.navn)}
             <span class="vl-meta">${escapeHtml(gruppe.navn)}</span></td>
-          <td class="vl-oversikt-tid">${escapeHtml(_tidsspenn(blokk))}</td>
+          <td class="vl-oversikt-tid">${escapeHtml(_tidsspenn(blokk))}${pausemerke}</td>
           <td class="vl-timer">${escapeHtml(_varighet(blokk))}</td>
           <td class="vl-timer">${escHtmlValue(plasser)}</td>
           <td class="vl-timer">${escHtmlValue(besatt)}</td>
@@ -885,6 +892,37 @@ function _planleggerHode(linje) {
 }
 
 
+function _planleggerPause(linje) {
+  // **Pauseregelen** (André, 23. sep. 2026: «regel i planleggeren — nå»).
+  // «30 min etter 4 t» i hvert skiftvindu som er langt nok. **Forskjøvet**
+  // er standard: tre lag som starter 14:00 tar pause 18:00, 18:30 og 19:00,
+  // ikke alle tre samtidig. Et skift for kort til regelen får ingen pause.
+  const etterT = linje.pause_etter_min === '' || linje.pause_etter_min == null
+    ? '' : Number(linje.pause_etter_min) / 60;
+  const forskyv = linje.pause_forskyv !== false;
+  return `
+      <div class="vl-pl-pause">
+        <label class="vl-meta"><i class="bi bi-cup-hot me-1"></i>Pause (min)
+          <input type="number" class="form-control form-control-sm" min="5" step="5"
+                 value="${escHtmlValue(linje.pause_min ?? '')}" placeholder="ingen"
+                 data-action="planleggerSettLinje" data-hendelse="change"
+                 data-felt="pause_min" data-id="${escHtmlValue(linje.id)}"></label>
+        <label class="vl-meta">etter (timer)
+          <input type="number" class="form-control form-control-sm" min="0" step="0.5"
+                 value="${escHtmlValue(etterT)}"
+                 data-action="planleggerSettLinje" data-hendelse="change"
+                 data-felt="pause_etter_min" data-id="${escHtmlValue(linje.id)}"></label>
+        <label class="vl-meta">Lagene
+          <select class="form-select form-select-sm"
+                  data-action="planleggerSettLinje" data-hendelse="change"
+                  data-felt="pause_forskyv" data-id="${escHtmlValue(linje.id)}">
+            <option value="1"${forskyv ? ' selected' : ''}>forskjøvet</option>
+            <option value="0"${forskyv ? '' : ' selected'}>samtidig</option>
+          </select></label>
+      </div>`;
+}
+
+
 function _planleggerLinje(linje) {
   const t = _planleggerLinjetall(linje);
   const vinduer = (linje.vinduer || [])
@@ -894,6 +932,7 @@ function _planleggerLinje(linje) {
     <div class="vl-kort vl-pl-linje">
       <div class="vl-pl-topp">${_planleggerHode(linje)}</div>
       <div class="vl-pl-vinduer">${vinduer}</div>
+      ${_planleggerPause(linje)}
       <div class="vl-pl-bunn">
         <button type="button" class="btn btn-sm btn-outline-secondary"
                 data-action="planleggerNyttVindu" data-id="${escHtmlValue(linje.id)}">

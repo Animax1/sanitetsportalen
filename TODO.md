@@ -156,20 +156,6 @@ Hvert steg slettes herfra når det er levert.*
       «la oss ta ditt forslag som en ekstra ting»). /ko/ tar en hel skjerm; planleggeren
       som egen side med samme tidslinje som tavla. Etter steg 4.
 
-### Vaktlista: avtalte pauser — ønsket 22. sep. 2026
-
-- [ ] **Avtalte pauser i vaktlista, som tavla i `/ko/` henter.** André: «vi har planer om
-      å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er lagt inn enda».
-      Kontrollert 22. sep. 2026: vaktlista har **hviletid mellom skift**
-      (`services._hviletider()`), men ingen pauser *i* et skift. Tavla har i dag KOs egne
-      planlagte pauser (`ko.PlanlagtPause`, «+ Planlegg» og «Pause nå» i Pause-raden).
-      **Regelen André ga når vaktlista får dem:** vaktlistas pause er utgangspunktet og
-      står i Pause-raden av seg selv; KO kan endre den i drift, og da gjelder KOs versjon
-      resten av vakta, merket «endret i drift» — vaktlista overstyrer den ikke lenger. KO
-      kan fortsatt planlegge for lag vaktlista ikke har gitt pause. Det krever et
-      kildefelt på `PlanlagtPause`. Retningen er `ko` → `vaktliste`. Åpent når punktet tas
-      opp: pause per plass eller per ressurs, og om den teller i timene.
-
 ### Oppdragslista: endre verdier rett i lista — venter (André, 23. sep. 2026)
 
 - [ ] **Hastegrad, problemstilling, lokasjon og tildelt ressurs rett i oppdragslista**,
@@ -446,16 +432,17 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       regel forsvinner i redigeringen.
 
 - [ ] **Vurder om `vaktliste/CLAUDE.md` kan krympes — seksjon for seksjon.** Fila er
-      strukturert (13 seksjoner, 17. sep. 2026) men ikke kortet ned; den er 56 799 tegn og
-      står pinnet i `FOR_STORE_I_DAG`. Kutt var **ikke** riktig den dagen, og grunnen bør
+      strukturert (17. sep. 2026) og delt (23. sep.: flaten til
+      `templates/vaktliste/CLAUDE.md`), men ikke kortet ned; den er 43 843 tegn og står
+      fortsatt pinnet i `FOR_STORE_I_DAG`. Kutt var **ikke** riktig den dagen, og grunnen bør
       stå: hvert avsnitt bærer en regel *og* feilen som lærte oss den, og det er
       begrunnelsen som får reglene til å feste seg. En kortere fil med dårligere
       dokumentasjon er ikke en forbedring.
 
       Det som *nå* er mulig, og som ikke var det før, er å vurdere én seksjon om gangen
       mot CHANGELOG: står hele hendelsesforløpet der, kan modulfila nøye seg med regelen
-      og den ene setningen som gjør den huskbar. De tre største er «Planleggingsflatene»
-      (8 003), «Plassen og skiftet» (7 763) og «Planleggeren» (6 189).
+      og den ene setningen som gjør den huskbar. De tre største er «Plassen og skiftet»
+      (7 802), «Planleggeren» (6 229) og «Belastning, budsjett og timeoversikt» (5 736).
 
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene

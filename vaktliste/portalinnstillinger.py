@@ -16,7 +16,7 @@ class VaktlistefilInnstillinger(BasePortalinnstillingHandler):
     mal = 'vaktliste/portalinnstillinger.html'
 
     def kontekst(self) -> dict:
-        from vaktliste import fil
+        from vaktliste import fil, pauser
 
         return {
             'vaktliste_fil_mottakere': '\n'.join(fil.mottakere()),
@@ -24,6 +24,7 @@ class VaktlistefilInnstillinger(BasePortalinnstillingHandler):
             'vaktliste_fil_intervall_min': fil.intervall_minutter(),
             'vaktliste_fil_bare_endret': fil.bare_ved_endring(),
             'vaktliste_fil_maks_intervall': fil.MAKS_INTERVALL_MIN,
+            'vaktliste_vis_pauser': pauser.vises_for_mannskapet(),
         }
 
     def valider(self, post) -> dict:
@@ -52,16 +53,18 @@ class VaktlistefilInnstillinger(BasePortalinnstillingHandler):
             'ved_drift': '1' if post.get('vaktliste_fil_ved_drift') else '0',
             'intervall': intervall,
             'bare_endret': '1' if post.get('vaktliste_fil_bare_endret') else '0',
+            'vis_pauser': '1' if post.get('vaktliste_vis_pauser') else '0',
         }
 
     def lagre(self, verdier: dict) -> None:
         from core.models import AppSetting
-        from vaktliste import fil
+        from vaktliste import fil, pauser
 
         AppSetting.set(fil.MOTTAKERE_NOKKEL, '\n'.join(verdier['mottakere']))
         AppSetting.set(fil.VED_DRIFT_NOKKEL, verdier['ved_drift'])
         AppSetting.set(fil.INTERVALL_NOKKEL, verdier['intervall'])
         AppSetting.set(fil.BARE_ENDRET_NOKKEL, verdier['bare_endret'])
+        AppSetting.set(pauser.VIS_NOKKEL, verdier['vis_pauser'])
 
 
 def register_handlers() -> None:

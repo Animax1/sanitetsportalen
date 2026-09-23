@@ -447,6 +447,9 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
 }
 .ko-tavle-stolpe.ko-tavle-pause-naa { border-style: solid; border-color: #fbbf24; color: #fde68a; }
 .ko-tavle-stolpe.ko-tavle-pause-ikke_tatt { border-color: #f87171; color: #fecaca; }
+/* Vaktlistas pause, endret av KO i drift (23. sep. 2026): prikket, så den
+   skiller seg fra planen uten en ny farge — fargene betyr alt noe her. */
+.ko-tavle-stolpe.ko-tavle-pause-endret { border-style: dotted; font-style: italic; }
 .ko-tavle-pause-knapp { --bs-btn-padding-y: 0; --bs-btn-padding-x: 0.35rem; --bs-btn-font-size: 0.7rem; }
 .ko-tavle-stolpe[data-tavle-plassering] { cursor: pointer; }
 /* Planlagt slutt (23. sep. 2026): stiplet fra nå til slutten — en plan, som

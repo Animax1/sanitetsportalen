@@ -1060,6 +1060,96 @@ async function opprettVaktpost() {
 }
 
 
+// ── Pausene (23. sep. 2026) ──────────────────────────────────────────────
+//
+// Lederens, per ressurs. Ett vindu for ny og endring: `data-pause` på vinduet
+// sier hvilken pause som endres, og står tomt for en ny.
+
+function _foreslaattPause(ressursId) {
+  // Første skift på ressursen, fire timer inn, en halvtime — det vanlige, og
+  // et tidspunkt som ligger innenfor skiftet. Uten skift: vaktas start.
+  const forste = (aktivListe?.vaktposter || [])
+    .filter((vp) => vp.ressurs_id === ressursId && vp.fra_tid)
+    .map((vp) => vp.fra_tid).sort()[0];
+  const fra = _plussTimer(forste || aktivListe?.vaktliste?.startet, forste ? 4 : 0);
+  return { fra, til: _plussTimer(fra, 0.5) };
+}
+
+
+function _visPausevindu(tittel, pauseId, ressursId, fra, til) {
+  const modal = document.getElementById('pauseModal');
+  if (!modal) return;
+  _skjulFeil('pause-feil');
+  modal.dataset.pause = pauseId == null ? '' : String(pauseId);
+  modal.dataset.ressurs = String(ressursId);
+  document.getElementById('pause-tittel').textContent = tittel;
+  _settTid('pause-fra', fra);
+  _settTid('pause-til', til);
+  document.getElementById('pause-slett-knapp')?.classList.toggle('d-none', pauseId == null);
+  bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
+
+function apneNyPause(ressursId) {
+  const r = aktivListe?.ressurser.find((x) => x.id === ressursId);
+  if (!r) return;
+  const forslag = _foreslaattPause(ressursId);
+  _visPausevindu(`Ny pause — ${r.navn}`, null, ressursId, forslag.fra, forslag.til);
+}
+
+
+function apnePause(pauseId) {
+  const p = (aktivListe?.pauser || []).find((x) => x.id === pauseId);
+  if (!p) return;
+  const r = aktivListe.ressurser.find((x) => x.id === p.ressurs_id);
+  _visPausevindu(`Pause — ${r ? r.navn : ''}`, p.id, p.ressurs_id, p.fra, p.til);
+}
+
+
+async function lagrePause() {
+  const modal = document.getElementById('pauseModal');
+  if (!modal) return;
+  _skjulFeil('pause-feil');
+  await withSubmitGuard('pause-knapp', async () => {
+    const fra = _tidFraFelt('pause-fra');
+    const til = _tidFraFelt('pause-til');
+    if (!fra || !til) {
+      _visFeil('pause-feil', 'Pausen må ha både fra og til.');
+      return;
+    }
+    const url = modal.dataset.pause
+      ? `/vaktliste/api/pauser/${Number(modal.dataset.pause)}/`
+      : `/vaktliste/api/ressurser/${Number(modal.dataset.ressurs)}/pauser/`;
+    const res = await apiFetch(url, {
+      method: modal.dataset.pause ? 'PUT' : 'POST',
+      body: JSON.stringify({ fra, til }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('pause-feil', d.message || 'Kunne ikke lagre pausen.');
+      return;
+    }
+    _lukkModal('pauseModal');
+    await lastListe(aktivListe.vaktliste.id);
+  });
+}
+
+
+async function slettPause() {
+  const modal = document.getElementById('pauseModal');
+  if (!modal || !modal.dataset.pause) return;
+  const res = await apiFetch(`/vaktliste/api/pauser/${Number(modal.dataset.pause)}/`,
+                             { method: 'DELETE' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    _visFeil('pause-feil', d.message || 'Kunne ikke fjerne pausen.');
+    return;
+  }
+  _lukkModal('pauseModal');
+  await lastListe(aktivListe.vaktliste.id);
+}
+
+
 // ── Planleggeren (15. sep. 2026) ─────────────────────────────────────────
 //
 // Oppsettet ligger i `planleggerlinjer` og lagres ikke før man trykker «Lag
@@ -1126,6 +1216,11 @@ function planleggerLesTilbake() {
       navn: r.navn,
       gruppe_id: r.gruppe_id,
       antall: 1,
+      // Pauseregelen står på ressursen (23. sep. 2026), så den leses tilbake
+      // som resten av oppsettet. Tom regel er tomme felter, ikke null-er.
+      pause_min: r.pause_min ?? '',
+      pause_etter_min: r.pause_etter_min ?? '',
+      pause_forskyv: r.pause_forskyv !== false,
       // **En ressurs uten skift får ett standardvindu**, ikke null. Uten det
       // ville raden vært ugyldig for serveren i det øyeblikket den ble
       // tegnet — og en bil man nettopp opprettet i ressursfanen kunne aldri
@@ -1213,6 +1308,9 @@ function planleggerNyLinje() {
     id: planleggerNesteId++,
     gruppe_id: grupper[0].id,
     antall: 1,
+    pause_min: '',
+    pause_etter_min: '',
+    pause_forskyv: true,
     vinduer: [_planleggerStandardvindu()],
   });
   planleggerfasit = null;
@@ -1251,6 +1349,22 @@ function planleggerFjernVindu(id) {
 }
 
 
+function _planleggerLinjeverdi(felt, verdi) {
+  // Verdien slik serveren vil ha den. **«Etter» skrives i timer og sendes i
+  // minutter** — lederen tenker «etter fire timer», regelen regner i minutter
+  // så halvtimer går an. Et tall som ikke lar seg lese sendes rått, så
+  // serveren sier fra i stedet for at feltet stille blir tomt.
+  if (felt === 'gruppe_id') return Number(verdi);
+  if (felt === 'pause_forskyv') return verdi !== '0';
+  if (felt === 'pause_etter_min') {
+    if (verdi === '' || verdi == null) return '';
+    const timer = Number(String(verdi).replace(',', '.'));
+    return Number.isFinite(timer) ? Math.round(timer * 60) : verdi;
+  }
+  return verdi;
+}
+
+
 function planleggerSettLinje(id, felt, verdi) {
   // **Tre argumenter, fordi feltet bærer `data-felt`.** Se kommentaren over
   // `_planleggerSkift()` i `vaktliste-oversikt.js`: delegeringen sender
@@ -1258,7 +1372,7 @@ function planleggerSettLinje(id, felt, verdi) {
   // ellers. Første utgave tok `(arg, verdi)` og fikk aldri verdien.
   const linje = _planleggerFinnLinje(id);
   if (!linje) return;
-  linje[felt] = felt === 'gruppe_id' ? Number(verdi) : verdi;
+  linje[felt] = _planleggerLinjeverdi(felt, verdi);
   planleggerfasit = null;
   // **Gruppa er en strukturendring**: «Antall» finnes ikke for grupper i ett
   // eksemplar, så raden skifter form. Nedtrekket er man dessuten ferdig med
@@ -1328,6 +1442,7 @@ function _genererFasit(fasit) {
       <td>${escHtmlValue(r.plasser)}</td>
       <td>${escHtmlValue(r.fjernes)}</td>
       <td>${escapeHtml(_tall(r.timer))} t</td>
+      <td>${escHtmlValue(r.pauser || 0)}</td>
     </tr>`).join('');
   // **Fjerningen står som sitt eget tall, ikke i en fotnote.** Å redigere et
   // vindu fra seks plasser til fire sletter to — det er riktig, og det er det
@@ -1336,14 +1451,20 @@ function _genererFasit(fasit) {
   const fjernes = fasit.fjernes ? `
       Ryddes bort: <strong>${escHtmlValue(fasit.fjernes)}</strong> plasser som
       fortsatt står som <strong>planlagt</strong>.` : '';
+  // Regelpausene lages på nytt hver gang; de lederen har lagt inn for hånd
+  // står. Det må stå her, for det er den ene tingen generatoren sletter uten
+  // at det er kladd.
+  const pauser = fasit.pauser ? `
+      Pauser fra regelen: <strong>${escHtmlValue(fasit.pauser)}</strong> — de lages
+      på nytt, og pauser lagt inn for hånd står.` : '';
   return `
     <p class="mb-2">Dette lages: <strong>${escHtmlValue(fasit.ressurser)}</strong>
       nye ressurser, <strong>${escHtmlValue(fasit.plasser)}</strong> nye tomme
-      plasser, <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.${fjernes}</p>
+      plasser, <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.${fjernes}${pauser}</p>
     <div class="vl-tabellramme">
       <table class="vl-tabell">
         <thead><tr><th>Navn</th><th>Gruppe</th><th></th><th>Skift</th>
-          <th>Nye plasser</th><th>Fjernes</th><th>Timer</th></tr></thead>
+          <th>Nye plasser</th><th>Fjernes</th><th>Timer</th><th>Pauser</th></tr></thead>
         <tbody>${rader}</tbody>
       </table>
     </div>`;

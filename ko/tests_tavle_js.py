@@ -23,7 +23,7 @@ HARNESS = (
     (KO_JS, ('koTavleKanSkrive', 'koTavleVindu', 'koTavleProsent', 'koTavleSynlig',
              'koTavleKanDras', 'koTavleMaal', 'koTavleVarighet', 'koTavleRader',
              'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleRadHtml',
-             'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk',
+             'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk', 'koTavlePauseRef', 'koTavlePauseKildetekst',
              # Steg 2.
              'koTavleTo', 'koTavleHHMM', 'koTavleTidNaer', 'koTavlePauseStatus',
              'koTavlePlanlagtHtml', 'koTavleValgtHtml', 'koTavleDognnokkel', 'koTavleDognene',
@@ -468,6 +468,46 @@ class Steg2Tests(TavlereglerTests):
         """)
         self.assertEqual(ut[0], '[["pause",50],["rett",2]] null', 'knappen velger ingenting')
         self.assertEqual(json.loads(ut[1]), [['pause', 50], ['rett', 2], 'flytt'])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class VaktlistasPauserJsTests(Steg2Tests):
+    """Vaktlistas pauser på tavla (23. sep. 2026): id-en `v<pk>` og kilden."""
+
+    def test_pause_referansen(self):
+        ut = self._json("""[koTavlePauseRef('50'), koTavlePauseRef(50), koTavlePauseRef('v12'),
+            koTavlePauseRef('v'), koTavlePauseRef('x12'), koTavlePauseRef(''), koTavlePauseRef(null),
+            koTavlePauseRef('12a')]""")
+        self.assertEqual(ut, [50, 50, 'v12', None, None, None, None, None])
+
+    def test_klikk_paa_vaktlistas_pause_aapner_skjemaet_med_referansen(self):
+        ut = self._kjor("""
+            const aapnet = [];
+            globalThis.koTavleApneSkjema = (type, id) => aapnet.push([type, id]);
+            const med = (verdi) => ({ closest: (v) => (v === '[data-tavle-pause]' ? { getAttribute: () => verdi } : null) });
+            koTavleKlikk(med('v12'));
+            console.log(JSON.stringify(aapnet));
+        """)
+        self.assertEqual(json.loads(ut[0]), [['pause', 'v12']])
+
+    def test_kilden_paa_stolpen_og_i_skjemaet(self):
+        ut = self._kjor("""
+            const d = JSON.parse(JSON.stringify(D2));
+            d.pauser[0].id = 'v12'; d.pauser[0].kilde = 'vaktliste';
+            d.pauser[1].kilde = 'endret';
+            const stolper = koTavleRader(d, koTavleVindu(NAA2, 12), 'alle')[0].stolper;
+            console.log(JSON.stringify(stolper.map((s) => [s.pause_id, s.pause_kilde])));
+            const html = stolper.map(koTavleStolpeHtml);
+            console.log(html[0].includes('data-tavle-pause="v12"'), html[0].includes('fra vaktlista'),
+                        html[0].includes('ko-tavle-pause-endret'));
+            console.log(html[1].includes('ko-tavle-pause-endret'), html[1].includes('endret i drift'));
+            console.log(koTavleSkjemaData({type: 'pause', id: 'v12'}, d, NAA2).hint.startsWith('Fra vaktlista.'));
+            console.log(koTavleSkjemaData({type: 'pause', id: 51}, d, NAA2).hint.startsWith('Fra vaktlista, endret'));
+            console.log(JSON.stringify([koTavlePauseKildetekst('ko'), koTavlePauseKildetekst(undefined)]));
+        """)
+        self.assertEqual(json.loads(ut[0]), [['v12', 'vaktliste'], [51, 'endret']])
+        self.assertEqual(ut[1:5], ['true true false', 'true true', 'true', 'true'])
+        self.assertEqual(json.loads(ut[5]), ['', ''])
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

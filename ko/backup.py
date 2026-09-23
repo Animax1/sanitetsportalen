@@ -90,7 +90,9 @@ class KoBackupHandler(BaseBackupHandler):
     #: `Tavleplassering` (22. sep. 2026) er begge deler på én rad: ressursen
     #: mot vaktlista, lokasjonen mot oppdrag. Navnene står frosset.
     #: `PlanlagtPause` har samme ressurspeker; `startet` peker innad i settet
-    #: og beholdes.
+    #: og beholdes. `fra_vaktliste` (23. sep. 2026) peker mot vaktlistas pause
+    #: og strippes av samme grunn — prisen er at en KO-overtakelse etter en
+    #: gjenoppretting står som KOs egen pause.
     #:
     #: **Programmet** (23. sep. 2026) følger samme regel: stedet peker mot
     #: `oppdrag`, ressursgruppa i behovet mot `vaktliste`, og begge navnene står
@@ -102,7 +104,7 @@ class KoBackupHandler(BaseBackupHandler):
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],
         'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
-        'ko.PlanlagtPause': ['ressurs', 'av'],
+        'ko.PlanlagtPause': ['ressurs', 'av', 'fra_vaktliste'],
         'ko.Programpost': ['lokasjon', 'endret_av'],
         'ko.Programbehov': ['gruppe'],
         'ko.Programendring': ['av'],

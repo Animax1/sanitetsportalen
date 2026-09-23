@@ -62,8 +62,8 @@ urlpatterns = [
     path('api/tavle/plasseringer/<int:pk>/', views.tavle_plassering_view,
          name='ko_api_tavle_plassering'),
     path('api/tavle/pauser/', views.tavle_pauser_view, name='ko_api_tavle_pauser'),
-    path('api/tavle/pauser/<int:pk>/', views.tavle_pause_view, name='ko_api_tavle_pause'),
-    path('api/tavle/pauser/<int:pk>/start/', views.tavle_pause_start_view,
+    path('api/tavle/pauser/<str:ref>/', views.tavle_pause_view, name='ko_api_tavle_pause'),
+    path('api/tavle/pauser/<str:ref>/start/', views.tavle_pause_start_view,
          name='ko_api_tavle_pause_start'),
     path('api/tavle/oppsett/', views.tavle_oppsett_view, name='ko_api_tavle_oppsett'),
     # Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026).

@@ -50,11 +50,23 @@ HTML_BUILDERS = (
     'mkGruppekurve',
     '_mkEnKurve',
     'mkIkkePlassert',
+    # Pausene (23. sep. 2026): linja på ressurskortet og regelen i planleggeren.
+    '_pauselinje', '_planleggerPause',
 )
 
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Pausene (23. sep. 2026). Markup bygget i funksjonene, med tidene og
+    # id-ene escapet inni; forskyvningen er hardkodede attributter.
+    'innhold': 'markup fra `_pauselinje`: pausene escapet inni, eller en fast tekst',
+    'ny': 'markup bygget lokalt, ressurs-id escapet inni',
+    '_pauselinje(r, egne)': 'markup fra `_pauselinje`, som selv skannes her',
+    '_planleggerPause(linje)': 'markup fra `_planleggerPause`, som selv skannes her',
+    "forskyv ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    "forskyv ? '' : ' selected'": 'hardkodet attributt fra en ternær',
+    'pauser': 'markup bygget lokalt i `_genererFasit`, tallet escapet inni',
+    'pausemerke': 'markup bygget lokalt i `blokkrad`, pausetidene escapet inni',
     # Fanerekka delt i bolker (16. sep. 2026, pulje 3 punkt 5).
     'slag': 'hardkodet CSS-klasse fra en ternær',
     # Rollerekkefølgen (16. sep. 2026, pulje 3 punkt 6). Begge er markup
@@ -310,7 +322,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', 'ressursErApen', '_radklasse', '_stempelknapper',
+        (VAKTLISTE_JS, ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge',
@@ -1525,7 +1537,7 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
+        (VAKTLISTE_JS, ('mkOversikt', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_sumTimer',
@@ -1983,7 +1995,7 @@ class FanenErGruppaTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
-                        'mkRessurs', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
+                        'mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
                         '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader',
@@ -2208,7 +2220,7 @@ class UtskriftslistaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
+        (VAKTLISTE_JS, ('mkOversikt', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_sumTimer',
@@ -2358,7 +2370,7 @@ class EnkeltgruppeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', '_sumTimer', '_radklasse',
+        (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', 'opptattPaaPlassen', '_varighet', '_skifttimer', '_tall',
@@ -3388,13 +3400,13 @@ class PlanleggerfanenTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (PORTAL_UTILS_JS, ('hendelseArgumenter', '_handlerArgument',
                            'klikkSkalKjore')),
-        (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
+        (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje',  '_planleggerPause','_planleggerVindu',
                         '_planleggerHode', '_planleggerStaar',
                         'planleggerLesTilbake', 'planleggerSikreLinjer',
                         '_planleggerVindutall', '_planleggerLinjetall',
                         '_gruppeFor',
                         '_planleggerRegnestykke', 'planleggerTotal',
-                        'planleggerSettLinje', 'planleggerSettVindu',
+                        'planleggerSettLinje', '_planleggerLinjeverdi', 'planleggerSettVindu',
                         'planleggerNyLinje', 'planleggerNyttVindu',
                         'planleggerTegnTall', '_vindutallTekst',
                         'planleggerFjernLinje', 'planleggerFjernVindu',
@@ -4190,7 +4202,7 @@ class PlanleggerenTegnesMedOppsettetTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnPanel', 'mkPlanlegger', '_planleggerLinje',
+        (VAKTLISTE_JS, ('tegnPanel', 'mkPlanlegger', '_planleggerLinje', '_planleggerPause',
                         '_planleggerVindu', '_planleggerHode',
                         '_planleggerStaar', 'planleggerLesTilbake',
                         'planleggerSikreLinjer', '_planleggerStandardvindu',
@@ -4720,7 +4732,7 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
+        (VAKTLISTE_JS, ('mkOversikt', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
              "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"

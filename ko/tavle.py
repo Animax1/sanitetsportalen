@@ -382,8 +382,10 @@ def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None) -> 
         raise Ugyldig('En pause kan ikke være lengre enn fire timer.')
     if til <= naa:
         raise Ugyldig('Pausen er alt over — en plan gjelder det som kommer.')
+    # En pause KO har tatt bort (`avlyst`) står bare som en merkelapp over
+    # vaktlistas — den skal ikke sperre for en ny.
     andre = (PlanlagtPause.objects.select_for_update()
-             .filter(vakt=vakt, ressurs=ressurs, fra__lt=til, til__gt=fra))
+             .filter(vakt=vakt, ressurs=ressurs, fra__lt=til, til__gt=fra, avlyst=False))
     if pause is not None:
         andre = andre.exclude(pk=pause.pk)
     kollisjon = andre.first()
@@ -395,14 +397,90 @@ def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None) -> 
             vakt=vakt, ressurs=ressurs, ressurs_navn=ressurs.navn, fra=fra, til=til,
             av=_bruker(bruker), av_navn=_navn(bruker))
     pause.fra, pause.til = fra, til
-    pause.save(update_fields=['fra', 'til'])
+    # En vaktlistepause KO har flyttet, er «endret i drift» — og derfra KOs.
+    pause.endret = pause.endret or pause.fra_vaktliste_id is not None
+    pause.save(update_fields=['fra', 'til', 'endret'])
     return pause
 
 
 def slett_pause(pause) -> None:
+    """Fjern en planlagt pause. **En overtatt vaktlistepause slettes ikke, den
+    avlyses**: raden står og sier at KO tok den bort, ellers ville vaktlistas
+    pause dukket opp igjen ved neste poll."""
     if pause.startet_id:
         raise Ugyldig('Pausen er startet, og står som en plassering i Pause-raden.')
+    if pause.fra_vaktliste_id is not None:
+        pause.avlyst = True
+        pause.save(update_fields=['avlyst'])
+        return
     pause.delete()
+
+
+# ── Vaktlistas pauser (23. sep. 2026) ─────────────────────────────────────────
+#
+# André: «vaktlistas pause er utgangspunktet og står i Pause-raden av seg selv;
+# KO kan endre den i drift, og da gjelder KOs versjon resten av vakta, merket
+# «endret i drift» — vaktlista overstyrer den ikke lenger. KO kan fortsatt
+# planlegge for lag vaktlista ikke har gitt pause.»
+#
+# **Ingen kopi før KO rører den.** Tavla leser vaktlistas pauser rett fra
+# vaktlista og viser dem med id `v<pk>`. Først en endring, «Pause nå» eller en
+# fjerning gjør den til en `PlanlagtPause` med `fra_vaktliste` — og da er den
+# KOs. Én sannhet til noen faktisk tar et valg.
+
+#: Prefikset på en vaktlistepause i tavlesvaret og i URL-en.
+VAKTLISTE_PREFIKS = 'v'
+
+
+def effektive_pauser(vakt, liste=None) -> list[dict]:
+    """Pausene tavla viser, sortert på `fra`: KOs egne som ikke er tatt bort,
+    og vaktlistas som KO ikke har overtatt.
+
+    **KO vinner også på overlapp**: har KO lagt en egen pause over tida til en
+    av vaktlistas for samme lag, vises KOs. Ellers ville en KO-pause lagt inn
+    før vaktlista fikk sine (eller etter at planleggeren laget dem på nytt)
+    stått dobbelt.
+    """
+    from vaktliste.models import Pause
+    from vaktliste.services import vaktliste_i_bruk
+
+    ko = list(PlanlagtPause.objects.filter(vakt=vakt))
+    overtatt = {q.fra_vaktliste_id for q in ko if q.fra_vaktliste_id}
+    aktive = [q for q in ko if not q.avlyst]
+    ut = [{
+        'id': q.pk,
+        'ressurs_id': q.ressurs_id,
+        'ressurs_navn': q.ressurs_navn,
+        'fra': q.fra,
+        'til': q.til,
+        'startet': q.startet_id is not None,
+        'av_navn': q.av_navn,
+        'kilde': 'endret' if q.endret else ('vaktliste' if q.fra_vaktliste_id else 'ko'),
+    } for q in aktive]
+    liste = vaktliste_i_bruk() if liste is None else liste
+    if liste is not None:
+        for p in Pause.objects.filter(ressurs__vaktliste=liste).select_related('ressurs'):
+            if p.pk in overtatt:
+                continue
+            if any(q.ressurs_id == p.ressurs_id and q.fra < p.til and p.fra < q.til for q in aktive):
+                continue
+            ut.append({'id': f'{VAKTLISTE_PREFIKS}{p.pk}', 'ressurs_id': p.ressurs_id,
+                       'ressurs_navn': p.ressurs.navn, 'fra': p.fra, 'til': p.til,
+                       'startet': False, 'av_navn': '', 'kilde': 'vaktliste'})
+    ut.sort(key=lambda d: (d['fra'], str(d['id'])))
+    return ut
+
+
+def overta_pause(vakt, vaktliste_pause, *, bruker) -> PlanlagtPause:
+    """Vaktlistas pause som KOs rad — lages første gang KO rører den, og
+    finnes den, er det den. Tidene er vaktlistas til KO endrer dem."""
+    q = PlanlagtPause.objects.filter(vakt=vakt, fra_vaktliste=vaktliste_pause).first()
+    if q is not None:
+        return q
+    return PlanlagtPause.objects.create(
+        vakt=vakt, ressurs=vaktliste_pause.ressurs, ressurs_navn=vaktliste_pause.ressurs.navn,
+        fra=vaktliste_pause.fra, til=vaktliste_pause.til, fra_vaktliste=vaktliste_pause,
+        av=_bruker(bruker), av_navn=_navn(bruker))
 
 
 @transaction.atomic
@@ -551,15 +629,9 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         'rader': [{'id': l.pk, 'navn': l.navn}
                   for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')
                   if l.pk not in ute],
-        'pauser': [{
-            'id': q.pk,
-            'ressurs_id': q.ressurs_id,
-            'ressurs_navn': q.ressurs_navn,
-            'fra': _iso(q.fra),
-            'til': _iso(q.til),
-            'startet': q.startet_id is not None,
-            'av_navn': q.av_navn,
-        } for q in PlanlagtPause.objects.filter(vakt=vakt).order_by('fra', 'id')],
+        # KOs egne og vaktlistas, se `effektive_pauser`. `kilde` er «ko»,
+        # «vaktliste» eller «endret» (i drift).
+        'pauser': [dict(q, fra=_iso(q['fra']), til=_iso(q['til'])) for q in effektive_pauser(vakt)],
         'grupper': list(grupper.values()),
         'ressurser': [{
             'id': r.pk,

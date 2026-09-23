@@ -1087,10 +1087,31 @@ def tavle_pauser_view(request):
     return JsonResponse({'status': 'ok', 'data': {'id': q.pk}})
 
 
-def _tavle_pause(request, pk):
+def _tavle_pause(request, ref):
+    """Pausen `ref` peker på: KOs egen (et tall), eller vaktlistas (`v<pk>`,
+    23. sep. 2026). **En vaktlistepause overtas her** — den blir KOs rad i det
+    KO rører den. Kalles derfor inne i `transaction.atomic()`, så en endring
+    som avvises ikke etterlater en overtakelse ingen ba om."""
+    from . import tavle
     from .models import PlanlagtPause
-    q = PlanlagtPause.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
-    if q is None or _bil_skjult(request, q.ressurs_id):
+
+    vakt = hent_aktiv_vakt()
+    ref = str(ref)
+    if ref.startswith(tavle.VAKTLISTE_PREFIKS):
+        from vaktliste.models import Pause
+        from vaktliste.services import vaktliste_i_bruk
+
+        liste = vaktliste_i_bruk()
+        pk = _heltall_eller_none(ref[len(tavle.VAKTLISTE_PREFIKS):])
+        vp = (Pause.objects.select_related('ressurs').filter(pk=pk, ressurs__vaktliste=liste).first()
+              if liste is not None and pk else None)
+        if vp is None or _bil_skjult(request, vp.ressurs_id):
+            return None
+        q = tavle.overta_pause(vakt, vp, bruker=request.user)
+    else:
+        pk = _heltall_eller_none(ref)
+        q = PlanlagtPause.objects.filter(pk=pk, vakt=vakt).first() if pk else None
+    if q is None or q.avlyst or _bil_skjult(request, q.ressurs_id):
         return None
     return q
 
@@ -1098,24 +1119,25 @@ def _tavle_pause(request, pk):
 @modul_kreves('ko', 'skriv_full', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 @rate_limit(group='ko:tavle_pause', rate='60/m', method=['PUT', 'DELETE'])
-def tavle_pause_view(request, pk):
-    """Endre eller fjern en planlagt pause."""
+def tavle_pause_view(request, ref):
+    """Endre eller fjern en planlagt pause — KOs egen eller vaktlistas."""
     from . import tavle
 
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    q = _tavle_pause(request, pk)
-    if q is None:
-        return _feil('Ukjent pause.', 404)
     data = _json_body(request)
     try:
-        if request.method == 'DELETE':
-            tavle.slett_pause(q)
-            return JsonResponse({'status': 'ok'})
-        tavle.planlegg_pause(q.vakt, q.ressurs, pause=q, bruker=request.user,
-                             fra=_tavle_tid(data.get('fra'), 'Fra'),
-                             til=_tavle_tid(data.get('til'), 'Til'))
+        with transaction.atomic():
+            q = _tavle_pause(request, ref)
+            if q is None:
+                return _feil('Ukjent pause.', 404)
+            if request.method == 'DELETE':
+                tavle.slett_pause(q)
+                return JsonResponse({'status': 'ok'})
+            tavle.planlegg_pause(q.vakt, q.ressurs, pause=q, bruker=request.user,
+                                 fra=_tavle_tid(data.get('fra'), 'Fra'),
+                                 til=_tavle_tid(data.get('til'), 'Til'))
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok'})
@@ -1124,18 +1146,20 @@ def tavle_pause_view(request, pk):
 @modul_kreves('ko', 'skriv_full', svar='json')
 @require_http_methods(['POST'])
 @rate_limit(group='ko:tavle_pause_start', rate='60/m', method='POST')
-def tavle_pause_start_view(request, pk):
-    """«Pause nå»: KO starter den; tavla flytter ingen av seg selv."""
+def tavle_pause_start_view(request, ref):
+    """«Pause nå»: KO starter den; tavla flytter ingen av seg selv. Også på
+    en av vaktlistas — da overtas den i samme transaksjon."""
     from . import tavle
 
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    q = _tavle_pause(request, pk)
-    if q is None:
-        return _feil('Ukjent pause.', 404)
     try:
-        tavle.start_pause(q, bruker=request.user)
+        with transaction.atomic():
+            q = _tavle_pause(request, ref)
+            if q is None:
+                return _feil('Ukjent pause.', 404)
+            tavle.start_pause(q, bruker=request.user)
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok'})
@@ -1248,7 +1272,8 @@ def program_dekning_view(request):
     start = program.dogn_start(request.GET.get('dogn', ''))
     if start is None:
         return _feil('Oppgi døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
-    return JsonResponse({'status': 'ok', 'data': {'timer': program.paa_vakt_per_time(start)}})
+    return JsonResponse({'status': 'ok', 'data': {
+        'timer': program.paa_vakt_per_time(start, hent_aktiv_vakt())}})
 
 
 # ── Plan mot faktisk og kopiering (steg 5) ──────────────────────────────────

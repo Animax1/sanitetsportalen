@@ -131,6 +131,15 @@ function koTavleTidNaer(refMs, hhmm) {
   return d.getTime();
 }
 
+// En pause-id fra markupen: et tall for KOs egne, `v<pk>` for vaktlistas
+// (23. sep. 2026). `Number('v12')` er NaN, og da åpnet klikket ingenting.
+function koTavlePauseRef(raa) {
+  const tekst = String(raa == null ? '' : raa).trim();
+  if (/^\d+$/.test(tekst)) return Number(tekst);
+  if (/^v\d+$/.test(tekst)) return tekst;
+  return null;
+}
+
 // Hvor en planlagt pause står: startet, ikke tatt, nå (fra forvarselet), eller
 // kommer. «Nå» er når KO får knappen — tavla starter den aldri selv.
 function koTavlePauseStatus(q, naaMs) {
@@ -284,6 +293,7 @@ function koTavleRader(data, vindu, filter) {
         plassering_id: t.p && !t.p.hendelse_nummer ? t.p.id : null,
         pause_id: t.q ? t.q.id : null,
         pause_status: t.q ? koTavlePauseStatus(t.q, vindu.naa) : '',
+        pause_kilde: t.q ? (t.q.kilde || 'ko') : '',
         slutt: t.slutt ? { over: t.slutt.over, min: t.slutt.min, kl: koTavleHHMM(t.slutt.til),
                            prosent: koTavleProsent(t.slutt.til, vindu) } : null,
       };
@@ -343,6 +353,7 @@ function koTavleStolpeHtml(s) {
   if (s.dras) klasser.push('ko-tavle-dras');
   if (s.ressurs_id !== null && s.ressurs_id === koTavleValgt && !s.pause_id) klasser.push('ko-tavle-valgt');
   if (s.pause_id) klasser.push('ko-tavle-planlagt', 'ko-tavle-pause-' + escapeHtml(s.pause_status));
+  if (s.pause_kilde === 'endret') klasser.push('ko-tavle-pause-endret');
   if (s.slutt && s.slutt.over) klasser.push('ko-tavle-over');
   // Den planlagte er kort og står tett: bare navnet, tida i `title`.
   const etikett = escapeHtml(s.navn) + (s.merke && !s.pause_id ? ' · ' + escapeHtml(s.merke) : '')
@@ -370,7 +381,8 @@ function koTavleStolpeHtml(s) {
       + ' title="Dra til en rad, eller klikk og velg rad"';
   } else if (skriv && s.pause_id) {
     dra = ' data-tavle-pause="' + escapeHtml(s.pause_id) + '" tabindex="0" role="button"'
-      + ' title="Planlagt pause ' + escapeHtml(s.merke) + ' — klikk for å endre"';
+      + ' title="Planlagt pause ' + escapeHtml(s.merke) + escapeHtml(koTavlePauseKildetekst(s.pause_kilde))
+      + ' — klikk for å endre"';
   } else if (skriv && s.plassering_id && !s.aapen) {
     dra = ' data-tavle-plassering="' + escapeHtml(s.plassering_id) + '" tabindex="0" role="button"'
       + ' title="Klikk for å rette tidene"';
@@ -473,6 +485,14 @@ function koTavleUtenPlassHtml(u) {
     + '<div class="ko-tavle-kort-under">' + escapeHtml(r.tekst) + '</div></div>').join('');
   return '<div class="ko-tavle-overskrift">Uten plass</div>' + kort
     + (travle ? '<div class="ko-tavle-overskrift mt-2">Opptatt</div>' + travle : '');
+}
+
+// Hvor pausen kommer fra, som et tillegg i `title`: «fra vaktlista» eller
+// «endret i drift». KOs egne sier ingenting — det er standarden på tavla.
+function koTavlePauseKildetekst(kilde) {
+  if (kilde === 'vaktliste') return ' · fra vaktlista';
+  if (kilde === 'endret') return ' · endret i drift';
+  return '';
 }
 
 // Den planlagte pausen på et kort i «Uten plass»: knappen når den er her,
@@ -687,7 +707,10 @@ function koTavleSkjemaData(skjema, data, naaMs) {
     fra: q ? koTavleHHMM(Date.parse(q.fra)) : koTavleHHMM(forslag),
     til: q ? koTavleHHMM(Date.parse(q.til)) : koTavleHHMM(forslag + 30 * 60000),
     tilLaast: false,
-    hint: 'Planen flytter ingen: når tiden er inne, får laget «Pause nå», og KO starter den.',
+    hint: (q && q.kilde === 'vaktliste'
+      ? 'Fra vaktlista. Endrer eller fjerner du den, gjelder KOs versjon resten av vakta. '
+      : (q && q.kilde === 'endret' ? 'Fra vaktlista, endret i drift — KOs versjon gjelder. ' : ''))
+      + 'Planen flytter ingen: når tiden er inne, får laget «Pause nå», og KO starter den.',
     kanFjerne: Boolean(q),
   };
 }
@@ -824,7 +847,7 @@ function koTavleKlikk(el) {
     return;
   }
   const pause = el.closest('[data-tavle-pause]');
-  if (pause) { koTavleApneSkjema('pause', Number(pause.getAttribute('data-tavle-pause'))); return; }
+  if (pause) { koTavleApneSkjema('pause', koTavlePauseRef(pause.getAttribute('data-tavle-pause'))); return; }
   const hist = el.closest('[data-tavle-plassering]');
   if (hist) koTavleApneSkjema('rett', Number(hist.getAttribute('data-tavle-plassering')));
 }
@@ -929,7 +952,9 @@ async function koTavleFjernISkjema() {
 }
 
 async function koTavleStartPause(id) {
-  await koTavleSend('/ko/api/tavle/pauser/' + Number(id) + '/start/', 'POST', {});
+  const ref = koTavlePauseRef(id);
+  if (ref === null) return;
+  await koTavleSend('/ko/api/tavle/pauser/' + ref + '/start/', 'POST', {});
 }
 
 function koTavleVisBesok() {

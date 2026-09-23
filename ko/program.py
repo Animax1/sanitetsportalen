@@ -346,29 +346,39 @@ def dogn_start(dogn: str):
     return timezone.make_aware(datetime.combine(d, time(t, m)), timezone.get_current_timezone())
 
 
-def paa_vakt_per_time(start) -> list[dict]:
+def paa_vakt_per_time(start, vakt=None) -> list[dict]:
     """Hvor mange av hver ressursgruppe vaktlista har på vakt, time for time
     i døgnet som begynner `start`. **Samme regel som resten av portalen**
     (`vaktliste.services.ressurser_med_skift`) — planleggeren skal ikke ha sin
     egen mening om hvem som er på vakt.
 
+    **Et lag i pause midt i timen er ikke på vakt den timen** (23. sep. 2026).
+    Pausene er tavlas — vaktlistas og KOs, med KOs endringer
+    (`tavle.effektive_pauser`) — og `pause` teller dem per gruppe, så stripa
+    kan si hvorfor tallet er lavere. Det er her en pause lagt midt i
+    headlineren blir synlig før vakta.
+
     Tjuefire spørringer, én per time: svaret hentes når planleggeren åpnes
     eller bytter døgn, ikke ved hver poll.
     """
-    from django.db.models import Count
-
     from vaktliste.services import ressurser_med_skift, vaktliste_i_bruk
 
+    from .tavle import effektive_pauser
+
     liste = vaktliste_i_bruk()
+    pauser = effektive_pauser(vakt, liste) if vakt is not None and liste is not None else []
     ut = []
     for i in range(24):
         fra = start + timedelta(hours=i)
-        grupper = {}
+        midt = fra + MIDT_I_TIMEN
+        grupper, i_pause = {}, {}
         if liste is not None:
-            grupper = {str(r['gruppe_id']): r['n'] for r in (
-                ressurser_med_skift(liste, fra + MIDT_I_TIMEN)
-                .values('gruppe_id').annotate(n=Count('pk')))}
-        ut.append({'fra': fra.isoformat(), 'grupper': grupper})
+            borte = {q['ressurs_id'] for q in pauser if q['fra'] <= midt < q['til']}
+            for r in ressurser_med_skift(liste, midt).values('pk', 'gruppe_id'):
+                nokkel = str(r['gruppe_id'])
+                maal = i_pause if r['pk'] in borte else grupper
+                maal[nokkel] = maal.get(nokkel, 0) + 1
+        ut.append({'fra': fra.isoformat(), 'grupper': grupper, 'pause': i_pause})
     return ut
 
 

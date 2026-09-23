@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
 
-from . import choices
+from . import choices, pauser
 from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
 
 
@@ -187,6 +187,9 @@ def _sammendrag(plan):
                          for fra, til, nye in _nye_plasser(rad)), 2)
 
     return {
+        # Pausene regelen legger inn. De lages på nytt ved hver generering,
+        # så tallet er hele regelens, ikke en endring.
+        'pauser': sum(len(p.get('pauser', [])) for p in plan),
         # **Bare de nye ressursene telles.** Raden som peker på en ressurs
         # som alt står, oppretter ingen — «2 ressurser» om en generering som
         # bare flytter tidene på to biler ville vært en løgn om hva som skjer.
@@ -202,6 +205,7 @@ def _sammendrag(plan):
             'plasser': _plasser(p),
             'fjernes': p.get('kladd', 0),
             'timer': _timesum(p),
+            'pauser': len(p.get('pauser', [])),
         } for p in plan],
     }
 
@@ -278,6 +282,7 @@ def _planlegg(vaktliste, linjer):
     sett_ressurs = set()
     for linje in linjer:
         skift = _linjens_skift(linje)
+        regel = pauser.les_regel(linje)
 
         ressurs_id = linje.get('ressurs_id')
         if ressurs_id is not None:
@@ -302,6 +307,7 @@ def _planlegg(vaktliste, linjer):
                 'ressurs': ressurs,
                 'beholdt': beholdt,
                 'kladd': kladd,
+                'pauseregel': regel,
             })
             continue
 
@@ -334,7 +340,10 @@ def _planlegg(vaktliste, linjer):
                 'ressurs': None,
                 'beholdt': {},
                 'kladd': 0,
+                'pauseregel': regel,
             })
+
+    _planlegg_pauser(plan)
 
     # **Grensen måles på det som skal lages**, ikke på tallene i feltene: en
     # rad som allerede står med sine seks plasser lager ingen, og skal ikke
@@ -345,6 +354,43 @@ def _planlegg(vaktliste, linjer):
             f'Oppsettet ville laget {totalt} plasser. Grensen er '
             f'{MAKS_PLASSER_TOTALT} — sjekk tidene og antallet.')
     return plan
+
+
+def _planlegg_pauser(plan):
+    """Pausene regelen gir, lagt på hver rad som `pauser`.
+
+    **Forskyvningen telles per gruppe og skiftstart, over hele planen** — ikke
+    per linje. Leses oppsettet tilbake, er hver ressurs sin egen linje, og en
+    teller per linje ville satt alle lagene tilbake på samme klokkeslett ved
+    neste generering. Rekkefølgen er planens, og den er ressursenes.
+
+    **En pause lederen har lagt inn for hånd, vinner.** Regelpausen som ville
+    overlappet den, hoppes over — lederen har alt bestemt noe om den tida.
+    """
+    teller = {}
+    for rad in plan:
+        rad['pauser'] = []
+        regel = rad.get('pauseregel')
+        if regel is None:
+            continue
+        etter, lengde, forskyv = regel
+        egne = []
+        if rad['ressurs'] is not None:
+            egne = [(p.fra, p.til) for p in rad['ressurs'].pauser.all() if not p.fra_regel]
+        for fra, til, _ in rad['skift']:
+            nokkel = (rad['gruppe'].pk, fra)
+            indeks = teller.get(nokkel, 0) if forskyv else 0
+            tid = pauser.regelpause(fra, til, etter_min=etter, lengde_min=lengde, indeks=indeks)
+            if tid is None:
+                continue
+            # **Også et lag på «samtidig» tar en plass i rekka.** Ellers la et
+            # forskjøvet lag i samme gruppe seg oppå dem, og to lag var borte
+            # samtidig — nettopp det forskyvningen finnes for å hindre.
+            # Funnet ved mutasjonstesting.
+            teller[nokkel] = teller.get(nokkel, 0) + 1
+            if any(a < tid[1] and tid[0] < b for a, b in egne):
+                continue
+            rad['pauser'].append(tid)
 
 
 def _neste_navn(gruppe, brukte_navn, finnes_i_gruppa):
@@ -405,7 +451,7 @@ def generer_grunnlag(vaktliste, linjer):
 
     Returnerer det samme som `forhaandsvis_grunnlag`, pluss `slettet`.
     """
-    from .models import Ressurs, Vaktpost
+    from .models import Pause, Ressurs, Vaktpost
 
     plan = _planlegg(vaktliste, linjer)
     slettet = 0
@@ -428,6 +474,18 @@ def generer_grunnlag(vaktliste, linjer):
                 for _ in range(nye):
                     Vaktpost.objects.create(
                         ressurs=ressurs, fra_tid=fra, til_tid=til)
+            # **Regelen står på ressursen, og regelpausene lages på nytt.**
+            # Pausene lederen har lagt inn eller rettet for hånd står, som
+            # det som er delt ut av plassene.
+            etter, lengde, forskyv = rad['pauseregel'] or (None, None, True)
+            ressurs.pause_etter_min, ressurs.pause_min = etter, lengde
+            ressurs.pause_forskyv = forskyv
+            ressurs.save(update_fields=['pause_etter_min', 'pause_min', 'pause_forskyv',
+                                        'updated_at'])
+            for p in ressurs.pauser.filter(fra_regel=True):
+                p.delete()
+            for fra, til in rad['pauser']:
+                Pause.objects.create(ressurs=ressurs, fra=fra, til=til, fra_regel=True)
 
     svar = _sammendrag(plan)
     svar['slettet'] = slettet

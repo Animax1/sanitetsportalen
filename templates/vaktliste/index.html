@@ -712,6 +712,44 @@
   </div>
 </div>
 
+{% comment %}
+  Pausene (23. sep. 2026): lederens, per ressurs. Samme vindu for ny og
+  endring — `data-pause` er satt når det er en endring, og da vises «Fjern».
+{% endcomment %}
+<div class="modal fade" id="pauseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pause-tittel">Pause</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-2">
+          <div class="col">
+            <label class="form-label" for="pause-fra">Fra</label>
+            <input type="datetime-local" step="300" id="pause-fra" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label" for="pause-til">Til</label>
+            <input type="datetime-local" step="300" id="pause-til" class="form-control">
+          </div>
+        </div>
+        <div class="form-text mb-2" id="pause-hjelp">
+          Pausen gjelder hele ressursen og må ligge innenfor skiftene. Den teller i timene.
+          KO ser den i Pause-raden på tavla.
+        </div>
+        <div id="pause-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger me-auto d-none" id="pause-slett-knapp"
+                data-action="slettPause">Fjern</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="pause-knapp"
+                data-action="lagrePause">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="nyVaktpostModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

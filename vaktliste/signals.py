@@ -29,7 +29,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import Mannskap, Ressurs, Utsending, Vaktliste, Vaktpost
+from .models import Mannskap, Pause, Ressurs, Utsending, Vaktliste, Vaktpost
 
 TABELLNAVN = 'vaktliste_mannskap'
 
@@ -309,6 +309,39 @@ def ressurs_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Ressurs)
 def ressurs_post_delete(sender, instance, **kwargs):
     _logg_slettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')
+
+
+# ── Pausene (23. sep. 2026) ──────────────────────────────────────────────────
+#
+# Oppsett som skiftene: hvem la inn, flyttet og fjernet en pause. En regel i
+# planleggeren som lager tjue pauser gir tjue rader — det er det som skjedde.
+
+PAUSE_TABELLNAVN = 'vaktliste_pause'
+
+
+def _beskriv_pause(p) -> str:
+    fra = timezone.localtime(p.fra).strftime('%d.%m %H:%M') if p.fra else '?'
+    til = timezone.localtime(p.til).strftime('%H:%M') if p.til else '?'
+    kilde = ' (regel)' if p.fra_regel else ''
+    return f'{p} {fra}–{til}{kilde}'
+
+
+@receiver(pre_save, sender=Pause)
+@ikke_under_loaddata
+def pause_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Pause, instance, PAUSE_TABELLNAVN)
+
+
+@receiver(post_save, sender=Pause)
+@ikke_under_loaddata
+def pause_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, PAUSE_TABELLNAVN, _beskriv_pause(instance))
+
+
+@receiver(post_delete, sender=Pause)
+def pause_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, PAUSE_TABELLNAVN, _beskriv_pause(instance))
 
 
 # ── Utsendinger av vaktlista som fil ─────────────────────────────────────────

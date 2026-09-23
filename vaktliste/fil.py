@@ -29,7 +29,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
 
-from .models import Ressursgruppe, Utsending, Vaktpost
+from . import pauser
+from .models import Pause, Ressursgruppe, Utsending, Vaktpost
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,13 @@ def rader_for(vaktliste):
     def _rekkefolge(vp):
         return (vp.fra_tid, vp.til_tid, (vp.mannskap.navn if vp.mannskap_id else '').lower())
 
+    # Pausene (23. sep. 2026): mannskapet ser dem i fila, med mindre admin har
+    # skjult dem. Per ressurs, som tekst — fila skal kunne leses uten portalen.
+    per_ressurs_pauser: dict[int, list] = {}
+    if pauser.vises_for_mannskapet():
+        for p in Pause.objects.filter(ressurs__vaktliste=vaktliste).order_by('fra', 'id'):
+            per_ressurs_pauser.setdefault(p.ressurs_id, []).append(_tidsspenn(p.fra, p.til))
+
     grupper = []
     for gruppe in Ressursgruppe.objects.order_by('rekkefolge', 'navn'):
         egne = sorted((r for r in ressurser.values() if r.gruppe_id == gruppe.pk),
@@ -145,6 +153,7 @@ def rader_for(vaktliste):
             skift = sorted(per_ressurs[r.pk], key=_rekkefolge)
             deler.append({'navn': r.navn, 'antall': sum(1 for vp in skift if vp.mannskap_id),
                           'ledige': sum(1 for vp in skift if vp.mannskap_id is None),
+                          'pauser': per_ressurs_pauser.get(r.pk, []),
                           'skift': [_rad(vp) for vp in skift]})
         if deler:
             grupper.append({'navn': gruppe.navn, 'ressurser': deler})

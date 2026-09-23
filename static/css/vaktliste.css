@@ -736,6 +736,43 @@
   margin: 0;
 }
 
+/* Pausene (23. sep. 2026): en linje i hodet på ressurskortet. Knappene for
+   lederen er ikke `.btn` — da ville utskriften skjult selve pausene sammen
+   med handlingene. */
+.vl-pauselinje {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.75rem 0.4rem;
+}
+.vl-pause {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+button.vl-pause:hover { border-style: solid; }
+.vl-pause-ny { font-size: 0.78rem; padding: 0 0.25rem; }
+.vl-pl-pause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.vl-pl-pause input { width: 5.5rem; }
+
+@media print {
+  /* Admin kan skjule pausene på papiret (portalinnstillingene). */
+  .vl-skjul-utskrift { display: none !important; }
+  .vl-pause { color: #000 !important; border-color: #000 !important; }
+}
+
 @media print {
   /*
      Det som skal ut på papiret er lista, ikke portalen rundt den. Alt som er

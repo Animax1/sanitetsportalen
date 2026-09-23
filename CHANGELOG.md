@@ -4,6 +4,88 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Avtalte pauser i vaktlista, og KO-tavla henter dem  `#vaktliste` `#ko` `#pauser`
+
+André: «vi har planer om å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er
+lagt inn enda». Svarene før koden: **1. per lag/ressurs · 2. teller i timene: ja · 3. leder ·
+4. mannskapet ser dem, «men admin kan skjule det i innstillinger» · 5. regel i planleggeren:
+«nå»**.
+
+**Vaktlista**
+- **Ny modell `vaktliste.Pause`** (migrasjon `0021`), per ressurs. Regler i `vaktliste/pauser.py`:
+  innenfor skiftene (et skiftbytte 14–22 / 22–06 er sammenhengende, så 21:45–22:15 går),
+  **høyst fire timer**, og **aldri to over hverandre** på samme ressurs. Samme tre regler som
+  KOs pauser, så en pause lagt inn her ikke kan bli avvist på tavla.
+- **Pausen teller i timene**: budsjettet, timeoversikten og belastningen er uendret. Testet.
+- **Lederen** (`kan_lede`) legger inn, flytter og fjerner: «+ Pause» og brikkene i en ny
+  **pauselinje i hodet på ressurskortet**. Alle med `les` ser dem. Nye endepunkter:
+  `POST api/ressurser/<pk>/pauser/`, `PUT/DELETE api/pauser/<pk>/`. Auditlogget
+  (`vaktliste_pause`).
+- **Regelen i planleggeren**: «Pause (min) etter (timer)» per ressurs, og **forskjøvet** eller
+  samtidig. Tre lag som starter 14:00 med «30 min etter 4 t» tar pause **18:00, 18:30 og 19:00**,
+  ikke alle samtidig. Regelen står på ressursen og leses tilbake. Regelpausene lages på nytt
+  ved hver «Lag grunnlaget»; en pause lederen har lagt inn eller rettet for hånd, står og
+  vinner. Et for kort skift får ingen pause. Får ikke de forskjøvne pausene plass i skiftet,
+  sier planleggeren fra (400), i stedet for å droppe dem stille. Bekreftelsen viser antall
+  pauser.
+- **Utskriften og fila på e-post** viser pausene («Pause: 02.10 18:00–18:30»). Oversikt har
+  dem under tida. **Admin kan skjule dem** under portalinnstillingene («Pausene i
+  vaktlista»); på skjermen står de alltid.
+
+**KO-tavla**
+- **Vaktlistas pauser står i Pause-raden av seg selv, uten kopi** (`tavle.effektive_pauser`,
+  id `v<pk>`). Retningen er `ko` → `vaktliste`; vaktlista vet ingenting om KO.
+- **Endrer, starter («Pause nå») eller fjerner KO en av dem, blir den KOs**
+  (`PlanlagtPause.fra_vaktliste`, migrasjon `ko/0019`), i samme transaksjon som handlingen. En
+  avvist endring etterlater ingen kopi. Endret er **«endret i drift»** (prikket kant,
+  `title`). Fjernet blir **`avlyst`**, ikke slettet, ellers dukket vaktlistas opp igjen ved
+  neste poll. **Vaktlista overstyrer ikke KOs versjon lenger**, og KO vinner også når en egen
+  KO-pause overlapper en av vaktlistas.
+- **Dekningsstripa i planleggeren trekker fra lag i pause midt i timen**, og tipset sier
+  «(2 i pause)». Det er her en pause lagt midt i headlineren blir synlig før vakta.
+
+**`vaktliste/CLAUDE.md` er delt**, som KO og oppdrag før den. Fila sto 32 tegn under taket
+sitt, og pausene trengte plass. Flaten (planleggingsflatene, tabellene og tidsfeltene,
+JS-filene) er flyttet **uendret** til `templates/vaktliste/CLAUDE.md`; skriptet sammenlignet
+linjene før og etter, og ingen manglet. Taket for vaktlistefila er senket fra 56 900 til
+43 950, så delingen ikke gror igjen. Rotas tak er hevet 200 tegn, bevisst: raden i kartet
+over modulfilene er rammeverk, og rota sto 17 tegn under.
+
+**Kjente grenser:** pause per person (samleplassen der seks tar pause én og én) finnes ikke;
+det kommer bare om en ekte vakt ber om det. En KO-overtakelse står som KOs egen pause etter en
+gjenoppretting, fordi `fra_vaktliste` strippes i backupen (pekeren går mot vaktlista, og
+sirkelen er den samme som for `ressurs`).
+
+**Mutasjonstesting: 78 mutanter**: 37 i vaktlistas tjenestelag og porter, 21 i KO, 20 i JS.
+**Ti overlevde første runde:**
+- **Én var en ekte feil i oppførselen** (vaktlista #23): et lag på «samtidig» tok ingen plass i
+  forskyvningen, så et forskjøvet lag i samme gruppe kunne legge seg oppå det. Nå tar alle lag
+  med pause en plass i rekka. Mutantens oppførsel var bedre enn koden, og den ble tatt inn.
+- **Én var et ekte hull i en port** (KO #15): uten den første sjekken ble bilens pause overtatt
+  for en bruker uten oppdragstilgang, og raden ble stående selv om svaret var 404, fordi en
+  404 inne i `transaction.atomic()` ikke ruller tilbake. Testen krever nå at ingenting er
+  overtatt.
+- **Seks var hull i testene:**
+  - en pause inntil *foran* en annen
+  - en annen ressurs sin pause på samme tid
+  - riktig melding for halv regel
+  - at «samtidig» lagres på ressursen
+  - sorteringen når vaktlistas pause kommer mellom KOs
+  - at dekningsendepunktet sender vakta videre
+  - og i JS at «+ Pause» er borte for `skriv_full`
+- **Én er ekvivalent** (filteret på vaktlista i `fil.rader_for`): pausene slås opp på
+  ressursens id, så filteret sparer bare spørringen.
+
+Alt annet ble drept, blant annet:
+- grensene (`<`/`<=` i alle ender: fire timer, skiftet, overlapp, regelens kanter, midten av
+  timen)
+- `and` → `or` i «innenfor skiftene»
+- sperrene på KOs overtakelse, avlysning og overlapp
+- transaksjonen rundt overtakelsen
+- ledergatene
+- «bare lista i bruk»
+- escapingen
+
 ## 2026-09-23 — Planleggeren: endringshistorikk, plan mot faktisk og «kopier programmet»  `#ko` `#planlegger`
 
 Steg 5 og siste av tavleplanleggeren. André: «det er egentlig kjempesmart. Og fint for videre

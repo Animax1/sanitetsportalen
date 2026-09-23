@@ -22,7 +22,7 @@ HARNESS = (
     (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml')),
     (KO_JS, ('koTavleKanSkrive', 'koTavleVindu', 'koTavleProsent', 'koTavleTo', 'koTavleHHMM',
              'koTavleDognnokkel', 'koTavleDognnavn', 'koTavleTidNaer', 'koTavleProgram',
-             'koTavleKonsertHtml', 'koTavleRadHtml', 'koTavleStolpeHtml', 'koTavleSluttHtml',
+             'koTavleKonsertHtml', 'koTavleRadHtml', 'koTavleStolpeHtml', 'koTavlePauseKildetekst', 'koTavleSluttHtml',
              'koTavleSkjemaData', 'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleVarighet',
              'koTavleRader', 'koTavleSynlig', 'koTavleKanDras', 'koTavlePauseStatus', 'koTavleSlutt',
              'koTavleBehovNaa', 'koTavleBehovHtml',
@@ -410,10 +410,26 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
             const uten = koPlanDekningForGruppe(t, null, 10);
             return [med[16], med[17], uten[16].kort, uten[16].har, med[18]];
         })()""")
-        self.assertEqual(ut[0], {'i': 16, 'trengs': 6, 'har': 5, 'kort': True})
+        self.assertEqual(ut[0], {'i': 16, 'trengs': 6, 'har': 5, 'pause': 0, 'kort': True})
         self.assertEqual(ut[1]['kort'], False)
         self.assertEqual(ut[2:4], [False, None])
-        self.assertEqual(ut[4], {'i': 18, 'trengs': 1, 'har': 1, 'kort': False}, 'akkurat nok er nok')
+        self.assertEqual(ut[4], {'i': 18, 'trengs': 1, 'har': 1, 'pause': 0, 'kort': False}, 'akkurat nok er nok')
+
+    def test_pausen_forklarer_tallet_i_stripa(self):
+        """Serveren har alt trukket laget i pause fra `grupper`; `pause` står
+        for å si hvorfor (23. sep. 2026)."""
+        ut = self._kjor(self.POSTER + """
+            const t = koPlanBehovPerTime(poster, V);
+            const timer = Array.from({length: 24}, (_, i) => ({grupper: {'10': 3}, pause: i === 16 ? {'10': 2} : {}}));
+            const s = koPlanDekningForGruppe(t, timer, 10);
+            console.log(JSON.stringify([s[16].pause, s[16].har, s[17].pause]));
+            const html = koPlanDekningHtml(s, [{id: 10, navn: 'Lag'}], 10, V, null);
+            console.log(html.includes('(2 i pause)'), (html.match(/i pause\)/g) || []).length);
+            console.log(koPlanDekningForGruppe(t, [{grupper: {}}], 10)[0].pause);
+        """)
+        self.assertEqual(json.loads(ut[0]), [2, 3, 0])
+        self.assertEqual(ut[1], 'true 1')
+        self.assertEqual(ut[2], '0', 'et gammelt svar uten `pause` er ingen pause')
 
     def test_stripa_tilbyr_bare_grupper_med_behov(self):
         ut = self._json("(() => {" + self.POSTER + """

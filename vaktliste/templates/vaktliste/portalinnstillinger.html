@@ -56,3 +56,21 @@ Flyttet hit 14. sep. 2026 — fram til da sto den midt i `core`s egen mal.
       </div>
     </div>
   </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>Pausene i vaktlista</strong></div>
+    <div class="card-body">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="vaktliste_vis_pauser"
+               name="vaktliste_vis_pauser" value="1"
+               {% if vaktliste_vis_pauser %}checked{% endif %}>
+        <label class="form-check-label" for="vaktliste_vis_pauser">
+          Vis pausene på utskriften og i fila på e-post
+        </label>
+      </div>
+      <div class="form-text">
+        Pausene står alltid på skjermen for den som planlegger, og i Pause-raden
+        på KO-tavla. Dette gjelder bare det mannskapet får på papir og e-post.
+      </div>
+    </div>
+  </div>

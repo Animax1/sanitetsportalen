@@ -193,11 +193,14 @@ function koPlanTimeStart(vindu, i) {
 
 // Stripa for én gruppe: trengs mot på vakt, per time. `har` er `null` når
 // vaktlistas tall ikke er hentet — da er ingenting «for få».
+// `pause` er hvor mange av gruppa som har pause midt i timen — de er alt
+// trukket fra `har` på serveren, og står for å forklare tallet.
 function koPlanDekningForGruppe(behovPerTime, timer, gruppeId) {
   return behovPerTime.map((m, i) => {
     const trengs = m.get(String(gruppeId)) || 0;
     const har = timer && timer[i] ? (timer[i].grupper[String(gruppeId)] || 0) : null;
-    return { i, trengs, har, kort: har !== null && trengs > har };
+    const pause = timer && timer[i] ? ((timer[i].pause || {})[String(gruppeId)] || 0) : 0;
+    return { i, trengs, har, pause, kort: har !== null && trengs > har };
   });
 }
 
@@ -297,7 +300,8 @@ function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil) {
   const hoyest = Math.max(1, ...stripe.map((s) => Math.max(s.trengs, s.har || 0)));
   const soyler = stripe.map((s) => {
     const kl = koTavleHHMM(koPlanTimeStart(vindu, s.i)).slice(0, 2);
-    const tittel = [kl, ': ', s.trengs, ' trengs, ', s.har === null ? '?' : s.har, ' på vakt'].join('');
+    const tittel = [kl, ': ', s.trengs, ' trengs, ', s.har === null ? '?' : s.har, ' på vakt',
+      s.pause ? [' (', s.pause, ' i pause)'].join('') : ''].join('');
     return '<div class="ko-plan-soyle' + (s.kort ? ' ko-plan-kort' : '') + '" title="' + escapeHtml(tittel) + '">'
       + '<div class="ko-plan-har" style="height:' + escapeHtml(((s.har || 0) / hoyest * 100).toFixed(1)) + '%"></div>'
       + '<div class="ko-plan-trengs" style="height:' + escapeHtml((s.trengs / hoyest * 100).toFixed(1)) + '%"></div>'
@@ -308,7 +312,7 @@ function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil) {
     + '</span>').join('');
   return '<div class="ko-plan-dekning"><div class="d-flex flex-wrap align-items-center gap-2 mb-1">'
     + '<span class="small fw-semibold">Dekning</span><div class="btn-group btn-group-sm flex-wrap">' + faner + '</div>'
-    + '<span class="small ko-plan-dempet">trengs / på vakt i vaktlista</span></div>'
+    + '<span class="small ko-plan-dempet">trengs / på vakt i vaktlista, utenom pause</span></div>'
     + '<div class="ko-plan-soyler">' + soyler + '</div><div class="ko-plan-timer">' + timer + '</div></div>';
 }
 

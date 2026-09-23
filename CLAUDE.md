@@ -167,7 +167,8 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `CLAUDE.md` (denne) | overalt | Det som gjelder alle moduler — se overskriftene |
 | `patients/CLAUDE.md` | `patients/` | API-mønsteret og viewdelingen |
 | `oppdrag/CLAUDE.md` | `oppdrag/` | Statusmaskinen, verdimengdene, bilens utganger, historikk mot arkiv |
-| `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, offline |
+| `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, pausene, offline |
+| `templates/vaktliste/CLAUDE.md` | `templates/vaktliste/` | Fanene, ressurskortene, regnearket, tidsfeltene, JS-filene |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
 | `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
 | `templates/ko/CLAUDE.md` | `templates/ko/` | Vinduene, ressursoversikten, tavla |
@@ -766,7 +767,7 @@ håndhever det på cellebredden.
 | `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `templates/oppdrag/CLAUDE.md` |
-| `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
+| `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 
