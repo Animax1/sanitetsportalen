@@ -29,6 +29,8 @@ let koPlanSkjema = null;     // åpent skjema: {id} (null = ny)
 let koPlanVisning = 'tidslinje';  // 'tidslinje' | 'liste' (steg 4)
 let koPlanDekning = null;    // {dogn, timer} eller {dogn, feil} fra /ko/api/program/dekning/
 let koPlanDekningGruppe = null;   // gruppa stripa viser
+let koPlanEtterpaa = null;   // svaret fra /ko/api/program/etterpaa/ (steg 5)
+let koPlanEtterpaaVakt = null;    // valgt vakt i «Etterpå», `null` = aktiv
 
 //: En time i millisekunder — tidslinja og stripa er døgnet i tjuefire.
 const KO_PLAN_TIME = 3600000;
@@ -310,6 +312,69 @@ function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil) {
     + '<div class="ko-plan-soyler">' + soyler + '</div><div class="ko-plan-timer">' + timer + '</div></div>';
 }
 
+// ── Etterpå: plan mot faktisk (steg 5) ───────────────────────────────────────
+
+// Det faktiske for én gruppe, som tekst. «3,6 i snitt · 48 min under» — og
+// ingenting å si før konserten har begynt.
+function koPlanFaktiskTekst(b, startet) {
+  if (!startet || b.snitt === null || b.snitt === undefined) return 'ikke begynt';
+  const snitt = String(b.snitt).replace('.', ',') + ' i snitt';
+  return b.under_min ? snitt + ' · ' + b.under_min + ' min under' : snitt;
+}
+
+// En rad i historikken, som tekst: hva, og for en endring hvert felt fra → til.
+function koPlanEndringTekst(e) {
+  if (e.hva === 'endret') {
+    return e.navn + ': ' + (e.detaljer || []).map((d) => d.felt + ' ' + (d.fra || '–') + ' → ' + (d.til || '–')).join(', ');
+  }
+  const d = e.detaljer || {};
+  return e.navn + ' ' + (e.hva === 'slettet' ? 'slettet' : 'lagt til')
+    + [d.sted, d.tid, d.beredskap ? 'beredskap ' + d.beredskap.toLowerCase() : '', d.behov]
+      .filter(Boolean).map((x) => ' · ' + x).join('');
+}
+
+function koPlanEtterpaaHtml(data, kanLede, aktivId) {
+  const vakter = (data.vakter || []).map((v) => '<option value="' + escapeHtml(v.id) + '"'
+    + (v.id === data.vakt.id ? ' selected' : '') + '>' + escapeHtml(v.navn) + '</option>').join('');
+  const velger = kanLede && (data.vakter || []).length > 1
+    ? '<label class="small">Vakt <select class="form-select form-select-sm d-inline-block w-auto" id="ko-plan-vakt"'
+      + ' data-action="koPlanVelgVakt" data-hendelse="change">' + vakter + '</select></label>' : '';
+  const kopier = kanLede && data.vakt.id !== aktivId && (data.poster || []).length
+    ? '<span class="d-inline-flex align-items-end gap-1 ms-2"><label class="small">Første konsertdøgn i aktiv vakt'
+      + ' <input type="date" class="form-control form-control-sm" id="ko-plan-kopier-dogn"></label>'
+      + '<button type="button" class="btn btn-sm btn-outline-primary" data-action="koPlanKopier">'
+      + 'Kopier programmet hit</button></span>' : '';
+  const rader = (data.poster || []).map((p) => {
+    const behov = (p.behov || []).map((b) => '<div>' + escapeHtml([b.trengs, b.gruppe_navn].join(' ')) + '</div>').join('')
+      || '<span class="ko-plan-dempet">–</span>';
+    const opprinnelig = p.behov_opprinnelig !== null && p.behov_opprinnelig !== undefined
+      && p.behov_opprinnelig !== p.behov_naa
+      ? '<div class="ko-plan-dempet small">opprinnelig: ' + escapeHtml(p.behov_opprinnelig || 'ingen') + '</div>' : '';
+    const faktisk = (p.behov || []).map((b) => '<div' + (b.under_min ? ' class="ko-plan-under"' : '') + '>'
+      + escapeHtml([b.gruppe_navn, koPlanFaktiskTekst(b, p.startet)].join(': ')) + '</div>').join('')
+      || '<span class="ko-plan-dempet">–</span>';
+    const oppdrag = p.oppdrag === null || p.oppdrag === undefined ? '–' : String(p.oppdrag);
+    return '<tr><td><div class="fw-semibold">' + escapeHtml(p.navn) + '</div><div class="ko-plan-dempet small">'
+      + escapeHtml([p.sted, p.tid, p.type].filter(Boolean).join(' · ')) + '</div></td>'
+      + '<td>' + koPlanBeredskapHtml(p) + '</td>'
+      + '<td>' + behov + opprinnelig + '</td><td>' + faktisk + '</td>'
+      + '<td class="text-end">' + escapeHtml(oppdrag) + '</td>'
+      + '<td class="text-end">' + escapeHtml(p.endringer ? String(p.endringer) : '–') + '</td></tr>';
+  }).join('');
+  const historikk = (data.endringer || []).slice().reverse().map((e) => '<li><span class="ko-plan-tid">'
+    + escapeHtml(koTavleHHMM(Date.parse(e.tidspunkt))) + '</span> ' + escapeHtml(koPlanEndringTekst(e))
+    + (e.av_navn ? ' <span class="ko-plan-dempet">(' + escapeHtml(e.av_navn) + ')</span>' : '') + '</li>').join('');
+  return '<div class="d-flex flex-wrap align-items-end gap-2 mb-2">' + velger + kopier + '</div>'
+    + (rader
+      ? '<div class="table-responsive"><table class="table table-sm ko-plan-etterpaa"><thead><tr><th>Konsert</th>'
+        + '<th>Beredskap</th><th>Behov</th><th>Faktisk på stedet</th><th class="text-end">Oppdrag</th>'
+        + '<th class="text-end">Endret</th></tr></thead><tbody>' + rader + '</tbody></table></div>'
+      : '<div class="tom-melding">Ingen konserter i denne vakta.</div>')
+    + '<div class="small ko-plan-dempet mb-1">«Faktisk» er tavlas plasseringer på stedet, også tida på en hendelse '
+    + 'der — ikke bilenes tid på oppdrag. Oppdrag er antall på stedet mens konserten pågikk.</div>'
+    + (historikk ? '<div class="fw-semibold small mt-2">Endringer</div><ul class="ko-plan-historikk">' + historikk + '</ul>' : '');
+}
+
 // Hva skjemaet skal vise: den valgte posten, eller en ny i valgt døgn.
 function koPlanSkjemaData(skjema, data, dogn) {
   if (!skjema || !data) return null;
@@ -398,7 +463,11 @@ function koTegnPlan() {
     koPlanDogn = dognene.includes(idag) ? idag : dognene[0];
   }
   const valg = document.getElementById('ko-plan-dogn-valg');
-  if (valg) valg.innerHTML = koPlanDognvalgHtml(dognene, koPlanDogn);
+  if (valg) {
+    valg.innerHTML = koPlanDognvalgHtml(dognene, koPlanDogn);
+    // «Etterpå» er hele vakta — et døgnvalg der ville sett ut som et filter.
+    valg.classList.toggle('d-none', koPlanVisning === 'etterpaa');
+  }
   const tall = document.getElementById('ko-plan-antall');
   if (tall) tall.textContent = '· ' + (koPlan.poster || []).length + ' i programmet';
   const skjema = document.getElementById('ko-plan-skjema');
@@ -415,6 +484,11 @@ function koTegnPlan() {
   document.querySelectorAll('[data-action="koPlanVelgVisning"]').forEach((k) => {
     k.classList.toggle('active', k.getAttribute('data-arg') === koPlanVisning);
   });
+  if (koPlanVisning === 'etterpaa') {
+    if (!koPlanEtterpaa) { koHentEtterpaa(); boks.innerHTML = '<div class="tom-melding">Henter …</div>'; return; }
+    boks.innerHTML = koPlanEtterpaaHtml(koPlanEtterpaa, koPlanKanLede(), koPlanAktivVakt());
+    return;
+  }
   if (koPlanVisning === 'liste') {
     boks.innerHTML = koPlanListeHtml(koPlanGruppert(koPlan.poster, koPlanDogn, koPlanDognstart()), koPlanKanLede());
     return;
@@ -446,8 +520,51 @@ function koPlanVelgDogn(k) {
 }
 
 function koPlanVelgVisning(v) {
-  koPlanVisning = v === 'liste' ? 'liste' : 'tidslinje';
+  koPlanVisning = ['liste', 'etterpaa'].includes(v) ? v : 'tidslinje';
+  if (koPlanVisning === 'etterpaa') koPlanEtterpaa = null;
   koTegnPlan();
+}
+
+function koPlanAktivVakt() {
+  return (koPlan && koPlan.vakt_id) || null;
+}
+
+async function koHentEtterpaa() {
+  const url = '/ko/api/program/etterpaa/' + (koPlanEtterpaaVakt ? '?vakt=' + Number(koPlanEtterpaaVakt) : '');
+  const res = await apiFetch(url);
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { koPlanVisFeil(d.message || 'Kunne ikke hente plan mot faktisk.'); return; }
+  koPlanEtterpaa = d.data || null;
+  koTegnPlan();
+}
+
+function koPlanVelgVakt() {
+  const el = document.getElementById('ko-plan-vakt');
+  koPlanEtterpaaVakt = el && Number(el.value) !== koPlanAktivVakt() ? Number(el.value) : null;
+  koPlanEtterpaa = null;
+  koTegnPlan();
+}
+
+async function koPlanKopier(bekreftet) {
+  if (!koPlanEtterpaa) return;
+  const dogn = (document.getElementById('ko-plan-kopier-dogn') || {}).value || '';
+  if (!dogn) { koPlanVisFeil('Velg første konsertdøgn i aktiv vakt.'); return; }
+  const kropp = { fra_vakt_id: koPlanEtterpaa.vakt.id, forste_dogn: dogn };
+  if (bekreftet === true) kropp.confirm = true;
+  const res = await apiFetch('/ko/api/program/kopier/', { method: 'POST', body: JSON.stringify(kropp) });
+  const d = await res.json().catch(() => ({}));
+  if (res.status === 409 && bekreftet !== true) {
+    if (window.confirm(d.message || 'Vakta har alt et program. Legge til likevel?')) await koPlanKopier(true);
+    return;
+  }
+  if (!res.ok) { koPlanVisFeil(d.message || 'Kunne ikke kopiere.'); return; }
+  const svar = d.data || {};
+  koPlanVisFeil((svar.hoppet_over || []).length
+    ? 'Kopierte ' + svar.kopiert + '. Hoppet over: ' + svar.hoppet_over.join('; ') : '');
+  koPlanEtterpaaVakt = null;
+  koPlanEtterpaa = null;
+  koPlanVisning = 'tidslinje';
+  await koHentPlan();
 }
 
 function koPlanVelgDekning(id) {

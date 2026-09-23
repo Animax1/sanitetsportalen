@@ -32,7 +32,9 @@ HARNESS = (
              'koPlanDognstart',
              # Steg 4: tidslinja og dekningen.
              'koPlanDognVindu', 'koPlanTimeStart', 'koPlanTidslinje', 'koPlanBehovPerTime', 'koPlanDekningForGruppe',
-             'koPlanDekningsgrupper', 'koPlanTidslinjeHtml', 'koPlanDekningHtml')),
+             'koPlanDekningsgrupper', 'koPlanTidslinjeHtml', 'koPlanDekningHtml',
+             # Steg 5: etterpå.
+             'koPlanFaktiskTekst', 'koPlanEndringTekst', 'koPlanEtterpaaHtml')),
 )
 
 FORSPILL = """
@@ -447,6 +449,78 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
               + koPlanDekningHtml(koPlanDekningForGruppe(koPlanBehovPerTime(poster, V), null, 10),
                                   [{{id: 10, navn: ond}}], 10, V, null)
               + koPlanDekningHtml([], [], null, V, ond));
+        """)
+        self.assertNotIn('<img', ut[0])
+        self.assertIn('&lt;img', ut[0])
+
+
+class EtterpaaJsTests(PlanreglerTests):
+    """Plan mot faktisk og historikken (steg 5)."""
+
+    DATA = """
+    const RAD = (extra = {}) => Object.assign({id: 1, navn: 'Headliner', sted: 'Parkscene', tid: '25.09 22:00–00:30',
+      type: 'Headliner', beredskap: 'oransje', beredskap_navn: 'Oransje', publikum: null,
+      behov: [{gruppe_navn: 'Lag', trengs: 4, snitt: 3.5, under_min: 30}], behov_opprinnelig: '4 Lag',
+      behov_naa: '4 Lag', startet: true, oppdrag: 2, endringer: 0}, extra);
+    const DATA = (extra = {}) => Object.assign({vakt: {id: 7, navn: 'Festival 2025'}, poster: [RAD()], endringer: [],
+      vakter: [{id: 8, navn: 'Festival 2026'}, {id: 7, navn: 'Festival 2025'}]}, extra);
+    """
+
+    def test_faktisk_som_tekst(self):
+        ut = self._json("""[
+            koPlanFaktiskTekst({snitt: 3.5, under_min: 30}, true),
+            koPlanFaktiskTekst({snitt: 4, under_min: 0}, true),
+            koPlanFaktiskTekst({snitt: 4, under_min: 0}, false),
+            koPlanFaktiskTekst({snitt: null, under_min: 0}, true),
+        ]""")
+        self.assertEqual(ut, ['3,5 i snitt · 30 min under', '4 i snitt', 'ikke begynt', 'ikke begynt'])
+
+    def test_endringen_som_tekst(self):
+        ut = self._json("""[
+            koPlanEndringTekst({navn: 'X', hva: 'endret', detaljer: [{felt: 'beredskap', fra: 'Gul', til: 'Rød'},
+                                                                   {felt: 'behov', fra: '', til: '2 Lag'}]}),
+            koPlanEndringTekst({navn: 'X', hva: 'opprettet', detaljer: {sted: 'Park', tid: '22:00', beredskap: 'Gul'}}),
+            koPlanEndringTekst({navn: 'X', hva: 'slettet', detaljer: {}}),
+        ]""")
+        self.assertEqual(ut, ['X: beredskap Gul → Rød, behov – → 2 Lag',
+                              'X lagt til · Park · 22:00 · beredskap gul', 'X slettet'])
+
+    def test_vaktvelger_og_kopiering_bare_for_lederen_og_ikke_paa_aktiv_vakt(self):
+        ut = self._kjor(self.DATA + """
+            const h = (d, leder, aktiv) => koPlanEtterpaaHtml(d, leder, aktiv);
+            console.log(h(DATA(), true, 8).includes('ko-plan-vakt'));
+            console.log(h(DATA(), false, 8).includes('ko-plan-vakt'));
+            console.log(h(DATA({vakter: [{id: 7, navn: 'x'}]}), true, 7).includes('ko-plan-vakt'));
+            console.log(h(DATA(), true, 8).includes('koPlanKopier'));
+            console.log(h(DATA(), false, 8).includes('koPlanKopier'));
+            console.log(h(DATA(), true, 7).includes('koPlanKopier'));
+            console.log(h(DATA({poster: []}), true, 8).includes('koPlanKopier'));
+        """)
+        self.assertEqual(ut[:7], ['true', 'false', 'false', 'true', 'false', 'false', 'false'])
+
+    def test_opprinnelig_bare_naar_det_er_endret_og_oppdrag_null_er_strek(self):
+        ut = self._kjor(self.DATA + """
+            console.log(koPlanEtterpaaHtml(DATA(), false, 7).includes('opprinnelig'));
+            console.log(koPlanEtterpaaHtml(DATA({poster: [RAD({behov_naa: '5 Lag'})]}), false, 7).includes('opprinnelig: 4 Lag'));
+            console.log(koPlanEtterpaaHtml(DATA({poster: [RAD({behov_opprinnelig: '', behov_naa: '2 Lag'})]}), false, 7)
+              .includes('opprinnelig: ingen'));
+            const html = koPlanEtterpaaHtml(DATA({poster: [RAD({oppdrag: null, startet: false})]}), false, 7);
+            console.log(/<td class="text-end">–<\/td><td class="text-end">–<\/td>/.test(html));
+            console.log(koPlanEtterpaaHtml(DATA(), false, 7).includes('ko-plan-under'));
+            console.log(koPlanEtterpaaHtml(DATA({poster: []}), false, 7).includes('Ingen konserter'));
+        """)
+        self.assertEqual(ut[:6], ['false', 'true', 'true', 'true', 'true', 'true'])
+
+    def test_etterpaa_escaper(self):
+        ond = '<img src=x onerror=alert(1)>'
+        ut = self._kjor(self.DATA + f"""
+            const ond = {json.dumps(ond)};
+            const d = DATA({{vakter: [{{id: 8, navn: ond}}, {{id: 7, navn: ond}}],
+              poster: [RAD({{navn: ond, sted: ond, tid: ond, type: ond, beredskap_navn: ond, behov_opprinnelig: ond,
+                behov: [{{gruppe_navn: ond, trengs: 1, snitt: 1, under_min: 0}}]}})],
+              endringer: [{{tidspunkt: '2026-09-25T20:00:00Z', navn: ond, hva: 'endret', av_navn: ond,
+                detaljer: [{{felt: ond, fra: ond, til: ond}}]}}]}});
+            console.log(koPlanEtterpaaHtml(d, true, 8));
         """)
         self.assertNotIn('<img', ut[0])
         self.assertIn('&lt;img', ut[0])

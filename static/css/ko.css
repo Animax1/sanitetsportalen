@@ -581,3 +581,9 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
   display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-left: 120px;
   font-size: 0.6rem; text-align: center; color: var(--portal-text-muted, #94a3b8);
 }
+
+/* Etterpå: plan mot faktisk (steg 5). */
+.ko-plan-etterpaa td, .ko-plan-etterpaa th { font-size: 0.8rem; vertical-align: top; }
+.ko-plan-under { color: #fcd34d; }
+.ko-plan-historikk { font-size: 0.78rem; padding-left: 1rem; margin: 0; }
+.ko-plan-historikk .ko-plan-tid { min-width: 0; margin-right: 0.3rem; }

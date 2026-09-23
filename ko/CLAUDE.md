@@ -269,3 +269,14 @@ docstring; kortversjonen:
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
 oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.
+
+### Endringer, plan mot faktisk og kopiering (steg 5)
+
+Detaljene står i docstringene i `ko/program.py`.
+
+| Regel | Hvorfor |
+|---|---|
+| `Programendring` ved hver lagring og sletting; «endret» bærer **bare feltene som endret seg**, og uendret gir ingen rad. Bildet er tekst med dato | Leses år etter år, også når sted eller gruppe er borte |
+| **`program_endret` i KO-loggen bare i drift**: pågår eller begynner innen 2 t (`I_DRIFT_FORVARSEL`), før *eller* etter endringen | Planlegging i god tid er oppsett, ikke en hendelse |
+| **Plan mot faktisk**: tavlas plasseringer (ikke pauser) på stedet, gruppe på id ellers navn, klippet til konserten. Oppdrag fra tabellen eller arkivet (distinkt nummer), **`None` etter kollaps** | Null ville vært en påstand. Bilens tid på oppdrag er ikke med, som i «Besøk» |
+| Tidligere vakter og **«kopier programmet»** er KO-lederens. Kopien flyttes i hele døgn (døgnstarten gjelder), går gjennom `lagre_post`, og det som ikke kan tas med **nevnes**. 409 med antallet før den legger til | Strukturen, ikke det som skjedde — som «Kopier oppsett» i vaktlista |

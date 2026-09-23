@@ -69,6 +69,8 @@ urlpatterns = [
     # Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026).
     path('api/program/', views.program_view, name='ko_api_program'),
     path('api/program/dekning/', views.program_dekning_view, name='ko_api_program_dekning'),
+    path('api/program/etterpaa/', views.program_etterpaa_view, name='ko_api_program_etterpaa'),
+    path('api/program/kopier/', views.program_kopier_view, name='ko_api_program_kopier'),
     path('api/program/<int:pk>/', views.program_post_view, name='ko_api_program_post'),
     path('api/konserttyper/', views.konserttyper_view, name='ko_api_konserttyper'),
     path('api/konserttyper/rekkefolge/', views.konserttyper_rekkefolge_view,

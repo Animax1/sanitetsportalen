@@ -22,9 +22,9 @@ from datetime import timedelta
 
 from django.db import transaction
 
-from .models import (BEREDSKAP_NAVN, Kjennetegn, Konserttype, Programbehov, Programpost,
-                     Tavleplassering)
-from .services import Ugyldig
+from .models import (BEREDSKAP_NAVN, Kjennetegn, Konserttype, Programbehov, Programendring,
+                     Programpost, Tavleplassering)
+from .services import Ugyldig, systemlinje
 
 #: Lengre enn dette er nesten sikkert en skrivefeil i klokkeslettet. Et fast
 #: behov — inngangen hele dagen — er det lengste som gir mening.
@@ -34,6 +34,10 @@ MAKS_LENGDE = timedelta(hours=24)
 MAKS_ANTALL = 99
 
 MAKS_NAVN = 120
+
+#: En endring løftes inn i KO-loggen når konserten pågår eller begynner innen
+#: dette — da er den situasjon, ikke planlegging (steg 5).
+I_DRIFT_FORVARSEL = timedelta(hours=2)
 
 
 def _navn(bruker) -> str:
@@ -100,8 +104,70 @@ def _kjennetegn(raa) -> list:
     return rader
 
 
+# ── Endringene (steg 5) ───────────────────────────────────────────────────────
+
+#: Feltene i bildet, i den rekkefølgen en endring leses. Navnet er det man
+#: sier; resten er det som kan endre seg under vakta.
+BILDE_FELT = (('navn', 'navn'), ('sted', 'sted'), ('tid', 'tid'), ('type', 'type'),
+              ('beredskap', 'beredskap'), ('publikum', 'publikum'), ('kjennetegn', 'kjennetegn'),
+              ('behov', 'behov'))
+
+
+def _tid(fra, til) -> str:
+    """«25.09 22:00–00:30». **Med dato**: flyttes konserten til neste døgn på
+    samme klokkeslett, er det en endring — uten datoen hadde historikken ikke
+    sett den."""
+    from django.utils import timezone
+    return f'{timezone.localtime(fra):%d.%m %H:%M}–{timezone.localtime(til):%H:%M}'
+
+
+def bilde(post) -> dict:
+    """Konserten som lesbar tekst, felt for felt — det som lagres i
+    historikken og sammenlignes ved hver endring. Tekst, ikke pekere: bildet
+    skal kunne leses også når typen eller gruppa er borte."""
+    return {
+        'navn': post.navn,
+        'sted': post.lokasjon_navn,
+        'tid': _tid(post.fra, post.til),
+        'type': post.konserttype_navn,
+        'beredskap': BEREDSKAP_NAVN.get(post.beredskap, ''),
+        'publikum': str(post.publikum) if post.publikum is not None else '',
+        'kjennetegn': ', '.join(sorted(k.navn for k in post.kjennetegn.all())),
+        'behov': ', '.join(f'{b.antall} {b.gruppe_navn}' for b in post.behov.order_by('gruppe_navn')),
+    }
+
+
+def forskjell(foer: dict, etter: dict) -> list[dict]:
+    """Feltene som endret seg, som `[{felt, fra, til}]`, i lesefølge."""
+    return [{'felt': navn, 'fra': foer.get(felt, ''), 'til': etter.get(felt, '')}
+            for felt, navn in BILDE_FELT if foer.get(felt, '') != etter.get(felt, '')]
+
+
+def i_drift(post_fra, post_til, naa) -> bool:
+    """Pågår konserten, eller begynner den innen forvarselet?"""
+    return post_fra - I_DRIFT_FORVARSEL <= naa < post_til
+
+
+def _loggfor(post, hva, detaljer, *, bruker, naa, i_drift_naa, vakt=None):
+    """Historikken alltid; KO-loggen bare når det gjelder noe som skjer nå."""
+    from . import systemlinjer
+    vakt = vakt or post.vakt
+    Programendring.objects.create(
+        vakt=vakt, post=post if hva != Programendring.SLETTET else None, post_navn=post.navn,
+        hva=hva, detaljer=detaljer, tidspunkt=naa, av=_bruker(bruker), av_navn=_navn(bruker))
+    if not i_drift_naa:
+        return
+    data = {'hva': hva, 'navn': post.navn, 'sted': post.lokasjon_navn}
+    if hva == Programendring.OPPRETTET:
+        data.update({'tid': detaljer.get('tid', ''),
+                     'beredskap': f'beredskap {detaljer["beredskap"].lower()}' if detaljer.get('beredskap') else ''})
+    elif hva == Programendring.ENDRET:
+        data['endringer'] = detaljer
+    systemlinje(vakt, systemlinjer.PROGRAM_ENDRET, data, tidspunkt=naa, bruker=bruker)
+
+
 @transaction.atomic
-def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None) -> Programpost:
+def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None, naa=None) -> Programpost:
     """Ny konsert, eller `post` endret. `fra`/`til` er tolket av viewet.
 
     **Alt valideres før noe skrives.** En inaktiv type eller et inaktivt sted
@@ -144,6 +210,11 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None) -> Programpost:
     kjennetegn = _kjennetegn(data.get('kjennetegn'))
     behov = _behov(data.get('behov'))
 
+    from django.utils import timezone
+    naa = naa or timezone.now()
+    ny = post is None
+    foer = None if ny else bilde(post)
+    var_i_drift = not ny and i_drift(post.fra, post.til, naa)
     if post is None:
         post = Programpost(vakt=vakt)
     post.lokasjon = lokasjon
@@ -163,12 +234,27 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None) -> Programpost:
     post.behov.all().delete()
     for gruppe, antall in behov:
         Programbehov.objects.create(post=post, gruppe=gruppe, gruppe_navn=gruppe.navn, antall=antall)
+    etter = bilde(post)
+    er_i_drift = var_i_drift or i_drift(post.fra, post.til, naa)
+    if ny:
+        _loggfor(post, Programendring.OPPRETTET, etter, bruker=bruker, naa=naa, i_drift_naa=er_i_drift)
+    else:
+        endret = forskjell(foer, etter)
+        # En lagring uten endring er ingen endring — og ingen linje.
+        if endret:
+            _loggfor(post, Programendring.ENDRET, endret, bruker=bruker, naa=naa, i_drift_naa=er_i_drift)
     return post
 
 
-def slett_post(post) -> None:
+@transaction.atomic
+def slett_post(post, *, bruker=None, naa=None) -> None:
     """Slett en konsert. Et lag som fulgte den, har ingen planlagt slutt
-    lenger — `folger` settes til tom av basen."""
+    lenger — `folger` settes til tom av basen. Historikken står: slettingen
+    er en rad med hele bildet, og de tidligere radene beholder navnet."""
+    from django.utils import timezone
+    naa = naa or timezone.now()
+    _loggfor(post, Programendring.SLETTET, bilde(post), bruker=bruker, naa=naa,
+             i_drift_naa=i_drift(post.fra, post.til, naa))
     post.delete()
 
 
@@ -203,6 +289,7 @@ def program_data(vakt) -> dict:
     from vaktliste.models import Ressursgruppe
 
     return {
+        'vakt_id': vakt.pk,
         'poster': poster(vakt),
         # Stedene her og ikke fra sentralbordet: planleggeren skal virke for
         # den som har KO uten oppdragstilgang, og stedsnavnene er ikke oppdrag.
@@ -283,3 +370,176 @@ def paa_vakt_per_time(start) -> list[dict]:
                 .values('gruppe_id').annotate(n=Count('pk')))}
         ut.append({'fra': fra.isoformat(), 'grupper': grupper})
     return ut
+
+
+# ── Plan mot faktisk (steg 5) ─────────────────────────────────────────────────
+#
+# André: «det er egentlig kjempesmart. Og fint for videre år på samme
+# arrangement å kunne se hva vi hadde på de konsertene og
+# risikovurdering/beredskapsnivå.»
+
+def _dekket(intervaller, fra, til, trengs):
+    """Snittet av hvor mange som sto der i `[fra, til)`, og hvor lenge det var
+    **færre enn** `trengs`. `intervaller` er `(start, slutt)` per ressurs, alt
+    klippet til vinduet. Et feie over grensene — der antallet kan endre seg."""
+    lengde = (til - fra).total_seconds()
+    if lengde <= 0:
+        return None, 0
+    punkter = sorted({fra, til} | {a for a, _ in intervaller} | {b for _, b in intervaller})
+    sum_tid, under = 0.0, 0.0
+    for a, b in zip(punkter, punkter[1:]):
+        n = sum(1 for s, e in intervaller if s <= a and e >= b)
+        sek = (b - a).total_seconds()
+        sum_tid += n * sek
+        if n < trengs:
+            under += sek
+    return sum_tid / lengde, round(under / 60)
+
+
+def _oppdrag_paa_stedet(post):
+    """Oppdrag på stedet mens konserten pågikk — fra den levende tabellen, eller
+    fra arkivet når vakta er arkivert. **`None` etter kollaps**: da finnes ikke
+    radene lenger, og null ville vært en påstand, ikke et tall."""
+    from oppdrag.models import ArkivertOppdrag, Oppdrag, OppdragArkiv
+
+    arkiv = OppdragArkiv.objects.filter(vakt_id=post.vakt_id).order_by('-pk').first()
+    if arkiv is None:
+        if post.lokasjon_id is None:
+            return None
+        return Oppdrag.objects.filter(vakt_id=post.vakt_id, lokasjon_id=post.lokasjon_id,
+                                      created_at__gte=post.fra, created_at__lt=post.til).count()
+    if arkiv.kollapset_at:
+        return None
+    return (ArkivertOppdrag.objects.filter(arkiv=arkiv, lokasjon_navn=post.lokasjon_navn,
+                                           opprettet_at__gte=post.fra, opprettet_at__lt=post.til)
+            .values('oppdragsnummer').distinct().count())
+
+
+def plan_mot_faktisk(vakt, naa=None) -> list[dict]:
+    """Per konsert: behovet (nå og opprinnelig), hvor mange som i snitt sto
+    der mens den pågikk, minuttene under behovet, oppdragene på stedet og hvor
+    mange ganger den ble endret.
+
+    «Sto der» er **tavlas plasseringer på stedet** — også tida på en hendelse
+    der, som tavla skriver som historikk. Bilens tid på et oppdrag er ikke med
+    (kjent grense, som i «Besøk»). En konsert som ikke har begynt har ikke noe
+    faktisk ennå; en som pågår regnes fram til nå.
+    """
+    from django.utils import timezone
+
+    naa = naa or timezone.now()
+    poster = list(Programpost.objects.filter(vakt=vakt)
+                  .prefetch_related('behov', 'endringer').order_by('fra', 'lokasjon_navn', 'id'))
+    plasseringer = list(Tavleplassering.objects.filter(vakt=vakt, pause=False)
+                        .select_related('ressurs__gruppe'))
+    ut = []
+    for post in poster:
+        slutt = min(post.til, naa)
+        startet = post.fra < naa
+        historikk = list(post.endringer.all())
+        opprinnelig = next((e.detaljer.get('behov', '') for e in historikk
+                            if e.hva == Programendring.OPPRETTET and isinstance(e.detaljer, dict)), None)
+        behov = []
+        for b in post.behov.all():
+            intervaller = []
+            if startet:
+                for p in plasseringer:
+                    if p.lokasjon_id != post.lokasjon_id or p.ressurs is None:
+                        continue
+                    # På id, og på navnet når id-en er borte (en gjenopprettet
+                    # backup stripper pekeren) — aldri «alle».
+                    if b.gruppe_id and p.ressurs.gruppe_id != b.gruppe_id:
+                        continue
+                    if not b.gruppe_id and p.ressurs.gruppe.navn != b.gruppe_navn:
+                        continue
+                    a, e = max(p.fra, post.fra), min(p.til or naa, slutt)
+                    if a < e:
+                        intervaller.append((a, e))
+            snitt, under = _dekket(intervaller, post.fra, slutt, b.antall) if startet else (None, 0)
+            behov.append({'gruppe_navn': b.gruppe_navn, 'trengs': b.antall,
+                          'snitt': round(snitt, 1) if snitt is not None else None, 'under_min': under})
+        ut.append({
+            'id': post.pk,
+            'navn': post.navn,
+            'sted': post.lokasjon_navn,
+            'type': post.konserttype_navn,
+            'tid': _tid(post.fra, post.til),
+            'beredskap': post.beredskap,
+            'beredskap_navn': BEREDSKAP_NAVN.get(post.beredskap, ''),
+            'publikum': post.publikum,
+            'behov': behov,
+            'behov_opprinnelig': opprinnelig,
+            'behov_naa': bilde(post)['behov'],
+            'startet': startet,
+            'oppdrag': _oppdrag_paa_stedet(post) if startet else None,
+            'endringer': sum(1 for e in historikk if e.hva == Programendring.ENDRET),
+        })
+    return ut
+
+
+def endringer(vakt) -> list[dict]:
+    """Historikken for vakta, eldste først."""
+    return [{'tidspunkt': e.tidspunkt.isoformat(), 'navn': e.post_navn, 'hva': e.hva,
+             'hva_navn': e.get_hva_display(), 'detaljer': e.detaljer, 'av_navn': e.av_navn}
+            for e in Programendring.objects.filter(vakt=vakt).order_by('tidspunkt', 'id')]
+
+
+# ── Kopier programmet til en ny vakt (steg 5) ─────────────────────────────────
+
+def _dogn_dato(t):
+    """Døgnet et tidspunkt hører til, som dato — døgnstarten som på tavla."""
+    from django.utils import timezone
+
+    from .tavle import dognstart
+    timer, minutter = (int(x) for x in dognstart().split(':'))
+    return (timezone.localtime(t) - timedelta(hours=timer, minutes=minutter)).date()
+
+
+@transaction.atomic
+def kopier_program(fra_vakt, til_vakt, *, forste_dogn, bruker, naa=None) -> dict:
+    """Programmet fra en tidligere vakt inn i `til_vakt`, **flyttet i hele
+    døgn** så første konsertdøgn lander på `forste_dogn`. Klokkeslettene står.
+
+    Hver konsert går gjennom `lagre_post` — samme validering og samme
+    historikk som en lagt inn for hånd. Stedet og gruppene finnes på id, ellers
+    på navnet; en konsert som ikke lar seg legge inn (stedet er borte, eller
+    ugyldig av en annen grunn) hoppes over og **nevnes**, ikke stille borte.
+    Samme tanke som «Kopier oppsett» i vaktlista: strukturen, ikke det som
+    skjedde.
+    """
+    from oppdrag.models import Lokasjon
+    from vaktliste.models import Ressursgruppe
+
+    kilde = list(Programpost.objects.filter(vakt=fra_vakt).prefetch_related('behov', 'kjennetegn')
+                 .order_by('fra', 'id'))
+    if not kilde:
+        raise Ugyldig('Vakta har ikke noe program å kopiere.')
+    skift = timedelta(days=(forste_dogn - _dogn_dato(kilde[0].fra)).days)
+    kopiert, hoppet_over = 0, []
+    for post in kilde:
+        lokasjon = (Lokasjon.objects.filter(pk=post.lokasjon_id, er_aktiv=True).first()
+                    or Lokasjon.objects.filter(navn=post.lokasjon_navn, er_aktiv=True).first())
+        if lokasjon is None:
+            hoppet_over.append(f'{post.navn} — stedet «{post.lokasjon_navn}» finnes ikke lenger')
+            continue
+        behov = []
+        for b in post.behov.all():
+            gruppe = (Ressursgruppe.objects.filter(pk=b.gruppe_id, er_aktiv=True).first()
+                      or Ressursgruppe.objects.filter(navn=b.gruppe_navn, er_aktiv=True).first())
+            if gruppe is None:
+                hoppet_over.append(f'{post.navn} — behovet for «{b.gruppe_navn}» er ikke med, gruppa finnes ikke')
+            else:
+                behov.append({'gruppe_id': gruppe.pk, 'antall': b.antall})
+        data = {'lokasjon_id': lokasjon.pk, 'navn': post.navn,
+                'konserttype_id': post.konserttype_id if post.konserttype and post.konserttype.er_aktiv else None,
+                'beredskap': post.beredskap, 'publikum': post.publikum,
+                'kjennetegn': [k.pk for k in post.kjennetegn.all() if k.er_aktiv], 'behov': behov}
+        # `lagre_post` er selv atomisk — nøstet er det et lagringspunkt, så en
+        # konsert som avvises tar ikke de andre med seg.
+        try:
+            lagre_post(til_vakt, data, fra=post.fra + skift, til=post.til + skift, bruker=bruker, naa=naa)
+        except Ugyldig as e:
+            hoppet_over.append(f'{post.navn} — {e}')
+            continue
+        kopiert += 1
+    return {'kopiert': kopiert, 'hoppet_over': hoppet_over, 'dager': skift.days}

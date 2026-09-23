@@ -430,3 +430,322 @@ class DekningTests(_Program):
         r = c.get(url, {'dogn': self.dogn})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.json()['data']['timer']), 24)
+
+
+class HistorikkenTests(_Program):
+    """Steg 5: planen husker hva den var — og KO-loggen får en linje bare når
+    endringen gjelder noe som pågår eller begynner innen to timer."""
+
+    def _linjer(self):
+        from ko.models import Logglinje
+        from ko import systemlinjer
+        return list(Logglinje.objects.filter(systemkode=systemlinjer.PROGRAM_ENDRET).order_by('id'))
+
+    def test_opprettet_baerer_hele_bildet_og_endret_bare_det_som_endret_seg(self):
+        from ko.models import Programendring
+        post = self._lagre()
+        forste = Programendring.objects.get()
+        self.assertEqual(forste.hva, 'opprettet')
+        self.assertEqual(forste.detaljer['behov'], f'2 {AMBULANSE}, 4 {LAG}')
+        self.assertEqual(forste.detaljer['beredskap'], 'Oransje')
+        self._lagre(post=post, beredskap='rod')
+        endret = Programendring.objects.order_by('-id').first()
+        self.assertEqual(endret.hva, 'endret')
+        self.assertEqual(endret.detaljer, [{'felt': 'beredskap', 'fra': 'Oransje', 'til': 'Rød'}])
+        self.assertEqual(endret.av_navn, 'kolederen')
+
+    def test_en_lagring_uten_endring_er_ingen_rad(self):
+        from ko.models import Programendring
+        post = self._lagre()
+        self._lagre(post=post)
+        self.assertEqual(Programendring.objects.count(), 1)
+
+    def test_flyttet_til_neste_doegn_paa_samme_klokkeslett_er_en_endring(self):
+        from ko.models import Programendring
+        post = self._lagre()
+        self._lagre(post=post, fra=self.fra + timedelta(days=1), til=self.til + timedelta(days=1))
+        self.assertEqual(Programendring.objects.order_by('-id').first().detaljer[0]['felt'], 'tid')
+
+    def test_slettet_star_igjen_med_navnet(self):
+        from ko.models import Programendring
+        post = self._lagre()
+        program.slett_post(post, bruker=self.leder)
+        rader = list(Programendring.objects.order_by('id'))
+        self.assertEqual([r.hva for r in rader], ['opprettet', 'slettet'])
+        self.assertTrue(all(r.post_id is None for r in rader), 'posten er borte, historikken står')
+        self.assertEqual(rader[1].post_navn, 'Headliner fredag')
+
+    def test_planlegging_langt_fram_gir_ingen_linje_i_ko_loggen(self):
+        langt = timezone.now() + timedelta(days=2)
+        post = self._lagre(fra=langt, til=langt + timedelta(hours=2))
+        self._lagre(post=post, fra=langt, til=langt + timedelta(hours=2), beredskap='rod')
+        self.assertEqual(self._linjer(), [])
+
+    def test_i_drift_gir_linje_i_ko_loggen_med_hva_som_endret_seg(self):
+        from ko import systemlinjer
+        naa = timezone.now()
+        post = self._lagre(fra=naa + timedelta(minutes=90), til=naa + timedelta(hours=4))
+        self._lagre(post=post, fra=naa + timedelta(minutes=120), til=naa + timedelta(hours=4), beredskap='rod')
+        linjer = self._linjer()
+        self.assertEqual(len(linjer), 2, 'lagt til og endret — begge innen to timer')
+        tekst = systemlinjer.tegn(linjer[1].systemkode, linjer[1].systemdata)
+        self.assertIn('Headliner fredag (Parkscene) endret', tekst)
+        self.assertIn('beredskap Oransje → Rød', tekst)
+
+    def test_grensen_er_to_timer_foer_start(self):
+        naa = timezone.now()
+        self.assertTrue(program.i_drift(naa + timedelta(hours=2), naa + timedelta(hours=3), naa))
+        self.assertFalse(program.i_drift(naa + timedelta(hours=2, seconds=1), naa + timedelta(hours=3), naa))
+        self.assertFalse(program.i_drift(naa - timedelta(hours=1), naa, naa), 'over er over')
+
+    def test_en_konsert_i_drift_flyttet_langt_fram_loftes_likevel(self):
+        """Å utsette noe som skulle begynt om en time, er nettopp det loggen skal si."""
+        naa = timezone.now()
+        post = self._lagre(fra=naa + timedelta(minutes=30), til=naa + timedelta(hours=2))
+        self._lagre(post=post, fra=naa + timedelta(days=1), til=naa + timedelta(days=1, hours=2))
+        self.assertEqual(len(self._linjer()), 2)
+
+    def test_sletting_i_drift_loftes(self):
+        naa = timezone.now()
+        post = self._lagre(fra=naa + timedelta(minutes=30), til=naa + timedelta(hours=2))
+        program.slett_post(post, bruker=self.leder)
+        self.assertEqual(len(self._linjer()), 2)
+
+
+class PlanMotFaktiskTests(_Program):
+
+    def setUp(self):
+        super().setUp()
+        self.naa = timezone.now()
+        self.fra = self.naa - timedelta(hours=2)
+        self.til = self.naa - timedelta(hours=1)
+
+    def _sto(self, ressurs, fra_min, til_min, lokasjon=None, **kw):
+        return Tavleplassering.objects.create(
+            vakt=self.vakt, ressurs=ressurs, ressurs_navn=ressurs.navn, lokasjon=lokasjon or self.park,
+            lokasjon_navn=(lokasjon or self.park).navn, fra=self.fra + timedelta(minutes=fra_min),
+            til=self.fra + timedelta(minutes=til_min) if til_min is not None else None, **kw)
+
+    def _rad(self, **kw):
+        return next(r for r in program.plan_mot_faktisk(self.vakt, self.naa) if r['navn'] == kw.get('navn', 'Headliner fredag'))
+
+    def test_snitt_og_minutter_under_behovet(self):
+        self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 2}])
+        self._sto(self.lag1, 0, 60)      # hele timen
+        self._sto(self.lag2, 30, 60)     # andre halvtime
+        self._sto(self.lag2, 0, 60, lokasjon=self.club)  # et annet sted teller ikke
+        b = self._rad()['behov'][0]
+        self.assertEqual(b['snitt'], 1.5)
+        self.assertEqual(b['under_min'], 30)
+
+    def test_bare_gruppa_teller_og_pause_teller_ikke(self):
+        self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 1}, {'gruppe_id': self.bil.gruppe_id, 'antall': 1}])
+        self._sto(self.bil, 0, 60)
+        self._sto(self.lag1, 0, 60, pause=True)   # på stedet, men i pause
+        rad = self._rad()
+        lag = next(b for b in rad['behov'] if b['gruppe_navn'] == LAG)
+        amb = next(b for b in rad['behov'] if b['gruppe_navn'] == self.bil.gruppe.navn)
+        self.assertEqual((lag['snitt'], lag['under_min']), (0.0, 60))
+        self.assertEqual((amb['snitt'], amb['under_min']), (1.0, 0))
+
+    def test_en_aapen_plassering_teller_fram_til_naa_og_en_som_paagaar_regnes_til_naa(self):
+        self.fra, self.til = self.naa - timedelta(hours=1), self.naa + timedelta(hours=1)
+        self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 1}])
+        self._sto(self.lag1, 30, None)
+        b = self._rad()['behov'][0]
+        self.assertEqual((b['snitt'], b['under_min']), (0.5, 30))
+
+    def test_ikke_begynt_har_ikke_noe_faktisk(self):
+        self.fra, self.til = self.naa + timedelta(hours=1), self.naa + timedelta(hours=2)
+        self._lagre()
+        rad = self._rad()
+        self.assertFalse(rad['startet'])
+        self.assertIsNone(rad['behov'][0]['snitt'])
+        self.assertIsNone(rad['oppdrag'])
+
+    def test_gruppa_matches_paa_navnet_naar_pekeren_er_borte(self):
+        post = self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 1}])
+        post.behov.update(gruppe=None)
+        self._sto(self.lag1, 0, 60)
+        self._sto(self.bil, 0, 60)
+        self.assertEqual(self._rad()['behov'][0]['snitt'], 1.0, 'bare laget — aldri «alle»')
+
+    def test_opprinnelig_behov_og_antall_endringer(self):
+        post = self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 4}])
+        self._lagre(post=post, behov=[{'gruppe_id': self.lag.pk, 'antall': 5}])
+        self._lagre(post=post, behov=[{'gruppe_id': self.lag.pk, 'antall': 5}], beredskap='rod')
+        rad = self._rad()
+        self.assertEqual(rad['behov_opprinnelig'], f'4 {LAG}')
+        self.assertEqual(rad['behov_naa'], f'5 {LAG}')
+        self.assertEqual(rad['endringer'], 2)
+
+    def test_oppdrag_paa_stedet_mens_konserten_paagikk(self):
+        from oppdrag.models import Oppdrag
+        from oppdrag.services import neste_oppdragsnummer
+        self.fra, self.til = self.naa - timedelta(minutes=5), self.naa + timedelta(hours=1)
+        self._lagre()
+        for sted in (self.park, self.park, self.club):
+            Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
+                                   problemstilling='Fall', hastegrad='Akutt', lokasjon=sted)
+        self.assertEqual(self._rad()['oppdrag'], 2)
+
+    def test_en_plassering_fra_foer_konserten_klippes_ved_start(self):
+        self._lagre(behov=[{'gruppe_id': self.lag.pk, 'antall': 1}])
+        self._sto(self.lag1, -30, 60)    # sto der en halvtime før konserten
+        self.assertEqual(self._rad()['behov'][0]['snitt'], 1.0)
+
+    def test_oppdrag_foer_konserten_teller_ikke(self):
+        from oppdrag.models import Oppdrag
+        from oppdrag.services import neste_oppdragsnummer
+        self.fra, self.til = self.naa - timedelta(minutes=5), self.naa + timedelta(hours=1)
+        self._lagre()
+        for _ in range(2):
+            o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
+                                       problemstilling='Fall', hastegrad='Akutt', lokasjon=self.park)
+        Oppdrag.objects.filter(pk=o.pk).update(created_at=self.fra - timedelta(minutes=1))
+        self.assertEqual(self._rad()['oppdrag'], 1)
+
+    def test_arkivert_teller_per_oppdragsnummer_og_kollapset_er_ukjent(self):
+        from oppdrag.models import ArkivertOppdrag, OppdragArkiv
+        self._lagre()
+        arkiv = OppdragArkiv.objects.create(tittel='A', vakt=self.vakt, vakt_navn='v', antall_rader=3)
+        inne = self.fra + timedelta(minutes=10)
+        # Én rad per oppdrag *og enhet* — oppdrag 1 hadde to biler.
+        for nr, enhet, sted, t in ((1, 'A1', 'Parkscene', inne), (1, 'A2', 'Parkscene', inne),
+                                   (2, 'A1', 'Parkscene', inne), (3, 'A1', 'Club', inne),
+                                   (4, 'A1', 'Parkscene', self.fra - timedelta(minutes=1))):
+            ArkivertOppdrag.objects.create(arkiv=arkiv, oppdragsnummer=nr, enhet_navn=enhet, lokasjon_navn=sted,
+                                           opprettet_at=t)
+        self.assertEqual(self.park.navn, 'Parkscene')
+        self.assertEqual(self._rad()['oppdrag'], 2, 'oppdrag 1 to ganger er ett oppdrag')
+        OppdragArkiv.objects.filter(pk=arkiv.pk).update(kollapset_at=self.naa)
+        self.assertIsNone(self._rad()['oppdrag'], 'radene er borte — null ville vært en påstand')
+
+    def test_dekket_helt_enkelt(self):
+        t0 = self.naa
+        t = lambda m: t0 + timedelta(minutes=m)
+        self.assertEqual(program._dekket([], t(0), t(60), 1), (0.0, 60))
+        self.assertEqual(program._dekket([(t(0), t(60)), (t(0), t(60))], t(0), t(60), 2), (2.0, 0))
+        self.assertEqual(program._dekket([(t(0), t(30))], t(0), t(60), 0), (0.5, 0), 'null trengs er aldri under')
+        self.assertEqual(program._dekket([], t(0), t(0), 1), (None, 0))
+
+
+class KopierProgrammetTests(_Program):
+
+    def setUp(self):
+        super().setUp()
+        from datetime import date
+        from core.models import Vakt
+        self.i_fjor = Vakt.objects.create(navn='Vakt 2025', year=2025, startet=timezone.now() - timedelta(days=365))
+        tz = timezone.get_current_timezone()
+        from datetime import datetime
+        self.fredag = timezone.make_aware(datetime(2025, 9, 26, 22, 0), tz)
+        program.lagre_post(self.i_fjor, self._data(), fra=self.fredag, til=self.fredag + timedelta(hours=2),
+                           bruker=self.leder)
+        program.lagre_post(self.i_fjor, self._data(navn='Natt', lokasjon_id=self.club.pk),
+                           fra=self.fredag + timedelta(hours=4), til=self.fredag + timedelta(hours=5), bruker=self.leder)
+        self.maal = date(2026, 9, 25)
+
+    def test_flyttet_i_hele_doegn_og_klokkeslettene_staar(self):
+        svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual((svar['kopiert'], svar['hoppet_over']), (2, []))
+        poster = list(Programpost.objects.filter(vakt=self.vakt).order_by('fra'))
+        self.assertEqual([timezone.localtime(p.fra).strftime('%d.%m %H:%M') for p in poster],
+                         ['25.09 22:00', '26.09 02:00'], 'natta etter følger med')
+        self.assertEqual(sorted(poster[0].behov.values_list('gruppe_navn', 'antall')),
+                         sorted([(LAG, 4), (AMBULANSE, 2)]))
+        self.assertEqual(poster[0].beredskap, 'oransje')
+        self.assertEqual(list(poster[0].kjennetegn.values_list('navn', flat=True)), ['Pyro'])
+
+    def test_stedet_finnes_paa_navnet_og_et_borte_sted_nevnes(self):
+        from ko.models import Programpost as PP
+        PP.objects.filter(vakt=self.i_fjor, navn='Natt').update(lokasjon=None)
+        Lokasjon.objects.filter(pk=self.park.pk).update(er_aktiv=False)
+        ny = Lokasjon.objects.create(navn='Parkscene 2026')
+        PP.objects.filter(vakt=self.i_fjor, navn='Headliner fredag').update(lokasjon=None, lokasjon_navn='Parkscene 2026')
+        svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual(svar['kopiert'], 2)
+        self.assertEqual(Programpost.objects.get(vakt=self.vakt, navn='Headliner fredag').lokasjon, ny)
+        Lokasjon.objects.filter(pk=ny.pk).update(er_aktiv=False)
+        svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual(svar['kopiert'], 1)
+        self.assertIn('Headliner fredag', svar['hoppet_over'][0])
+
+    def test_natta_etter_hoerer_til_doegnet_foer(self):
+        """Første konsert kl. 05:30 hører til døgnet før (døgnstart 06:00) — den
+        skal lande natt til dagen etter `forste_dogn`, ikke på selve datoen.
+        05:30 og ikke 01:30: 01:30 er 23:30 UTC dagen før, og da ville en
+        `.date()` på tidspunktet tilfeldigvis truffet riktig døgn."""
+        from core.models import Vakt
+        from datetime import datetime
+        natt = timezone.make_aware(datetime(2025, 9, 27, 5, 30), timezone.get_current_timezone())
+        v = Vakt.objects.create(navn='Natt 2025', year=2025, startet=natt)
+        program.lagre_post(v, self._data(navn='Nattkonsert'), fra=natt, til=natt + timedelta(hours=1), bruker=self.leder)
+        program.kopier_program(v, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        post = Programpost.objects.get(vakt=self.vakt, navn='Nattkonsert')
+        self.assertEqual(timezone.localtime(post.fra).strftime('%d.%m %H:%M'), '26.09 05:30')
+
+    def test_et_inaktivt_sted_paa_id_viker_for_et_aktivt_med_samme_navn(self):
+        Lokasjon.objects.filter(pk=self.park.pk).update(er_aktiv=False, navn='Parkscene (gammel)')
+        ny = Lokasjon.objects.create(navn=self.park.navn)
+        svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual(svar['hoppet_over'], [])
+        self.assertEqual(Programpost.objects.get(vakt=self.vakt, navn='Headliner fredag').lokasjon, ny)
+
+    def test_en_gruppe_som_er_borte_nevnes_og_resten_av_behovet_kommer_med(self):
+        from vaktliste.models import Ressursgruppe
+        Ressursgruppe.objects.filter(pk=self.amb.pk).update(er_aktiv=False)
+        svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual(svar['kopiert'], 2)
+        self.assertEqual([h for h in svar['hoppet_over'] if AMBULANSE in h],
+                         [f'{n} — behovet for «{AMBULANSE}» er ikke med, gruppa finnes ikke'
+                          for n in ('Headliner fredag', 'Natt')])
+        post = Programpost.objects.get(vakt=self.vakt, navn='Headliner fredag')
+        self.assertEqual(list(post.behov.values_list('gruppe_navn', flat=True)), [LAG])
+
+    def test_tomt_program_er_en_feil_og_kopien_har_historikk(self):
+        from core.models import Vakt
+        from ko.models import Programendring
+        tom = Vakt.objects.create(navn='Tom', year=2024, startet=timezone.now())
+        with self.assertRaises(services.Ugyldig):
+            program.kopier_program(tom, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
+        self.assertEqual(Programendring.objects.filter(vakt=self.vakt, hva='opprettet').count(), 2)
+
+
+class Steg5PorteneTests(PorteneTests):
+
+    def test_etterpaa_aktiv_for_les_tidligere_for_lederen(self):
+        from core.models import Vakt
+        self._lagre()
+        r = self._klient('les').get('/ko/api/program/etterpaa/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()['data']['poster']), 1)
+        self.assertEqual(r.json()['data']['vakter'], [], 'vaktvelgeren er lederens')
+        gammel = Vakt.objects.create(navn='i fjor', year=2025, startet=timezone.now() - timedelta(days=365))
+        self.assertEqual(self._klient('skriv_full').get('/ko/api/program/etterpaa/', {'vakt': gammel.pk}).status_code, 403)
+        leder = self._klient('skriv_leder')
+        self.assertEqual(leder.get('/ko/api/program/etterpaa/', {'vakt': gammel.pk}).status_code, 200)
+        self.assertEqual(leder.get('/ko/api/program/etterpaa/', {'vakt': 99999}).status_code, 404)
+
+    def test_kopier_er_lederens_og_spor_foer_den_legger_til(self):
+        from core.models import Vakt
+        gammel = Vakt.objects.create(navn='i fjor', year=2025, startet=timezone.now() - timedelta(days=365))
+        program.lagre_post(gammel, self._data(), fra=self.fra, til=self.til, bruker=self.leder)
+        url = '/ko/api/program/kopier/'
+        kropp = {'fra_vakt_id': gammel.pk, 'forste_dogn': '2026-09-25'}
+        self.assertEqual(self._klient('skriv_full').post(url, kropp, content_type='application/json').status_code, 403)
+        c = self._klient('skriv_leder')
+        self.assertEqual(c.post(url, dict(kropp, forste_dogn='fredag'), content_type='application/json').status_code, 400)
+        self.assertEqual(c.post(url, dict(kropp, fra_vakt_id=self.vakt.pk),
+                                content_type='application/json').status_code, 400, 'ikke fra seg selv')
+        self.assertEqual(c.post(url, kropp, content_type='application/json').status_code, 200)
+        r = c.post(url, kropp, content_type='application/json')
+        self.assertEqual(r.status_code, 409, 'vakta har alt et program')
+        self.assertEqual(r.json()['antall'], 1)
+        self.assertEqual(c.post(url, dict(kropp, confirm=True), content_type='application/json').status_code, 200)
+        self.assertEqual(Programpost.objects.filter(vakt=self.vakt).count(), 2)
+        self.assertEqual(c.post(url, dict(kropp, fra_vakt_id=self.vakt.pk, confirm=True),
+                                content_type='application/json').status_code, 400,
+                         'ikke fra seg selv — også når vakta har et program å kopiere')
+        self.assertEqual(Programpost.objects.filter(vakt=self.vakt).count(), 2)

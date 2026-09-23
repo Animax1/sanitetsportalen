@@ -105,6 +105,7 @@ class KoBackupHandler(BaseBackupHandler):
         'ko.PlanlagtPause': ['ressurs', 'av'],
         'ko.Programpost': ['lokasjon', 'endret_av'],
         'ko.Programbehov': ['gruppe'],
+        'ko.Programendring': ['av'],
     }
 
 

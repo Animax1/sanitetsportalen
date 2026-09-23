@@ -148,12 +148,10 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
 ### KO: tavleplanleggeren — under bygging (23. sep. 2026)
 
 *Skissene og svarene står i Artifact «Tavleplanleggeren» og i CHANGELOG. Steg 1 (planlagt
-slutt og overtid), steg 2 (programmet og planleggervinduet), steg 3 (behov i drift) og steg 4
-(tidslinja og dekningsstripa) er levert.
+slutt og overtid), steg 2 (programmet og planleggervinduet), steg 3 (behov i drift), steg 4
+(tidslinja og dekningsstripa) og steg 5 (endringer, plan mot faktisk, kopier) er levert.
 Hvert steg slettes herfra når det er levert.*
 
-- [ ] **Steg 5 — endringer og plan mot faktisk.** Systemlinje ved hver programendring,
-      plan mot faktisk per konsert (også tidligere år), og «kopier programmet» til ny vakt.
 - [ ] **Ekstra: planleggeren i eget nettleservindu på skjerm to** (André, 23. sep. 2026:
       «la oss ta ditt forslag som en ekstra ting»). /ko/ tar en hel skjerm; planleggeren
       som egen side med samme tidslinje som tavla. Etter steg 4.

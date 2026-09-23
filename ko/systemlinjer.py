@@ -86,6 +86,7 @@ HENDELSE_LAG_AV = 'hendelse_lag_av'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 TAVLE_FLYTTET = 'tavle_flyttet'
 TAVLE_RETTET = 'tavle_rettet'
+PROGRAM_ENDRET = 'program_endret'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -150,6 +151,13 @@ KODER: dict[str, str] = {
         'En retting skriver om historikken «Besøk» teller. Uten en linje ville '
         'tallene endret seg uten at noen kunne si hvorfor — samme grunn som '
         'TIDSPUNKT_KORRIGERT.',
+    # Programmet (tavleplanleggeren, 23. sep. 2026). **Bare når endringen
+    # gjelder noe som pågår eller begynner innen to timer** — ellers er det
+    # planlegging, og femten konserter lagt inn om formiddagen er femten
+    # linjer ingen trenger. Historikken står uansett i `Programendring`.
+    PROGRAM_ENDRET:
+        '«Headliner forsinket til 22:30, beredskap satt til rød» forklarer hvorfor '
+        '«2 / 4» plutselig ble «2 / 5» på tavla, og hvem som bestemte det.',
 }
 
 
@@ -286,6 +294,17 @@ def tegn(kode: str, data: dict) -> str:
             if foer != etter:
                 deler.append(f'{navn} {foer or "–"} → {etter or "–"}')
         return f'{hvem} {sted} rettet: ' + ', '.join(deler)
+    if kode == PROGRAM_ENDRET:
+        navn = data.get('navn') or 'Konsert'
+        sted = f' ({data["sted"]})' if data.get('sted') else ''
+        if data.get('hva') == 'slettet':
+            return f'Program: {navn}{sted} slettet'
+        if data.get('hva') == 'opprettet':
+            deler = [f'Program: {navn}{sted} lagt til', data.get('tid') or '', data.get('beredskap') or '']
+            return ' · '.join(d for d in deler if d)
+        endringer = ', '.join(f'{e.get("felt")} {e.get("fra") or "–"} → {e.get("til") or "–"}'
+                              for e in (data.get('endringer') or []))
+        return f'Program: {navn}{sted} endret' + (f' — {endringer}' if endringer else '')
     if kode == OPPDRAG_KNYTTET:
         fra = data.get('fra_hendelsesnummer')
         til = data.get('hendelsesnummer')

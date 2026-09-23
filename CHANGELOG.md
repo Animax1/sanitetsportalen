@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Planleggeren: endringshistorikk, plan mot faktisk og «kopier programmet»  `#ko` `#planlegger`
+
+Steg 5 og siste av tavleplanleggeren. André: «det er egentlig kjempesmart. Og fint for videre
+år på samme arrangement å kunne se hva vi hadde på de konsertene og risikovurdering/
+beredskapsnivå.»
+
+- **Hver endring i programmet lagres** (`ko.Programendring`, migrasjon `0018`): lagt til og
+  slettet med hele bildet, endret med **bare feltene som endret seg** — «beredskap Gul → Rød,
+  behov 1 Ambulanse, 2 Lag → 2 Ambulanse, 3 Lag». Å lagre uten å endre noe gir ingen rad.
+  Bildet er tekst, ikke pekere, og tida har dato, så historikken kan leses også når stedet
+  eller gruppa er borte.
+- **Systemlinje i KO-loggen bare i drift** (`program_endret`): når konserten pågår eller
+  begynner innen to timer, før *eller* etter endringen. Planlegging i god tid havner i
+  historikken, ikke i loggen. Å utsette en konsert som skulle begynt om en time, er nettopp
+  det loggen skal vise.
+- **Ny visning i planleggeren: «Etterpå»** (tredje knapp). Per konsert: beredskap, behov
+  (med «opprinnelig: …» når det er endret), **faktisk på stedet** — snitt, og minutter under
+  behovet per gruppe, fra tavlas plasseringer (pauser teller ikke) — antall oppdrag på stedet
+  mens konserten pågikk, og hvor mange ganger den ble endret. Historikken står under.
+  Døgnvalget er skjult der, fordi visningen gjelder hele vakta.
+- **Tidligere vakter** (vaktvelgeren) og **«Kopier programmet hit»** er KO-lederens. Kopien
+  flyttes i **hele døgn** så første konsertdøgn lander på valgt dato, og klokkeslettene
+  står. En konsert kl. 05:30 hører til døgnet før, som på tavla. Sted og gruppe matches på
+  id, ellers på navn. **Det som ikke kan tas med, blir nevnt**: et sted som er borte, eller
+  **en gruppe som er borte** (den siste ble funnet underveis — resten av behovet kom med, og
+  linja ble borte uten at noe ble sagt). Har aktiv vakt alt et program, spør den først (409):
+  «Kopien legges til ved siden av, ingenting erstattes. Fortsette?»
+- Oppdrag fra en arkivert vakt telles per oppdragsnummer (arkivet har én rad per oppdrag
+  *og enhet*). **Etter kollaps står det «–», ikke 0**, fordi 0 ville vært en påstand og
+  ikke et tall.
+
+**Kjent grense:** «faktisk» er tavlas plasseringer, som i «Besøk». Tida en bil bruker på et
+oppdrag på stedet, er ikke med.
+
+**Mutasjonstesting: 38 i tjenestelaget og viewene, 12 i JS.** Python: grensene i «i drift»
+(`<=`/`<` i begge ender, forvarselet fjernet), systemlinja bare i drift, ingen rad uten
+endring, «før *eller* etter», slettingen, diffen, `_dekket` (`<` mot `<=`, `and` → `or`,
+tom lengde), pause, sted og gruppe (id og navn), klippingen, «startet», antall endringer,
+arkiv og kollaps, oppdragsvinduet, døgnforskyvningen, stedsmatchingen og portene (403, 404,
+409, «ikke fra seg selv»). **Åtte overlevde i første runde, og sju var ekte hull:**
+plasseringer fra før konserten ble ikke klippet, oppdrag før konserten, arkiv etter kollaps,
+`distinct` på oppdragsnummer, døgnet til en konsert før døgnstart, inaktivt sted på id med et
+aktivt med samme navn, og kopi fra seg selv. Den siste gikk grønn fordi testen traff «ingen
+program å kopiere» først. Døgnmutanten overlevde også den nye testen første gang: **01:30
+norsk tid er 23:30 UTC dagen før**, så `.date()` traff riktig døgn ved en tilfeldighet. Testen
+bruker nå 05:30. Den åttende var en ekvivalent mutant: et ekstra `transaction.atomic()` rundt
+`lagre_post`, som selv er atomisk og gir lagringspunktet. Den er fjernet, med en kommentar.
+JS: 12 av 12 drept (ledergaten, «ikke på aktiv vakt», «opprinnelig» bare ved endring, «–»
+for ukjent, escaping av historikken og raden).
+
 ## 2026-09-23 — Planleggeren: tidslinja over døgnet, og dekningen mot vaktlista  `#ko` `#planlegger`
 
 Steg 4 av tavleplanleggeren — «tabletoppen» fra skissene: **hvor mange trengs, og har vi

@@ -873,3 +873,44 @@ class Programbehov(models.Model):
 
     def __str__(self):
         return f'{self.antall} {self.gruppe_navn}'
+
+
+class Programendring(models.Model):
+    """Hver endring i programmet, med hva den var (steg 5, 23. sep. 2026).
+
+    **Planen skal huske hva den var** — André: «ja og ja» til at planen endres
+    underveis *og* at plan mot faktisk tas vare på, også til neste år.
+    Sammenlignes det faktiske bare med planen slik den står til slutt, ser det
+    ut som om man alltid planla riktig. `detaljer` bærer feltene som endret seg
+    (`[{felt, fra, til}]`), og ved opprettelse hele bildet — det er
+    «opprinnelig» i plan mot faktisk.
+
+    Står igjen når konserten slettes (`post` blir tom, navnet er frosset).
+    """
+
+    OPPRETTET = 'opprettet'
+    ENDRET = 'endret'
+    SLETTET = 'slettet'
+    HVA_VALG = ((OPPRETTET, 'Lagt til'), (ENDRET, 'Endret'), (SLETTET, 'Slettet'))
+
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT, related_name='ko_programendringer', verbose_name='Vakt')
+    post = models.ForeignKey(
+        Programpost, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='endringer', verbose_name='Programpost')
+    post_navn = models.CharField(max_length=120, verbose_name='Konsert (navn)')
+    hva = models.CharField(max_length=10, choices=HVA_VALG, verbose_name='Hva')
+    detaljer = models.JSONField(default=list, blank=True, verbose_name='Detaljer')
+    tidspunkt = models.DateTimeField(default=timezone.now, verbose_name='Tidspunkt')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_programendringer', verbose_name='Av')
+    av_navn = models.CharField(max_length=150, blank=True, default='', verbose_name='Av (navn)')
+
+    class Meta:
+        verbose_name = 'Programendring'
+        verbose_name_plural = 'Programendringer'
+        ordering = ['tidspunkt', 'id']
+
+    def __str__(self):
+        return f'{self.post_navn} · {self.hva}'
