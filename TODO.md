@@ -159,25 +159,15 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
       kildefelt på `PlanlagtPause`. Retningen er `ko` → `vaktliste`. Åpent når punktet tas
       opp: pause per plass eller per ressurs, og om den teller i timene.
 
-### Oppdraget: endre verdier uten «Rediger» — backlog, 22. sep. 2026
+### Oppdragslista: endre verdier rett i lista — venter (André, 23. sep. 2026)
 
-To innspill fra backloggen i portalen, som André vil se på etter menyen, fargen og
-statusføringen (levert 22. sep., se CHANGELOG). **Det gjelder inne på oppdraget**, ikke
-lista (André).
-
-- [ ] **Hastegrad, problemstilling, lokasjon og tildelt ressurs direkte i oppdraget**, uten
-      «Rediger» — «klikke på disse verdiene … gir en liten dropdown for de andre valgene».
-      Én mekanisme (klikk → nedtrekk → lagre ett felt), bygget én gang. Serveren er klar:
-      `PUT /oppdrag/api/oppdrag/<pk>/` tar ett felt om gangen. Tre ting å løse:
-      **hastegrad og problemstilling henger sammen** (`_valider_problemstilling_og_antall`)
-      — et bytte av hastegrad må be om problemstilling når den gamle ikke passer; **tildelt
-      ressurs** gir bare mening med null eller én enhet, ellers er det «Flytt»; og
-      endringen bør synes i oppdragets tidslinje, så et feilklikk ikke er stille.
-- [ ] **Beskrivelsen synlig uten «Rediger».** Oppdragsnotatet vises alt i `visOppdrag()`
-      når det står tekst i det — avklar med André hvilken tekst han ikke ser.
-- [ ] **Senere, om ønsket: det samme i lista.** Tre feller vinduet ikke har: tavla tegnes
-      på nytt ved hver polling (et åpent nedtrekk forsvinner), hele raden er en knapp som
-      åpner oppdraget, og et feilklikk på en travel tavle endrer et oppdrag stille.
+- [ ] **Hastegrad, problemstilling, lokasjon og tildelt ressurs rett i oppdragslista**,
+      som det nå gjøres inne i oppdraget (levert 23. sep. 2026, se CHANGELOG). André:
+      «avvent litt». Tre feller oppdragsvinduet ikke har: lista tegnes på nytt ved hver
+      polling (et åpent nedtrekk forsvinner), hele raden er en knapp som åpner oppdraget,
+      og et feilklikk på en travel liste endrer et oppdrag uten at noen ser det. Brikkene
+      og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
+      kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
 ### Vaktlista: fjern «Sett i drift», la drift følge vakta — ønsket 14. sep. 2026
 

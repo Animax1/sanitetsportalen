@@ -677,3 +677,16 @@
 .input-group-text {
   background: var(--surface-2); color: var(--text-main); border-color: var(--border-color);
 }
+
+/* Verdiene rett i oppdragsvinduet (23. sep. 2026): brikker man klikker for å
+   få et nedtrekk. Hastegraden beholder fargen sin fra `.hastegrad`. */
+.verdi-brikke {
+  display: inline-flex; align-items: center; margin: 0 0.35rem 0.25rem 0;
+  padding: 0.15rem 0.55rem; border-radius: 6px; font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+}
+.verdi-brikke:not(.hastegrad) { background: transparent; color: var(--text-main); }
+button.verdi-brikke.verdi-kan-endres { cursor: pointer; }
+button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
+.verdi-brikke .bi-caret-down-fill { font-size: 0.6rem; opacity: 0.7; }
+.verdi-velger { display: inline-flex; align-items: center; margin: 0 0.35rem 0.25rem 0; }

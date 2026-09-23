@@ -272,6 +272,20 @@ def hendelse_til_dict(h) -> dict:
     }
 
 
+def endring_til_dict(endring) -> dict:
+    """En endring i oppdragets verdier, til tidslinjen."""
+    return {
+        'id': endring.pk,
+        'felt': endring.felt,
+        'felt_navn': endring.get_felt_display(),
+        'fra': endring.fra_verdi,
+        'til': endring.til_verdi,
+        'automatisk': endring.automatisk,
+        'tidspunkt': endring.created_at.isoformat(),
+        'av': endring.endret_av_navn,
+    }
+
+
 def bytte_til_dict(bytte) -> dict:
     return {
         'id': bytte.pk,

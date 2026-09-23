@@ -112,7 +112,11 @@ class OpprettelseTests(OppdragBasis):
 
     def test_redigering_sjekker_mot_gjeldende_verdier(self):
         o = self._oppdrag()   # Akutt / Pustevansker
-        res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/', data=json.dumps({'hastegrad': 'Drift'}),
+        # Hastegraden alene (André, 23. sep. 2026): problemstillingen blir
+        # «Udefinert» når den ikke passer, ikke en 400. Sendes begge, gjelder
+        # valideringen — se under.
+        res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/',
+                         data=json.dumps({'hastegrad': 'Drift', 'problemstilling': 'Pustevansker'}),
                          content_type='application/json')
         self.assertEqual(res.status_code, 400, 'Pustevansker er ikke drift')
         res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/',

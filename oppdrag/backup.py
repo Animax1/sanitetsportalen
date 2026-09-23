@@ -57,6 +57,7 @@ class OppdragBackupHandler(BaseBackupHandler):
         'oppdrag.Statusmelding': ['meldt_av', 'trukket_tilbake_av'],
         'oppdrag.Oppdragsenhet': ['varslet_av'],
         'oppdrag.Enhetsbytte': ['byttet_av'],
+        'oppdrag.Oppdragsendring': ['endret_av'],
         'oppdrag.Enhetshendelse': ['av'],
         'oppdrag.Enhet': ['user'],
     }

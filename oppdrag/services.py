@@ -17,8 +17,8 @@ from django.utils import timezone
 from core.notifications import notify
 
 from . import choices
-from .models import (Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet,
-                     Statusmelding, Vaktmodusperiode)
+from .models import (Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsendring,
+                     Oppdragsenhet, Statusmelding, Vaktmodusperiode)
 
 logger = logging.getLogger(__name__)
 
@@ -1569,3 +1569,51 @@ def synlige_for_enhet(enhet, vakt=None):
         if melding is not None and melding.tidspunkt > grense:
             ut.append(rad.oppdrag)
     return ut
+
+
+# ── Endringer i oppdraget (23. sep. 2026) ───────────────────────────────────
+#
+# Verdiene endres rett i vinduet, uten «Rediger» (backlog punkt 4 og 5), og
+# hver endring står i tidslinjen (André: «ja» — et feilklikk skal ikke være
+# stille).
+
+def problemstilling_etter_hastegrad(hastegrad: str, problemstilling: str) -> str:
+    """Problemstillingen når hastegraden byttes (André, 23. sep. 2026):
+    **beholdes om den kan**, ellers «Udefinert». Å bytte fra Akutt til Drift
+    gjør «Pustevansker» meningsløs; å bytte fra Akutt til Hast gjør ikke det.
+    «Udefinert» sperrer Ledig til noen har satt en som passer
+    (`ProblemstillingUdefinert`) — det er signalet, ikke en bieffekt."""
+    from . import verdier
+    if verdier.problemstilling_passer(hastegrad, problemstilling, gjeldende=problemstilling):
+        return problemstilling
+    return choices.UDEFINERT
+
+
+def felt_i_tidslinjen(oppdrag) -> dict:
+    """Verdiene en endring logges for, som tekst."""
+    return {
+        Oppdragsendring.HASTEGRAD: oppdrag.hastegrad or '',
+        Oppdragsendring.PROBLEMSTILLING: oppdrag.problemstilling or '',
+        Oppdragsendring.LOKASJON: getattr(oppdrag.lokasjon, 'navn', '') or '',
+        Oppdragsendring.NOTAT: oppdrag.fritekst or '',
+    }
+
+
+def logg_endringer(oppdrag, foer: dict, *, bruker=None, automatisk=()) -> list:
+    """Én `Oppdragsendring` per felt som faktisk endret seg. Oppdragsnotatet
+    logges **uten verdier** (`Oppdragsendring`)."""
+    etter = felt_i_tidslinjen(oppdrag)
+    ekte = bruker if bruker is not None and getattr(bruker, 'is_authenticated', False) else None
+    ut = []
+    for felt, _ in Oppdragsendring.FELT_VALG:
+        if foer.get(felt, '') == etter[felt]:
+            continue
+        uten_verdi = felt == Oppdragsendring.NOTAT
+        ut.append(Oppdragsendring.objects.create(
+            oppdrag=oppdrag, felt=felt,
+            fra_verdi='' if uten_verdi else foer.get(felt, '')[:255],
+            til_verdi='' if uten_verdi else etter[felt][:255],
+            automatisk=felt in automatisk, endret_av=ekte,
+            endret_av_navn=getattr(ekte, 'username', '') or ''))
+    return ut
+

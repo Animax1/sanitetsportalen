@@ -295,6 +295,14 @@ function enhetshendelseTekst(h) {
 }
 
 
+// «Hastegrad: Haster → Akutt». Notatet står uten verdier — samme regel som
+// audit: at det ble endret, ikke hva det sto.
+function endringTekst(e) {
+  if (e.felt === 'fritekst') return 'Oppdragsnotat endret';
+  const tekst = `${e.felt_navn}: ${e.fra || '–'} → ${e.til || '–'}`;
+  return e.automatisk ? `${tekst} (passet ikke den nye hastegraden)` : tekst;
+}
+
 function tidslinjeHtml(data) {
   // Unionen av statusmeldinger og enhetsbytter. De to er skilt i databasen
   // fordi et bytte ikke er en status og statistikken måler statusene; å slå
@@ -326,6 +334,19 @@ function tidslinjeHtml(data) {
           <span class="tidslinje-tid">${escapeHtml(klokke(h.tidspunkt))}</span>
           <span>${escapeHtml(tekst)}</span>
           <span class="tidslinje-notat">· ${escapeHtml(h.av)}</span>
+        </div>`,
+    });
+  });
+
+  // Endringene i verdiene (23. sep. 2026): et feilklikk skal ikke være stille.
+  (data.endringer || []).forEach((e) => {
+    rader.push({
+      tid: e.tidspunkt,
+      html: `
+        <div class="tidslinje-rad">
+          <span class="tidslinje-tid">${escapeHtml(klokke(e.tidspunkt))}</span>
+          <span>${escapeHtml(endringTekst(e))}</span>
+          <span class="tidslinje-notat">· ${escapeHtml(e.av)}</span>
         </div>`,
     });
   });
@@ -454,9 +475,6 @@ async function visOppdrag(id) {
   // Med flere enheter er «flytt» flytt av én rad — hvilken, spørres om.
   const flyttValg = OPPDRAG_TILGANG.kanSkrive ? _flyttValg(o) : '';
 
-  const redigerKnapp = OPPDRAG_TILGANG.kanSkrive
-    ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visRedigerOppdrag">Rediger</button>`
-    : '';
   // Hendelsen oppdraget hører til, med knytt/løsne — **KOs**, og bare på
   // `/ko/`: `ko.js` er betinget lastet, og kallet går gjennom en vakt
   // (CLAUDE.md). Markupen skannes i `ko/tests_js.py`, der byggeren bor.
@@ -472,18 +490,17 @@ async function visOppdrag(id) {
     ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
                data-id="${escHtmlValue(o.id)}"><i class="bi bi-trash me-1"></i>Slett oppdrag</button>`
     : '';
+  // **Verdiene står framme, og endres der de står** (backlog punkt 4 og 5,
+  // 23. sep. 2026): «Rediger»-knappen gjemte det man åpnet oppdraget for.
+  apentVerdivalg = null;
+  apentNotat = false;
   innhold.innerHTML = (`
-    <div class="oppdrag-meta mb-2">
-      <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
-      <span class="ms-2">${escapeHtml(o.lokasjon_navn)}</span>
-      <span class="ms-2">${escapeHtml(o.status_navn)}</span>
-      ${redigerKnapp}
-    </div>
+    <div class="oppdrag-verdier mb-2" id="oppdrag-verdier">${_verdierHtml(o, null, OPPDRAG_TILGANG.kanSkrive)}</div>
+    <div class="text-danger small mb-2 d-none" id="verdi-feil"></div>
     ${hendelseValg}
     ${lagBlokk}
     ${beskrivelse}
-    ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
-    <div id="rediger-oppdrag"></div>
+    <div id="oppdrag-notat">${_notatHtml(o, false, OPPDRAG_TILGANG.kanSkrive)}</div>
     <h6 class="text-muted">Enheter</h6>
     <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>
     <h6 class="text-muted">Tidslinje</h6>
@@ -824,70 +841,198 @@ async function slettHistorikk() {
 }
 
 
-function visRedigerOppdrag() {
-  // Sentralbordet retter oppdraget (André, 12. sep. 2026): lokasjon,
-  // hastegrad, problemstilling og fritekst. Valgene hentes fra
-  // «Nytt oppdrag»-skjemaet, som finnes for alle med skrivetilgang — én
-  // kilde for verdimengdene.
-  const o = apentOppdrag;
-  const boks = document.getElementById('rediger-oppdrag');
-  if (!o || !boks) return;
-  if (boks.innerHTML) { boks.innerHTML = ''; return; }
-  // Det tomme valget i «Nytt oppdrag» («ingen hastegrad valgt») hører ikke
-  // hjemme her: et oppdrag som finnes har en hastegrad.
-  const kopier = (fraId, valgt) => Array.from(document.querySelectorAll(`#${fraId} option`))
-    .filter((op) => op.value !== '')
-    .map((op) => `<option value="${escHtmlValue(op.value)}"${op.value === valgt ? ' selected' : ''}>${escapeHtml(op.textContent)}</option>`)
-    .join('');
-  const lokvalg = lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id).map(
-    (l) => `<option value="${escHtmlValue(l.id)}"${l.id === o.lokasjon_id ? ' selected' : ''}>${escapeHtml(l.navn)}</option>`).join('');
-  // Oppdragsnotatet (André, 19. sep. 2026: «vi endrer fra fritekst til
-  // oppdragsnotat»): oppdragets egen tekst, og bare enhetene på oppdraget
-  // ser den. Det KO deler fra hendelsen står for seg.
-  const fritekstHint = '<div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes.</div>';
-  boks.innerHTML = (`
-    <div class="row g-2 mt-1">
-      <div class="col-md-6"><label class="form-label" for="red-hastegrad">Hastegrad</label>
-        <select id="red-hastegrad" class="form-select form-select-sm"
-                data-action="hastegradEndret" data-hendelse="change" data-arg="red">${kopier('nytt-hastegrad', o.hastegrad)}</select></div>
-      <div class="col-md-6"><label class="form-label" for="red-lokasjon">Lokasjon</label>
-        <select id="red-lokasjon" class="form-select form-select-sm">${lokvalg}</select></div>
-      <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
-        <select id="red-problemstilling" class="form-select form-select-sm"></select></div>
-      <div class="col-12"><label class="form-label" for="red-fritekst">Oppdragsnotat</label>
-        <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea>${fritekstHint}</div>
-      <div class="col-12 d-flex gap-2 align-items-center">
-        <span id="red-feil" class="text-danger small"></span>
-        <span class="ms-auto d-flex gap-2">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="visRedigerOppdrag">Avbryt</button>
-          <button type="button" class="btn btn-sm btn-primary" id="red-lagre"
-                  data-action="lagreOppdrag" data-id="${escHtmlValue(o.id)}">Lagre</button>
-        </span>
-      </div>
-    </div>`);
-  fyllProblemstillinger('red', o.hastegrad, o.problemstilling);
+// ── Verdiene rett i vinduet (backlog punkt 4 og 5, 23. sep. 2026) ─────────
+//
+// André: «klikke på disse verdiene … gir en liten dropdown for de andre
+// valgene», og «rediger-knappen inne i oppdraget gjemmer redigerbar info».
+// Hvert felt lagres for seg, idet det velges — serveren tar ett felt om
+// gangen, og hver endring står i tidslinjen. **Inne i oppdraget, ikke i
+// lista** (André: «avvent litt» med lista): lista tegnes om ved hver
+// polling, hele raden er en knapp, og et feilklikk der ses av ingen.
+
+//: Feltet som står åpent som nedtrekk, eller `null`.
+let apentVerdivalg = null;
+//: Står oppdragsnotatet åpent for redigering?
+let apentNotat = false;
+
+const VERDIFELT = ['hastegrad', 'problemstilling', 'lokasjon', 'ressurs'];
+
+// Kan feltet endres her? **Ressursen bare med null eller én enhet** (André:
+// «ja») — med flere er det «Flytt» og «Legg til» under, fordi et bytte da
+// ikke sier hvem som byttes.
+function _verdiKanEndres(o, felt, kanSkrive) {
+  if (!kanSkrive || !VERDIFELT.includes(felt)) return false;
+  return felt !== 'ressurs' || (o.enheter || []).length <= 1;
 }
 
+// Valgene i nedtrekket, med den gjeldende verdien først valgt — så `change`
+// bare fyrer på et ekte bytte.
+function _verdiValg(o, felt) {
+  if (felt === 'hastegrad') {
+    return HASTEGRAD_REKKEFOLGE.map((h) => ({ verdi: h, tekst: h, valgt: h === o.hastegrad }));
+  }
+  if (felt === 'problemstilling') {
+    const liste = problemstillingerFor(o.hastegrad);
+    if (!liste.includes(o.problemstilling)) liste.unshift(o.problemstilling);
+    return liste.map((p) => ({ verdi: p, tekst: p, valgt: p === o.problemstilling }));
+  }
+  if (felt === 'lokasjon') {
+    return lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id)
+      .map((l) => ({ verdi: String(l.id), tekst: l.navn, valgt: l.id === o.lokasjon_id }));
+  }
+  if (felt === 'ressurs') {
+    const naa = (o.enheter || [])[0];
+    const valg = enheter.filter((e) => e.pa_vakt || (naa && e.id === naa.enhet_id))
+      .map((e) => ({ verdi: String(e.id), tekst: e.navn, valgt: Boolean(naa) && e.id === naa.enhet_id }));
+    return naa ? valg : [{ verdi: '', tekst: 'Velg enhet', valgt: true }].concat(valg);
+  }
+  return [];
+}
 
-async function lagreOppdrag(id) {
-  const feil = document.getElementById('red-feil');
-  await withSubmitGuard('red-lagre', async () => {
-    const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        problemstilling: document.getElementById('red-problemstilling').value,
-        hastegrad: document.getElementById('red-hastegrad').value,
-        lokasjon_id: Number(document.getElementById('red-lokasjon').value),
-        fritekst: document.getElementById('red-fritekst').value,
-      }),
-    });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.status !== 'ok') {
-      if (feil) feil.textContent = d.message || 'Kunne ikke lagre.';
-      return;
-    }
-    await visOppdrag(id);
-    await lastAlt();
+// Forespørselen et valg blir til. **Ressursen er ikke et felt på
+// oppdraget:** uten enhet varsles den valgte («Legg til»), med én flyttes
+// oppdraget (`flytt_til_enhet`, som står i tidslinjen som før).
+function _verdiForesporsel(o, felt, verdi) {
+  const url = `/oppdrag/api/oppdrag/${Number(o.id)}/`;
+  if (felt === 'hastegrad') return { url, method: 'PUT', body: { hastegrad: verdi } };
+  if (felt === 'problemstilling') return { url, method: 'PUT', body: { problemstilling: verdi } };
+  if (felt === 'lokasjon') return { url, method: 'PUT', body: { lokasjon_id: Number(verdi) } };
+  if (felt === 'ressurs' && verdi) {
+    const antall = (o.enheter || []).length;
+    if (antall === 0) return { url: `${url}enheter/${Number(verdi)}/`, method: 'POST', body: {} };
+    if (antall === 1) return { url: `${url}flytt/`, method: 'POST', body: { enhet_id: Number(verdi) } };
+  }
+  return null;
+}
+
+function _verdiTekst(o, felt) {
+  if (felt === 'hastegrad') return o.hastegrad;
+  if (felt === 'problemstilling') return o.problemstilling;
+  if (felt === 'lokasjon') return o.lokasjon_navn || 'Ingen lokasjon';
+  const navn = (o.enheter || []).map((e) => e.enhet_navn);
+  return navn.length ? navn.join(', ') : 'Ingen ressurs';
+}
+
+const VERDIFELT_NAVN = { hastegrad: 'Hastegrad', problemstilling: 'Problemstilling',
+                         lokasjon: 'Lokasjon', ressurs: 'Tildelt ressurs' };
+
+function _verdiBrikke(o, felt, kanSkrive) {
+  const verdiTekst = escapeHtml(_verdiTekst(o, felt));
+  const klasse = felt === 'hastegrad' ? ` hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}` : '';
+  if (!_verdiKanEndres(o, felt, kanSkrive)) {
+    const hvorfor = (felt === 'ressurs' && kanSkrive)
+      ? ' title="Flere enheter — bruk «Flytt» eller «Legg til» under"' : '';
+    return `<span class="verdi-brikke${klasse}"${hvorfor}>${verdiTekst}</span>`;
+  }
+  return `<button type="button" class="verdi-brikke verdi-kan-endres${klasse}" data-action="visVerdivalg"
+            data-arg="${escHtmlValue(felt)}" title="${escHtmlValue(VERDIFELT_NAVN[felt])} — klikk for å endre">${verdiTekst}<i class="bi bi-caret-down-fill ms-1"></i></button>`;
+}
+
+function _verdiVelgerHtml(o, felt) {
+  const valg = _verdiValg(o, felt).map((v) =>
+    `<option value="${escHtmlValue(v.verdi)}"${v.valgt ? ' selected' : ''}>${escapeHtml(v.tekst)}</option>`).join('');
+  return `<span class="verdi-velger">
+      <select id="verdi-valg" class="form-select form-select-sm d-inline-block w-auto"
+              aria-label="${escHtmlValue(VERDIFELT_NAVN[felt])}"
+              data-action="lagreVerdi" data-hendelse="change" data-arg="${escHtmlValue(felt)}">${valg}</select>
+      <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-action="avbrytVerdivalg">Avbryt</button>
+    </span>`;
+}
+
+function _verdierHtml(o, aapen, kanSkrive) {
+  const brikker = VERDIFELT.map((felt) => (aapen === felt && _verdiKanEndres(o, felt, kanSkrive)
+    ? _verdiVelgerHtml(o, felt) : _verdiBrikke(o, felt, kanSkrive))).join('');
+  return `${brikker}<span class="oppdrag-meta ms-1">${escapeHtml(o.status_navn)}</span>`;
+}
+
+function _tegnVerdiene() {
+  const el = document.getElementById('oppdrag-verdier');
+  if (!el || !apentOppdrag) return;
+  el.innerHTML = _verdierHtml(apentOppdrag, apentVerdivalg, OPPDRAG_TILGANG.kanSkrive);
+  const valg = document.getElementById('verdi-valg');
+  if (valg) valg.focus();
+}
+
+function visVerdivalg(felt) {
+  apentVerdivalg = felt;
+  _visVerdifeil('');
+  _tegnVerdiene();
+}
+
+function avbrytVerdivalg() {
+  apentVerdivalg = null;
+  _tegnVerdiene();
+}
+
+function _visVerdifeil(melding) {
+  const el = document.getElementById('verdi-feil');
+  if (!el) return;
+  el.textContent = melding || '';
+  el.classList.toggle('d-none', !melding);
+}
+
+async function _sendVerdi(foresporsel) {
+  const res = await apiFetch(foresporsel.url, {
+    method: foresporsel.method, body: JSON.stringify(foresporsel.body),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visVerdifeil(d.message || 'Kunne ikke lagre.');
+    return false;
+  }
+  await visOppdrag(apentOppdragId);
+  await lastAlt();
+  return true;
+}
+
+async function lagreVerdi(felt) {
+  const valg = document.getElementById('verdi-valg');
+  if (!valg || !apentOppdrag) return;
+  const foresporsel = _verdiForesporsel(apentOppdrag, felt, valg.value);
+  if (!foresporsel) return;
+  await _sendVerdi(foresporsel);
+}
+
+// Oppdragsnotatet: alltid synlig, redigeres der det står.
+function _notatHtml(o, aapen, kanSkrive) {
+  if (aapen && kanSkrive) {
+    return `<div class="oppdrag-notat mb-3">
+        <label class="form-label small mb-1" for="notat-felt">Oppdragsnotat</label>
+        <textarea id="notat-felt" class="form-control form-control-sm" rows="3">${escapeHtml(o.fritekst || '')}</textarea>
+        <div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes.</div>
+        <div class="d-flex gap-2 justify-content-end mt-1">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="avbrytNotat">Avbryt</button>
+          <button type="button" class="btn btn-sm btn-primary" id="notat-lagre" data-action="lagreNotat">Lagre</button>
+        </div>
+      </div>`;
+  }
+  const knapp = kanSkrive
+    ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visNotat">${o.fritekst ? 'Endre' : 'Legg til'}</button>`
+    : '';
+  const notatTekst = o.fritekst
+    ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
+    : '<div class="oppdrag-meta">Ingen oppdragsnotat.</div>';
+  return `<div class="oppdrag-notat mb-3"><div class="oppdrag-meta small">Oppdragsnotat${knapp}</div>${notatTekst}</div>`;
+}
+
+function _tegnNotat() {
+  const el = document.getElementById('oppdrag-notat');
+  if (!el || !apentOppdrag) return;
+  el.innerHTML = _notatHtml(apentOppdrag, apentNotat, OPPDRAG_TILGANG.kanSkrive);
+  const felt = document.getElementById('notat-felt');
+  if (felt) felt.focus();
+}
+
+function visNotat() { apentNotat = true; _tegnNotat(); }
+
+function avbrytNotat() { apentNotat = false; _tegnNotat(); }
+
+async function lagreNotat() {
+  const felt = document.getElementById('notat-felt');
+  if (!felt || !apentOppdrag) return;
+  await withSubmitGuard('notat-lagre', async () => {
+    await _sendVerdi({ url: `/oppdrag/api/oppdrag/${Number(apentOppdrag.id)}/`, method: 'PUT',
+                       body: { fritekst: felt.value } });
   });
 }
 

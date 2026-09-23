@@ -30,9 +30,9 @@ from core.vakt import hent_aktiv_vakt
 
 from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
-from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Statusmelding
+from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
-    bytte_til_dict, er_enhetskonto, etag_for, hendelse_til_dict, json_body, melding_til_dict,
+    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for, hendelse_til_dict, json_body, melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
 
@@ -635,6 +635,8 @@ def oppdrag_detalj_view(request, pk):
             'enhetsbytter': [bytte_til_dict(b) for b in oppdrag.enhetsbytter.all()],
             'enhetshendelser': [hendelse_til_dict(h) for h in
                                 oppdrag.enhetshendelser.select_related('enhet', 'av')],
+            # Endringene i verdiene (23. sep. 2026) — til tidslinjen.
+            'endringer': [endring_til_dict(e) for e in oppdrag.endringer.all()],
             # Knappen skal bare finnes når den kan brukes.
             'kan_slettes': (not er_enhetskonto(request.user)
                             and services.kan_slettes(oppdrag, request.user)),
@@ -663,6 +665,16 @@ def oppdrag_detalj_view(request, pk):
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
 
+    # **Hastegraden alene** (23. sep. 2026, rett i vinduet): problemstillingen
+    # beholdes om den passer, ellers blir den «Udefinert» — ikke en 400.
+    # Sendes begge, er det operatørens valg, og da gjelder valideringen under.
+    automatisk = set()
+    if 'hastegrad' in data and 'problemstilling' not in data:
+        ny = services.problemstilling_etter_hastegrad(data['hastegrad'], oppdrag.problemstilling)
+        if ny != oppdrag.problemstilling:
+            data['problemstilling'] = ny
+            automatisk.add(Oppdragsendring.PROBLEMSTILLING)
+
     feil = (verdier.valider_problemstilling(data, gjeldende=oppdrag.problemstilling)
             or _valider_problemstilling_og_antall(
                 data, data.get('hastegrad', oppdrag.hastegrad),
@@ -684,7 +696,12 @@ def oppdrag_detalj_view(request, pk):
         except (Lokasjon.DoesNotExist, ValueError, TypeError):
             return JsonResponse(
                 {'status': 'error', 'message': 'Ukjent lokasjon.'}, status=400)
-    oppdrag.save()
+    # Verdiene før endringen, lest av raden som står i basen — ikke av
+    # objektet over, som alt er endret.
+    foer = services.felt_i_tidslinjen(Oppdrag.objects.select_related('lokasjon').get(pk=oppdrag.pk))
+    with transaction.atomic():
+        oppdrag.save()
+        services.logg_endringer(oppdrag, foer, bruker=request.user, automatisk=automatisk)
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
 

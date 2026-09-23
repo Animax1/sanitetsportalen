@@ -773,6 +773,53 @@ class Statusmelding(BaseTimeStampedModel):
         return f'{self.get_status_display()} {self.tidspunkt:%d.%m %H:%M}'
 
 
+class Oppdragsendring(BaseTimeStampedModel):
+    """Et felt på oppdraget ble endret av sentralbordet (André, 23. sep. 2026).
+
+    Verdiene i oppdraget endres nå rett i vinduet, uten «Rediger» — og da må
+    endringen synes i tidslinjen, så et feilklikk ikke er stille (André: «ja»
+    på spørsmålet). Egen modell, som `Enhetsbytte`: en endring er ikke en
+    status, og statistikken måler statusene.
+
+    **Verdiene er frosset tekst**, ikke pekere: «Hovedscene → Village» skal stå
+    også etter at lokasjonen er omdøpt. **Oppdragsnotatet logges uten
+    verdier** — samme regel som audit (`signals.FELT_UTEN_VERDILOGGING`): at
+    det ble endret, og av hvem, men aldri hva det sto.
+    """
+
+    HASTEGRAD = 'hastegrad'
+    PROBLEMSTILLING = 'problemstilling'
+    LOKASJON = 'lokasjon'
+    NOTAT = 'fritekst'
+    FELT_VALG = (
+        (HASTEGRAD, 'Hastegrad'),
+        (PROBLEMSTILLING, 'Problemstilling'),
+        (LOKASJON, 'Lokasjon'),
+        (NOTAT, 'Oppdragsnotat'),
+    )
+
+    oppdrag = models.ForeignKey(
+        Oppdrag, on_delete=models.CASCADE, related_name='endringer')
+    felt = models.CharField(max_length=20, choices=FELT_VALG)
+    fra_verdi = models.CharField(max_length=255, blank=True, default='')
+    til_verdi = models.CharField(max_length=255, blank=True, default='')
+    #: Satt når endringen var en følge av en annen — problemstillingen som ble
+    #: «Udefinert» fordi hastegraden byttet til en den ikke passer for.
+    automatisk = models.BooleanField(default=False)
+    endret_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='oppdragsendringer')
+    endret_av_navn = models.CharField(max_length=150, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Oppdragsendring'
+        verbose_name_plural = 'Oppdragsendringer'
+        ordering = ['created_at', 'id']
+
+    def __str__(self) -> str:
+        return f'{self.oppdrag} · {self.felt}'
+
+
 class Enhetsbytte(BaseTimeStampedModel):
     """113 flyttet oppdraget til en annen enhet.
 

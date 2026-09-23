@@ -86,3 +86,11 @@ og `Enhetshendelse.detalj` og bjellevarselet bruker den. Eldre `detalj`-rader st
 **«Endre status» tilbyr «Avbrutt — trenger ny ressurs»** (23. sep. 2026) der bilen selv har
 Avbryt-knappen: `_statusvalg` leser `OPPDRAG_AVBRYT_FRA` fra `sentralbordkontekst()`, så
 begge sidene får den, og serveren (`foer_avbrutt`) avgjør uansett.
+
+**Oppdragsvinduet har ingen «Rediger»** (backlog punkt 4 og 5, 23. sep. 2026 — André: «rediger
+knappen inne i oppdraget gjemmer redigerbar info»). Hastegrad, problemstilling, lokasjon og
+tildelt ressurs står som brikker; et klikk gir et nedtrekk, og valget lagres med én gang
+(`_verdiForesporsel`). **Ressursen er ikke et felt:** uten enhet legges den valgte til, med én
+flyttes oppdraget, med flere er brikken låst og «Flytt»/«Legg til» under gjelder. Notatet står
+alltid framme. **Inne i oppdraget, ikke i lista** — André: «avvent litt»; fellene står i TODO.
+

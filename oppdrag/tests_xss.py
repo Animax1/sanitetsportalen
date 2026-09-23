@@ -33,7 +33,11 @@ HTML_BUILDERS_PER_FIL = {
         '_enhetskort', 'enhetskortInnmat',
         # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
         # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
-        'fyllProblemstillinger', 'visFoerStatus', 'visRedigerOppdrag',
+        'fyllProblemstillinger', 'visFoerStatus',
+        # Verdiene rett i vinduet (23. sep. 2026) — erstatter
+        # `visRedigerOppdrag`: brikkene, nedtrekket, notatet og raden i
+        # tidslinjen.
+        '_verdiBrikke', '_verdiVelgerHtml', '_verdierHtml', '_notatHtml', 'endringTekst',
         'visRettTid', '_lydvarselSkjema', 'fyllNedtrekk', 'renderArkiv',
         # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
         # fritekst fra et annet moduls register, og escapes her som alt annet.
@@ -83,6 +87,13 @@ HTML_BUILDERS_PER_FIL = {
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Verdiene rett i oppdragsvinduet (23. sep. 2026).
+    'verdiTekst': 'escapeHtml(_verdiTekst(...)) rett over',
+    'notatTekst': 'markup bygget rett over, notatet escapet der',
+    'hvorfor': 'fast attributt fra en ternær, ingen data i',
+    "v.valgt ? ' selected' : ''": 'fast attributt fra en ternær',
+    'brikker': 'markup fra _verdiBrikke()/_verdiVelgerHtml(), som skannes for seg',
+    "o.fritekst ? 'Endre' : 'Legg til'": 'fast tekst fra en ternær',
     # «Fra loggen i H14» (19. sep. 2026): blokka i bilen bygges av
     # `delteLinjerBlokk()`, som skannes for seg.
     'beskrivelseBlokk': 'ferdig markup fra delteLinjerBlokk(), som skannes for seg',

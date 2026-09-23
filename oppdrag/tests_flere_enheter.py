@@ -1480,7 +1480,8 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
                                   'tidslinjeHtml', 'enhetshendelseTekst', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
                                   'flyttFraEnheter', 'enhetAvventer',
-                                  '_flyttValg')),
+                                  '_flyttValg', '_verdierHtml', '_verdiBrikke', '_verdiKanEndres',
+                                  '_verdiTekst', '_notatHtml', 'endringTekst')),
         ))
 
     STUBB = """
@@ -1488,6 +1489,10 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         globalThis.enheter = [];
         globalThis.apentOppdrag = null;
         globalThis.apentOppdragId = null;
+        globalThis.apentVerdivalg = null;
+        globalThis.apentNotat = false;
+        globalThis.VERDIFELT = ['hastegrad', 'problemstilling', 'lokasjon', 'ressurs'];
+        globalThis.VERDIFELT_NAVN = {};
         globalThis.apiFetch = async () => ({ ok: true, json: async () => ({ status: 'ok', data: {
           id: 1, nummer: 1, problemstilling: 'Fall', hastegrad: 'Akutt', lokasjon_navn: 'Scene',
           status: 'venter', status_navn: 'Venter', fritekst: '', historikk_fra: null,

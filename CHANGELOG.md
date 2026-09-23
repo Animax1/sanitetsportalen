@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Oppdraget: verdiene endres rett i vinduet, uten «Rediger», og står i tidslinjen  `#oppdrag/sentralbord`
+
+Backlog punkt 4 og 5. André: «klikke på disse verdiene når de er skrevet ut gir en liten
+dropdown for de andre valgene», og «Ikke måtte trykke rediger for å se/redigere info i et
+oppdrag». 23. sep.: «rediger knappen inne i oppdraget gjemmer redigerbar info».
+
+**Inne i oppdraget, ikke i oppdragslista.** Begge ble vurdert. Lista tegnes på nytt ved
+hver polling, så et åpent nedtrekk forsvinner; hele raden er en knapp som åpner
+oppdraget; og et feilklikk på en travel liste endrer et oppdrag uten at noen ser det.
+André: «avvent litt» med lista — den står i TODO.
+
+**Hva som er endret i oppdragsvinduet:** «Rediger»-knappen og skjemaet er borte.
+**Hastegrad, problemstilling, lokasjon og tildelt ressurs står som brikker** øverst; et
+klikk gir et nedtrekk med den gjeldende verdien valgt, og valget lagres med én gang, ett
+felt om gangen. **Oppdragsnotatet står alltid framme**, med «Endre»/«Legg til».
+
+**Svarene André ga før koden:**
+- **Hastegraden alene:** problemstillingen **beholdes om den passer**, ellers blir den
+  **«Udefinert»** — for eksempel Akutt → Drift med «Pustevansker». Før ga det en 400.
+  «Udefinert» sperrer Ledig til noen setter en som passer. Sendes hastegrad og
+  problemstilling sammen, gjelder valideringen som før.
+- **Tildelt ressurs:** uten enhet legges den valgte til; med én flyttes oppdraget
+  (`flytt_til_enhet`, som alt står i tidslinjen); **med flere er brikken låst**, og
+  «Flytt»/«Legg til» under gjelder.
+- **Hver endring står i oppdragets tidslinje:** «Hastegrad: Akutt → Drift · andre»,
+  «Problemstilling: Pustevansker → Udefinert (passet ikke den nye hastegraden)»,
+  «Oppdragsnotat endret». **Notatet logges uten verdier**, samme regel som audit.
+
+Ny modell **`Oppdragsendring`** (migrasjon `oppdrag/0032`) med frosne verdier som tekst, så
+en omdøpt lokasjon ikke skriver om historikken; `endret_av` strippes i backupen. `endringer`
+følger med i `GET /oppdrag/api/oppdrag/<id>/`. Samme vindu i `/oppdrag/` og `/ko/`.
+
+**Prøvd i Chromium:** Akutt → Drift på O1 ga «Udefinert» automatisk, notatet ble lagt til,
+og de tre linjene sto i tidslinjen med hvem. Ingen konsollfeil.
+
+**Mutasjoner: 20, alle drept** — regelen for hastegrad begge veier, at den bare gjelder når
+hastegraden kommer alene, loggingen og «uten verdier», at uendret ikke logges, at
+«før»-verdiene leses fra basen, backup-strippingen, og i nettleseren: låsen med flere
+enheter, skrivegaten, «legg til» mot «flytt», filtrene i nedtrekkene, escapingen og
+kallstedet i tidslinjen. En gammel prøve ble endret med vilje: «hastegrad Drift alene gir
+400» er nå «gir Udefinert» — det var Andrés avgjørelse.
+
 ## 2026-09-23 — KO fører «Avbrutt» for en bil, og `oppdrag/CLAUDE.md` er delt  `#oppdrag/statusmaskin` `#core/dokumentasjon`
 
 **«Avbrutt» i sentralbordets «Endre status»** (bestilt 22. sep. 2026). Bilen melder på
