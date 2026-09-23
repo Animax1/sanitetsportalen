@@ -572,6 +572,28 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 Fem åpne spørsmål til André står i §6 i notatet.
 
+### Kartmodul med værlag — se [`docs/FORSLAG_KARTMODUL.md`](./docs/FORSLAG_KARTMODUL.md)
+
+**Forslag, ikke besluttet — og ikke i år** (23. sep. 2026). Kilder og arkitektur er
+utredet, så arbeidet ikke gjøres på nytt. André har valgt **MET, Kartverket og
+NVE/Varsom** — 0 kr i data. Nødfall uten nett er utenfor første versjon.
+
+- [ ] **Modulen `kart/`** med Leaflet vendret under `static/vendor/`, topografisk og
+      gråtone bakgrunnskart fra Kartverket, og kildehenvisning som vannmerke nede til
+      høyre. Krever ett smalt tillegg i CSP-ens `img-src` (`cache.kartverket.no`) —
+      uten det er kartet grått uten feilmelding (§4.1).
+- [ ] **Værdata hentes av serveren, med cache** — MET krever identifiserende
+      `User-Agent`, som JavaScript ikke kan sette. Vindpil per lokasjon (husk at
+      `wind_from_direction` er *fra*-retningen, pila roteres 180°), nedbørsmengde fra
+      Locationforecast og neste 90 minutter fra Nowcast (§3.1, §4.3).
+- [ ] **Farevarsler som polygoner** fra MetAlerts (maks én henting per 10 min) og
+      Varsom (flom, jordskred, snøskred).
+- [ ] **Flyfoto: finn en kilde.** Norge i bilder er ikke lenger åpent — det krever tilgang
+      gjennom en Norge digitalt-part. Sjekk om korpset har det via en samarbeidspartner;
+      ellers Sentinel-2 (10 m, sjekk lisensen) (§6.1).
+- [ ] **Koordinater på `oppdrag.Lokasjon`**, meldt inn til kartet gjennom et register i
+      `core` framfor at kartet importerer oppdrag — én sannhet om hvor stedene er (§6.2).
+
 ### Backlog-modulen (`/backlog/`)
 
 Levert 17. sep. 2026: innspill klassifisert som bug eller ønske, løst-flagg, filter på type,
