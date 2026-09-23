@@ -780,6 +780,7 @@ async function koHentRessurser() {
 
 document.addEventListener('DOMContentLoaded', () => {
   koOppsettStart();
+  koTidStart();
   koTavleStart();
   koPlanStart();
   koSidebarLyttere();

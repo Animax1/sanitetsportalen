@@ -145,16 +145,13 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
-### KO: tavleplanleggeren — under bygging (23. sep. 2026)
+### KO: hvem som planlegger på tavla — kan strammes inn (André, 23. sep. 2026)
 
-*Skissene og svarene står i Artifact «Tavleplanleggeren» og i CHANGELOG. Steg 1 (planlagt
-slutt og overtid), steg 2 (programmet og planleggervinduet), steg 3 (behov i drift), steg 4
-(tidslinja og dekningsstripa) og steg 5 (endringer, plan mot faktisk, kopier) er levert.
-Hvert steg slettes herfra når det er levert.*
-
-- [ ] **Ekstra: planleggeren i eget nettleservindu på skjerm to** (André, 23. sep. 2026:
-      «la oss ta ditt forslag som en ekstra ting»). /ko/ tar en hel skjerm; planleggeren
-      som egen side med samme tidslinje som tavla. Etter steg 4.
+- [ ] **«+ Planlegg» er `skriv_full` i KO i dag** — André: «Alle i første omgang, kan være vi
+      strammer inn på det». Porten sitter i `tavle_pauser_view` og `tavle_pause_view`
+      (`ko/views.py`); skal den bli KO-lederens, er det `_kan_lede_ko(request)` der og
+      `koKanFjerne()` for knappen i `koTavleRadHtml`. «Flytt nå» bør da fortsatt være
+      `skriv_full` — å trykke er å føre tavla, ikke å planlegge.
 
 ### Oppdragslista: endre verdier rett i lista — venter (André, 23. sep. 2026)
 

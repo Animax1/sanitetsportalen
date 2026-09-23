@@ -750,14 +750,27 @@ class PlanlagtPause(models.Model):
         related_name='ko_overtatt', verbose_name='Fra vaktlistas pause')
     endret = models.BooleanField(default=False, verbose_name='Endret i drift')
     avlyst = models.BooleanField(default=False, verbose_name='Tatt bort i drift')
+    # **Planen kan gjelde en hvilken som helst rad på tavla** (André, 23. sep.
+    # 2026: «trenger planlegg knapp på alle lokasjonene for å kunne sette
+    # ressurser»). `pause` er Pause-raden; ellers er det en lokasjon. Et eget
+    # flagg og ikke «lokasjon er tom»: `lokasjon` er SET_NULL, og en plan på et
+    # sted som ble slettet skal ikke stille bli en pause. Modellen heter
+    # fortsatt `PlanlagtPause` — et nytt navn ville krevd en oversettelse i
+    # `core.backup.GAMLE_MODELLNAVN` for hver backupfil som er tatt.
+    pause = models.BooleanField(default=True, verbose_name='Pause')
+    lokasjon = models.ForeignKey(
+        'oppdrag.Lokasjon', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_planlagte', verbose_name='Lokasjon')
+    lokasjon_navn = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Lokasjon (navn)')
 
     class Meta:
-        verbose_name = 'Planlagt pause'
-        verbose_name_plural = 'Planlagte pauser'
+        verbose_name = 'Planlagt plassering'
+        verbose_name_plural = 'Planlagte plasseringer'
         ordering = ['fra', 'id']
 
     def __str__(self):
-        return f'{self.ressurs_navn} · pause'
+        return f'{self.ressurs_navn} · {"pause" if self.pause else self.lokasjon_navn}'
 
 
 # ── Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026) ───────────────────
@@ -778,18 +791,22 @@ BEREDSKAP_NAVN: dict[str, str] = dict(BEREDSKAP_VALG)
 
 
 class Konserttype(models.Model):
-    """Hva slags konsert — «Headliner», «Hiphop / rap». **Beskriver, setter
-    ingenting** (André: «Konserttyper skal ikke automatisk sette ressurser»).
-    Den finnes for å sammenligne samme slags konsert år for år. Lista er
-    KO-lederens, som ansvarsområdene; ikke per vakt."""
+    """**Artisten** (André, 23. sep. 2026: «Endre navnet konserttyper til
+    Artist. For det er slik vi kommer til å gjøre det»). Lista er KO-lederens,
+    som ansvarsområdene, og ikke per vakt — samme artist kan komme igjen neste
+    år. **Setter ingenting** (André: «skal ikke automatisk sette ressurser»).
 
-    navn = models.CharField(max_length=60, unique=True, verbose_name='Konserttype')
+    Klassen og tabellen heter fortsatt `Konserttype`: et nytt navn ville krevd
+    en oversettelse i `core.backup.GAMLE_MODELLNAVN` for hver backupfil som
+    alt er tatt, for et navn bare koden ser."""
+
+    navn = models.CharField(max_length=60, unique=True, verbose_name='Artist')
     er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
     rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
 
     class Meta:
-        verbose_name = 'Konserttype'
-        verbose_name_plural = 'Konserttyper'
+        verbose_name = 'Artist'
+        verbose_name_plural = 'Artister'
         ordering = ['rekkefolge', 'navn']
 
     def __str__(self):

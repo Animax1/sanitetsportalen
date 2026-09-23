@@ -104,7 +104,7 @@ class KoBackupHandler(BaseBackupHandler):
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],
         'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
-        'ko.PlanlagtPause': ['ressurs', 'av', 'fra_vaktliste'],
+        'ko.PlanlagtPause': ['ressurs', 'av', 'fra_vaktliste', 'lokasjon'],
         'ko.Programpost': ['lokasjon', 'endret_av'],
         'ko.Programbehov': ['gruppe'],
         'ko.Programendring': ['av'],

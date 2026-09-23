@@ -177,8 +177,6 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None, naa=None) -> Pr
     from oppdrag.models import Lokasjon
 
     navn = str(data.get('navn') or '').strip()
-    if not navn:
-        raise Ugyldig('Konserten må ha et navn.')
     if len(navn) > MAKS_NAVN:
         raise Ugyldig(f'Navnet er for langt (maks {MAKS_NAVN} tegn).')
     if til <= fra:
@@ -201,6 +199,13 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None, naa=None) -> Pr
             raise Ugyldig('Ukjent konserttype.')
         if not konserttype.er_aktiv and (post is None or post.konserttype_id != konserttype.pk):
             raise Ugyldig('Konserttypen er ikke aktiv.')
+
+    # **Artisten er navnet** når ingenting annet er skrevet (23. sep. 2026):
+    # «Konserttyper» ble «Artister», og da er «Kygo» det båndet skal si.
+    if not navn and konserttype is not None:
+        navn = konserttype.navn
+    if not navn:
+        raise Ugyldig('Konserten må ha en artist eller et navn.')
 
     beredskap = str(data.get('beredskap') or '')
     if beredskap and beredskap not in BEREDSKAP_NAVN:
@@ -288,6 +293,8 @@ def program_data(vakt) -> dict:
     from oppdrag.models import Lokasjon
     from vaktliste.models import Ressursgruppe
 
+    from .tavle import rulling
+
     return {
         'vakt_id': vakt.pk,
         'poster': poster(vakt),
@@ -302,6 +309,9 @@ def program_data(vakt) -> dict:
         'grupper': [{'id': g.pk, 'navn': g.navn}
                     for g in Ressursgruppe.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')],
         'beredskap': [{'verdi': v, 'navn': n} for v, n in BEREDSKAP_NAVN.items()],
+        # Tidsvinduet er tavlas (23. sep. 2026), og konsertplanleggeren følger
+        # det — også for den som har KO uten vaktlistetilgang, og dermed ingen tavle.
+        'rulling': rulling(),
     }
 
 
@@ -346,7 +356,12 @@ def dogn_start(dogn: str):
     return timezone.make_aware(datetime.combine(d, time(t, m)), timezone.get_current_timezone())
 
 
-def paa_vakt_per_time(start, vakt=None) -> list[dict]:
+#: Så mange timer dekningen regnes for om gangen — et tavlevindu er høyst 24,
+#: og ett døgn til gir rom for å rulle uten å hente på nytt for hver time.
+MAKS_DEKNINGSTIMER = 48
+
+
+def paa_vakt_per_time(start, vakt=None, antall=24) -> list[dict]:
     """Hvor mange av hver ressursgruppe vaktlista har på vakt, time for time
     i døgnet som begynner `start`. **Samme regel som resten av portalen**
     (`vaktliste.services.ressurser_med_skift`) — planleggeren skal ikke ha sin
@@ -368,12 +383,12 @@ def paa_vakt_per_time(start, vakt=None) -> list[dict]:
     liste = vaktliste_i_bruk()
     pauser = effektive_pauser(vakt, liste) if vakt is not None and liste is not None else []
     ut = []
-    for i in range(24):
+    for i in range(max(1, min(MAKS_DEKNINGSTIMER, int(antall)))):
         fra = start + timedelta(hours=i)
         midt = fra + MIDT_I_TIMEN
         grupper, i_pause = {}, {}
         if liste is not None:
-            borte = {q['ressurs_id'] for q in pauser if q['fra'] <= midt < q['til']}
+            borte = {q['ressurs_id'] for q in pauser if q['pause'] and q['fra'] <= midt < q['til']}
             for r in ressurser_med_skift(liste, midt).values('pk', 'gruppe_id'):
                 nokkel = str(r['gruppe_id'])
                 maal = i_pause if r['pk'] in borte else grupper

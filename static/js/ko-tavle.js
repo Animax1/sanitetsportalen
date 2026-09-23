@@ -42,7 +42,7 @@ let koTavleValgt = null;     // ressursen som er valgt for klikk-så-rad
 let koTavleDrag = null;      // pågående drag: {id, x, y, drar, spokelse}
 let koTavleTegnEtterDrag = false;
 let koTavleSvelgKlikk = false;  // klikket nettleseren sender etter et drag
-let koTavleSkjema = null;    // åpent skjema: {type: 'rett'|'pause', id}
+let koTavleSkjema = null;    // åpent skjema: {type: 'rett'|'pause', id, lokasjon_id, ref}
 let koTavleVisning = 'tavle';  // 'tavle' | 'besok'
 let koTavleBesokValg = { lokasjon: null, maal: 'antall' };
 
@@ -67,12 +67,25 @@ function koTavleLagreFilter(verdi) {
 
 // ── Reglene ──────────────────────────────────────────────────────────────────
 
-// Tidslinja: **nå står ved to tredjedeler**, så det meste av vinduet er det
-// som har skjedd, og en tredjedel er det som kommer (pauser, i steg 2).
-function koTavleVindu(naaMs, timer) {
+// Tidslinja. **Det meste av vinduet er det som kommer** (André, 23. sep.
+// 2026: «Vi må og kunne se lenger frem i tid enn bakover») — `andelBak`
+// prosent før nå, ¼ som standard, satt av KO-leder. Til da sto nå ved to
+// tredjedeler, og tavla var et bilde av det som hadde skjedd.
+//
+// **`anker` er starten på vinduet når noen har rullet** — et tidspunkt, ikke
+// et avvik fra nå, så vinduet står stille mens klokka går. `null` følger nå.
+function koTavleVindu(naaMs, timer, andelBak, anker) {
   const lengde = Math.max(1, Number(timer) || 12) * 3600000;
-  const fra = naaMs - (lengde * 2) / 3;
+  const andel = Number.isFinite(Number(andelBak)) && andelBak !== null && andelBak !== ''
+    ? Math.max(0, Math.min(50, Number(andelBak))) : 25;
+  const fra = Number.isFinite(anker) ? anker : naaMs - (lengde * andel) / 100;
   return { fra, til: fra + lengde, naa: naaMs };
+}
+
+// Er tidspunktet i vinduet? Nå-streken tegnes bare da — `koTavleProsent`
+// klemmer, og en strek klemt til kanten ser ut som nå.
+function koTavleIVinduet(tMs, vindu) {
+  return tMs >= vindu.fra && tMs <= vindu.til;
 }
 
 function koTavleProsent(tMs, vindu) {
@@ -129,6 +142,19 @@ function koTavleTidNaer(refMs, hhmm) {
   if (d.getTime() - refMs > 12 * 3600000) d.setDate(d.getDate() - 1);
   else if (refMs - d.getTime() > 12 * 3600000) d.setDate(d.getDate() + 1);
   return d.getTime();
+}
+
+// «Til» er **første gang klokka viser det etter «fra»** — 22:00–00:30 går
+// over midnatt av seg selv, og en plan på et sted kan vare opp mot et døgn.
+// Konsertplanleggeren bruker den samme (`koPlanTil` var dens egen til 23. sep.
+// 2026, da tavla fikk planer lengre enn tolv timer).
+function koTavleTilEtter(fraMs, hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m || !Number.isFinite(fraMs) || Number(m[1]) > 23 || Number(m[2]) > 59) return null;
+  const t = new Date(fraMs);
+  t.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  while (t.getTime() <= fraMs) t.setDate(t.getDate() + 1);
+  return t.getTime();
 }
 
 // En pause-id fra markupen: et tall for KOs egne, `v<pk>` for vaktlistas
@@ -222,6 +248,12 @@ function koTavleBehovNaa(data, radId, naaMs) {
 // den siste stiplet, fordi den ikke er noe tavla satte.
 function koTavleRader(data, vindu, filter) {
   const ressurser = new Map((data.ressurser || []).map((r) => [r.id, r]));
+  // En plan kan gjelde et lag som ikke er på tavla nå — det går vakt i
+  // morgen. Gruppa (for filteret) finnes da i `alle_ressurser`.
+  const planbare = new Map((data.alle_ressurser || []).map((r) => [r.id, r]));
+  // Så mye av vinduet en stolpe minst tar (`width: max(72px, …)`), omtrent —
+  // banen holdes opptatt så lenge, ellers tegnes neste stolpe oppå navnet.
+  const minste = (vindu.til - vindu.fra) * 0.1;
   const rader = [{ id: 'pause', navn: 'Pause', pause: true }]
     .concat((data.rader || []).map((r) => ({ id: r.id, navn: r.navn, pause: false })));
   return rader.map((rad) => {
@@ -239,19 +271,23 @@ function koTavleRader(data, vindu, filter) {
       if (!(fra < vindu.til && til > vindu.fra)) return;
       treff.push({ p, r, fra, til, aapen: !p.til, opptatt: false, slutt: koTavleSlutt(p, vindu.naa) });
     });
-    if (rad.pause) {
-      // De planlagte pausene som ikke er startet. Den startede står som
-      // plasseringen den ble til.
-      (data.pauser || []).forEach((q) => {
-        if (q.startet) return;
-        const r = ressurser.get(q.ressurs_id);
-        if (!(r ? koTavleSynlig(r, filter) : (!filter || filter === 'alle'))) return;
-        const fra = Date.parse(q.fra);
-        const til = Date.parse(q.til);
-        if (!(fra < vindu.til && til > vindu.fra)) return;
-        treff.push({ p: null, r, q, fra, til, aapen: false, opptatt: false });
-      });
-    } else {
+    // De planlagte som ikke er startet — **i raden de skal til** (23. sep.
+    // 2026: «planlegg knapp på alle lokasjonene»). Den startede står som
+    // plasseringen den ble til. `pause` mangler i svar fra før runde 2, og
+    // da var alle planer pauser.
+    (data.pauser || []).forEach((q) => {
+      if (q.startet) return;
+      const erPause = q.pause !== false;
+      if (rad.pause ? !erPause : (erPause || q.lokasjon_id !== rad.id)) return;
+      const r = ressurser.get(q.ressurs_id);
+      const g = r || planbare.get(q.ressurs_id);
+      if (!(g ? koTavleSynlig(g, filter) : (!filter || filter === 'alle'))) return;
+      const fra = Date.parse(q.fra);
+      const til = Date.parse(q.til);
+      if (!(fra < vindu.til && til > vindu.fra)) return;
+      treff.push({ p: null, r, q, fra, til, aapen: false, opptatt: false });
+    });
+    if (!rad.pause) {
       (data.ressurser || []).forEach((r) => {
         if (!r.opptatt || r.opptatt.lokasjon_id !== rad.id || !koTavleSynlig(r, filter)) return;
         treff.push({ p: null, r, fra: Date.parse(r.opptatt.fra), til: vindu.naa, aapen: false, opptatt: true });
@@ -267,8 +303,11 @@ function koTavleRader(data, vindu, filter) {
       // stolpe oppå knappen.
       // Den stiplede slutten står i banen også, ellers tegnes neste stolpe
       // oppå den.
-      baner[bane] = t.q ? Math.max(t.til, t.fra + 2.5 * 3600000)
-        : (t.slutt && !t.slutt.over ? Math.max(t.til, t.slutt.til) : t.til);
+      // Den åpne vokser framover fra starten sin (23. sep. 2026), så den
+      // holder banen minst like lenge.
+      const slutt = t.slutt && !t.slutt.over ? Math.max(t.til, t.slutt.til) : t.til;
+      baner[bane] = t.q ? Math.max(t.til, t.fra + minste * 1.6)
+        : (t.aapen || t.opptatt ? Math.max(slutt, t.fra + minste) : slutt);
       const navn = t.r ? t.r.navn : (t.p ? t.p.ressurs_navn : (t.q ? t.q.ressurs_navn : ''));
       const min = (t.til - t.fra) / 60000;
       let merke = '';
@@ -294,6 +333,8 @@ function koTavleRader(data, vindu, filter) {
         pause_id: t.q ? t.q.id : null,
         pause_status: t.q ? koTavlePauseStatus(t.q, vindu.naa) : '',
         pause_kilde: t.q ? (t.q.kilde || 'ko') : '',
+        // «Pause nå» i Pause-raden, «Flytt nå» på et sted.
+        plan_pause: t.q ? t.q.pause !== false : false,
         slutt: t.slutt ? { over: t.slutt.over, min: t.slutt.min, kl: koTavleHHMM(t.slutt.til),
                            prosent: koTavleProsent(t.slutt.til, vindu) } : null,
       };
@@ -333,13 +374,156 @@ function koTavleUtenPlass(data, filter, naaMs) {
         id: r.id, navn: r.navn, bil: r.bil,
         pause: sistePause.has(r.id) ? koTavleVarighet((naaMs - sistePause.get(r.id)) / 60000) : '',
         dras: koTavleKanDras(r, koTavleKanSkrive()),
-        planlagt: p ? { id: p.q.id, naa: p.status === 'naa', kl: koTavleHHMM(Date.parse(p.q.fra)) } : null,
+        planlagt: p ? { id: p.q.id, naa: p.status === 'naa', kl: koTavleHHMM(Date.parse(p.q.fra)),
+                        pause: p.q.pause !== false, sted: p.q.lokasjon_navn || '' } : null,
       };
     }),
     opptatt: synlige.filter((r) => r.opptatt).map((r) => ({
       id: r.id, navn: r.navn, tekst: r.opptatt.tekst,
     })),
   };
+}
+
+// ── Tida: vinduet tavla og konsertplanleggeren deler (23. sep. 2026) ─────────
+//
+// André: «hvis jeg går frem i tid på planlegger tidslinjen skjer det samme med
+// tavlen». **Ett anker for begge**, og for alle vinduer som står oppe — et
+// vindu åpnet for seg (`?vindu=`) er en egen side, og da går ankeret over
+// `BroadcastChannel`. Ikke `localStorage`: en fane som lastes på nytt skal
+// følge nå, ikke der noen rullet i går.
+
+const KO_TID_KANAL = 'ko-tid';
+let koTidAnker = null;       // starten på vinduet, eller `null` = følg nå
+let koTidKanal = null;
+let koTidDrag = null;        // {x, fra, bredde, lengde}
+
+// Rullingen og vinduet som gjelder: tavlas svar, ellers programmets (som
+// bærer det samme, så konsertplanleggeren virker uten tavla), ellers
+// standarden.
+function koTidInnstillinger() {
+  const t = typeof koTavle !== 'undefined' && koTavle ? koTavle : null;
+  const p = typeof koPlan !== 'undefined' && koPlan && koPlan.rulling ? koPlan.rulling : null;
+  const k = t || p || {};
+  return { timer: k.timer || 12, andel_bak: k.andel_bak ?? 25, steg_min: k.steg_min || 120,
+           dognstart: k.dognstart || '06:00' };
+}
+
+function koTidVindu(naaMs) {
+  const i = koTidInnstillinger();
+  return koTavleVindu(naaMs, i.timer, i.andel_bak, koTidAnker);
+}
+
+// ◀ og ▶: et steg fra der vinduet står. Regel for seg, fordi den avgjør hvor
+// man havner.
+function koTidNyttAnker(vindu, retning, stegMin) {
+  const steg = Math.max(1, Number(stegMin) || 120) * 60000;
+  return vindu.fra + (retning < 0 ? -steg : steg);
+}
+
+// Dra på aksen: tida følger fingeren — dra mot venstre, og vinduet går fram.
+// Hele minutter, så to vinduer som synkes ikke skiller seg på et sekund.
+function koTidEtterDrag(fraMs, dxPx, breddePx, lengdeMs) {
+  if (!breddePx) return fraMs;
+  return Math.round((fraMs - (dxPx / breddePx) * lengdeMs) / 60000) * 60000;
+}
+
+// En melding fra et annet vindu er data, og leses deretter: et anker er et
+// positivt tall eller `null`; `sporr` ber de andre si hva de står på.
+function koTidMelding(data) {
+  if (!data || typeof data !== 'object') return null;
+  if (data.sporr === true) return { sporr: true };
+  if (data.anker === null) return { anker: null };
+  const a = Number(data.anker);
+  return Number.isFinite(a) && a > 0 ? { anker: a } : null;
+}
+
+// «◀ Nå ▶» og hva man ser. Når vinduet er rullet bort fra nå, står det med
+// en vei tilbake — et vindu som ikke viser nå, skal se ut som det.
+//
+// Datoen er kalenderens, ikke døgnets: «tor. 02:00» er torsdag, selv om
+// natta hører til onsdagens døgn i «Besøk» (døgnstarten er for å telle, ikke
+// for å si hva klokka er).
+function koTidKontrollHtml(vindu, anker) {
+  const kl = (ms) => koTavleDognnavn(koTavleDognnokkel(ms, '00:00')) + ' ' + koTavleHHMM(ms);
+  const tekst = kl(vindu.fra) + ' – ' + kl(vindu.til);
+  const borte = anker !== null && anker !== undefined && !koTavleIVinduet(vindu.naa, vindu);
+  return '<div class="ko-tid-kontroll' + (anker !== null && anker !== undefined ? ' ko-tid-rullet' : '') + '">'
+    + '<div class="btn-group btn-group-sm">'
+    + '<button type="button" class="btn btn-outline-secondary" data-action="koTidSteg" data-arg="-1" title="Tilbake i tid">◀</button>'
+    + '<button type="button" class="btn btn-outline-secondary' + (anker === null || anker === undefined ? ' active' : '')
+    + '" data-action="koTidNaa" title="Følg nå">Nå</button>'
+    + '<button type="button" class="btn btn-outline-secondary" data-action="koTidSteg" data-arg="1" title="Fram i tid">▶</button>'
+    + '</div><span class="ko-tid-tekst">' + escapeHtml(tekst) + '</span>'
+    + (borte ? '<span class="ko-tid-borte">Du ser ikke nå · <button type="button" class="btn btn-link btn-sm p-0"'
+      + ' data-action="koTidNaa">Tilbake til nå</button></span>' : '')
+    + '</div>';
+}
+
+function koTidTegnAlt() {
+  if (typeof koTegnTavle === 'function') koTegnTavle();
+  if (typeof koTegnPlan === 'function') koTegnPlan();
+}
+
+function koTidSett(anker, del) {
+  koTidAnker = Number.isFinite(anker) ? anker : null;
+  if (del !== false && koTidKanal) koTidKanal.postMessage({ anker: koTidAnker });
+  koTidTegnAlt();
+}
+
+function koTidSteg(retning) {
+  const naa = Date.now() + koTavleKlokkeavvik;
+  koTidSett(koTidNyttAnker(koTidVindu(naa), Number(retning), koTidInnstillinger().steg_min));
+}
+
+function koTidNaa() { koTidSett(null); }
+
+// Aksen dras med pekerhendelser, på `[data-tid-akse]` i begge vinduene.
+// Lytterne sitter på dokumentet: aksen tegnes på nytt under fingeren.
+function koTidLyttere() {
+  document.addEventListener('pointerdown', (e) => {
+    const akse = e.target.closest ? e.target.closest('[data-tid-akse]') : null;
+    if (!akse || e.button > 0) return;
+    const naa = Date.now() + koTavleKlokkeavvik;
+    const v = koTidVindu(naa);
+    koTidDrag = { x: e.clientX, fra: v.fra, bredde: akse.getBoundingClientRect().width, lengde: v.til - v.fra };
+    document.body.classList.add('ko-tid-drar');
+    e.preventDefault();
+  });
+  let venter = false;
+  window.addEventListener('pointermove', (e) => {
+    const d = koTidDrag;
+    if (!d) return;
+    koTidAnker = koTidEtterDrag(d.fra, e.clientX - d.x, d.bredde, d.lengde);
+    if (venter) return;
+    venter = true;
+    window.requestAnimationFrame(() => { venter = false; koTidTegnAlt(); });
+  });
+  const slipp = () => {
+    if (!koTidDrag) return;
+    koTidDrag = null;
+    document.body.classList.remove('ko-tid-drar');
+    koTidSett(koTidAnker);
+  };
+  window.addEventListener('pointerup', slipp);
+  window.addEventListener('pointercancel', slipp);
+}
+
+// Kalles fra ko.js. Uten `BroadcastChannel` virker alt, bare hvert vindu for seg.
+function koTidStart() {
+  koTidLyttere();
+  if (typeof BroadcastChannel !== 'function') return;
+  koTidKanal = new BroadcastChannel(KO_TID_KANAL);
+  koTidKanal.onmessage = (e) => {
+    const m = koTidMelding(e.data);
+    if (!m) return;
+    if (m.sporr) {
+      if (koTidAnker !== null) koTidKanal.postMessage({ anker: koTidAnker });
+      return;
+    }
+    koTidSett(m.anker, false);
+  };
+  // Et vindu som nettopp ble åpnet, spør de andre hvor de står.
+  koTidKanal.postMessage({ sporr: true });
 }
 
 // ── Byggerne ─────────────────────────────────────────────────────────────────
@@ -361,14 +545,15 @@ function koTavleStolpeHtml(s) {
     + (s.lenge ? ' <span title="Samme sted over 3 timer">⏱</span>' : '')
     + (s.slutt && s.slutt.over ? ' <span class="ko-tavle-over-tekst">' + escapeHtml(koTavleVarighet(s.slutt.min))
       + ' over</span>' : '');
-  // Den åpne (og den opptatte) slutter ved nå og vokser **bakover** til lesbar
-  // bredde — en stolpe som stakk forbi nå-streken ville sett ut som en plan.
+  // **Alt vokser framover** til lesbar bredde (André, 23. sep. 2026:
+  // «navnet begynner i "fortid", det må heller gå fremover i fremtid»). Den
+  // åpne vokste bakover fra nå til 23. sep., så et lag som nettopp var
+  // plassert sto med navnet i tida før det kom. Den planlagte får plass til
+  // «Pause nå»/«Flytt nå» når den er her; ellers dekket naboen knappen.
   const bredde = Math.max(0, 100 - s.venstre - s.hoyre).toFixed(2);
-  // Den planlagte vokser framover til den har plass til navnet — og til
-  // «Pause nå» når den er her; ellers dekket naboen knappen.
   let plass = 'left:' + escapeHtml(s.venstre.toFixed(2)) + '%;right:' + escapeHtml(s.hoyre.toFixed(2)) + '%';
   if (s.aapen || s.opptatt) {
-    plass = 'right:' + escapeHtml(s.hoyre.toFixed(2)) + '%;width:max(72px,' + escapeHtml(bredde) + '%)';
+    plass = 'left:' + escapeHtml(s.venstre.toFixed(2)) + '%;width:max(72px,' + escapeHtml(bredde) + '%)';
   } else if (s.pause_id) {
     plass = 'left:' + escapeHtml(s.venstre.toFixed(2)) + '%;width:max('
       + (s.pause_status === 'naa' ? '140px' : '64px') + ',' + escapeHtml(bredde) + '%)';
@@ -381,17 +566,18 @@ function koTavleStolpeHtml(s) {
       + ' title="Dra til en rad, eller klikk og velg rad"';
   } else if (skriv && s.pause_id) {
     dra = ' data-tavle-pause="' + escapeHtml(s.pause_id) + '" tabindex="0" role="button"'
-      + ' title="Planlagt pause ' + escapeHtml(s.merke) + escapeHtml(koTavlePauseKildetekst(s.pause_kilde))
+      + ' title="' + (s.plan_pause ? 'Planlagt pause ' : 'Planlagt ') + escapeHtml(s.merke)
+      + escapeHtml(koTavlePauseKildetekst(s.pause_kilde))
       + ' — klikk for å endre"';
   } else if (skriv && s.plassering_id && !s.aapen) {
     dra = ' data-tavle-plassering="' + escapeHtml(s.plassering_id) + '" tabindex="0" role="button"'
       + ' title="Klikk for å rette tidene"';
   }
-  // «Pause nå» på den planlagte når tiden er inne. KO starter den; tavla
-  // flytter ingen av seg selv.
+  // «Pause nå» / «Flytt nå» på den planlagte når tiden er inne. KO starter
+  // den; tavla flytter ingen av seg selv (André: «KO skal trykke flytt nå»).
   const start = skriv && s.pause_id && s.pause_status === 'naa'
     ? ' <button type="button" class="btn btn-sm btn-warning ko-tavle-pause-knapp" data-action="koTavleStartPause"'
-      + ' data-arg="' + escapeHtml(s.pause_id) + '">Pause nå</button>'
+      + ' data-arg="' + escapeHtml(s.pause_id) + '">' + (s.plan_pause ? 'Pause nå' : 'Flytt nå') + '</button>'
     : '';
   return '<div class="' + klasser.join(' ') + '" style="' + plass + '"' + dra + '>' + etikett + start + '</div>'
     + koTavleSluttHtml(s, skriv);
@@ -449,9 +635,10 @@ function koTavleRadHtml(rad) {
     + escapeHtml(rad.id) + '">'
     + '<div class="ko-tavle-radnavn"><span>' + escapeHtml(rad.navn) + '</span>'
     + (rad.fulgt ? '<span class="ko-tavle-stjerne" title="Fulgt sted — «ikke vært» står under tavla">★</span>' : '')
-    + (rad.pause && koTavleKanSkrive()
+    + (koTavleKanSkrive()
       ? '<button type="button" class="btn btn-sm btn-outline-secondary ko-tavle-planlegg"'
-        + ' data-action="koTavlePlanlegg" title="Planlegg en pause for et lag">+ Planlegg</button>'
+        + ' data-action="koTavlePlanlegg" data-arg="' + escapeHtml(rad.id) + '" title="'
+        + (rad.pause ? 'Planlegg en pause for et lag' : 'Planlegg hvem som skal hit, og når') + '">+ Planlegg</button>'
       : '')
     + (rad.over ? '<span class="ko-tavle-over-tall" title="Står over planlagt slutt">' + escapeHtml(String(rad.over))
       + ' over</span>' : '')
@@ -495,15 +682,17 @@ function koTavlePauseKildetekst(kilde) {
   return '';
 }
 
-// Den planlagte pausen på et kort i «Uten plass»: knappen når den er her,
-// klokkeslettet ellers.
+// Den neste planen på et kort i «Uten plass»: knappen når den er her,
+// klokkeslettet og stedet ellers.
 function koTavlePlanlagtHtml(p) {
   if (!p) return '';
+  const pause = p.pause !== false;
   if (p.naa && koTavleKanSkrive()) {
     return '<button type="button" class="btn btn-sm btn-warning mt-1 ko-tavle-pause-knapp"'
-      + ' data-action="koTavleStartPause" data-arg="' + escapeHtml(p.id) + '">Pause nå</button>';
+      + ' data-action="koTavleStartPause" data-arg="' + escapeHtml(p.id) + '">'
+      + (pause ? 'Pause nå' : 'Flytt nå · ' + escapeHtml(p.sted)) + '</button>';
   }
-  return '<div class="ko-tavle-kort-under">Pause ' + escapeHtml(p.kl) + '</div>';
+  return '<div class="ko-tavle-kort-under">' + (pause ? 'Pause ' : escapeHtml(p.sted) + ' ') + escapeHtml(p.kl) + '</div>';
 }
 
 // Linja over tavla når et lag er valgt. «Rett tidene» for plasseringen det
@@ -696,21 +885,38 @@ function koTavleSkjemaData(skjema, data, naaMs) {
       kanFjerne: true,
     };
   }
+  // En plan: i Pause-raden, eller på et sted (23. sep. 2026). Stedet er
+  // raden knappen sto i, og endres ikke — å flytte planen er en ny plan.
   const q = skjema.id ? (data.pauser || []).find((x) => x.id === skjema.id) : null;
   if (skjema.id && !q) return null;
+  const lokasjonId = q ? (q.pause === false ? q.lokasjon_id : null) : (skjema.lokasjon_id || null);
+  const sted = lokasjonId ? (data.rader || []).find((r) => r.id === lokasjonId) : null;
+  const stedNavn = q && q.lokasjon_navn ? q.lokasjon_navn : (sted ? sted.navn : '');
+  if (!q && lokasjonId && !sted) return null;
+  const pause = !lokasjonId;
   const kvarter = 15 * 60000;
-  const forslag = Math.ceil(naaMs / kvarter) * kvarter;
+  // **Forslaget er der man ser**, ikke nå: har KO rullet til i morgen, er det
+  // i morgen planen gjelder.
+  const forslag = Math.ceil((Number.isFinite(skjema.ref) ? skjema.ref : naaMs) / kvarter) * kvarter;
+  const flytt = pause ? '«Pause nå»' : '«Flytt nå»';
+  // Hele vaktlista, ikke bare tavla nå: et lag som går vakt i morgen kan
+  // planlegges i morgen. Serveren sjekker skiftet. En bil tar ikke pause.
+  const kilde = data.alle_ressurser && data.alle_ressurser.length ? data.alle_ressurser : (data.ressurser || []);
   return {
-    type: 'pause', id: q ? q.id : null,
-    tittel: q ? 'Endre pause · ' + q.ressurs_navn : 'Planlegg pause',
-    ressurser: q ? null : (data.ressurser || []).filter((r) => !r.bil).map((r) => ({ id: r.id, navn: r.navn })),
+    type: 'pause', id: q ? q.id : null, lokasjon_id: lokasjonId, pause,
+    tittel: q ? (pause ? 'Endre pause · ' : 'Endre plan · ' + stedNavn + ' · ') + q.ressurs_navn
+      : (pause ? 'Planlegg pause' : 'Planlegg · ' + stedNavn),
+    ressurser: q ? null : kilde.filter((r) => !pause || !r.bil).map((r) => ({ id: r.id, navn: r.navn })),
     fra: q ? koTavleHHMM(Date.parse(q.fra)) : koTavleHHMM(forslag),
-    til: q ? koTavleHHMM(Date.parse(q.til)) : koTavleHHMM(forslag + 30 * 60000),
+    til: q ? koTavleHHMM(Date.parse(q.til)) : koTavleHHMM(forslag + (pause ? 30 : 120) * 60000),
+    // Klokkeslettene leses nær dette tidspunktet (`koTavleSkjemaKropp`).
+    ref: q ? Date.parse(q.fra) : forslag,
     tilLaast: false,
     hint: (q && q.kilde === 'vaktliste'
       ? 'Fra vaktlista. Endrer eller fjerner du den, gjelder KOs versjon resten av vakta. '
       : (q && q.kilde === 'endret' ? 'Fra vaktlista, endret i drift — KOs versjon gjelder. ' : ''))
-      + 'Planen flytter ingen: når tiden er inne, får laget «Pause nå», og KO starter den.',
+      + 'Planen flytter ingen: når tiden er inne, får laget ' + flytt + ', og KO trykker. '
+      + (pause ? '' : 'Laget må ha skift i vaktlista når planen begynner.'),
     kanFjerne: Boolean(q),
   };
 }
@@ -741,7 +947,7 @@ function koTavleSkjemaHtml(d) {
     + '<button type="button" class="btn btn-sm btn-primary" data-action="koTavleLagreSkjema">Lagre</button>'
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koTavleLukkSkjema">Avbryt</button>'
     + (d.kanFjerne ? '<button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-action="koTavleFjernISkjema">'
-      + (d.type === 'rett' ? 'Fjern plasseringen' : 'Fjern pausen') + '</button>' : '')
+      + (d.type === 'rett' ? 'Fjern plasseringen' : (d.pause === false ? 'Fjern planen' : 'Fjern pausen')) + '</button>' : '')
     + '</div><div class="small ko-tavle-dempet mt-1">' + escapeHtml(d.hint) + '</div>';
 }
 
@@ -766,13 +972,16 @@ function koTegnTavle() {
     boks.innerHTML = koTavleBesokHtml(koTavle, b, koTavleBesokValg, koTavleBesokValg.lokasjon);
     return;
   }
-  const vindu = koTavleVindu(naa, koTavle.timer);
+  const vindu = koTidVindu(naa);
   const rader = koTavleRader(koTavle, vindu, filter);
-  const naaStrek = '<div class="ko-tavle-naa" style="left:' + escapeHtml(koTavleProsent(naa, vindu).toFixed(2)) + '%"></div>';
+  const naaStrek = koTavleIVinduet(naa, vindu)
+    ? '<div class="ko-tavle-naa" style="left:' + escapeHtml(koTavleProsent(naa, vindu).toFixed(2)) + '%"></div>' : '';
   boks.innerHTML = '<div class="ko-tavle-uten" tabindex="0" data-tavle-mal="uten">'
     + koTavleUtenPlassHtml(koTavleUtenPlass(koTavle, filter, naa)) + '</div>'
-    + '<div class="ko-tavle-rutenett"><div class="ko-tavle-hode"><div class="ko-tavle-radnavn">Lokasjon · nå</div>'
-    + '<div class="ko-tavle-tidslinje">' + koTavleTimerHtml(vindu) + naaStrek + '</div></div>'
+    + '<div class="ko-tavle-rutenett">' + koTidKontrollHtml(vindu, koTidAnker)
+    + '<div class="ko-tavle-hode"><div class="ko-tavle-radnavn">Lokasjon · nå</div>'
+    + '<div class="ko-tavle-tidslinje" data-tid-akse="1" title="Dra for å gå fram eller tilbake i tid">'
+    + koTavleTimerHtml(vindu) + naaStrek + '</div></div>'
     + '<div class="ko-tavle-rader">' + rader.map(koTavleRadHtml).join('')
     + '<div class="ko-tavle-naa-lag">' + naaStrek + '</div></div>'
     + koTavleIkkeVaertHtml(koTavleIkkeVaert(koTavle, filter, naa)) + '</div>';
@@ -791,8 +1000,10 @@ function koTegnTavleSkjema(naa) {
   const d = koTavleSkjemaData(koTavleSkjema, koTavle, naa);
   // Et skjema som står åpent, tegnes ikke om under fingrene på den som
   // skriver — pollen skal ikke tømme et felt.
-  if (d && el.dataset.skjema === koTavleSkjema.type + ':' + (koTavleSkjema.id || 'ny')) return;
-  el.dataset.skjema = d ? koTavleSkjema.type + ':' + (koTavleSkjema.id || 'ny') : '';
+  // Nøkkelen bærer raden: «+ Planlegg» i en annen rad er et annet skjema.
+  const nokkel = d ? [koTavleSkjema.type, koTavleSkjema.id || 'ny', koTavleSkjema.lokasjon_id || ''].join(':') : '';
+  if (d && el.dataset.skjema === nokkel) return;
+  el.dataset.skjema = nokkel;
   el.classList.toggle('d-none', !d);
   el.innerHTML = d ? koTavleSkjemaHtml(d) : '';
 }
@@ -852,8 +1063,13 @@ function koTavleKlikk(el) {
   if (hist) koTavleApneSkjema('rett', Number(hist.getAttribute('data-tavle-plassering')));
 }
 
-function koTavleApneSkjema(type, id) {
-  koTavleSkjema = { type, id: id || null };
+function koTavleApneSkjema(type, id, lokasjonId) {
+  // `ref` er tidspunktet klokkeslettene leses nær: nå, eller — har KO rullet
+  // bort fra nå — et stykke inn i det hun ser på.
+  const naa = Date.now() + koTavleKlokkeavvik;
+  const v = koTidVindu(naa);
+  koTavleSkjema = { type, id: id || null, lokasjon_id: lokasjonId || null,
+                    ref: koTavleIVinduet(naa, v) ? naa : v.fra + (v.til - v.fra) / 4 };
   koTavleValgt = null;
   koTavleVisFeil('');
   koTegnTavle();
@@ -864,7 +1080,11 @@ function koTavleLukkSkjema() {
   koTegnTavle();
 }
 
-function koTavlePlanlegg() { koTavleApneSkjema('pause', null); }
+// «+ Planlegg» i en rad: `pause` er Pause-raden, et tall er et sted.
+function koTavlePlanlegg(rad) {
+  const id = Number(rad);
+  koTavleApneSkjema('pause', null, Number.isFinite(id) && id > 0 ? id : null);
+}
 
 function koTavleRettValgt(id) { koTavleApneSkjema('rett', Number(id)); }
 
@@ -900,15 +1120,18 @@ function koTavleSkjemaKropp(skjema, data, verdier, naaMs) {
     }
     return kropp;
   }
-  const fra = koTavleTidNaer(naaMs, verdier.fra);
-  // «Til» leses nær «fra», så «23:50–00:20» går over midnatt av seg selv.
-  const til = fra === null ? null : koTavleTidNaer(fra, verdier.til);
+  // «Fra» leses nær der skjemaet ble åpnet — tidslinja kan stå i morgen.
+  const fra = koTavleTidNaer(Number.isFinite(skjema.ref) ? skjema.ref : naaMs, verdier.fra);
+  // «Til» er første gang klokka viser det etter «fra», så «23:50–00:20» går
+  // over midnatt, og en plan på et sted kan vare mer enn tolv timer.
+  const til = fra === null ? null : koTavleTilEtter(fra, verdier.til);
   if (fra === null || til === null) return null;
   const kropp = { fra: new Date(fra).toISOString(), til: new Date(til).toISOString() };
   if (!skjema.id) {
-    // «Velg…» står først (23. sep. 2026): uten lag er det ingen pause å planlegge.
+    // «Velg…» står først (23. sep. 2026): uten lag er det ingen plan.
     if (!verdier.ressurs) return null;
     kropp.ressurs_id = Number(verdier.ressurs);
+    if (skjema.lokasjon_id) kropp.lokasjon_id = Number(skjema.lokasjon_id);
   }
   return kropp;
 }
@@ -931,7 +1154,7 @@ async function koTavleLagreSkjema() {
   }, Date.now() + koTavleKlokkeavvik);
   if (!kropp) {
     koTavleVisFeil(s.type === 'pause' && !s.id && !verdi('ko-tavle-skjema-ressurs')
-      ? 'Velg laget pausen gjelder.' : 'Fyll inn klokkeslettene som TT:MM.');
+      ? 'Velg laget planen gjelder.' : 'Fyll inn klokkeslettene som TT:MM.');
     return;
   }
   const url = s.type === 'rett' ? '/ko/api/tavle/plasseringer/' + s.id + '/'
@@ -945,7 +1168,7 @@ async function koTavleFjernISkjema() {
   if (!s) return;
   const sporsmaal = s.type === 'rett'
     ? 'Fjerne plasseringen? Den forsvinner fra tavla og fra «Besøk», og loggen får en linje om det.'
-    : 'Fjerne den planlagte pausen?';
+    : 'Fjerne planen?';
   if (!window.confirm(sporsmaal)) return;
   const url = s.type === 'rett' ? '/ko/api/tavle/plasseringer/' + s.id + '/' : '/ko/api/tavle/pauser/' + s.id + '/';
   if (await koTavleSend(url, 'DELETE', {})) koTavleLukkSkjema();
@@ -980,9 +1203,23 @@ function koTavleBesokMaal(maal) {
 // «Nullstill»: oppdragsmodulens JS kjenner ikke KO. Fanen tegnes synkront, så
 // den setter en beholder og henter lista etterpå.
 
-function koTavleOppsettHtml(rader) {
-  if (!rader.length) return '<div class="tom-melding">Ingen aktive lokasjoner i oppdragsmodulen.</div>';
-  return '<table class="table table-sm align-middle mb-2"><thead><tr><th>Lokasjon (fra oppdragsmodulen)</th>'
+// `data` er svaret fra `/ko/api/tavle/oppsett/`: lokasjonene og rullingen.
+function koTavleOppsettHtml(data) {
+  const rader = (data && data.lokasjoner) || [];
+  // Rullingen (23. sep. 2026, André: «la admin og ko-leder kunne justere på
+  // rulling»): hvor mye av vinduet som er før nå, og hvor langt ◀ ▶ går.
+  const rulling = '<div class="d-flex flex-wrap gap-3 align-items-end mb-3">'
+    + '<label class="small">Før nå (prosent av vinduet) <input type="number" min="0" max="50" step="5"'
+    + ' class="form-control form-control-sm" id="ko-tavle-andel-bak" value="' + escapeHtml(String(data && data.andel_bak !== undefined
+      ? data.andel_bak : 25)) + '"></label>'
+    + '<label class="small">◀ ▶ flytter (minutter) <input type="number" min="15" max="720" step="15"'
+    + ' class="form-control form-control-sm" id="ko-tavle-steg" value="' + escapeHtml(String((data && data.steg_min) || 120))
+    + '"></label>'
+    + '<div class="form-text m-0">Gjelder tavla og konsertplanleggeren. Tidsvinduet (timer) settes i portalinnstillingene.</div>'
+    + '</div>';
+  if (!rader.length) return rulling + '<div class="tom-melding">Ingen aktive lokasjoner i oppdragsmodulen.</div>'
+    + '<button type="button" class="btn btn-sm btn-primary" data-action="koLagreTavleOppsett">Lagre</button>';
+  return rulling + '<table class="table table-sm align-middle mb-2"><thead><tr><th>Lokasjon (fra oppdragsmodulen)</th>'
     + '<th class="text-center">På tavla</th><th class="text-center">Følg besøk ★</th></tr></thead><tbody>'
     + rader.map((l) => '<tr><td>' + escapeHtml(l.navn) + '</td>'
       + '<td class="text-center"><input type="checkbox" class="form-check-input" data-tavle-oppsett="paa" value="'
@@ -1002,25 +1239,29 @@ function koTegnTavleOppsett() {
 }
 
 async function koHentTavleOppsett(svar) {
-  let rader = svar;
-  if (!rader) {
+  let data = svar;
+  if (!data) {
     const res = await apiFetch('/ko/api/tavle/oppsett/');
     if (!res.ok) return;
-    rader = (await res.json()).data || [];
+    data = (await res.json()).data || {};
   }
   const el = document.getElementById('ko-tavle-oppsett');
-  if (el) el.innerHTML = koTavleOppsettHtml(rader);
+  if (el) el.innerHTML = koTavleOppsettHtml(data);
 }
 
 async function koLagreTavleOppsett() {
   const ider = (hva, avkrysset) => Array.from(document.querySelectorAll('[data-tavle-oppsett="' + hva + '"]'))
     .filter((el) => el.checked === avkrysset).map((el) => Number(el.value));
-  const res = await apiFetch('/ko/api/tavle/oppsett/', {
-    method: 'PUT', body: JSON.stringify({ skjulte: ider('paa', false), fulgte: ider('fulgt', true) }),
-  });
+  const kropp = { skjulte: ider('paa', false), fulgte: ider('fulgt', true) };
+  // Rullingen sendes bare når feltene står der — et tomt felt er en feil
+  // serveren sier fra om, et manglende felt er «rør ikke».
+  const andel = document.getElementById('ko-tavle-andel-bak');
+  const steg = document.getElementById('ko-tavle-steg');
+  if (andel && steg) { kropp.andel_bak = andel.value; kropp.steg_min = steg.value; }
+  const res = await apiFetch('/ko/api/tavle/oppsett/', { method: 'PUT', body: JSON.stringify(kropp) });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) { window.alert(d.message || 'Kunne ikke lagre.'); return; }
-  await koHentTavleOppsett(d.data || []);
+  await koHentTavleOppsett(d.data || {});
   if (koTavleErFramme()) koHentTavle();
 }
 

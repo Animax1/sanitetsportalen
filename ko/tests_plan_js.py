@@ -26,12 +26,13 @@ HARNESS = (
              'koTavleSkjemaData', 'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleVarighet',
              'koTavleRader', 'koTavleSynlig', 'koTavleKanDras', 'koTavlePauseStatus', 'koTavleSlutt',
              'koTavleBehovNaa', 'koTavleBehovHtml',
-             'koPlanDognene', 'koPlanTid', 'koPlanTil', 'koPlanGruppert', 'koPlanBehovTekst',
+             'koTavleTilEtter', 'koTavleIVinduet',
+             'koPlanDognene', 'koPlanTid', 'koPlanGruppert', 'koPlanDognListe', 'koPlanBehovTekst',
              'koPlanKropp', 'koPlanBeredskapHtml', 'koPlanPostHtml', 'koPlanListeHtml',
-             'koPlanDognvalgHtml', 'koPlanSkjemaData', 'koPlanSkjemaHtml', 'koPlanSteder',
-             'koPlanDognstart',
-             # Steg 4: tidslinja og dekningen.
-             'koPlanDognVindu', 'koPlanTimeStart', 'koPlanTidslinje', 'koPlanBehovPerTime', 'koPlanDekningForGruppe',
+             'koPlanSkjemaData', 'koPlanSkjemaHtml', 'koPlanSteder',
+             'koPlanDognstart', 'koPlanValgtDogn',
+             # Steg 4: tidslinja og dekningen — tavlas vindu fra runde 2.
+             'koPlanTimene', 'koPlanDekningNokkel', 'koPlanTidslinje', 'koPlanBehovPerTime', 'koPlanDekningForGruppe',
              'koPlanDekningsgrupper', 'koPlanTidslinjeHtml', 'koPlanDekningHtml',
              # Steg 5: etterpå.
              'koPlanFaktiskTekst', 'koPlanEndringTekst', 'koPlanEtterpaaHtml')),
@@ -81,10 +82,10 @@ class PlanreglerTests(SimpleTestCase):
 
     def test_til_er_foerste_gang_klokka_viser_det_etter_fra(self):
         ut = self._json("""[
-            koPlanTil(L(25, 22), '00:30') === L(26, 0, 30),
-            koPlanTil(L(25, 22), '23:00') === L(25, 23),
-            koPlanTil(L(25, 22), '22:00') === L(26, 22),
-            koPlanTil(L(25, 22), 'x'),
+            koTavleTilEtter(L(25, 22), '00:30') === L(26, 0, 30),
+            koTavleTilEtter(L(25, 22), '23:00') === L(25, 23),
+            koTavleTilEtter(L(25, 22), '22:00') === L(26, 22),
+            koTavleTilEtter(L(25, 22), 'x'),
         ]""")
         self.assertEqual(ut, [True, True, True, None], '22–22 er et døgn, ikke null')
 
@@ -153,7 +154,7 @@ class PlanreglerTests(SimpleTestCase):
         grunn = "{lokasjon_id: '3', navn: 'x', dogn: '2026-09-25', fra: '22:00', til: '23:00', behov: {}}"
         tilfeller = {
             "Object.assign(G, {lokasjon_id: ''})": 'Velg stedet.',
-            "Object.assign(G, {navn: '  '})": 'Konserten må ha et navn.',
+            "Object.assign(G, {navn: '  '})": 'Velg artisten, eller skriv et navn.',
             "Object.assign(G, {fra: 'nå'})": 'Fyll inn klokkeslettene som TT:MM.',
             "Object.assign(G, {til: ''})": 'Fyll inn klokkeslettene som TT:MM.',
             "Object.assign(G, {publikum: 'mange'})": 'Forventet publikum må være et tall.',
@@ -164,6 +165,10 @@ class PlanreglerTests(SimpleTestCase):
             with self.subTest(uttrykk):
                 self.assertEqual(self._json(f"(() => {{ const G = {grunn}; return koPlanKropp({uttrykk}, '06:00').feil; }})()"),
                                  melding)
+        # Med en artist er navnet valgfritt — serveren bruker artistens.
+        self.assertEqual(self._json(f"(() => {{ const G = {grunn};"
+                                    " return koPlanKropp(Object.assign(G, {navn: '', konserttype_id: '4'}), '06:00').kropp; })()")
+                         ['navn'], '')
 
     def test_skjemaet_fylles_fra_posten_og_en_ny_starter_i_valgt_doegn(self):
         ut = self._json("""(() => {
@@ -191,10 +196,9 @@ class PlanreglerTests(SimpleTestCase):
             const data = {{poster: [p], konserttyper: [{{id: 1, navn: ond, er_aktiv: true}}],
               kjennetegn: [{{id: 1, navn: ond, er_aktiv: true}}], grupper: [{{id: 1, navn: ond}}],
               beredskap: [{{verdi: 'rod', navn: ond}}]}};
-            console.log(koPlanListeHtml(koPlanGruppert([p], '2026-09-25', '06:00'), true)
-              + koPlanSkjemaHtml(koPlanSkjemaData({{id: 1}}, data, '2026-09-25'), data, [{{id: 1, navn: ond}}], ['2026-09-25'])
-              + koPlanDognvalgHtml(['2026-09-25'], '2026-09-25'));
-            const vindu = koTavleVindu(L(25, 22, 30), 12);
+            console.log(koPlanListeHtml(koPlanDognListe([p], '06:00'), true)
+              + koPlanSkjemaHtml(koPlanSkjemaData({{id: 1}}, data, '2026-09-25'), data, [{{id: 1, navn: ond}}], ['2026-09-25']));
+            const vindu = koTavleVindu(L(25, 22, 30), 12, 25, L(25, 22, 30) - 8 * 3600000);
             console.log(koTavleRadHtml({{id: 1, navn: ond, pause: false, stolper: [], baner: 1, naa: 0, over: 0,
               program: koTavleProgram({{program: [p]}}, 1, vindu)}}));
         """)
@@ -212,7 +216,7 @@ class ProgrammetPaaTavlaJsTests(PlanreglerTests):
             const data = {program: [POST(1, 'Park', 1, L(25, 20), L(25, 23)), POST(2, 'Club', 2, L(25, 21), L(25, 22)),
                                     POST(3, 'Park', 1, L(24, 6), L(24, 7)), POST(4, 'Park', 1, L(25, 22), L(26, 1),
                                     {beredskap: 'lilla'})]};
-            const v = koTavleVindu(L(25, 22), 12);
+            const v = koTavleVindu(L(25, 22), 12, 25, L(25, 22) - 8 * 3600000);
             return koTavleProgram(data, 1, v).map((k) => [k.id, k.beredskap, k.venstre < 100 - k.hoyre]);
         })()""")
         self.assertEqual(ut, [[1, 'oransje', True], [4, '', True]],
@@ -220,7 +224,7 @@ class ProgrammetPaaTavlaJsTests(PlanreglerTests):
 
     def test_baandet_ligger_bak_stolpene_og_bærer_teksten(self):
         ut = self._kjor("""
-            const v = koTavleVindu(L(25, 22), 12);
+            const v = koTavleVindu(L(25, 22), 12, 25, L(25, 22) - 8 * 3600000);
             const k = koTavleProgram({program: [POST(1, 'Park', 1, L(25, 20), L(25, 23))]}, 1, v);
             const html = koTavleRadHtml({id: 1, navn: 'Park', pause: false, baner: 1, naa: 1, over: 0, program: k,
               stolper: [{ressurs_id: 1, navn: 'Lag 1', merke: '', venstre: 10, hoyre: 33, bane: 0, aapen: true,
@@ -238,7 +242,7 @@ class ProgrammetPaaTavlaJsTests(PlanreglerTests):
         ut = self._kjor("""
             const data = {rader: [{id: 1, navn: 'Park'}], ressurser: [], plasseringer: [], pauser: [],
                           program: [POST(1, 'Park', 1, L(25, 20), L(25, 23))]};
-            const rader = koTavleRader(data, koTavleVindu(L(25, 22), 12), 'alle');
+            const rader = koTavleRader(data, koTavleVindu(L(25, 22), 12, 25, L(25, 22) - 8 * 3600000), 'alle');
             const park = rader.find((r) => r.id === 1);
             console.log(park.program.length, rader.find((r) => r.pause).program.length);
             console.log(koTavleRadHtml(park).includes('ko-tavle-konsert'));
@@ -345,7 +349,7 @@ class BehovIDriftJsTests(PlanreglerTests):
 
     def test_gjennom_den_ekte_inngangen_og_pause_raden_har_ingen(self):
         ut = self._kjor(self.DATA + """
-            const rader = koTavleRader(data, koTavleVindu(L(25, 22), 12), 'alle');
+            const rader = koTavleRader(data, koTavleVindu(L(25, 22), 12, 25, L(25, 22) - 8 * 3600000), 'alle');
             const park = rader.find((r) => r.id === 1);
             console.log(JSON.stringify([park.behov.length, rader.find((r) => r.pause).behov.length]));
             console.log(koTavleRadHtml(park));
@@ -378,13 +382,34 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
           POST(5, 'Teltet', 3, L(25, 20), L(25, 21), {behov: [{gruppe_id: null, gruppe_navn: 'Borte', antall: 5}]}),
         ];
         const steder = [{id: 1, navn: 'Hovedscene'}, {id: 2, navn: 'Scene 2'}, {id: 3, navn: 'Teltet'}];
-        const V = koPlanDognVindu('2026-09-25', '06:00');
+        const V = {fra: L(25, 6), til: L(26, 6), naa: L(25, 6)};
+        const T = koPlanTimene(V);
     """
 
-    def test_doegnvinduet(self):
-        ut = self._json("(() => { const v = koPlanDognVindu('2026-09-25', '06:00');"
-                        " return [v.fra === L(25, 6), v.til === L(26, 6), koPlanDognVindu('x', '06:00')]; })()")
-        self.assertEqual(ut, [True, True, None])
+    def test_timene_i_vinduet_ogsaa_naar_det_ikke_begynner_paa_en_hel_time(self):
+        ut = self._json("""(() => {
+            const hel = koPlanTimene({fra: L(25, 6), til: L(26, 6)});
+            const skjev = koPlanTimene({fra: L(25, 6, 20), til: L(25, 18, 20)});
+            return [hel.length, hel[0] === L(25, 6), skjev.length, skjev[0] === L(25, 6), skjev[12] === L(25, 18),
+                    koPlanTimene({fra: L(25, 0), til: L(28, 0)}).length,
+                    koPlanDekningNokkel(skjev) === L(25, 6) + '|13', koPlanDekningNokkel([])];
+        })()""")
+        self.assertEqual(ut, [24, True, 13, True, True, 48, True, ''],
+                         'den første timen begynner før vinduet; aldri mer enn 48 (serverens tak)')
+
+    def test_listen_er_alle_doegnene_med_stedene_sine(self):
+        ut = self._json("""koPlanDognListe([POST(1, 'Park', 1, L(26, 20), L(26, 22)),
+            POST(2, 'Club', 2, L(25, 22), L(25, 23)), POST(3, 'Park', 1, L(26, 1), L(26, 2))], '06:00')
+            .map((d) => [d.dogn, d.grupper.map((g) => [g.sted, g.poster.map((p) => p.id)])])""")
+        self.assertEqual(ut, [['2026-09-25', [['Club', [2]], ['Park', [3]]]], ['2026-09-26', [['Park', [1]]]]],
+                         'kl. 01 natt til 26. hører til 25.')
+
+    def test_skjemaets_doegn_er_der_tidslinja_staar(self):
+        ut = self._json("""[koPlanValgtDogn({fra: L(25, 5), til: L(25, 17)}, L(25, 8), '06:00'),
+                              koPlanValgtDogn({fra: L(27, 12), til: L(28, 0)}, L(25, 8), '06:00'),
+                              koPlanValgtDogn({fra: L(27, 2), til: L(27, 6)}, L(25, 8), '06:00')]""")
+        self.assertEqual(ut, ['2026-09-25', '2026-09-27', '2026-09-26'],
+                         'nå når nå er i vinduet; ellers en fjerdedel inn i det man ser')
 
     def test_radene_i_stedsrekkefolge_med_baner_og_bare_doegnet(self):
         ut = self._json("(() => {" + self.POSTER + """
@@ -395,7 +420,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
 
     def test_behovet_teller_i_hver_time_konserten_beroerer(self):
         ut = self._json("(() => {" + self.POSTER + """
-            const t = koPlanBehovPerTime(poster, V);
+            const t = koPlanBehovPerTime(poster, T);
             return [16, 17, 18, 14].map((i) => [t[i].get('10') || 0, t[i].get('20') || 0]).concat([[t[14].size]]);
         })()""")
         # 22-timen: Scene 2 (2) + Hovedscene 22:30 (4). 23-timen: Hovedscene 22:30–23:30 (4) + 23:00 (1).
@@ -404,7 +429,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
 
     def test_stripa_er_for_faa_bare_naar_vaktlistas_tall_er_kjent(self):
         ut = self._json("(() => {" + self.POSTER + """
-            const t = koPlanBehovPerTime(poster, V);
+            const t = koPlanBehovPerTime(poster, T);
             const timer = Array.from({length: 24}, (_, i) => ({grupper: i === 16 ? {'10': 5} : (i === 18 ? {'10': 1} : {'10': 9})}));
             const med = koPlanDekningForGruppe(t, timer, 10);
             const uten = koPlanDekningForGruppe(t, null, 10);
@@ -419,7 +444,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
         """Serveren har alt trukket laget i pause fra `grupper`; `pause` står
         for å si hvorfor (23. sep. 2026)."""
         ut = self._kjor(self.POSTER + """
-            const t = koPlanBehovPerTime(poster, V);
+            const t = koPlanBehovPerTime(poster, T);
             const timer = Array.from({length: 24}, (_, i) => ({grupper: {'10': 3}, pause: i === 16 ? {'10': 2} : {}}));
             const s = koPlanDekningForGruppe(t, timer, 10);
             console.log(JSON.stringify([s[16].pause, s[16].har, s[17].pause]));
@@ -433,7 +458,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
 
     def test_stripa_tilbyr_bare_grupper_med_behov(self):
         ut = self._json("(() => {" + self.POSTER + """
-            const g = koPlanDekningsgrupper(koPlanBehovPerTime(poster, V),
+            const g = koPlanDekningsgrupper(koPlanBehovPerTime(poster, T),
               [{id: 30, navn: 'Samleplass'}, {id: 20, navn: 'Ambulanse'}, {id: 10, navn: 'Lag'}]);
             return g.map((x) => x.navn);
         })()""")
@@ -447,7 +472,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
             console.log(koPlanTidslinjeHtml(rader, V, false, L(25, 22)).includes('data-action'));
             console.log(koPlanDekningHtml([], [], null, V, 'Krever vaktlista.'));
             console.log(koPlanDekningHtml([], [], null, V, null).includes('Ingen behov'));
-            const s = koPlanDekningForGruppe(koPlanBehovPerTime(poster, V),
+            const s = koPlanDekningForGruppe(koPlanBehovPerTime(poster, T),
               Array.from({length: 24}, () => ({grupper: {'10': 1}})), 10);
             console.log(koPlanDekningHtml(s, [{id: 10, navn: 'Lag'}], 10, V, null).includes('ko-plan-kort'));
         """)
@@ -462,7 +487,7 @@ class TidslinjeOgDekningJsTests(PlanreglerTests):
             poster[0].navn = ond; poster[0].lokasjon_navn = ond; poster[0].beredskap_navn = ond;
             poster[0].behov = [{{gruppe_id: 10, gruppe_navn: ond, antall: 1}}];
             console.log(koPlanTidslinjeHtml(koPlanTidslinje(poster, V, steder), V, true, L(25, 22))
-              + koPlanDekningHtml(koPlanDekningForGruppe(koPlanBehovPerTime(poster, V), null, 10),
+              + koPlanDekningHtml(koPlanDekningForGruppe(koPlanBehovPerTime(poster, T), null, 10),
                                   [{{id: 10, navn: ond}}], 10, V, null)
               + koPlanDekningHtml([], [], null, V, ond));
         """)

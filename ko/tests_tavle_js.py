@@ -25,7 +25,7 @@ HARNESS = (
              'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleRadHtml',
              'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk', 'koTavlePauseRef', 'koTavlePauseKildetekst',
              # Steg 2.
-             'koTavleTo', 'koTavleHHMM', 'koTavleTidNaer', 'koTavlePauseStatus',
+             'koTavleTo', 'koTavleHHMM', 'koTavleTidNaer', 'koTavleTilEtter', 'koTavlePauseStatus',
              'koTavlePlanlagtHtml', 'koTavleValgtHtml', 'koTavleDognnokkel', 'koTavleDognene',
              'koTavleBesok', 'koTavleIkkeVaert', 'koTavleDognnavn', 'koTavleSistHtml',
              'koTavleBesokHtml', 'koTavleIkkeVaertHtml', 'koTavleSkjemaData',
@@ -98,13 +98,27 @@ class TavlereglerTests(SimpleTestCase):
 
     # ── Tidslinja ───────────────────────────────────────────────────────────
 
-    def test_naa_staar_ved_to_tredjedeler(self):
-        v = self._json('koTavleVindu(NAA, 12)')
+    def test_det_meste_er_framover_og_andelen_er_innstillingen(self):
+        """André, 23. sep. 2026: «Vi må og kunne se lenger frem i tid enn
+        bakover». ¼ bak som standard; KO-leder setter andelen, klemt til 0–50."""
         naa = self._json('NAA')
-        self.assertEqual(naa - v['fra'], 8 * 3600000)
-        self.assertEqual(v['til'] - naa, 4 * 3600000)
+        v = self._json('koTavleVindu(NAA, 12)')
+        self.assertEqual((naa - v['fra'], v['til'] - naa), (3 * 3600000, 9 * 3600000))
+        v = self._json('koTavleVindu(NAA, 12, 50)')
+        self.assertEqual(naa - v['fra'], 6 * 3600000)
+        self.assertEqual(self._json('koTavleVindu(NAA, 12, 0)')['fra'], naa)
+        self.assertEqual(self._json('koTavleVindu(NAA, 12, 90)')['fra'], naa - 6 * 3600000, 'klemt til 50')
+        self.assertEqual(self._json("koTavleVindu(NAA, 12, 'tull')")['fra'], naa - 3 * 3600000)
         v24 = self._json('koTavleVindu(NAA, 24)')
         self.assertEqual(v24['til'] - v24['fra'], 24 * 3600000)
+
+    def test_ankeret_holder_vinduet_stille_mens_klokka_gaar(self):
+        ut = self._json("""[koTavleVindu(NAA, 12, 25, NAA + 86400000),
+                            koTavleVindu(NAA + 600000, 12, 25, NAA + 86400000),
+                            koTavleVindu(NAA, 12, 25, null).fra === NAA - 3 * 3600000]""")
+        self.assertEqual(ut[0]['fra'], ut[1]['fra'], 'rullet vindu følger ikke nå')
+        self.assertEqual(ut[0]['til'] - ut[0]['fra'], 12 * 3600000)
+        self.assertTrue(ut[2], '`null` følger nå')
 
     def test_timer_som_ikke_er_et_tall_gir_standarden(self):
         v = self._json("koTavleVindu(NAA, 'tull')")
@@ -139,7 +153,7 @@ class TavlereglerTests(SimpleTestCase):
     # ── Radene ──────────────────────────────────────────────────────────────
 
     def _rader(self, filter_='alle'):
-        return self._json(f"koTavleRader(DATA, koTavleVindu(NAA, 12), '{filter_}')")
+        return self._json(f"koTavleRader(DATA, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), '{filter_}')")
 
     def test_pause_staar_oeverst_og_er_ikke_en_lokasjon(self):
         rader = self._rader()
@@ -163,7 +177,7 @@ class TavlereglerTests(SimpleTestCase):
             const d = JSON.parse(JSON.stringify(DATA));
             d.plasseringer.push({id: 9, ressurs_id: 102, ressurs_navn: 'Lag 2', lokasjon_id: null,
               pause: true, hendelse_nummer: null, fra: '2026-09-22T16:30:00Z', til: null});
-            return koTavleRader(d, koTavleVindu(NAA, 12), 'alle')[0].stolper.find((s) => s.aapen);
+            return koTavleRader(d, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle')[0].stolper.find((s) => s.aapen);
         })()""")
         self.assertFalse(ut['lenge'])
         self.assertEqual(ut['varighet'], '3 t 30')
@@ -190,7 +204,7 @@ class TavlereglerTests(SimpleTestCase):
             const d = JSON.parse(JSON.stringify(DATA));
             d.plasseringer.push({id: 9, ressurs_id: 102, ressurs_navn: 'Lag 2', lokasjon_id: 1,
               pause: false, hendelse_nummer: null, fra: '2026-09-22T17:30:00Z', til: '2026-09-22T17:45:00Z'});
-            return koTavleRader(d, koTavleVindu(NAA, 12), 'alle')[1];
+            return koTavleRader(d, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle')[1];
         })()""")
         self.assertEqual(ut['baner'], 3, 'Lag 1 fra 16, Lag 2 fra 17 og 17:30 — tre samtidig')
 
@@ -200,7 +214,7 @@ class TavlereglerTests(SimpleTestCase):
 
     def test_uten_skrivetilgang_kan_ingenting_dras(self):
         ut = self._json("(() => { koKanSkriveSvar = false;"
-                        " return koTavleRader(DATA, koTavleVindu(NAA, 12), 'alle')[1].stolper.map((s) => s.dras); })()")
+                        " return koTavleRader(DATA, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle')[1].stolper.map((s) => s.dras); })()")
         self.assertEqual(ut, [False, False])
 
     # ── «Uten plass» ────────────────────────────────────────────────────────
@@ -222,7 +236,7 @@ class TavlereglerTests(SimpleTestCase):
             d.ressurser.forEach((r) => { r.navn = ondt; });
             d.ressurser[2].opptatt.tekst = ondt; d.ressurser[2].opptatt.merke = ondt;
             d.rader[0].navn = ondt; d.grupper[0].navn = ondt;
-            const html = koTavleRader(d, koTavleVindu(NAA, 12), 'alle').map(koTavleRadHtml).join('')
+            const html = koTavleRader(d, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').map(koTavleRadHtml).join('')
               + koTavleUtenPlassHtml(koTavleUtenPlass(d, 'alle', NAA)) + koTavleFilterHtml(d, 'alle');
             assert(!html.includes('<img'), 'rå markup slapp gjennom: ' + html);
             assert(html.includes('&lt;img'), 'navnet forsvant i stedet for å escapes');
@@ -233,7 +247,7 @@ class TavlereglerTests(SimpleTestCase):
         """En knapp som fører til en vegg er verre enn ingen knapp."""
         ut = self._kjor("""
             koKanSkriveSvar = false;
-            const html = koTavleRader(DATA, koTavleVindu(NAA, 12), 'alle').map(koTavleRadHtml).join('')
+            const html = koTavleRader(DATA, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').map(koTavleRadHtml).join('')
               + koTavleUtenPlassHtml(koTavleUtenPlass(DATA, 'alle', NAA));
             console.log(html.includes('data-dras'));
             koKanSkriveSvar = true;
@@ -328,7 +342,7 @@ class Steg2Tests(TavlereglerTests):
                          'ti minutter før er «nå»; ved slutt uten start er den ikke tatt')
 
     def test_planlagte_staar_i_pause_raden_og_den_startede_ikke(self):
-        ut = self._json("koTavleRader(D2, koTavleVindu(NAA2, 12), 'alle')[0].stolper"
+        ut = self._json("koTavleRader(D2, koTavleVindu(NAA2, 12, 25, NAA2 - 8 * 3600000), 'alle')[0].stolper"
                         ".map((s) => [s.pause_id, s.pause_status, s.dras])")
         self.assertEqual(ut, [[50, 'naa', False], [51, 'kommer', False]])
 
@@ -347,7 +361,7 @@ class Steg2Tests(TavlereglerTests):
         ut = self._kjor("""
             const u = koTavleUtenPlass(D2, 'alle', NAA2);
             console.log(JSON.stringify(u.ledige.map((r) => [r.navn, r.planlagt])));
-            const rad = koTavleRader(D2, koTavleVindu(NAA2, 12), 'alle')[0];
+            const rad = koTavleRader(D2, koTavleVindu(NAA2, 12, 25, NAA2 - 8 * 3600000), 'alle')[0];
             console.log(koTavleRadHtml(rad).includes('data-action="koTavleStartPause" data-arg="50"'),
                         koTavleUtenPlassHtml(u).includes('data-action="koTavleStartPause"'));
             koKanSkriveSvar = false;
@@ -355,7 +369,7 @@ class Steg2Tests(TavlereglerTests):
                         koTavleUtenPlassHtml(u).includes('koTavleStartPause'),
                         koTavleRadHtml(rad).includes('koTavlePlanlegg'));
         """)
-        self.assertEqual(json.loads(ut[0]), [['Lag 2', {'id': 50, 'naa': True, 'kl': '02:05'}]])
+        self.assertEqual(json.loads(ut[0]), [['Lag 2', {'id': 50, 'naa': True, 'kl': '02:05', 'pause': True, 'sted': ''}]])
         self.assertEqual(ut[1], 'true true')
         self.assertEqual(ut[2], 'false false false')
 
@@ -495,7 +509,7 @@ class VaktlistasPauserJsTests(Steg2Tests):
             const d = JSON.parse(JSON.stringify(D2));
             d.pauser[0].id = 'v12'; d.pauser[0].kilde = 'vaktliste';
             d.pauser[1].kilde = 'endret';
-            const stolper = koTavleRader(d, koTavleVindu(NAA2, 12), 'alle')[0].stolper;
+            const stolper = koTavleRader(d, koTavleVindu(NAA2, 12, 25, NAA2 - 8 * 3600000), 'alle')[0].stolper;
             console.log(JSON.stringify(stolper.map((s) => [s.pause_id, s.pause_kilde])));
             const html = stolper.map(koTavleStolpeHtml);
             console.log(html[0].includes('data-tavle-pause="v12"'), html[0].includes('fra vaktlista'),
@@ -536,7 +550,7 @@ class PlanlagtSluttJsTests(TavlereglerTests):
 
     def test_stiplet_fram_til_slutten_og_banen_holdes(self):
         ut = self._kjor(self._med_slutt('2026-09-22T22:00:00Z') + """
-            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').find((r) => r.id === 1);
             const s = rad.stolper.find((x) => x.navn === 'Lag 1');
             console.log(JSON.stringify(s.slutt));
             console.log(koTavleStolpeHtml(s));
@@ -552,7 +566,7 @@ class PlanlagtSluttJsTests(TavlereglerTests):
 
     def test_over_tida_gir_rod_kant_minutter_og_tall_paa_raden(self):
         ut = self._kjor(self._med_slutt('2026-09-22T19:40:00Z') + """
-            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').find((r) => r.id === 1);
             const s = rad.stolper.find((x) => x.navn === 'Lag 1');
             console.log(koTavleStolpeHtml(s));
             console.log(koTavleRadHtml(rad));
@@ -567,7 +581,7 @@ class PlanlagtSluttJsTests(TavlereglerTests):
     def test_uten_skrivetilgang_aapner_den_stiplede_ingenting(self):
         ut = self._kjor(self._med_slutt('2026-09-22T22:00:00Z') + """
             koKanSkriveSvar = false;
-            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.id === 1);
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').find((r) => r.id === 1);
             console.log(koTavleStolpeHtml(rad.stolper.find((x) => x.navn === 'Lag 1')));
         """)
         self.assertIn('ko-tavle-slutt-plan', ut[0])
@@ -585,7 +599,7 @@ class PlanlagtSluttJsTests(TavlereglerTests):
             D.plasseringer = D.plasseringer.filter((p) => p.id !== 3);
             D.pauser = [{id: 50, ressurs_id: 102, ressurs_navn: 'Lag 2', fra: '2026-09-22T21:00:00Z',
                          til: '2026-09-22T21:30:00Z', startet: false}];
-            const rad = koTavleRader(D, koTavleVindu(NAA, 12), 'alle').find((r) => r.pause);
+            const rad = koTavleRader(D, koTavleVindu(NAA, 12, 25, NAA - 8 * 3600000), 'alle').find((r) => r.pause);
             console.log(JSON.stringify(rad.stolper.map((s) => [s.navn, s.bane])));
         """)
         baner = dict(json.loads(ut[0]))

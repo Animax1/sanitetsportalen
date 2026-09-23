@@ -4,6 +4,87 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Tavla og konsertplanleggeren, runde 2: framover i tid, «+ Planlegg» på alle rader, «Flytt nå», felles tidslinje og egne vinduer  `#ko` `#tavle` `#planlegger`
+
+André etter test på staging: «Tidslinjen på tavlen er litt rar. Når du drar over en enhet så
+begynner navnet i "fortid", det må heller gå fremover i fremtid. Og planleggeren ser ut til å
+være ren konsert planlegger. Greit nok men da må vi omgjøre på navnet. Og trenger planlegg
+knapp på alle lokasjonene for å kunne sette ressurser. Vi må og kunne se lenger frem i tid enn
+bakover. Og kunne scrolle tilbake og frem i tid for å planlegge. Endre navnet konserttyper til
+Artist. … Og så er planlegger broken, du har bare valgt dager. Jeg må jo få en tidslinje aktig
+oppsett som kan følge tavle. og hvis jeg går frem i tid på planlegger tidslinjen skjer det
+samme med tavlen.»
+
+Skissert først (Artifact «Planleggeren, runde 2»). Svarene: **1.** planleggingen inn i tavla,
+konsertdelen blir eget vindu, «Konsertplanlegger» — og «Den funksjonaliteten må gjelde alle
+vinduer vi har i flaten vår» (eget nettleservindu) · **2.** artistlista er KO-lederens · **3.**
+«KO skal trykke flytt nå» · **4.** alle som fører tavla planlegger, «kan være vi strammer inn» ·
+**5.** «la admin og ko-leder kunne justere på rulling» · **6.** synk begge veier. «Gjør alt i
+helhet.»
+
+**Tavla**
+- **Stolpen vokser framover.** Den åpne plasseringen var høyreforankret ved nå og vokste
+  *bakover* til 72 px — et lag som nettopp var plassert sto med navnet «i fortid». Nå begynner
+  den der laget kom, og ligger over sin egen stiplede slutt.
+- **Mer framover enn bakover:** ¼ av vinduet før nå som standard (var ⅔). KO-leder setter
+  andelen (0–50 %) og hvor langt ◀ ▶ flytter (15–720 min) i KO-innstillinger → «Tavla».
+  Verdier utenfor avvises ved lagring og klemmes ved lesing; uten feltene i kroppen skrives
+  ingenting (ingen tomme auditrader).
+- **◀ Nå ▶, og dra i aksen** for å gå fram og tilbake i tid. Er nå utenfor det man ser, står
+  «Du ser ikke nå · Tilbake til nå», og nå-streken tegnes ikke — før ble den klemt til kanten
+  og så ut som nå.
+- **«+ Planlegg» i hver rad**, ikke bare i Pause-raden. `PlanlagtPause` har fått `pause` og
+  `lokasjon`/`lokasjon_navn` (migrasjon `ko/0020`): en plan i Pause-raden (≤ 4 t) eller på et
+  sted (≤ 1 døgn). Planen står stiplet i raden den skal til. **Laget må ha skift når planen
+  begynner** (`paa_vakt_ved`), ikke være på vakt *nå* — en plan for i morgen gjelder laget som
+  går vakt i morgen. Nedtrekket er hele vaktlista (`alle_ressurser`), biler bare på et sted.
+  Klokkeslettene leses nær der tidslinja står, så en plan kan legges i morgen.
+- **«Flytt nå»** (og «Pause nå») fra ti minutter før — på stolpen og på kortet i «Uten plass»
+  («Flytt nå · Village»). KO trykker; tavla flytter ingen. Står laget alt der, knyttes planen
+  til den plasseringen. **Planens slutt blir plasseringens planlagte slutt**, så overtiden
+  vises som for alt annet — men en slutt KO alt har satt, overskrives ikke. Et sted som er
+  slettet etter at planen ble lagt, gir en feilmelding med det frosne navnet.
+- En plan på et sted skjuler ikke vaktlistas pause, og trekkes ikke fra i dekningen — bare
+  pauser gjør det.
+
+**Konsertplanleggeren** (het «Planlegger»)
+- **Følger tavlas tidslinje** — samme vindu, samme ◀ Nå ▶, samme drag. Ruller du det ene,
+  ruller det andre. Døgnknappene er borte; «Liste» viser hele programmet døgn for døgn.
+- **Dekningen hentes for vinduet**: `/ko/api/program/dekning/?fra=<time>&timer=N` (1–48;
+  `?dogn=` virker fortsatt). Søylene står i prosent under tidslinja, så de treffer båndene
+  også når vinduet ikke begynner på en hel time. Hentes ikke mens aksen dras.
+- **«Konserttyper» heter «Artister»** (fanen, skjemaet, lista). Modellen heter fortsatt
+  `Konserttype` — backupfilene bærer modellnavnet. **Navnet på konserten er valgfritt**; tomt er
+  artistens. Typeforslagene fra `0017` («Headliner», «Pop», «Fast post (ikke konsert)» …) er
+  typer, ikke artister, og fjernes der de er ubrukt (`ko/0021`); en i bruk blir stående.
+
+**Egne vinduer — alle seks**
+- **«Åpne i eget vindu»** (↗) i hodet på hvert KO-vindu: `/ko/?vindu=<navn>` viser bare det
+  vinduet over hele flaten, for skjerm to. Samme side, ikke en egen mal — ett sted vinduet
+  tegnes. Oppsettet lagres ikke derfra. I hovedvinduet skjules det og står i stripa.
+- **Tidslinja synkes mellom vinduene** over `BroadcastChannel('ko-tid')`: et nytt vindu spør
+  de andre hvor de står. Ikke `localStorage` — en fane som lastes på nytt, skal følge nå.
+  Meldingene leses som data (`koTidMelding`): bare et positivt tall eller `null`.
+
+**Funnet i nettleseren:** teksten over tidslinja sa «Ons. 23.09. 14:11 – Ons. 23.09. 02:11» —
+datoen kom fra døgnnøkkelen (døgnstart 06), der natta hører til onsdagen. Klokka 02 er
+torsdag; teksten bruker nå kalenderdatoen. **Og `start_pause` mistet den planlagte slutten**:
+`sett_planlagt_slutt` henter raden på nytt med `select_for_update` og returnerer den nye, og
+returverdien ble kastet — funnet av den første testen.
+
+**Mutasjonstesting (for hånd):** 23 mutanter i tjenestelaget og viewene (`ko/tavle.py`,
+`ko/program.py`, `ko/views.py`, `0021`) og 31 i JS-reglene (`ko-tavle.js`, `ko-plan.js`, `ko-layout.js`). **To overlevde i første
+runde, begge tettet:** (1) testen for at en stedsplan ikke skjuler vaktlistas pause la de to i
+*hvert sitt* tidsrom, så regelen ble aldri prøvd; (2) `if 'andel_bak' in data …` kunne
+fjernes uten at noe ble rødt, fordi standardverdiene ga samme resultat — testen krever nå at
+ingenting skrives. **I JS overlevde én:** kortet i «Uten plass» kunne si «Pause 22:00» om en
+plan på et sted uten at noe ble rødt — byggeren var prøvd, men ikke veien gjennom
+`koTavleUtenPlass`. Tettet.
+
+**Tester:** `ko/tests_tavle_plan.py` (ny), `ko/tests_tavle_runde2_js.py` (ny, med
+`koTegnTavle` og `koTegnPlan` gjennom den ekte inngangen), og de eksisterende tavle- og
+planleggertestene skrevet om til et eksplisitt anker der de forutsatte ⅔ bakover.
+
 ## 2026-09-23 — Avtalte pauser i vaktlista, og KO-tavla henter dem  `#vaktliste` `#ko` `#pauser`
 
 André: «vi har planer om å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er

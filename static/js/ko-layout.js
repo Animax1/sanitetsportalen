@@ -1,5 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-// ko-layout.js — rutenettet: fire plasser i 2×2 (seks vinduer — tavla og planleggeren deler plass), bytte av plass og størrelse.
+// ko-layout.js — rutenettet: fire plasser i 2×2 (seks vinduer — tavla og
+// konsertplanleggeren deler plass), bytte av plass og størrelse, og et vindu
+// åpnet for seg (`?vindu=`).
 //
 // Første av KOs fem filer (`KO_JS` i patients/js_test_utils.py). Ingen
 // bundler, ett globalt navnerom, og **ingenting kjører på toppnivå her** —
@@ -63,7 +65,7 @@ const KO_VINDUSNAVN = {
   ressurser: 'Ressursoversikt',
   oppdrag: 'Oppdragsliste',
   tavle: 'Tavle',
-  plan: 'Planlegger',
+  plan: 'Konsertplanlegger',
 };
 
 //: Gulvet, i prosent. Under dette kan en skillelinje ikke dras: et vindu på
@@ -404,8 +406,77 @@ function koSettKonsollhoyde() {
     '--ko-hoyde', koKonsollhoyde(topp, window.innerHeight) + 'px');
 }
 
+// ── Et vindu for seg (23. sep. 2026) ─────────────────────────────────────────
+//
+// André: «Det må og gå ann å gjøre det samme med å lage et eget vindu av
+// tavlen … Den funksjonaliteten må gjelde alle vinduer vi har i flaten vår.»
+// **Samme side, med `?vindu=<navn>`** — ikke en egen mal: da er det ett sted
+// vinduet tegnes, og en endring i det følger med til skjerm to av seg selv.
+// Tidslinja synkes mellom dem (`koTidStart` i ko-tavle.js).
+//
+// I hovedvinduet **skjules** det som ble åpnet for seg, og står i stripa med
+// navnet sitt — samme regel som ellers: en flate man ikke ser, er en tilstand
+// man ser. Siste synlige skjules ikke; da står det to steder, og det er greit.
+
+// Navnet i adressen, eller `null`. Brukerdata: bare et kjent vindu gjelder.
+function koEgetVinduNavn(sok) {
+  try {
+    const navn = new URLSearchParams(sok || '').get('vindu');
+    return KO_VINDUER.includes(navn) ? navn : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function koEgetVinduUrl(navn) {
+  return KO_VINDUER.includes(navn) ? '/ko/?vindu=' + encodeURIComponent(navn) : null;
+}
+
+// Knappen i vinduets hode. Navngitt mål, så et nytt trykk henter fram det
+// samme nettleservinduet i stedet for å åpne et til.
+function koApneEgetVindu(navn) {
+  const url = koEgetVinduUrl(navn);
+  if (!url) return;
+  window.open(url, 'ko-' + navn, 'popup,width=1280,height=800');
+  const ny = koSkjul(koOppsett || koLesOppsett(), navn);
+  if (ny.skjult.length === ((koOppsett && koOppsett.skjult) || []).length) return;
+  koOppsett = ny;
+  koLagreOppsett(koOppsett);
+  koTegnOppsett(koOppsett);
+}
+
+// Bare det ene vinduet, over hele konsollen. **Oppsettet lagres ikke** herfra:
+// det er hovedvinduets, og et vindu for seg skal ikke omrokkere det.
+function koTegnEgetVindu(navn) {
+  const rad = document.getElementById('ko-rad-1');
+  const el = koVinduElement(navn);
+  if (!rad || !el) return;
+  document.body.classList.add('ko-eget-vindu');
+  document.querySelectorAll('.ko-vindu').forEach((v) => v.classList.toggle('d-none', v !== el));
+  rad.insertBefore(el, rad.firstChild);
+  el.style.flex = '1 1 100%';
+  rad.style.flex = '1 1 100%';
+  rad.classList.remove('d-none');
+  const rad2 = document.getElementById('ko-rad-2');
+  if (rad2) rad2.classList.add('d-none');
+  document.querySelectorAll('.ko-splitter-v, .ko-splitter-h').forEach((sp) => sp.classList.add('d-none'));
+  const stripe = document.getElementById('ko-skjulte');
+  if (stripe) stripe.classList.add('d-none');
+  document.title = (KO_VINDUSNAVN[navn] || navn) + ' · KO';
+  if (typeof koTavleSynligNaa === 'function') koTavleSynligNaa();
+  if (typeof koPlanSynligNaa === 'function') koPlanSynligNaa();
+}
+
 // Kalles fra ko.js sin `DOMContentLoaded`.
 function koOppsettStart() {
+  const eget = koEgetVinduNavn(window.location.search);
+  if (eget) {
+    koOppsett = koLesOppsett();
+    koTegnEgetVindu(eget);
+    koSettKonsollhoyde();
+    window.addEventListener('resize', koSettKonsollhoyde);
+    return;
+  }
   koOppsett = koLesOppsett();
   koTegnOppsett(koOppsett);
   koDraLyttere();

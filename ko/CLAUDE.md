@@ -247,26 +247,26 @@ hvilke rader som finnes er projeksjon — `opptatt()` utleder det ved hver lesin
 | Til samme sted igjen er en feil, ikke en ny rad | Ellers teller «Besøk» ett besøk som to |
 | Hver flytting er en systemlinje (`TAVLE_FLYTTET`) med hvem | Å gå på en hendelse har alt sin linje |
 | **Retting** (`rett`, `fjern`): naboene tilpasses i samme lagring, men **en nabo forsvinner aldri**, og tida på en hendelse rettes ikke og gås ikke inn i. Systemlinje `TAVLE_RETTET` | Historikken «Besøk» teller skal ikke endre seg uten et spor |
-| **Planlagt pause** (`PlanlagtPause`): KOs egen, maks fire timer, ikke i fortida, aldri to over hverandre — heller ikke oppå en startet. «Pause nå» (`start_pause`) plasserer i Pause-raden, eller knytter til pausen laget alt har | Planen flytter ingen |
-| **Vaktlistas pauser** (`effektive_pauser`, 23. sep. 2026) står i Pause-raden som `v<pk>`, **uten kopi**. Rører KO en, overtas den i samme transaksjon (`fra_vaktliste`, `endret`, `avlyst`); KO vinner også på overlapp. Dekningen trekker fra lag i pause | André: vaktlistas er utgangspunktet, KOs endring gjelder resten av vakta |
-| **Planlagt slutt** (`Tavleplassering.planlagt_til`, 23. sep. 2026): bare på den åpne, fram i tid, høyst et døgn. `sett_planlagt_slutt`; PUT på plasseringen tar `fra` og `planlagt_til` i én transaksjon. **Flytter ingen** — når tida er ute, får laget rød kant. Står igjen på den lukkede, arves ikke av neste plassering | André: «planlegge tid per plassering med beskjed/tegn på overtid». Samme regel som pausene: et lag midt i noe skal ikke forsvinne fordi klokka sa det |
-| **Innstillingene**: tidsvindu 12–24 t og døgnstart (portalinnstilling, global admin); «På tavla» og «Følg besøk ★» per lokasjon (`skriv_leder`) — ID-lister i `AppSetting`, auditlogget | KO eier avkryssingene, ikke lokasjonene |
+| **Planlagt plassering** (`PlanlagtPause`, runde 2): Pause-raden (≤ 4 t) eller et sted (`lokasjon`, ≤ 1 døgn); ikke i fortida, aldri to over hverandre. Skift når planen begynner (`paa_vakt_ved`), ikke «på vakt nå». «Pause nå»/«Flytt nå» (`start_pause`) plasserer — eller knytter til der laget alt står — og planens slutt blir `planlagt_til` | Planen flytter ingen; «KO skal trykke flytt nå» (André) |
+| **Vaktlistas pauser** (`effektive_pauser`) står i Pause-raden som `v<pk>`, **uten kopi**. Rører KO en, overtas den i samme transaksjon (`fra_vaktliste`, `endret`, `avlyst`); KO vinner også på overlapp. Dekningen trekker fra lag i pause | André: vaktlistas er utgangspunktet, KOs endring gjelder resten av vakta |
+| **Planlagt slutt** (`Tavleplassering.planlagt_til`): bare på den åpne, fram i tid, høyst et døgn. `sett_planlagt_slutt`. **Flytter ingen** — når tida er ute, får laget rød kant. Står igjen på den lukkede, arves ikke av neste plassering | André: «planlegge tid per plassering med beskjed/tegn på overtid». Et lag midt i noe skal ikke forsvinne fordi klokka sa det |
+| **Innstillingene**: tidsvindu 12–24 t og døgnstart (portalinnstilling, admin); «På tavla», «Følg besøk ★» og rullingen (`andel_bak` 0–50 %, `steg_min` 15–720 — avvist utenfor, klemt ved lesing) er `skriv_leder`, i én dør. `AppSetting`, auditlogget | KO eier avkryssingene, ikke lokasjonene |
 
-**Programmet** (tavleplanleggeren, 23. sep. 2026) — `ko/program.py`, modellene
-`Konserttype`, `Kjennetegn`, `Programpost`, `Programbehov`. Reglene står i modulens
-docstring; kortversjonen:
+**Programmet** (konsertplanleggeren, 23. sep. 2026) — `ko/program.py`, modellene
+`Konserttype` (**heter «Artist»** fra runde 2; klassen og tabellen står, backupfilene bærer
+navnet), `Kjennetegn`, `Programpost`, `Programbehov`. Kortversjonen:
 
 | Regel | Hvorfor |
 |---|---|
-| **Typen setter ingen ressurser**; behovet skrives inn per konsert, i vaktlistas ressursgrupper | André: «Konserttyper skal ikke automatisk sette ressurser». «Spesiallag» er en egen gruppe der |
+| **Artisten setter ingen ressurser**; behovet skrives inn per konsert. Tomt navn er artistens | André: «Konserttyper skal ikke automatisk sette ressurser» |
 | Beredskapsnivå grønn/gul/oransje/rød (`BEREDSKAP_VALG`), tomt for et fast behov; ukjent avvises | «En standardisert form» |
-| Konserttyper og kjennetegn er `VERDILISTER` (KO-innstillinger, `skriv_leder`), seedet med et forslag (`0017`); en type i bruk slettes ikke — heller ikke fra i fjor | Kjennetegnene kan legges inn den dagen samarbeidspartneren svarer, uten en utrulling |
+| Artister og kjennetegn er `VERDILISTER` (`skriv_leder`); typeforslaget fra `0017` fjernet der ubrukt (`0021`); i bruk slettes ikke | Kjennetegnene legges inn når samarbeidspartneren svarer |
 | Alt valideres før noe skrives, og `lagre_post` er én transaksjon; behovet byttes ut i sin helhet | En konsert uten behovet sitt er et halvt svar som ser helt ut |
 | Inaktivt sted/type avvises på en ny post, beholdes på en endring | Som en deaktivert problemstilling på et oppdrag |
 | Sted, type og gruppe fryses som navn; `lokasjon`, `endret_av` og `Programbehov.gruppe` strippes i backupen | Programmet skal leses år etter år. Samme sirkel som `HendelseLag.ressurs` |
 | **`Tavleplassering.folger`**: «følger konserten» — samme sted, samme vakt, ikke over. Aldri sammen med `planlagt_til`; tavlesvaret gir den gjeldende slutten | Konserten forsinkes, og lagenes slutt følger med uten at noen retter noe |
 | **KO-leder skriver** (`/ko/api/program/`), `les` ser | André: «KO-leder», før og under vakta |
-| **Dekningen** (`paa_vakt_per_time`, `/ko/api/program/dekning/?dogn=`): på vakt per gruppe, midt i hver time, fra `vaktliste.services.ressurser_med_skift` — **samme regel som resten av portalen, også for bilene**. Gaten er vaktlistas `les`, som tavla | Planleggeren skal ikke ha sin egen mening om hvem som er på vakt. Bilens `pa_vakt` er hva KO har skrudd på *nå*, ikke hva som er planlagt i kveld |
+| **Dekningen** (`paa_vakt_per_time`, `…/dekning/?fra=&timer=` — 1–48, tavlas vindu): på vakt per gruppe midt i hver time, fra `ressurser_med_skift` — **også for bilene**; minus lag i *pause*, ikke på et sted. Gaten er vaktlistas `les` | Planleggeren har ingen egen mening om hvem som er på vakt. Bilens `pa_vakt` er *nå*, ikke i kveld |
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
 oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.

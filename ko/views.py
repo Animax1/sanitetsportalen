@@ -199,7 +199,8 @@ def index_view(request):
         {'slug': 'tavla', 'navn': 'Tavla', 'tegn': 'koTegnTavleOppsett'},
         # Programmet (23. sep. 2026): listene konsertene velger fra. Samme
         # fabrikk som ansvarsområdene.
-        {'slug': 'konserttyper', 'navn': 'Konserttyper', 'ny': 'Ny konserttype',
+        # «Konserttyper» ble «Artister» 23. sep. 2026 (André); URL-en står.
+        {'slug': 'konserttyper', 'navn': 'Artister', 'ny': 'Ny artist',
          'url': '/ko/api/konserttyper/'},
         {'slug': 'kjennetegn', 'navn': 'Kjennetegn', 'ny': 'Nytt kjennetegn',
          'url': '/ko/api/kjennetegn/'},
@@ -1068,7 +1069,8 @@ def tavle_plassering_view(request, pk):
 @require_http_methods(['POST'])
 @rate_limit(group='ko:tavle_pauser', rate='60/m', method='POST')
 def tavle_pauser_view(request):
-    """Planlegg en pause for et lag (skisse 2, «+ Planlegg»)."""
+    """«+ Planlegg» på en rad: en pause, eller et sted (23. sep. 2026). Alle som
+    fører tavla (`skriv_full`) — André: «Alle i første omgang»."""
     from . import tavle
 
     stengt = _tavle_gate(request)
@@ -1078,10 +1080,18 @@ def tavle_pauser_view(request):
     ressurs = _tavle_ressurs(request, data)
     if ressurs is None:
         return _feil('Ukjent ressurs.', 404)
+    # **Hvilken som helst rad** (23. sep. 2026): `lokasjon_id` er et sted,
+    # uten er det Pause-raden.
+    lokasjon = None
+    if data.get('lokasjon_id') not in (None, ''):
+        from oppdrag.models import Lokasjon
+        lokasjon = Lokasjon.objects.filter(pk=_heltall_eller_none(data.get('lokasjon_id'))).first()
+        if lokasjon is None:
+            return _feil('Ukjent lokasjon.', 404)
     try:
         q = tavle.planlegg_pause(hent_aktiv_vakt(), ressurs, bruker=request.user,
                                  fra=_tavle_tid(data.get('fra'), 'Fra'),
-                                 til=_tavle_tid(data.get('til'), 'Til'))
+                                 til=_tavle_tid(data.get('til'), 'Til'), lokasjon=lokasjon)
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok', 'data': {'id': q.pk}})
@@ -1182,13 +1192,22 @@ def tavle_oppsett_view(request):
             return _feil('Å sette opp tavla er skriv_leder i KO.', 403)
         data = _json_body(request)
         try:
-            tavle.lagre_oppsett(skjulte_ider=data.get('skjulte'), fulgte_ider=data.get('fulgte'))
+            with transaction.atomic():
+                tavle.lagre_oppsett(skjulte_ider=data.get('skjulte'), fulgte_ider=data.get('fulgte'))
+                # Rullingen (23. sep. 2026): sendes den, lagres den — samme dør.
+                if 'andel_bak' in data or 'steg_min' in data:
+                    tavle.lagre_rulling(andel=data.get('andel_bak', tavle.andel_bak()),
+                                        steg=data.get('steg_min', tavle.steg_min()))
         except services.Ugyldig as e:
             return _feil(str(e))
     ute, fulgt = set(tavle.skjulte()), set(tavle.fulgte())
-    return JsonResponse({'status': 'ok', 'data': [{
-        'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
-    } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')]})
+    return JsonResponse({'status': 'ok', 'data': {
+        'lokasjoner': [{
+            'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
+        } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')],
+        'andel_bak': tavle.andel_bak(),
+        'steg_min': tavle.steg_min(),
+    }})
 
 
 # ── Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026) ───────────────────
@@ -1269,11 +1288,25 @@ def program_dekning_view(request):
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    start = program.dogn_start(request.GET.get('dogn', ''))
-    if start is None:
-        return _feil('Oppgi døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
+    # **Et vindu, ikke et døgn** (23. sep. 2026): konsertplanleggeren følger
+    # tavlas tidsvindu, og det kan stå over to døgn. `?fra=` er starten på den
+    # første timen, `?timer=` hvor mange. `?dogn=` står igjen for et døgn.
+    antall = _heltall_eller_none(request.GET.get('timer'))
+    antall = 24 if antall is None else antall
+    if not 1 <= antall <= program.MAKS_DEKNINGSTIMER:
+        return _feil(f'Oppgi mellom 1 og {program.MAKS_DEKNINGSTIMER} timer.')
+    if request.GET.get('fra'):
+        try:
+            start = _tavle_tid(request.GET.get('fra'), 'Fra')
+        except services.Ugyldig as e:
+            return _feil(str(e))
+    else:
+        start = program.dogn_start(request.GET.get('dogn', ''))
+        if start is None:
+            return _feil('Oppgi vinduet som ?fra=<tidspunkt>&timer=N, eller døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
     return JsonResponse({'status': 'ok', 'data': {
-        'timer': program.paa_vakt_per_time(start, hent_aktiv_vakt())}})
+        'fra': start.isoformat(),
+        'timer': program.paa_vakt_per_time(start, hent_aktiv_vakt(), antall)}})
 
 
 # ── Plan mot faktisk og kopiering (steg 5) ──────────────────────────────────

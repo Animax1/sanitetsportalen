@@ -213,7 +213,6 @@ KO_LOGG_BYGGERE = (
     'koPlanBeredskapHtml',
     'koPlanPostHtml',
     'koPlanListeHtml',
-    'koPlanDognvalgHtml',
     'koPlanSkjemaHtml',
     'koPlanTidslinjeHtml',
     'koPlanDekningHtml',
@@ -231,6 +230,8 @@ KO_LOGG_BYGGERE = (
     'koTavleBesokHtml',
     'koTavleIkkeVaertHtml',
     'koTavleOppsettHtml',
+    # Runde 2 (23. sep. 2026): ◀ Nå ▶ over tavla og tidslinja.
+    'koTidKontrollHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.

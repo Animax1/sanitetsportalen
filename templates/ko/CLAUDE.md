@@ -18,10 +18,17 @@ før koden — de er målet): `Hendelseslogg │ Loggstrøm` øverst, `Ressursov
 Oppdragsliste` nederst. «Tre kolonner er taket» fra 17. sep. ble opphevet av André samme
 dag som hendelsene ble en egen flate. Prinsippet — alt synlig samtidig, ingen faner — står.
 **Tavla er det femte vinduet og deler plass med ressursoversikten** (22. sep. 2026, `KO_PAR`):
-den som ikke står i rutenettet står i stripa, og «⇄» i hodet bytter. **Planleggeren er det
-sjette, og deler plass med oppdragslista** (23. sep. 2026 — André: «inni i ko rutenettet med
-samme løsning som tavlen, at den er minimert»): parkert som standard, og da kan tavla og
-planleggeren stå side om side i nederste rad.
+den som ikke står i rutenettet står i stripa, og «⇄» i hodet bytter. **Konsertplanleggeren
+er det sjette, og deler plass med oppdragslista** (23. sep. 2026 — André: «inni i ko
+rutenettet med samme løsning som tavlen, at den er minimert»): parkert som standard, og da
+kan tavla og planleggeren stå side om side i nederste rad. Den het «Planlegger» til runde 2.
+
+**Hvert vindu kan åpnes for seg** (runde 2, André: «Den funksjonaliteten må gjelde alle
+vinduer vi har i flaten vår»). Samme side med `?vindu=<navn>` (`koEgetVinduNavn`, bare et
+kjent navn), ikke en egen mal — ett sted vinduet tegnes. Der vises bare det vinduet, og
+oppsettet **lagres ikke**: det er hovedvinduets. I hovedvinduet skjules det og står i
+stripa; det siste synlige blir stående, og står da to steder. Tidslinja synkes mellom
+vinduene over `BroadcastChannel('ko-tid')`.
 
 **Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
 Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad
@@ -140,8 +147,9 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 | **Klikk laget, så raden** — og Enter, og Esc | Samme handling for den som ikke kan dra. `koTavleKlikk` er den ene inngangen |
 | **Klikket etter et drag svelges** (`koTavleSvelgKlikk`) | Det lander på felles forelder og ville ellers valgt noe |
 | Bare `koTavleKanDras` får `data-dras` | En knapp som fører til en vegg er verre enn ingen knapp — `les` og de opptatte får ingen |
-| **Nå står ved to tredjedeler** (`koTavleVindu`) | Det meste av vinduet er det som har skjedd |
-| Åpne og opptatte stolper **slutter ved nå** og vokser bakover til `max(72px, …)` | En stolpe forbi nå-streken ser ut som en plan |
+| **¼ før nå som standard** (`koTavleVindu`, `andel_bak` fra KO-leder); var ⅔ til runde 2 | «se lenger frem i tid enn bakover» (André) |
+| **Ett tidsvindu for tavla og konsertplanleggeren**: `koTidAnker` er starten når noen har rullet, `null` følger nå. ◀ Nå ▶ (`koTidNyttAnker`, `steg_min`), dra på aksen (`[data-tid-akse]`, `koTidEtterDrag`). Nå utenfor gir «Du ser ikke nå · Tilbake til nå», og ingen nå-strek klemt til kanten | «går jeg frem i tid på planleggeren, skjer det samme med tavlen». Ikke i `localStorage`: en fane som lastes, følger nå |
+| Stolpene **vokser framover** fra starten til `max(72px, …)`; den åpne ligger over sin stiplede slutt | Til runde 2 vokste de bakover, og navnet sto «i fortid» |
 | **Ingen `min-width` på rutenettet** | Tavla står ofte i den smale plassen; rullet tidslinja vannrett, forsvant nå-streken |
 | Poller hvert 15. s **bare når den står framme**, tegner nå-streken hvert minutt | `koTegnOppsett` kaller `koTavleSynligNaa`, så en tavle som hentes fram viser nå |
 | Filteret er vaktlistas ressursgrupper, huskes per nettleser (`ko.tavle.filter`) | Gruppene finnes alt; fire faste valg ville vært en taksonomi til |
@@ -149,7 +157,7 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 | **Retting er et skjema, ikke et dra i kanten** (skisse 3). Klokkeslett, ikke dato: `koTavleTidNaer` gir nærmeste tidspunkt rundt det som rettes | Et feildrag på en travel tavle skal ikke flytte historikken stille; «20:00» på en vakt over midnatt betyr nesten alltid den nærmeste |
 | «Til» er låst på den åpne og der en hendelse tok over (`koTavleSkjemaData`) | Hendelsen eier tida videre |
 | Et åpent skjema tegnes ikke om av pollen | Ellers tømmes feltet under fingrene |
-| Planlagt pause: stiplet i Pause-raden, «Pause nå» fra ti minutter før (`koTavlePauseStatus`), på stolpen og på kortet i «Uten plass» | KO starter den; tavla flytter ingen av seg selv. Rød kant når tida gikk uten at den ble tatt |
+| **«+ Planlegg» i hver rad** (runde 2): stiplet i raden den skal til — Pause-raden eller stedet. «Pause nå»/«Flytt nå» fra ti minutter før (`koTavlePauseStatus`), på stolpen og kortet i «Uten plass». Lagene er hele vaktlista (`alle_ressurser`), biler bare på et sted; klokkeslettene leses nær der tidslinja står (`ref`) | KO trykker; tavla flytter ingen. Rød kant når tida gikk |
 | Vaktlistas pause har id `v<pk>` — `koTavlePauseRef()` leser begge formene; `title` sier «fra vaktlista» eller «endret i drift» (prikket kant) | `Number('v12')` er NaN, og da åpnet klikket ingenting |
 | **Planlagt slutt**: stiplet fra nå til slutten (`koTavleSluttHtml`), klikk åpner skjemaet; ute av tida gir rød kant, «N min over» og «N over» på raden. `koTavleSlutt` er regelen. Feltet står i «Tider og slutt» for den åpne, og tomt er ingen plan | Overtid er et tegn, ikke en handling. Den stiplede holder banen, så neste stolpe ikke legges oppå |
 | **«Besøk»** er en visning i samme vindu, regnet i nettleseren av vaktas plasseringer (`koTavleBesok`). Døgnet fra døgnstarten; nuller øverst på et fulgt sted | Alt ligger alt i svaret — ingen egen spørring å holde i takt |
@@ -160,21 +168,23 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 bare med `les` i oppdragsmodulen — både i svaret og ved flytting (404: en bil man ikke får
 se, finnes ikke). Flytting er `skriv_full` i KO.
 
-## Planleggeren og programmet på tavla (23. sep. 2026)
+## Konsertplanleggeren og programmet på tavla (23. sep. 2026)
 
 `static/js/ko-plan.js`, vinduet `plan`. Reglene i `ko/program.py` (se `ko/CLAUDE.md`).
+**Tidslinja er tavlas** (`koTidVindu`) fra runde 2; døgnknappene er borte, og «Liste»
+viser hele programmet døgn for døgn (`koPlanDognListe`).
 
 | Valg | Hvorfor |
 |---|---|
-| **Døgnet og klokkeslettet, ikke dato-og-tid**: `koPlanTid` legger et klokkeslett før døgnstarten i natta etter; `koPlanTil` er første gang klokka viser «til» etter «fra» | «01:00 fredag» er natt til lørdag, som i «Besøk». 22:00–22:00 er et døgn, ikke null |
-| Døgnvalget er noen døgn fra vaktstart **pluss hvert døgn som har en konsert** (`koPlanDognene`) | Ingenting i programmet skal stå utenfor det man kan velge |
+| **Døgnet og klokkeslettet, ikke dato-og-tid**: `koPlanTid` legger et klokkeslett før døgnstarten i natta etter; `koTavleTilEtter` er første gang klokka viser «til» etter «fra» | «01:00 fredag» er natt til lørdag, som i «Besøk». 22:00–22:00 er et døgn, ikke null |
+| Skjemaets døgnvalg: noen døgn fra vaktstart, **hvert døgn med en konsert**, og døgnet tidslinja står i (`koPlanValgtDogn`). «Artist» er nedtrekket, navnet valgfritt | Ingenting i programmet skal stå utenfor det man kan velge |
 | Stedene kommer med programsvaret (`steder`), ikke fra sentralbordets `lokasjoner` | Den som har KO uten oppdragstilgang skal kunne se programmet. Et inaktivt sted posten alt står på, tilbys likevel |
 | `koPlanKropp` sier fra ved knappen (`{feil}`); tomt antall er null og tas ut | Samme regel som «Velg…» ellers |
 | Bare KO-leder får «+ Konsert» og klikk på en post (`koPlanKanLede` → `koKanFjerne`) | En knapp som fører til en vegg er verre enn ingen |
 | **Båndene bak radene** (`koTavleProgram`, `koTavleKonsertHtml`): skravur og kant i beredskapsfargen, `ko-beredskap-<nivå>`; ukjent nivå får ingen farge | Samme form som skissene, og en annen enn prioriteten på hendelsene — så «rødt» ikke betyr to ting |
 | **Behovet i drift** (`koTavleBehovNaa`, steg 3): «Lag 2/4» under stedsnavnet for konsertene som pågår eller begynner innen `KO_TAVLE_BEHOV_FORVARSEL_MIN` (30). Teller åpne plasseringer på stedet **og** de som er opptatt der (hendelse, oppdrag); to konserter samtidig legges sammen; gruppa matches på navn når id-en er borte | Lagene skal være på plass når konserten starter. Opptatt der er fortsatt der |
 | **«Følg konserten»** i «Tider og slutt»: konsertene på stedet som ikke er over; valgt sendes `folger_id`, ikke en egen tid | Flyttes konserten, følger slutten med |
-| **Tidslinja** (steg 4, standardvisningen; «liste» er den andre): døgnet fra døgnstarten, **bare stedene som har noe i døgnet**, i stedslistas rekkefølge; overlappende konserter på samme sted får hver sin bane (`koPlanTidslinje`) | Tabletoppen — hele døgnet på ett blikk, samme form som tavla |
-| **Dekningsstripa**: behovet time for time (`koPlanBehovPerTime`) mot vaktlistas tall (`/ko/api/program/dekning/`). **En konsert teller i hver time den berører**; «for få» bare når vaktlistas tall er kjent; fanene er gruppene med behov i døgnet | Forsiktig med vilje: stripa sier heller «for få» enn «nok» når den er i tvil. Uten vaktlistetilgang sier den hvorfor, i stedet for å vise null |
+| **Tidslinja** (standardvisningen): tavlas vindu, **bare stedene som har noe i det**, i stedslistas rekkefølge; overlappende konserter på samme sted får hver sin bane (`koPlanTidslinje`) | Samme form og samme tid som tavla |
+| **Dekningsstripa**: behovet per hele time i vinduet (`koPlanTimene`, `koPlanBehovPerTime`) mot vaktlistas tall (`…/dekning/?fra=&timer=`), søylene plassert i prosent under tidslinja. Hentes ikke mens aksen dras. **En konsert teller i hver time den berører** | Heller «for få» enn «nok» i tvil. Uten vaktlistetilgang sier den hvorfor |
 | **«Etterpå»** (steg 5, tredje visning, `koPlanEtterpaaHtml`): konsert, beredskap, behov (med «opprinnelig» bare når det er endret), faktisk på stedet, oppdrag og antall endringer; historikken under, nyeste først. Vaktvelgeren og «Kopier programmet hit» bare for KO-leder, og kopien ikke fra aktiv vakt | Plan mot faktisk er der man ser om behovet holdt. Kopiering fra seg selv er et feilklikk |
 | Standardfargen står i `var(--bf, …)`, ikke som `--bf` på grunnregelen | Satt der, vant den over `.ko-beredskap-*` senere i fila, og merket ble grått |

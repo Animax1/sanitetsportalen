@@ -177,6 +177,11 @@
               <i class="bi bi-plus-lg me-1"></i>Ny hendelse
             </button>
             {% endif %}
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koApneEgetVindu" data-arg="hendelser"
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne hendelsesloggen i eget vindu">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </button>
             <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="hendelser"
                   title="Skjul vinduet" aria-label="Skjul hendelsesloggen">
@@ -212,6 +217,11 @@
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="meldinger">Meldinger</button>
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="system">System</button>
           </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koApneEgetVindu" data-arg="logg"
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne loggstrømmen i eget vindu">
+            <i class="bi bi-box-arrow-up-right"></i>
+          </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="logg"
                   title="Skjul vinduet" aria-label="Skjul loggstrømmen">
@@ -304,6 +314,11 @@
             <i class="bi bi-arrow-left-right me-1"></i>Tavle
           </button>
           {% endif %}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koApneEgetVindu" data-arg="ressurser"
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne ressursoversikten i eget vindu">
+            <i class="bi bi-box-arrow-up-right"></i>
+          </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="ressurser"
                   title="Skjul vinduet" aria-label="Skjul ressursoversikten">
@@ -371,14 +386,19 @@
               <i class="bi bi-clock-history me-1"></i>Historikk
             </button>
           </span>
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koApneEgetVindu" data-arg="oppdrag"
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne oppdragslista i eget vindu">
+            <i class="bi bi-box-arrow-up-right"></i>
+          </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="oppdrag"
                   title="Skjul vinduet" aria-label="Skjul oppdragslista">
             <i class="bi bi-eye-slash"></i>
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
-                  data-action="koByttPar" data-arg="oppdrag" title="Bytt til planleggeren">
-            <i class="bi bi-arrow-left-right me-1"></i>Planlegger
+                  data-action="koByttPar" data-arg="oppdrag" title="Bytt til konsertplanleggeren">
+            <i class="bi bi-arrow-left-right me-1"></i>Konsertplanlegger
           </button>
 
           {% endif %}
@@ -428,6 +448,11 @@
                     data-action="koByttPar" data-arg="tavle" title="Bytt til ressursoversikten">
               <i class="bi bi-arrow-left-right me-1"></i>Ressursoversikt
             </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-action="koApneEgetVindu" data-arg="tavle"
+                    title="Åpne i eget vindu — for skjerm to" aria-label="Åpne tavla i eget vindu">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </button>
             <button type="button" class="btn btn-outline-secondary btn-sm ko-skjul-knapp"
                     data-action="koSkjulVindu" data-arg="tavle"
                     title="Skjul vinduet" aria-label="Skjul tavla">
@@ -447,7 +472,7 @@
         </div>
       </section>
 
-      {# ═════ PLANLEGGER (23. sep. 2026) ═════ #}
+      {# ═════ KONSERTPLANLEGGER (23. sep. 2026) ═════ #}
       {% comment %}
         Deler plass med oppdragslista (`KO_PAR` i ko-layout.js) og står parkert
         som standard. Programmet er KOs: alle med `les` ser det, KO-leder
@@ -456,16 +481,15 @@
       <section class="ko-vindu d-none" id="ko-vindu-plan" data-vindu="plan">
         <div class="ko-vindu-hode">
           <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
-          <i class="bi bi-calendar-range"></i><span class="ko-vindu-tittel">Planlegger</span>
+          <i class="bi bi-calendar-range"></i><span class="ko-vindu-tittel">Konsertplanlegger</span>
           <span class="ko-vindu-tall" id="ko-plan-antall"></span>
-          <div class="btn-group btn-group-sm ms-2 flex-wrap" role="group" aria-label="Døgn" id="ko-plan-dogn-valg"></div>
           <div class="btn-group btn-group-sm ms-1" role="group" aria-label="Visning">
             <button type="button" class="btn btn-outline-secondary active" data-action="koPlanVelgVisning"
-                    data-arg="tidslinje" title="Døgnet som tidslinje, med dekningen under">
+                    data-arg="tidslinje" title="Tidslinja — samme tid som tavla — med dekningen under">
               <i class="bi bi-bar-chart-steps"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary" data-action="koPlanVelgVisning"
-                    data-arg="liste" title="Konsertene som liste">
+                    data-arg="liste" title="Hele programmet som liste, døgn for døgn">
               <i class="bi bi-list-ul"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary" data-action="koPlanVelgVisning"
@@ -483,9 +507,14 @@
                     data-action="koByttPar" data-arg="plan" title="Bytt til oppdragslista">
               <i class="bi bi-arrow-left-right me-1"></i>Oppdragsliste
             </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-action="koApneEgetVindu" data-arg="plan"
+                    title="Åpne i eget vindu — for skjerm to" aria-label="Åpne konsertplanleggeren i eget vindu">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </button>
             <button type="button" class="btn btn-outline-secondary btn-sm ko-skjul-knapp"
                     data-action="koSkjulVindu" data-arg="plan"
-                    title="Skjul vinduet" aria-label="Skjul planleggeren">
+                    title="Skjul vinduet" aria-label="Skjul konsertplanleggeren">
               <i class="bi bi-eye-slash"></i>
             </button>
           </span>

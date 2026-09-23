@@ -620,12 +620,13 @@ class PorteneSteg2Tests(PorteneTests):
         url = '/ko/api/tavle/oppsett/'
         kropp = {'skjulte': [self.club.pk], 'fulgte': [self.park.pk]}
         d = self._klient('les').get(url).json()['data']
-        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in d],
+        self.assertEqual((d['andel_bak'], d['steg_min']), (25, 120))
+        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in d['lokasjoner']],
                          [('Club Venue', True, False), ('Parkscene', True, False)])
         self.assertEqual(self._klient('skriv_full').put(url, kropp, content_type='application/json').status_code, 403)
         r = self._klient('skriv_leder').put(url, kropp, content_type='application/json')
         self.assertEqual(r.status_code, 200, r.content)
-        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in r.json()['data']],
+        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in r.json()['data']['lokasjoner']],
                          [('Club Venue', False, False), ('Parkscene', True, True)])
         self.assertEqual(self._klient(None).get(url).status_code, 403)
 

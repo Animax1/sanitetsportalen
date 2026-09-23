@@ -367,19 +367,44 @@ def sett_planlagt_slutt(plassering, til, *, naa=None) -> Tavleplassering:
 MAKS_PAUSE = timedelta(hours=4)
 
 
+def paa_vakt_ved(ressurs, tidspunkt, naa) -> bool:
+    """Kan ressursen planlegges fra `tidspunkt`? **På tavla nå, eller med et
+    skift i vaktlista som dekker starten** — en plan for i morgen gjelder laget
+    som går vakt i morgen, ikke det som står på tavla nå. Samme regel for
+    skiftene som resten av portalen (`ressurser_med_skift`)."""
+    from vaktliste.services import ressurser_med_skift, vaktliste_i_bruk
+
+    if ressurs.pk in {r.pk for r in ressurser_paa_tavla(naa)}:
+        return True
+    liste = vaktliste_i_bruk()
+    return liste is not None and ressurser_med_skift(liste, tidspunkt).filter(pk=ressurs.pk).exists()
+
+
 @transaction.atomic
-def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None) -> PlanlagtPause:
-    """Ny planlagt pause, eller `pause` endret. **Flytter ingen** — se
-    `PlanlagtPause`."""
+def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None,
+                   lokasjon=None) -> PlanlagtPause:
+    """Ny planlagt plassering — i Pause-raden, eller på `lokasjon` — eller
+    `pause` endret. **Flytter ingen** — se `PlanlagtPause`.
+
+    Navnet er pausens fordi det var den første planen tavla fikk; siden 23.
+    sep. 2026 er det «+ Planlegg» på alle rader (André). Stedet settes når
+    planen lages og endres ikke: å flytte planen til et annet sted er en ny
+    plan.
+    """
     naa = naa or timezone.now()
     if pause is not None and pause.startet_id:
-        raise Ugyldig('Pausen er startet. Rett plasseringen i Pause-raden i stedet.')
-    if pause is None and ressurs.pk not in {r.pk for r in ressurser_paa_tavla(naa)}:
-        raise Ugyldig(f'{ressurs.navn} er ikke på vakt nå.')
+        raise Ugyldig('Planen er startet. Rett plasseringen på tavla i stedet.')
+    if pause is None and lokasjon is not None and not lokasjon.er_aktiv:
+        raise Ugyldig('Lokasjonen er ikke aktiv.')
+    if pause is None and not paa_vakt_ved(ressurs, fra, naa):
+        raise Ugyldig(f'{ressurs.navn} har ikke skift i vaktlista kl. {_klokke(fra)}.')
     if til <= fra:
         raise Ugyldig('«Til» må være etter «fra».')
-    if til - fra > MAKS_PAUSE:
+    er_pause = pause.pause if pause is not None else lokasjon is None
+    if er_pause and til - fra > MAKS_PAUSE:
         raise Ugyldig('En pause kan ikke være lengre enn fire timer.')
+    if not er_pause and til - fra > MAKS_PLANLAGT:
+        raise Ugyldig('En planlagt plassering kan ikke vare mer enn et døgn.')
     if til <= naa:
         raise Ugyldig('Pausen er alt over — en plan gjelder det som kommer.')
     # En pause KO har tatt bort (`avlyst`) står bare som en merkelapp over
@@ -390,11 +415,13 @@ def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None) -> 
         andre = andre.exclude(pk=pause.pk)
     kollisjon = andre.first()
     if kollisjon is not None:
-        raise Ugyldig(f'{ressurs.navn} har alt en pause {_klokke(kollisjon.fra)}–'
+        raise Ugyldig(f'{ressurs.navn} har alt en plan {_klokke(kollisjon.fra)}–'
                       f'{_klokke(kollisjon.til)}.')
     if pause is None:
         return PlanlagtPause.objects.create(
             vakt=vakt, ressurs=ressurs, ressurs_navn=ressurs.navn, fra=fra, til=til,
+            pause=lokasjon is None, lokasjon=lokasjon,
+            lokasjon_navn=getattr(lokasjon, 'navn', '') or '',
             av=_bruker(bruker), av_navn=_navn(bruker))
     pause.fra, pause.til = fra, til
     # En vaktlistepause KO har flyttet, er «endret i drift» — og derfra KOs.
@@ -456,17 +483,24 @@ def effektive_pauser(vakt, liste=None) -> list[dict]:
         'startet': q.startet_id is not None,
         'av_navn': q.av_navn,
         'kilde': 'endret' if q.endret else ('vaktliste' if q.fra_vaktliste_id else 'ko'),
+        # `None` er Pause-raden. Et sted som er slettet, gir også `None` —
+        # men da er `pause` usann, og planen står i ingen rad.
+        'pause': q.pause,
+        'lokasjon_id': q.lokasjon_id,
+        'lokasjon_navn': q.lokasjon_navn,
     } for q in aktive]
     liste = vaktliste_i_bruk() if liste is None else liste
     if liste is not None:
         for p in Pause.objects.filter(ressurs__vaktliste=liste).select_related('ressurs'):
             if p.pk in overtatt:
                 continue
-            if any(q.ressurs_id == p.ressurs_id and q.fra < p.til and p.fra < q.til for q in aktive):
+            if any(q.pause and q.ressurs_id == p.ressurs_id and q.fra < p.til and p.fra < q.til
+                   for q in aktive):
                 continue
             ut.append({'id': f'{VAKTLISTE_PREFIKS}{p.pk}', 'ressurs_id': p.ressurs_id,
                        'ressurs_navn': p.ressurs.navn, 'fra': p.fra, 'til': p.til,
-                       'startet': False, 'av_navn': '', 'kilde': 'vaktliste'})
+                       'startet': False, 'av_navn': '', 'kilde': 'vaktliste',
+                       'pause': True, 'lokasjon_id': None, 'lokasjon_navn': ''})
     ut.sort(key=lambda d: (d['fra'], str(d['id'])))
     return ut
 
@@ -485,24 +519,37 @@ def overta_pause(vakt, vaktliste_pause, *, bruker) -> PlanlagtPause:
 
 @transaction.atomic
 def start_pause(pause, *, bruker, naa=None) -> Tavleplassering:
-    """«Pause nå»: laget går i Pause-raden, og planen peker på plasseringen.
+    """«Pause nå» og «Flytt nå»: laget går dit planen sier, og planen peker på
+    plasseringen. KO trykker — tavla flytter ingen av seg selv (André, 23. sep.
+    2026: «KO skal trykke flytt nå»).
 
-    **Står laget alt i pause**, knyttes planen til den — KO dro det dit før
-    hun så knappen, og det er samme pause.
+    **Står laget alt der**, knyttes planen til den plasseringen — KO dro det
+    dit før hun så knappen, og det er samme plan. **Planens slutt blir
+    plasseringens planlagte slutt**, så overtiden vises på tavla som for alt
+    annet med en slutt.
     """
     naa = naa or timezone.now()
     pause = PlanlagtPause.objects.select_for_update().get(pk=pause.pk)
     if pause.startet_id:
-        raise Ugyldig('Pausen er alt startet.')
+        raise Ugyldig('Planen er alt startet.')
     if pause.ressurs is None:
         raise Ugyldig('Ressursen finnes ikke lenger i vaktlista.')
+    if not pause.pause and pause.lokasjon is None:
+        raise Ugyldig(f'Stedet «{pause.lokasjon_navn}» finnes ikke lenger.')
     naavaerende = aapen(pause.ressurs)
-    if naavaerende is not None and naavaerende.pause:
+    der_alt = naavaerende is not None and (
+        naavaerende.pause if pause.pause
+        else (not naavaerende.pause and naavaerende.lokasjon_id == pause.lokasjon_id))
+    if der_alt:
         plassering = naavaerende
-    else:
+    elif pause.pause:
         plassering = plasser(pause.vakt, pause.ressurs, bruker=bruker, pause=True, naa=naa)
+    else:
+        plassering = plasser(pause.vakt, pause.ressurs, bruker=bruker, lokasjon=pause.lokasjon, naa=naa)
     pause.startet = plassering
     pause.save(update_fields=['startet'])
+    if pause.til > naa and plassering.planlagt_til is None and plassering.folger_id is None:
+        plassering = sett_planlagt_slutt(plassering, min(pause.til, naa + MAKS_PLANLAGT), naa=naa)
     return plassering
 
 
@@ -525,6 +572,55 @@ STANDARD_DOGNSTART = '06:00'
 #: som alt annet et menneske har bestemt.
 SKJULTE_NOKKEL = 'ko.tavle_skjulte'
 FULGTE_NOKKEL = 'ko.tavle_fulgte'
+
+
+#: **Rullingen** (André, 23. sep. 2026: «la admin og ko-leder kunne justere på
+#: rulling»). Hvor stor del av vinduet som ligger før nå — ¼ som standard, så
+#: det meste er framover — og hvor langt ◀ og ▶ flytter. Satt i
+#: KO-innstillingene («Tavla»), som er KO-lederens og admins.
+ANDEL_BAK_NOKKEL = 'ko.tavle_andel_bak'
+ANDEL_BAK_MIN, ANDEL_BAK_MAKS, STANDARD_ANDEL_BAK = 0, 50, 25
+STEG_NOKKEL = 'ko.tavle_steg_min'
+STEG_MIN, STEG_MAKS, STANDARD_STEG = 15, 720, 120
+
+
+def _klemt_tall(nokkel, standard, lav, hoy) -> int:
+    from core.models import AppSetting
+    try:
+        verdi = int(AppSetting.get(nokkel, standard))
+    except (TypeError, ValueError):
+        return standard
+    return max(lav, min(hoy, verdi))
+
+
+def andel_bak() -> int:
+    """Prosent av vinduet før nå."""
+    return _klemt_tall(ANDEL_BAK_NOKKEL, STANDARD_ANDEL_BAK, ANDEL_BAK_MIN, ANDEL_BAK_MAKS)
+
+
+def steg_min() -> int:
+    """Minutter ◀ og ▶ flytter vinduet."""
+    return _klemt_tall(STEG_NOKKEL, STANDARD_STEG, STEG_MIN, STEG_MAKS)
+
+
+def lagre_rulling(*, andel, steg) -> None:
+    """Avvises utenfor grensene, ikke klemt stille: en verdi som ble lagret
+    annerledes enn hun skrev den, er en innstilling hun tror hun har."""
+    from core.models import AppSetting
+    try:
+        andel, steg = int(andel), int(steg)
+    except (TypeError, ValueError):
+        raise Ugyldig('Andel og steg må være hele tall.') from None
+    if not ANDEL_BAK_MIN <= andel <= ANDEL_BAK_MAKS:
+        raise Ugyldig(f'Andelen bak nå må være mellom {ANDEL_BAK_MIN} og {ANDEL_BAK_MAKS} prosent.')
+    if not STEG_MIN <= steg <= STEG_MAKS:
+        raise Ugyldig(f'Steget må være mellom {STEG_MIN} og {STEG_MAKS} minutter.')
+    AppSetting.set(ANDEL_BAK_NOKKEL, str(andel))
+    AppSetting.set(STEG_NOKKEL, str(steg))
+
+
+def rulling() -> dict:
+    return {'timer': timer(), 'andel_bak': andel_bak(), 'steg_min': steg_min(), 'dognstart': dognstart()}
 
 
 def timer() -> int:
@@ -624,6 +720,8 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         'naa': naa.isoformat(),
         'timer': timer(),
         'dognstart': dognstart(),
+        'andel_bak': andel_bak(),
+        'steg_min': steg_min(),
         'vakt_start': _iso(vakt.startet),
         'fulgte': fulgte(),
         'rader': [{'id': l.pk, 'navn': l.navn}
@@ -659,5 +757,23 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         # Programmet (steg 2): båndene bak radene, og det «følger konserten»
         # kan velge mellom.
         'program': program_poster(vakt),
+        # **Alle som kan planlegges**, ikke bare dem på tavla nå: en plan for i
+        # morgen gjelder lagene som går vakt i morgen. Serveren sjekker skiftet
+        # (`paa_vakt_ved`); lista er bare nedtrekket.
+        'alle_ressurser': _planbare(med_biler),
     }
+
+
+def _planbare(med_biler) -> list[dict]:
+    from vaktliste.models import Ressurs
+    from vaktliste.services import vaktliste_i_bruk
+
+    liste = vaktliste_i_bruk()
+    if liste is None:
+        return []
+    qs = Ressurs.objects.filter(vaktliste=liste).select_related('gruppe')
+    if not med_biler:
+        qs = qs.filter(enhet__isnull=True)
+    return [{'id': r.pk, 'navn': r.navn, 'gruppe_id': r.gruppe_id, 'bil': r.enhet_id is not None}
+            for r in qs.order_by('gruppe__rekkefolge', 'gruppe__navn', 'rekkefolge', 'navn')]
 

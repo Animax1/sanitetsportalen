@@ -29,7 +29,8 @@ class _Program(_Grunnlag):
         self.leder = _bruker('kolederen')
         self.lag = gruppe(LAG)
         self.amb = gruppe(AMBULANSE)
-        self.headliner = Konserttype.objects.get(navn='Headliner')
+        # Artistlista er tom etter `0021`; testene lager sin egen «Headliner».
+        self.headliner = Konserttype.objects.create(navn='Headliner')
         self.pyro = Kjennetegn.objects.get(navn='Pyro')
         naa = timezone.now()
         self.fra = naa + timedelta(hours=1)
@@ -50,10 +51,34 @@ class _Program(_Grunnlag):
 
 class ForslagetTests(_Program):
 
-    def test_forslaget_til_typer_og_kjennetegn_er_lagt_inn(self):
-        """André: «vi kommer med et forslag som vi kan justere». Pyro først."""
+    def test_forslaget_til_kjennetegn_er_lagt_inn_og_typeforslagene_er_borte(self):
+        """André: «vi kommer med et forslag som vi kan justere». Pyro først.
+        Typeforslagene ble fjernet da typene ble artister (`0021`) — de er
+        ikke artister, og sto ubrukt."""
         self.assertEqual(Kjennetegn.objects.order_by('rekkefolge').first().navn, 'Pyro')
-        self.assertTrue(Konserttype.objects.filter(navn='Fast post (ikke konsert)').exists())
+        self.assertFalse(Konserttype.objects.filter(navn='Fast post (ikke konsert)').exists())
+
+    def test_et_typeforslag_i_bruk_blir_staaende(self):
+        """`0021` fjerner bare de ubrukte: en konsert som peker på «Pop» skal
+        ikke miste typen sin."""
+        import importlib
+
+        from django.apps import apps
+        m = importlib.import_module('ko.migrations.0021_artister_uten_typeforslag')
+        pop = Konserttype.objects.create(navn='Pop')
+        Konserttype.objects.create(navn='Rock / metal')
+        egen = Konserttype.objects.create(navn='Kaizers')
+        self._lagre(konserttype_id=pop.pk)
+        m.fjern_ubrukte_typeforslag(apps, None)
+        # «Headliner» (fra `setUp`) er ubrukt og går også.
+        self.assertEqual(sorted(Konserttype.objects.values_list('navn', flat=True)), ['Kaizers', 'Pop'])
+        self.assertTrue(Konserttype.objects.filter(pk=egen.pk).exists())
+
+    def test_uten_navn_er_artisten_navnet_og_uten_begge_er_det_en_feil(self):
+        post = self._lagre(navn='')
+        self.assertEqual(post.navn, 'Headliner')
+        with self.assertRaisesRegex(services.Ugyldig, 'artist eller et navn'):
+            self._lagre(navn='  ', konserttype_id=None)
 
 
 class LagrePostTests(_Program):
@@ -88,7 +113,7 @@ class LagrePostTests(_Program):
 
     def test_ugyldige_verdier_avvises_og_ingenting_lagres(self):
         ugyldige = {
-            'tomt navn': dict(navn='  '),
+            'tomt navn uten artist': dict(navn='  ', konserttype_id=None),
             'for langt navn': dict(navn='x' * 121),
             'ukjent sted': dict(lokasjon_id=99999),
             'sted som ikke er et tall': dict(lokasjon_id='tull'),
