@@ -648,7 +648,13 @@ function _statusvalg(status) {
     .filter((s) => s !== status);
   const bak = alle.filter((s) => STATUS_RANG[s] < rang
     || (STATUS_RANG[s] === rang && s !== status));
-  return { bak, foran: alle.filter((s) => !bak.includes(s)) };
+  const foran = alle.filter((s) => !bak.includes(s));
+  // **«Avbrutt»** (bestilt 22. sep. 2026): bilen melder på samband at den
+  // avbryter. Ikke en status i kjeden, men bilens Avbryt-knapp ført av
+  // sentralbordet — ledig, og oppdraget trenger ny ressurs. Bare der bilen
+  // selv har knappen (`AVBRYT_FRA`, fra serveren).
+  if ((globalThis.window?.OPPDRAG_AVBRYT_FRA || []).includes(status)) foran.push('avbryt');
+  return { bak, foran };
 }
 
 function _nesteStatus(status) {
@@ -733,7 +739,8 @@ function visFoerStatus(enhetId) {
   const { bak, foran } = _statusvalg(e.status);
   // Forvalget er neste ledd — og for den som er ledig, statusen hun sto i før.
   const valgt = _nesteStatus(e.status) || _forrigeStatus(enhetId, e.status) || bak[bak.length - 1];
-  const valg = (st) => `<option value="${escHtmlValue(st)}"${st === valgt ? ' selected' : ''}>${escapeHtml(navn[st] || st)}</option>`;
+  const etikett = (st) => (st === 'avbryt' ? 'Avbrutt — trenger ny ressurs' : (navn[st] || st));
+  const valg = (st) => `<option value="${escHtmlValue(st)}"${st === valgt ? ' selected' : ''}>${escapeHtml(etikett(st))}</option>`;
   const gruppe = (etikett, liste) => (liste.length
     ? `<optgroup label="${escHtmlValue(etikett)}">${liste.map(valg).join('')}</optgroup>` : '');
   const statusvalg = gruppe('Videre', foran) + gruppe('Tilbake til', bak);

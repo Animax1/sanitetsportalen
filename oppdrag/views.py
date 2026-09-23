@@ -132,6 +132,9 @@ def sentralbordkontekst(request) -> dict:
         # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
         'avreist_til': js_json(list(choices.AVREIST_TIL)),
         'status_navn': js_json(choices.STATUS_NAVN),
+        # «Avbrutt» i sentralbordets statusnedtrekk (23. sep. 2026): samme
+        # regel som bilens Avbryt-knapp, fra samme kilde.
+        'avbryt_fra': js_json(sorted(services.AVBRYT_FRA)),
         'hastegrader': choices.HASTEGRAD,
     }
 
@@ -802,7 +805,7 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
     målet tilbake i stedet for å slettes (`services.foer_status`). `venter`
     er derfor et gyldig mål her, selv om ingen stempler den.
     """
-    if overgang not in services.FOERBARE:
+    if overgang not in services.FOERBARE and overgang != choices.AVBRYT:
         return JsonResponse(
             {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'}, status=404)
     if sted and (overgang != choices.AVREIST or sted not in choices.AVREIST_TIL_NAVN):
@@ -826,9 +829,15 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
             tidspunkt = timezone.make_aware(tidspunkt)
 
     try:
-        melding = services.foer_status(
-            oppdrag, enhet, overgang, tidspunkt=tidspunkt, bruker=request.user,
-            sted=sted or '', sted_tekst=_sted_tekst(json_body(request), sted))
+        if overgang == choices.AVBRYT:
+            # «Avbrutt» (23. sep. 2026): ikke en status i kjeden, men bilens
+            # Avbryt-knapp ført av sentralbordet — se `services.foer_avbrutt`.
+            melding = services.foer_avbrutt(oppdrag, enhet, tidspunkt=tidspunkt,
+                                            bruker=request.user)
+        else:
+            melding = services.foer_status(
+                oppdrag, enhet, overgang, tidspunkt=tidspunkt, bruker=request.user,
+                sted=sted or '', sted_tekst=_sted_tekst(json_body(request), sted))
     except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
         # 400, ikke 409: operatøren sitter ved et skjema, og meldingen sier
         # hvilket ledd som mangler eller hvilken nabo som er i veien.

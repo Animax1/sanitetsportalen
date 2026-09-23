@@ -159,13 +159,6 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
       kildefelt på `PlanlagtPause`. Retningen er `ko` → `vaktliste`. Åpent når punktet tas
       opp: pause per plass eller per ressurs, og om den teller i timene.
 
-### KO: «Avbrutt» i sentralbordets nedtrekk — bestilt 22. sep. 2026
-
-- [ ] **KO skal kunne føre «Avbrutt» for en enhet i Rykker ut eller Fremme**, når bilen
-      melder det på samband. I dag kan KO bare sette «Ledig»: da føres det ikke som
-      avbrutt, og oppdraget blir ikke flagget «trenger ny ressurs». Samme regel som bilen
-      (`services.AVBRYT_FRA`, `avbryt_oppdrag`), med operatøren som den som meldte.
-
 ### Oppdraget: endre verdier uten «Rediger» — backlog, 22. sep. 2026
 
 To innspill fra backloggen i portalen, som André vil se på etter menyen, fargen og
@@ -381,16 +374,6 @@ nettleser.
       staging**, og ta §6 (låste felter) og §13 fra en iPhone eller iPad. De punktene
       finnes bare der — `readonly` er uten virkning på `datetime-local`, og Safari
       ignorerer `color` på et deaktivert felt. Funn føres i CHANGELOG med byggnummer.
-
-### Del `oppdrag/CLAUDE.md` — den er på taket (21. sep. 2026)
-
-- [ ] **Oppdragsfila sprengte 22 000-taket 21. sep. 2026, og taket ble hevet i
-      `core/tests_claude_md.py` som en midlertidig avgjørelse — ikke som svaret.** Den
-      står 3 tegn under det hevede taket, så neste regel møter veggen. KO-fila ble delt
-      22. sep. 2026 (se CHANGELOG): flaten til `templates/ko/CLAUDE.md`, som lastes når
-      noen arbeider i `templates/ko/`. **Samme grep passer her** — oppdragsfila har
-      frontendseksjonen (5 194 tegn), og `templates/oppdrag/` er der begge grensesnittene
-      bor. Flytt, ikke skriv om, og la tallet i `FOR_STORE_I_DAG` gå ned etterpå.
 
 ### Teknisk gjeld — kartlagt 13. sep. 2026
 

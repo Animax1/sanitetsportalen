@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — KO fører «Avbrutt» for en bil, og `oppdrag/CLAUDE.md` er delt  `#oppdrag/statusmaskin` `#core/dokumentasjon`
+
+**«Avbrutt» i sentralbordets «Endre status»** (bestilt 22. sep. 2026). Bilen melder på
+samband at den avbryter; før kunne KO bare føre «Ledig», og da ble det ikke ført som
+avbrutt, og oppdraget ble ikke flagget «trenger ny ressurs». Nå står **«Avbrutt — trenger
+ny ressurs»** sist under «Videre» når bilen står i Rykker ut eller Fremme — samme steder
+bilen selv har Avbryt-knappen. Gjelder både `/oppdrag/` og `/ko/` (delt malbit).
+
+`services.foer_avbrutt` er bilens `avbryt_oppdrag` ført av sentralbordet: samme regel
+(`AVBRYT_FRA`, prøvd ett sted), samme «trenger ny ressurs»-logikk og samme
+`Enhetshendelse.AVBRUTT`, men med operatøren som meldt av, meldingen merket `manuell`, og
+tidspunktet prøvd som en ny melding (ikke i framtida, ikke før det bilen alt har meldt).
+Endepunktet er det sentralbordet alt bruker: `POST …/enheter/<id>/status/avbryt/`
+(`skriv_full`). Lista over hvor Avbrutt finnes kommer fra serveren
+(`window.OPPDRAG_AVBRYT_FRA`), så nedtrekket og bilen kan ikke bli uenige. Prøvd i
+Chromium: MB 2 i Fremme → Avbrutt → oppdraget flagget, merket på plass.
+
+**Mutasjoner: 10, alle drept** — sperrene i tjenesten, `manuell` begge ledd, portene i
+viewet, regelen i nedtrekket og linja i malbiten. En dublett ble fjernet før mutasjonene:
+`foer_avbrutt` sjekket `AVBRYT_FRA` selv, og `avbryt_oppdrag` sjekker det samme.
+
+**`oppdrag/CLAUDE.md` er delt** (sto 3 tegn under taket). Frontendseksjonen — de to
+grensesnittene, ressurslista delt med `/ko/`, sentralbordet i `/ko/` — er flyttet ordrett
+til `templates/oppdrag/CLAUDE.md`, som lastes når noen arbeider i `templates/oppdrag/`,
+samme grep som KO-fila fikk dagen før. Kontrollert med skript: hver ikke-tom linje fra før
+står i en av de to filene. Oppdragsfila er nede fra 22 636 til rundt 18 000 tegn, og
+unntaket i `FOR_STORE_I_DAG` er strøket — den står under `MODUL_TEGNGRENSE` som de andre.
+Rota peker på den nye fila i begge tabellene; plassen ble hentet ved å korte rotas egen
+rad («Det som gjelder alle moduler — se overskriftene») i stedet for en regel.
+
 ## 2026-09-22 — KO-tavla, steg 2: planlagte pauser, retting, «Besøk» og innstillingene  `#ko/oppsett`
 
 André: «Ja kjør begge stegene du.» Steg 2 er resten av skissene.

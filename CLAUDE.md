@@ -164,13 +164,14 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 
 | Fil | Lastes når du arbeider i | Innhold |
 |---|---|---|
-| `CLAUDE.md` (denne) | overalt | Arbeidsflyt, mutasjonstesting, modulregistry, tilgangsmodell, rate-limiting, audit, backup, arkiv, avhengighetsretning, frontend, migrasjoner, drift |
+| `CLAUDE.md` (denne) | overalt | Det som gjelder alle moduler — se overskriftene |
 | `patients/CLAUDE.md` | `patients/` | API-mønsteret og viewdelingen |
 | `oppdrag/CLAUDE.md` | `oppdrag/` | Statusmaskinen, verdimengdene, bilens utganger, historikk mot arkiv |
 | `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, offline |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
 | `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
-| `templates/ko/CLAUDE.md` | `templates/ko/` | KOs flate: vinduene, ressursoversikten, sentralbordet i `/ko/` |
+| `templates/ko/CLAUDE.md` | `templates/ko/` | Vinduene, ressursoversikten, tavla |
+| `templates/oppdrag/CLAUDE.md` | `templates/oppdrag/` | Sentralbordet, bilens skjerm, den delte lista |
 | `backlog/CLAUDE.md` | `backlog/` | Angrefristen, de tre nivåene, hvorfor modulen står utenfor vaktscopet |
 
 **Modulfilene lastes ikke alltid, og det er hele poenget — men det koster noe.** Rota leses
@@ -762,9 +763,9 @@ håndhever det på cellebredden.
 | `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
 | `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |
 | `statistikk-oppdrag.js`, `-ko.js`, `-bemanning.js` | `/statistikk/`, **kun** med modultilgang | `statistikk/CLAUDE.md` |
-| `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `oppdrag/CLAUDE.md` |
-| `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
-| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
+| `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `templates/oppdrag/CLAUDE.md` |
+| `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `templates/oppdrag/CLAUDE.md` |
+| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `templates/oppdrag/CLAUDE.md` |
 | `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |

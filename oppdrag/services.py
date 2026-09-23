@@ -926,7 +926,7 @@ def trenger_ny_ressurs(oppdrag, *, utenom_rad) -> bool:
 
 @transaction.atomic
 def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
-                   forsinket: bool = False, enhet=None) -> Statusmelding:
+                   forsinket: bool = False, enhet=None, manuell: bool = False) -> Statusmelding:
     """Bilen trykker «Avbryt» i Rykker ut eller Fremme (André, 12. og 22.
     sep. 2026).
 
@@ -950,7 +950,8 @@ def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
         oppdrag.trenger_ressurs_siden = naa
         oppdrag.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden', 'updated_at'])
     melding = sett_status(oppdrag, choices.LEDIG, bruker=bruker, tidspunkt=naa,
-                          forsinket=forsinket, enhet=rad.enhet, avbrutt=True)
+                          forsinket=forsinket, enhet=rad.enhet, avbrutt=True,
+                          manuell=manuell)
     Enhetshendelse.objects.create(
         oppdrag=oppdrag, enhet=rad.enhet, type=Enhetshendelse.AVBRUTT,
         tidspunkt=naa, av=bruker, varslet_at=rad.varslet_at)
@@ -1353,6 +1354,31 @@ def _valider_tidspunkt(rad, ny_status: str, tidspunkt, beholdte, naa) -> None:
                 f'«{choices.STATUS_NAVN.get(ny_status, ny_status)}» kan ikke være før '
                 f'«{siste.get_status_display()}» '
                 f'({timezone.localtime(siste.tidspunkt).strftime("%H:%M")}).')
+
+
+@transaction.atomic
+def foer_avbrutt(oppdrag, enhet, *, tidspunkt, bruker, naa=None) -> Statusmelding:
+    """Sentralbordet fører «Avbrutt» for en enhet (bestilt 22. sep. 2026).
+
+    Bilen melder på samband at den avbryter, i stedet for å trykke. Før dette
+    kunne KO bare føre «Ledig» — da ble det ikke ført som avbrutt, og
+    oppdraget ble ikke flagget «trenger ny ressurs». **Samme regel og samme
+    tjeneste som bilens knapp** (`avbryt_oppdrag`, bare fra `AVBRYT_FRA`),
+    med operatøren som den som meldte og meldingen merket `manuell`, som
+    alle andre føringer. Tidspunktet prøves som en ny melding i
+    `foer_status`: ikke i framtida, og ikke bak det enheten alt har meldt.
+    """
+    naa = naa or timezone.now()
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    # `AVBRYT_FRA` prøves av `avbryt_oppdrag`, ett sted for bilen og KO.
+    if tidspunkt is None:
+        raise KorreksjonUgyldig('Mangler tidspunkt.')
+    _valider_tidspunkt(rad, choices.LEDIG, tidspunkt,
+                       list(Statusmelding.objects.gjeldende_for_enhet(rad)), naa)
+    return avbryt_oppdrag(oppdrag, bruker=bruker, tidspunkt=tidspunkt,
+                          enhet=rad.enhet, manuell=True)
 
 
 @transaction.atomic

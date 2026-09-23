@@ -102,10 +102,10 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # så de kan krympe og ikke vokse — den neste som trenger plass møter
     # samme vegg, og da er delingen svaret.
     #
-    # **KO-fila er delt** (22. sep. 2026): flaten — vinduene, rutenettet,
-    # ressursoversikten, sentralbordet i `/ko/` — til `templates/ko/CLAUDE.md`,
-    # og raden er borte herfra. Oppdragsfila står igjen.
-    'oppdrag/CLAUDE.md': 22_650,
+    # **Begge er delt**: KO-fila 22. sep. 2026 (flaten til
+    # `templates/ko/CLAUDE.md`) og oppdragsfila 23. sep. (frontendseksjonen til
+    # `templates/oppdrag/CLAUDE.md`, fra 22 636 til under 18 000 tegn). Radene er
+    # borte herfra, og begge står under `MODUL_TEGNGRENSE` som de andre.
 }
 
 #: Over denne størrelsen må en modulfil ha seksjoner. Tallet er der en fil
