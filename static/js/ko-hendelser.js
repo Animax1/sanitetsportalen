@@ -2,7 +2,7 @@
 // ko-hendelser.js — hendelsesloggen: tabellen, hendelsen åpnet i vinduet,
 // skjemaet «Ny hendelse», prioritet, «bli med», og koblingen til oppdragene.
 //
-// Andre av KOs fire filer. Ingenting kjører på toppnivå; ko.js sin
+// Andre av KOs fem filer. Ingenting kjører på toppnivå; ko.js sin
 // `DOMContentLoaded` starter alt. Lista kommer med logg-pollen
 // (`koTaImotHendelser`), kommentarene er logglinjer med `hendelse_id`
 // (`koLinjer` i ko.js), og oppdragene på hendelsen leses fra sentralbordets

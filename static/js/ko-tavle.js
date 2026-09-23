@@ -3,7 +3,7 @@
 // plassert i rutene (André, 22. sep. 2026, etter skissene som ble avtalt før
 // koden).
 //
-// Tredje av KOs fire filer (`KO_JS` i patients/js_test_utils.py). Ingenting
+// Tredje av KOs fem filer (`KO_JS` i patients/js_test_utils.py). Ingenting
 // kjører på toppnivå her — `koTavleStart()` kalles fra `DOMContentLoaded` i
 // ko.js, som er den siste fila.
 //
@@ -149,6 +149,26 @@ function koTavleSlutt(p, naaMs) {
   return { til, over, min: Math.round(Math.abs(naaMs - til) / 60000) };
 }
 
+// Programmet i en rad (steg 2): konsertene på stedet som overlapper vinduet,
+// som bånd bak stolpene. **Beredskapsnivået er en klasse, ikke en farge i
+// koden** — `ko-beredskap-<nivå>` i ko.css — og et ukjent nivå blir stående
+// uten farge i stedet for å låne en.
+function koTavleProgram(data, radId, vindu) {
+  return (data.program || []).filter((k) => k.lokasjon_id === radId).map((k) => {
+    const fra = Date.parse(k.fra);
+    const til = Date.parse(k.til);
+    return { k, fra, til };
+  }).filter((x) => x.fra < vindu.til && x.til > vindu.fra).map(({ k, fra, til }) => ({
+    id: k.id,
+    navn: k.navn,
+    beredskap: ['gronn', 'gul', 'oransje', 'rod'].includes(k.beredskap) ? k.beredskap : '',
+    tekst: [k.navn, k.konserttype_navn, k.beredskap_navn ? 'Beredskap ' + k.beredskap_navn.toLowerCase() : '',
+            koTavleHHMM(fra) + '–' + koTavleHHMM(til)].filter(Boolean).join(' · '),
+    venstre: koTavleProsent(fra, vindu),
+    hoyre: 100 - koTavleProsent(til, vindu),
+  }));
+}
+
 // Radene med stolpene sine. **Pause-raden står øverst og er ikke en
 // lokasjon.** En stolpe er en plassering som overlapper vinduet, eller en
 // ressurs som er opptatt på en hendelse eller et oppdrag med lokasjon —
@@ -233,6 +253,7 @@ function koTavleRader(data, vindu, filter) {
     return { id: rad.id, navn: rad.navn, pause: rad.pause, stolper, baner: Math.max(1, baner.length),
              naa: treff.filter((t) => t.aapen || t.opptatt).length,
              over: stolper.filter((s) => s.slutt && s.slutt.over).length,
+             program: rad.pause ? [] : koTavleProgram(data, rad.id, vindu),
              fulgt: !rad.pause && (data.fulgte || []).includes(rad.id) };
   });
 }
@@ -344,9 +365,20 @@ function koTavleSluttHtml(s, skriv) {
     + escapeHtml(s.slutt.kl) + '</div>';
 }
 
+// Et bånd bak raden: konserten på stedet (steg 2). Samme form som i
+// skissene — skravur og en kant øverst i beredskapsfargen, aldri et fylt
+// merke, så det ikke forveksles med prioriteten på en hendelse.
+function koTavleKonsertHtml(k) {
+  return '<div class="ko-tavle-konsert' + (k.beredskap ? ' ko-beredskap-' + escapeHtml(k.beredskap) : '')
+    + '" style="left:' + escapeHtml(k.venstre.toFixed(2)) + '%;right:' + escapeHtml(k.hoyre.toFixed(2)) + '%"'
+    + ' title="' + escapeHtml(k.tekst) + '"><span class="ko-tavle-konsert-navn">' + escapeHtml(k.navn)
+    + '</span></div>';
+}
+
 function koTavleRadHtml(rad) {
   const hoyde = rad.baner * 28 + 8;
-  const stolper = rad.stolper.map(koTavleStolpeHtml).join('');
+  // Båndene først, så stolpene legger seg over dem.
+  const stolper = [].concat((rad.program || []).map(koTavleKonsertHtml), rad.stolper.map(koTavleStolpeHtml)).join('');
   return '<div class="ko-tavle-rad' + (rad.pause ? ' ko-tavle-pause' : '') + '" tabindex="0" data-tavle-mal="'
     + escapeHtml(rad.id) + '">'
     + '<div class="ko-tavle-radnavn"><span>' + escapeHtml(rad.navn) + '</span>'
@@ -577,6 +609,11 @@ function koTavleSkjemaData(skjema, data, naaMs) {
       // Den planlagte slutten hører bare til den åpne.
       harSlutt: !p.til,
       slutt: p.planlagt_til ? koTavleHHMM(Date.parse(p.planlagt_til)) : '',
+      // «Følger konserten» (steg 2): konsertene på stedet som ikke er over.
+      folger: p.folger_id || null,
+      konserter: p.til || p.pause ? [] : (data.program || [])
+        .filter((k) => k.lokasjon_id === p.lokasjon_id && Date.parse(k.til) > naaMs)
+        .map((k) => ({ id: k.id, tekst: k.navn + ' (til ' + koTavleHHMM(Date.parse(k.til)) + ')' })),
       hint: !p.til ? '«Til» er nå: plasseringen er åpen. Planlagt slutt flytter ingen — når tida er ute, '
         + 'får laget rød kant til det flyttes. Tomt felt er ingen plan.'
         : (hendelseTok ? '«Til» er låst: laget gikk på H' + neste.hendelse_nummer + ', og hendelsen eier tida videre.'
@@ -603,6 +640,9 @@ function koTavleSkjemaData(skjema, data, naaMs) {
 function koTavleSkjemaHtml(d) {
   const valg = velgValg('') + (d.ressurser || [])
     .map((r) => '<option value="' + escapeHtml(r.id) + '">' + escapeHtml(r.navn) + '</option>').join('');
+  // «Følg konserten» (steg 2): konsertene på stedet som ikke er over.
+  const konsertValg = (d.konserter || []).map((k) => '<option value="' + escapeHtml(k.id) + '"'
+    + (k.id === d.folger ? ' selected' : '') + '>Følg ' + escapeHtml(k.tekst) + '</option>').join('');
   const velger = d.ressurser
     ? '<label class="small">Lag <select class="form-select form-select-sm" id="ko-tavle-skjema-ressurs">'
       + valg + '</select></label>'
@@ -613,6 +653,11 @@ function koTavleSkjemaHtml(d) {
     + escapeHtml(d.fra) + '"></label>'
     + '<label class="small">Til <input type="time" class="form-control form-control-sm" id="ko-tavle-skjema-til" value="'
     + escapeHtml(d.til) + '"' + (d.tilLaast ? ' disabled' : '') + '></label>'
+    + (d.harSlutt && konsertValg
+      ? '<label class="small">Slutt <select class="form-select form-select-sm" id="ko-tavle-skjema-folger">'
+        + '<option value=""' + (d.folger ? '' : ' selected') + '>Egen tid</option>' + konsertValg
+        + '</select></label>'
+      : '')
     + (d.harSlutt ? '<label class="small">Planlagt slutt <input type="time" class="form-control form-control-sm"'
       + ' id="ko-tavle-skjema-slutt" value="' + escapeHtml(d.slutt) + '"></label>' : '')
     + '<button type="button" class="btn btn-sm btn-primary" data-action="koTavleLagreSkjema">Lagre</button>'
@@ -758,6 +803,10 @@ function koTavleSkjemaKropp(skjema, data, verdier, naaMs) {
       const til = koTavleTidNaer(Date.parse(p.til), verdier.til);
       if (til === null) return null;
       kropp.til = new Date(til).toISOString();
+    } else if (verdier.folger) {
+      // Følger laget en konsert, er det konsertens slutt som gjelder — og
+      // feltet med egen tid leses ikke.
+      kropp.folger_id = Number(verdier.folger);
     } else {
       // Den planlagte slutten leses nær **nå**: «00:30» kl. 22 er i natt.
       // Tomt er ingen plan, og sendes som det — ikke utelatt, ellers kunne
@@ -800,7 +849,7 @@ async function koTavleLagreSkjema() {
   const verdi = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
   const kropp = koTavleSkjemaKropp(s, koTavle, {
     fra: verdi('ko-tavle-skjema-fra'), til: verdi('ko-tavle-skjema-til'), ressurs: verdi('ko-tavle-skjema-ressurs'),
-    slutt: verdi('ko-tavle-skjema-slutt'),
+    slutt: verdi('ko-tavle-skjema-slutt'), folger: verdi('ko-tavle-skjema-folger'),
   }, Date.now() + koTavleKlokkeavvik);
   if (!kropp) {
     koTavleVisFeil(s.type === 'pause' && !s.id && !verdi('ko-tavle-skjema-ressurs')

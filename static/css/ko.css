@@ -461,6 +461,24 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
 .ko-tavle-stolpe.ko-tavle-over { border: 2px solid #ef4444; box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35); }
 .ko-tavle-over-tekst { font-weight: 700; color: #fecaca; }
 .ko-tavle-slutt-merke { position: absolute; width: 0; height: 24px; border-left: 2px solid #ef4444; z-index: 1; }
+/* Programmet (steg 2): konserten som bånd bak raden. Beredskapsnivået er
+   skravur og en kant øverst — samme farge som standarden, men en annen form
+   enn prioriteten på hendelsene, så «rødt» ikke betyr to ting. */
+.ko-tavle-konsert {
+  position: absolute; top: 2px; bottom: 2px; z-index: 0; pointer-events: auto;
+  border-top: 3px solid var(--bf, #64748b); border-radius: 4px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bf, #64748b) 18%, transparent) 0 6px,
+    color-mix(in srgb, var(--bf, #64748b) 7%, transparent) 6px 12px);
+}
+.ko-tavle-konsert-navn {
+  position: absolute; right: 4px; bottom: 1px; font-size: 0.65rem; font-weight: 600;
+  color: var(--bf, #94a3b8); white-space: nowrap; overflow: hidden; max-width: calc(100% - 8px);
+}
+.ko-beredskap-gronn { --bf: #22c55e; }
+.ko-beredskap-gul { --bf: #facc15; }
+.ko-beredskap-oransje { --bf: #fb923c; }
+.ko-beredskap-rod { --bf: #ef4444; }
+.ko-tavle-stolpe, .ko-tavle-slutt-plan { z-index: 1; }
 .ko-tavle-over-tall {
   font-size: 0.7rem; font-weight: 700; color: #fecaca; border: 1px solid #ef4444;
   border-radius: 999px; padding: 0 0.4rem; margin-left: 0.3rem; white-space: nowrap;
@@ -477,3 +495,40 @@ body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-sel
 .ko-tavle-besok { padding: 0.5rem 0.75rem; width: 100%; overflow-x: auto; }
 .ko-tavle-besok-tabell td, .ko-tavle-besok-tabell th { white-space: nowrap; }
 .ko-tavle-besok-tabell tr.ko-tavle-null td { color: #fde68a; }
+
+/* ── Planleggeren (23. sep. 2026) ─────────────────────────────────────────
+   Programmet per døgn og sted. Beredskapsnivået som merke har samme form som
+   båndet på tavla — skravur og en kant — ikke et fylt merke. */
+.ko-plan { padding: 0.25rem 0.5rem; }
+.ko-plan-sted { margin-bottom: 0.6rem; }
+.ko-plan-stednavn {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--portal-text-muted, #94a3b8); margin: 0.4rem 0 0.2rem;
+}
+.ko-plan-post {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem;
+  padding: 0.35rem 0.5rem; border: 1px solid var(--portal-border); border-radius: 6px;
+  margin-bottom: 0.3rem; background: var(--portal-surface-2);
+}
+.ko-plan-post[data-action] { cursor: pointer; }
+.ko-plan-post[data-action]:hover { border-color: var(--portal-accent); }
+.ko-plan-tid { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 6.5rem; }
+.ko-plan-navn { font-weight: 600; }
+.ko-plan-type, .ko-plan-dempet { color: var(--portal-text-muted, #94a3b8); font-weight: 400; }
+.ko-plan-behov { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.ko-plan-kjennetegnene { display: inline-flex; gap: 0.25rem; flex-wrap: wrap; }
+.ko-plan-kjennetegn {
+  font-size: 0.7rem; border: 1px solid var(--portal-border); border-radius: 999px; padding: 0 0.45rem;
+}
+/* Standardfargen står i `var()`, ikke som `--bf` her: satt her, vant den over
+   `.ko-beredskap-*` (samme spesifisitet, senere i fila) og merket ble grått. */
+.ko-plan-beredskap, .ko-plan-nivaa {
+  font-size: 0.72rem; font-weight: 700; color: var(--bf, #94a3b8);
+  border: 1px solid var(--bf, #64748b); border-top-width: 3px; border-radius: 4px; padding: 0 0.4rem;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bf, #64748b) 18%, transparent) 0 4px,
+    transparent 4px 8px);
+}
+.ko-plan-nivaa { cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; }
+.ko-plan-skjema-rad { display: flex; flex-wrap: wrap; align-items: end; gap: 0.4rem 0.6rem; margin-bottom: 0.4rem; }
+.ko-plan-navnefelt { flex: 1 1 12rem; }
+.ko-plan-behov-felt input { width: 4.5rem; }

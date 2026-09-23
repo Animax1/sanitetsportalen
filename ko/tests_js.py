@@ -207,6 +207,13 @@ KO_LOGG_BYGGERE = (
     # filteret og funksjonen som setter dem sammen.
     'koTavleStolpeHtml',
     'koTavleSluttHtml',
+    'koTavleKonsertHtml',
+    # ko-plan.js (23. sep. 2026): planleggeren.
+    'koPlanBeredskapHtml',
+    'koPlanPostHtml',
+    'koPlanListeHtml',
+    'koPlanDognvalgHtml',
+    'koPlanSkjemaHtml',
     'koTavleRadHtml',
     'koTavleTimerHtml',
     'koTavleUtenPlassHtml',
@@ -1631,7 +1638,8 @@ class OppsettetTests(SimpleTestCase):
             "console.log(JSON.stringify(koVisIgjen(t, 'ressurser').rader));\n"
             "console.log(JSON.stringify(koVisIgjen(koSkjul(o, 'ressurser'), 'tavle').skjult),"
             " 'den skjulte partneren slippes med');\n")
-        self.assertEqual(ut[0], '[["hendelser","logg"],["tavle","oppdrag"]] ["ressurser"]')
+        # Planleggeren står parkert også — den deler plass med oppdragslista.
+        self.assertEqual(ut[0], '[["hendelser","logg"],["tavle","oppdrag"]] ["ressurser","plan"]')
         self.assertEqual(ut[1], '[["hendelser","logg"],["ressurser","oppdrag"]] det gamle er urørt')
         self.assertEqual(json.loads(ut[2]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']])
         self.assertEqual(ut[3], '[] den skjulte partneren slippes med')

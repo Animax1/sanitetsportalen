@@ -52,6 +52,7 @@ KO_JS = (
     JS_DIR / 'ko-layout.js',
     JS_DIR / 'ko-hendelser.js',
     JS_DIR / 'ko-tavle.js',
+    JS_DIR / 'ko-plan.js',
     JS_DIR / 'ko.js',
 )
 #: **Vaktlistesiden er seks filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),

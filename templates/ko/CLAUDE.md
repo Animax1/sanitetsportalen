@@ -18,7 +18,10 @@ før koden — de er målet): `Hendelseslogg │ Loggstrøm` øverst, `Ressursov
 Oppdragsliste` nederst. «Tre kolonner er taket» fra 17. sep. ble opphevet av André samme
 dag som hendelsene ble en egen flate. Prinsippet — alt synlig samtidig, ingen faner — står.
 **Tavla er det femte vinduet og deler plass med ressursoversikten** (22. sep. 2026, `KO_PAR`):
-den som ikke står i rutenettet står i stripa, og «⇄» i hodet bytter.
+den som ikke står i rutenettet står i stripa, og «⇄» i hodet bytter. **Planleggeren er det
+sjette, og deler plass med oppdragslista** (23. sep. 2026 — André: «inni i ko rutenettet med
+samme løsning som tavlen, at den er minimert»): parkert som standard, og da kan tavla og
+planleggeren stå side om side i nederste rad.
 
 **Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
 Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad
@@ -155,3 +158,18 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 **Gaten er komposisjonsregelen**: tavla krever `les` i vaktlista (403 ellers), bilene
 bare med `les` i oppdragsmodulen — både i svaret og ved flytting (404: en bil man ikke får
 se, finnes ikke). Flytting er `skriv_full` i KO.
+
+## Planleggeren og programmet på tavla (23. sep. 2026)
+
+`static/js/ko-plan.js`, vinduet `plan`. Reglene i `ko/program.py` (se `ko/CLAUDE.md`).
+
+| Valg | Hvorfor |
+|---|---|
+| **Døgnet og klokkeslettet, ikke dato-og-tid**: `koPlanTid` legger et klokkeslett før døgnstarten i natta etter; `koPlanTil` er første gang klokka viser «til» etter «fra» | «01:00 fredag» er natt til lørdag, som i «Besøk». 22:00–22:00 er et døgn, ikke null |
+| Døgnvalget er noen døgn fra vaktstart **pluss hvert døgn som har en konsert** (`koPlanDognene`) | Ingenting i programmet skal stå utenfor det man kan velge |
+| Stedene kommer med programsvaret (`steder`), ikke fra sentralbordets `lokasjoner` | Den som har KO uten oppdragstilgang skal kunne se programmet. Et inaktivt sted posten alt står på, tilbys likevel |
+| `koPlanKropp` sier fra ved knappen (`{feil}`); tomt antall er null og tas ut | Samme regel som «Velg…» ellers |
+| Bare KO-leder får «+ Konsert» og klikk på en post (`koPlanKanLede` → `koKanFjerne`) | En knapp som fører til en vegg er verre enn ingen |
+| **Båndene bak radene** (`koTavleProgram`, `koTavleKonsertHtml`): skravur og kant i beredskapsfargen, `ko-beredskap-<nivå>`; ukjent nivå får ingen farge | Samme form som skissene, og en annen enn prioriteten på hendelsene — så «rødt» ikke betyr to ting |
+| **«Følg konserten»** i «Tider og slutt»: konsertene på stedet som ikke er over; valgt sendes `folger_id`, ikke en egen tid | Flyttes konserten, følger slutten med |
+| Standardfargen står i `var(--bf, …)`, ikke som `--bf` på grunnregelen | Satt der, vant den over `.ko-beredskap-*` senere i fila, og merket ble grått |

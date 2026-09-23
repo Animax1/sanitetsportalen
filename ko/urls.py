@@ -66,6 +66,17 @@ urlpatterns = [
     path('api/tavle/pauser/<int:pk>/start/', views.tavle_pause_start_view,
          name='ko_api_tavle_pause_start'),
     path('api/tavle/oppsett/', views.tavle_oppsett_view, name='ko_api_tavle_oppsett'),
+    # Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026).
+    path('api/program/', views.program_view, name='ko_api_program'),
+    path('api/program/<int:pk>/', views.program_post_view, name='ko_api_program_post'),
+    path('api/konserttyper/', views.konserttyper_view, name='ko_api_konserttyper'),
+    path('api/konserttyper/rekkefolge/', views.konserttyper_rekkefolge_view,
+         name='ko_api_konserttyper_rekkefolge'),
+    path('api/konserttyper/<int:pk>/', views.konserttype_detalj_view, name='ko_api_konserttype_detalj'),
+    path('api/kjennetegn/', views.kjennetegn_view, name='ko_api_kjennetegn'),
+    path('api/kjennetegn/rekkefolge/', views.kjennetegn_rekkefolge_view,
+         name='ko_api_kjennetegn_rekkefolge'),
+    path('api/kjennetegn/<int:pk>/', views.kjennetegn_detalj_view, name='ko_api_kjennetegn_detalj'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,

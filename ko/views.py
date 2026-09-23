@@ -53,7 +53,7 @@ from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
 from .models import (MELDER_VALG, PRIORITET_VALG, Ansvarsmerke, Ansvarsomraade, Hendelse,
-                     Logglinje)
+                     Kjennetegn, Konserttype, Logglinje)
 from .tilstede import tilstede
 
 
@@ -197,6 +197,12 @@ def index_view(request):
         # Tavla (22. sep. 2026): «På tavla» og «Følg besøk ★» per lokasjon,
         # tegnet av `koTegnTavleOppsett()` i ko-tavle.js gjennom kroken `tegn`.
         {'slug': 'tavla', 'navn': 'Tavla', 'tegn': 'koTegnTavleOppsett'},
+        # Programmet (23. sep. 2026): listene konsertene velger fra. Samme
+        # fabrikk som ansvarsområdene.
+        {'slug': 'konserttyper', 'navn': 'Konserttyper', 'ny': 'Ny konserttype',
+         'url': '/ko/api/konserttyper/'},
+        {'slug': 'kjennetegn', 'navn': 'Kjennetegn', 'ny': 'Nytt kjennetegn',
+         'url': '/ko/api/kjennetegn/'},
     ] if _kan_lede_ko(request) else []
     if er_global_admin(request.user):
         # «Nullstill» (André, 18. sep. 2026) — for test og utvikling; i prod
@@ -733,6 +739,10 @@ VERDILISTER = {
     # og et område som slettes skal ikke skrive om loggen.
     'ansvarsomraader': _Verdiliste(Ansvarsomraade, 'ansvarsomraader', 40,
                                    lambda r: Ansvarsmerke.objects.filter(omraade=r.navn).count()),
+    # Programmet (tavleplanleggeren, steg 2). I bruk = konserter som peker
+    # dit, i alle vakter: en type fjorårets program står med, slettes ikke.
+    'konserttyper': _Verdiliste(Konserttype, 'konserttyper', 60, lambda r: r.poster.count()),
+    'kjennetegn': _Verdiliste(Kjennetegn, 'kjennetegn', 60, lambda r: r.poster.count()),
 }
 
 
@@ -832,6 +842,12 @@ def _rekkefolge_view(slug):
 ansvarsomraader_view = _liste_view('ansvarsomraader')
 ansvarsomraade_detalj_view = _detalj_view('ansvarsomraader')
 ansvarsomraader_rekkefolge_view = _rekkefolge_view('ansvarsomraader')
+konserttyper_view = _liste_view('konserttyper')
+konserttype_detalj_view = _detalj_view('konserttyper')
+konserttyper_rekkefolge_view = _rekkefolge_view('konserttyper')
+kjennetegn_view = _liste_view('kjennetegn')
+kjennetegn_detalj_view = _detalj_view('kjennetegn')
+kjennetegn_rekkefolge_view = _rekkefolge_view('kjennetegn')
 
 
 # ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────
@@ -1021,7 +1037,7 @@ def tavle_plassering_view(request, pk):
         if request.method == 'DELETE':
             tavle.fjern(p, bruker=request.user)
             return JsonResponse({'status': 'ok'})
-        if 'fra' not in data and 'planlagt_til' not in data:
+        if 'fra' not in data and 'planlagt_til' not in data and 'folger_id' not in data:
             raise services.Ugyldig('Ingenting å endre.')
         # Tidene og den planlagte slutten i ett: feiler den ene, er heller
         # ikke den andre lagret — skjemaet sendte dem som én ting.
@@ -1030,7 +1046,15 @@ def tavle_plassering_view(request, pk):
                 fra = _tavle_tid(data.get('fra'), 'Fra')
                 til = _tavle_tid(data.get('til'), 'Til') if p.til is not None else None
                 tavle.rett(p, fra=fra, til=til, bruker=request.user)
-            if 'planlagt_til' in data:
+            if data.get('folger_id'):
+                # «Følger konserten» (steg 2) går foran en egen tid.
+                from . import program
+                from .models import Programpost
+                post = Programpost.objects.filter(pk=_heltall_eller_none(data.get('folger_id'))).first()
+                if post is None:
+                    raise services.Ugyldig('Ukjent konsert.')
+                program.folg(p, post, naa=timezone.now())
+            elif 'planlagt_til' in data or 'folger_id' in data:
                 # Tomt er «ingen plan»; noe annet enn et tidspunkt er en feil.
                 raa = data.get('planlagt_til')
                 slutt = _tavle_tid(raa, 'Planlagt slutt') if raa else None
@@ -1141,3 +1165,68 @@ def tavle_oppsett_view(request):
     return JsonResponse({'status': 'ok', 'data': [{
         'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
     } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')]})
+
+
+# ── Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026) ───────────────────
+#
+# **Å lese er `les` i KO, å skrive er KO-lederens** (André: «KO-leder»), både
+# før og under vakta. Behovet peker på vaktlistas ressursgrupper, men bærer
+# bare navnene deres — ingen vaktlistedata om personer — så gaten er KOs egen.
+
+def _heltall_eller_none(raa):
+    try:
+        return int(raa)
+    except (TypeError, ValueError):
+        return None
+
+
+def _program_tider(data):
+    return _tavle_tid(data.get('fra'), 'Fra'), _tavle_tid(data.get('til'), 'Til')
+
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='ko:program', rate='60/m', method='POST')
+def program_view(request):
+    """Programmet for aktiv vakt, og valgene skjemaet trenger. POST lager en
+    ny konsert."""
+    from . import program
+
+    vakt = hent_aktiv_vakt()
+    if request.method == 'POST':
+        if not _kan_lede_ko(request):
+            return _feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
+        data = _json_body(request)
+        try:
+            fra, til = _program_tider(data)
+            post = program.lagre_post(vakt, data, fra=fra, til=til, bruker=request.user)
+        except services.Ugyldig as e:
+            return _feil(str(e))
+        return JsonResponse({'status': 'ok', 'data': program.til_dict(post)})
+    return JsonResponse({'status': 'ok', 'data': program.program_data(vakt)})
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='ko:program_post', rate='60/m', method=['PUT', 'DELETE'])
+def program_post_view(request, pk):
+    """Endre eller slett en konsert i aktiv vakt."""
+    from . import program
+    from .models import Programpost
+
+    if not _kan_lede_ko(request):
+        return _feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
+    post = Programpost.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
+    if post is None:
+        return _feil('Ukjent konsert.', 404)
+    if request.method == 'DELETE':
+        program.slett_post(post)
+        return JsonResponse({'status': 'ok'})
+    data = _json_body(request)
+    try:
+        fra, til = _program_tider(data)
+        post = program.lagre_post(post.vakt, data, fra=fra, til=til, bruker=request.user, post=post)
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': program.til_dict(post)})

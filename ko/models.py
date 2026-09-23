@@ -676,6 +676,11 @@ class Tavleplassering(models.Model):
     #: ute, står laget der med rød kant til KO flytter det. Står igjen når
     #: plasseringen lukkes — «planlagt til 23:45, gikk 00:10» er historikk.
     planlagt_til = models.DateTimeField(null=True, blank=True, verbose_name='Planlagt til')
+    #: «Følger konserten» (steg 2): slutten er konsertens, og flyttes konserten,
+    #: følger den med. Satt i stedet for `planlagt_til`, aldri sammen med den.
+    folger = models.ForeignKey(
+        'Programpost', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='plasseringer', verbose_name='Følger konserten')
     av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='ko_tavleplasseringer',
@@ -743,3 +748,128 @@ class PlanlagtPause(models.Model):
 
     def __str__(self):
         return f'{self.ressurs_navn} · pause'
+
+
+# ── Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026) ───────────────────
+#
+# Konsertene per sted, med beredskapsnivå og behov. Skissene og svarene står i
+# Artifact «Tavleplanleggeren»; reglene i `ko/program.py`.
+
+#: Beredskapsnivå — standardisert (André, 23. sep. 2026: «grønn, gul, oransje
+#: og rød som beredskapsnivå på konsertene som er en standardisert form»). Tomt
+#: er «ikke satt», for et fast behov som ikke er en konsert.
+BEREDSKAP_VALG: tuple[tuple[str, str], ...] = (
+    ('gronn', 'Grønn'),
+    ('gul', 'Gul'),
+    ('oransje', 'Oransje'),
+    ('rod', 'Rød'),
+)
+BEREDSKAP_NAVN: dict[str, str] = dict(BEREDSKAP_VALG)
+
+
+class Konserttype(models.Model):
+    """Hva slags konsert — «Headliner», «Hiphop / rap». **Beskriver, setter
+    ingenting** (André: «Konserttyper skal ikke automatisk sette ressurser»).
+    Den finnes for å sammenligne samme slags konsert år for år. Lista er
+    KO-lederens, som ansvarsområdene; ikke per vakt."""
+
+    navn = models.CharField(max_length=60, unique=True, verbose_name='Konserttype')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Konserttype'
+        verbose_name_plural = 'Konserttyper'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self):
+        return self.navn
+
+
+class Kjennetegn(models.Model):
+    """Avkrysninger på en konsert — «Pyro» først. **En liste KO-leder setter
+    opp, ikke faste felt i koden**: svaret fra samarbeidspartneren om hva en
+    konsert skal bære, kan da legges inn den dagen det kommer."""
+
+    navn = models.CharField(max_length=60, unique=True, verbose_name='Kjennetegn')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Kjennetegn'
+        verbose_name_plural = 'Kjennetegn'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self):
+        return self.navn
+
+
+class Programpost(models.Model):
+    """En konsert — eller et fast behov som ikke er en konsert — på ett sted i
+    ett tidsrom. **Behovet skrives inn for hånd** (`Programbehov`), per
+    ressursgruppe i vaktlista.
+
+    Pekerne ut av modulen — lokasjonen og typen — har navnet frosset ved
+    siden av, som `Tavleplassering`: programmet skal kunne leses år etter år,
+    også når stedet er omdøpt eller typen slettet. **Ingen fritekst om
+    personer**: da kan programmet stå fra år til år.
+    """
+
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT, related_name='ko_program', verbose_name='Vakt')
+    lokasjon = models.ForeignKey(
+        'oppdrag.Lokasjon', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_program', verbose_name='Sted')
+    lokasjon_navn = models.CharField(max_length=255, verbose_name='Sted (navn)')
+    navn = models.CharField(max_length=120, verbose_name='Navn')
+    konserttype = models.ForeignKey(
+        Konserttype, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='poster', verbose_name='Konserttype')
+    konserttype_navn = models.CharField(
+        max_length=60, blank=True, default='', verbose_name='Konserttype (navn)')
+    beredskap = models.CharField(
+        max_length=10, blank=True, default='', choices=BEREDSKAP_VALG, verbose_name='Beredskapsnivå')
+    fra = models.DateTimeField(verbose_name='Fra')
+    til = models.DateTimeField(verbose_name='Til')
+    publikum = models.PositiveIntegerField(null=True, blank=True, verbose_name='Forventet publikum')
+    kjennetegn = models.ManyToManyField(Kjennetegn, blank=True, related_name='poster',
+                                        verbose_name='Kjennetegn')
+    endret_at = models.DateTimeField(auto_now=True, verbose_name='Sist endret')
+    endret_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_programposter', verbose_name='Sist endret av')
+    endret_av_navn = models.CharField(max_length=150, blank=True, default='',
+                                      verbose_name='Sist endret av (navn)')
+
+    class Meta:
+        verbose_name = 'Programpost'
+        verbose_name_plural = 'Programposter'
+        ordering = ['fra', 'lokasjon_navn', 'id']
+
+    def __str__(self):
+        return f'{self.navn} · {self.lokasjon_navn}'
+
+
+class Programbehov(models.Model):
+    """Hvor mange av én ressursgruppe konserten trenger — «4 lag», «2
+    ambulanser». Gruppa er vaktlistas (`Ressursgruppe`); «Spesiallag» er en
+    egen gruppe der (André: «en fast type lag»). Navnet står frosset."""
+
+    post = models.ForeignKey(Programpost, on_delete=models.CASCADE, related_name='behov',
+                             verbose_name='Programpost')
+    gruppe = models.ForeignKey(
+        'vaktliste.Ressursgruppe', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_behov', verbose_name='Ressursgruppe')
+    gruppe_navn = models.CharField(max_length=60, verbose_name='Ressursgruppe (navn)')
+    antall = models.PositiveSmallIntegerField(verbose_name='Antall')
+
+    class Meta:
+        verbose_name = 'Behov'
+        verbose_name_plural = 'Behov'
+        ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'gruppe'], name='ett_behov_per_gruppe'),
+        ]
+
+    def __str__(self):
+        return f'{self.antall} {self.gruppe_navn}'

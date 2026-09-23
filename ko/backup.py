@@ -91,6 +91,11 @@ class KoBackupHandler(BaseBackupHandler):
     #: mot vaktlista, lokasjonen mot oppdrag. Navnene står frosset.
     #: `PlanlagtPause` har samme ressurspeker; `startet` peker innad i settet
     #: og beholdes.
+    #:
+    #: **Programmet** (23. sep. 2026) følger samme regel: stedet peker mot
+    #: `oppdrag`, ressursgruppa i behovet mot `vaktliste`, og begge navnene står
+    #: frosset. Konserttypen og kjennetegnene er KOs egne og beholdes, og det
+    #: gjør `Tavleplassering.folger` også — den peker innad i settet.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av', 'delt_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
@@ -98,6 +103,8 @@ class KoBackupHandler(BaseBackupHandler):
         'ko.HendelseLag': ['ressurs', 'av'],
         'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
         'ko.PlanlagtPause': ['ressurs', 'av'],
+        'ko.Programpost': ['lokasjon', 'endret_av'],
+        'ko.Programbehov': ['gruppe'],
     }
 
 

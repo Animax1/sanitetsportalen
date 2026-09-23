@@ -376,6 +376,10 @@
                   title="Skjul vinduet" aria-label="Skjul oppdragslista">
             <i class="bi bi-eye-slash"></i>
           </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+                  data-action="koByttPar" data-arg="oppdrag" title="Bytt til planleggeren">
+            <i class="bi bi-arrow-left-right me-1"></i>Planlegger
+          </button>
 
           {% endif %}
         </div>
@@ -440,6 +444,42 @@
           {% else %}
           <p class="text-muted small mb-0">Tavla viser vaktlistas ressurser, og krever tilgang til vaktlista.</p>
           {% endif %}
+        </div>
+      </section>
+
+      {# ═════ PLANLEGGER (23. sep. 2026) ═════ #}
+      {% comment %}
+        Deler plass med oppdragslista (`KO_PAR` i ko-layout.js) og står parkert
+        som standard. Programmet er KOs: alle med `les` ser det, KO-leder
+        (`skriv_leder`) legger det. Tegnes av ko-plan.js.
+      {% endcomment %}
+      <section class="ko-vindu d-none" id="ko-vindu-plan" data-vindu="plan">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-calendar-range"></i><span class="ko-vindu-tittel">Planlegger</span>
+          <span class="ko-vindu-tall" id="ko-plan-antall"></span>
+          <div class="btn-group btn-group-sm ms-2 flex-wrap" role="group" aria-label="Døgn" id="ko-plan-dogn-valg"></div>
+          <span class="ms-auto d-flex align-items-center gap-1">
+            {% if kan_lede_ko %}
+            <button type="button" class="btn btn-primary btn-sm" data-action="koPlanNy">
+              <i class="bi bi-plus-lg me-1"></i>Konsert
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-action="koByttPar" data-arg="plan" title="Bytt til oppdragslista">
+              <i class="bi bi-arrow-left-right me-1"></i>Oppdragsliste
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ko-skjul-knapp"
+                    data-action="koSkjulVindu" data-arg="plan"
+                    title="Skjul vinduet" aria-label="Skjul planleggeren">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+          </span>
+        </div>
+        <div class="alert alert-warning py-1 px-2 m-2 small d-none" id="ko-plan-feil" role="alert"></div>
+        <div class="ko-tavle-skjema d-none" id="ko-plan-skjema"></div>
+        <div class="ko-vindu-kropp">
+          <div class="ko-plan" id="ko-plan"><div class="tom-melding">Laster…</div></div>
         </div>
       </section>
     </div>
@@ -547,12 +587,13 @@
 {% include "oppdrag/_sentralbord_skript.html" %}
 {% endif %}
 {% comment %}
-  KOs tre filer, i lasterekkefølge (`KO_JS` i patients/js_test_utils.py):
-  oppsettet, hendelsene, og til slutt loggen med den ene
+  KOs fem filer, i lasterekkefølge (`KO_JS` i patients/js_test_utils.py):
+  oppsettet, hendelsene, tavla, planleggeren, og til slutt loggen med den ene
   `DOMContentLoaded`-kroken — alt som kjører på toppnivå står i den siste.
 {% endcomment %}
 <script src="{% static 'js/ko-layout.js' %}"></script>
 <script src="{% static 'js/ko-hendelser.js' %}"></script>
 <script src="{% static 'js/ko-tavle.js' %}"></script>
+<script src="{% static 'js/ko-plan.js' %}"></script>
 <script src="{% static 'js/ko.js' %}"></script>
 {% endblock %}

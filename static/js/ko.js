@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // ko.js — loggstrømmen, sidebaren, ansvarsmerket, vaktlistas ressurser, og
-// **den ene `DOMContentLoaded`-kroken**. Siste av KOs fire filer (`KO_JS` i
+// **den ene `DOMContentLoaded`-kroken**. Siste av KOs fem filer (`KO_JS` i
 // patients/js_test_utils.py): rutenettet bor i ko-layout.js, hendelsene i
 // ko-hendelser.js, og alt som *kjører* på toppnivå står nederst her
 // (CLAUDE.md). Listene eies av oppdrag-sentral-*.js (pulje 4).
@@ -781,6 +781,7 @@ async function koHentRessurser() {
 document.addEventListener('DOMContentLoaded', () => {
   koOppsettStart();
   koTavleStart();
+  koPlanStart();
   koSidebarLyttere();
   setInterval(() => {
     // Ikke poll en liste ingen ser på: flere operatører sitter på samme side

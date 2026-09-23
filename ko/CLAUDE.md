@@ -35,6 +35,7 @@ uten at noen rykket ut.
 | **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
 | **Tavla**: plasseringene, forrangen, historikken fra hendelsene | `ko.Tavleplassering`, `ko/tavle.py`, `bil_rykket_ut` i `ko/signals.py` |
+| **Programmet**: konsertene, beredskapsnivå, behov, «følger konserten» | `ko/program.py`, `ko.Programpost`, `Programbehov` |
 
 ## Retningen: KO er øverste lag
 
@@ -249,6 +250,21 @@ hvilke rader som finnes er projeksjon — `opptatt()` utleder det ved hver lesin
 | **Planlagt pause** (`PlanlagtPause`): KOs egen, maks fire timer, ikke i fortida, aldri to over hverandre — heller ikke oppå en startet. «Pause nå» (`start_pause`) plasserer i Pause-raden, eller knytter til pausen laget alt har | Planen flytter ingen. Vaktlistas pauser (TODO) blir utgangspunktet; da trengs et kildefelt |
 | **Planlagt slutt** (`Tavleplassering.planlagt_til`, 23. sep. 2026): bare på den åpne, fram i tid, høyst et døgn. `sett_planlagt_slutt`; PUT på plasseringen tar `fra` og `planlagt_til` i én transaksjon. **Flytter ingen** — når tida er ute, får laget rød kant. Står igjen på den lukkede, arves ikke av neste plassering | André: «planlegge tid per plassering med beskjed/tegn på overtid». Samme regel som pausene: et lag midt i noe skal ikke forsvinne fordi klokka sa det |
 | **Innstillingene**: tidsvindu 12–24 t og døgnstart (portalinnstilling, global admin); «På tavla» og «Følg besøk ★» per lokasjon (`skriv_leder`) — ID-lister i `AppSetting`, auditlogget | KO eier avkryssingene, ikke lokasjonene |
+
+**Programmet** (tavleplanleggeren, 23. sep. 2026) — `ko/program.py`, modellene
+`Konserttype`, `Kjennetegn`, `Programpost`, `Programbehov`. Reglene står i modulens
+docstring; kortversjonen:
+
+| Regel | Hvorfor |
+|---|---|
+| **Typen setter ingen ressurser**; behovet skrives inn per konsert, i vaktlistas ressursgrupper | André: «Konserttyper skal ikke automatisk sette ressurser». «Spesiallag» er en egen gruppe der |
+| Beredskapsnivå grønn/gul/oransje/rød (`BEREDSKAP_VALG`), tomt for et fast behov; ukjent avvises | «En standardisert form» |
+| Konserttyper og kjennetegn er `VERDILISTER` (KO-innstillinger, `skriv_leder`), seedet med et forslag (`0017`); en type i bruk slettes ikke — heller ikke fra i fjor | Kjennetegnene kan legges inn den dagen samarbeidspartneren svarer, uten en utrulling |
+| Alt valideres før noe skrives, og `lagre_post` er én transaksjon; behovet byttes ut i sin helhet | En konsert uten behovet sitt er et halvt svar som ser helt ut |
+| Inaktivt sted/type avvises på en ny post, beholdes på en endring | Som en deaktivert problemstilling på et oppdrag |
+| Sted, type og gruppe fryses som navn; `lokasjon`, `endret_av` og `Programbehov.gruppe` strippes i backupen | Programmet skal leses år etter år. Samme sirkel som `HendelseLag.ressurs` |
+| **`Tavleplassering.folger`**: «følger konserten» — samme sted, samme vakt, ikke over. Aldri sammen med `planlagt_til`; tavlesvaret gir den gjeldende slutten | Konserten forsinkes, og lagenes slutt følger med uten at noen retter noe |
+| **KO-leder skriver** (`/ko/api/program/`), `les` ser | André: «KO-leder», før og under vakta |
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
 oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.

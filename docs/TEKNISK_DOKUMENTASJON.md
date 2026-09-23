@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **167 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **175 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
-| `/ko/` | 31 | `ko/urls.py` | Sida, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
+| `/ko/` | 39 | `ko/urls.py` | Sida, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
 | `/backlog/` | 9 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, kommentartråd, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
@@ -1527,7 +1527,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 31 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 32 filer i `static/js/`, fordelt
 på sju sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to
 grensesnittene under `/oppdrag/`.
 
@@ -1547,7 +1547,7 @@ grensesnittene under `/oppdrag/`.
 | `oppdrag-enhet.js` | `/oppdrag/`, **enhetskontoer** | Bilens skjerm, offline-kø, lydvarsel |
 | `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |
 | `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
-| `ko-*.js` (fire) | **kun** `/ko/` | Rutenettet, hendelsene, tavla og loggen — se `templates/ko/CLAUDE.md` |
+| `ko-*.js` (fem) | **kun** `/ko/` | Rutenettet, hendelsene, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
 
 **To sider er delt i flere filer** (14. sep. 2026): `vaktliste.js` var 3 801 linjer og
 `oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt navnerom**, så

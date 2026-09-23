@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-// ko-layout.js — rutenettet: fire plasser i 2×2 (fem vinduer — tavla deler plass), bytte av plass og størrelse.
+// ko-layout.js — rutenettet: fire plasser i 2×2 (seks vinduer — tavla og planleggeren deler plass), bytte av plass og størrelse.
 //
-// Første av KOs fire filer (`KO_JS` i patients/js_test_utils.py). Ingen
+// Første av KOs fem filer (`KO_JS` i patients/js_test_utils.py). Ingen
 // bundler, ett globalt navnerom, og **ingenting kjører på toppnivå her** —
 // `koOppsettStart()` kalles fra `DOMContentLoaded`-kroken i ko.js, som er
 // den siste fila.
@@ -32,13 +32,18 @@ const KO_OPPSETT_NOKKEL = 'ko.oppsett';
 //: med de fire andre … som et skjult vindu som erstattes». Den som ikke står i
 //: rutenettet, står i stripa over konsollen, som de skjulte: en flate man ikke
 //: ser, skal være en tilstand man ser.
-const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag', 'tavle'];
+//:
+//: **Planleggeren er det sjette** (23. sep. 2026), og deler plass med
+//: oppdragslista — André: «inni i ko rutenettet med samme løsning som tavlen, at
+//: den er minimert». Da kan tavla og planleggeren stå side om side i nederste
+//: rad, og i standardoppsettet står den parkert i stripa.
+const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag', 'tavle', 'plan'];
 
 //: Plassene i rutenettet — to rader med to.
 const KO_PLASSER = 4;
 
 //: Parene som deler en plass: den ene står i rutenettet, den andre er parkert.
-const KO_PAR = { ressurser: 'tavle', tavle: 'ressurser' };
+const KO_PAR = { ressurser: 'tavle', tavle: 'ressurser', oppdrag: 'plan', plan: 'oppdrag' };
 
 //: Standardoppsettet: hendelsesloggen og loggstrømmen øverst, ressursene og
 //: oppdragene nederst. `bredde` er venstre vindus andel per rad, `hoyde` er
@@ -58,6 +63,7 @@ const KO_VINDUSNAVN = {
   ressurser: 'Ressursoversikt',
   oppdrag: 'Oppdragsliste',
   tavle: 'Tavle',
+  plan: 'Planlegger',
 };
 
 //: Gulvet, i prosent. Under dette kan en skillelinje ikke dras: et vindu på
@@ -72,10 +78,10 @@ function koKlemProsent(prosent) {
   return Math.min(100 - KO_MIN_PROSENT, Math.max(KO_MIN_PROSENT, p));
 }
 
-// Hvilke fire vinduer som står i rutenettet er gyldig: de tre uten partner
-// hver én gang, og **nøyaktig én** av hvert par. Et oppsett lagret før tavla
-// fantes (fire vinduer, ressursoversikten med) er dermed gyldig som det er —
-// ingen KO-PC mister oppsettet sitt av en oppdatering.
+// Hvilke fire vinduer som står i rutenettet er gyldig: de uten partner hver
+// én gang, og **nøyaktig én** av hvert par. Et oppsett lagret før tavla eller
+// planleggeren fantes (ressursoversikten og oppdragslista med) er dermed
+// gyldig som det er — ingen KO-PC mister oppsettet sitt av en oppdatering.
 function koGyldigePlasser(flate) {
   if (flate.length !== KO_PLASSER || new Set(flate).size !== KO_PLASSER) return false;
   if (!flate.every((v) => KO_VINDUER.includes(v))) return false;
@@ -240,6 +246,7 @@ function koTegnOppsett(oppsett) {
   // Tavla som nettopp ble hentet fram skal vise nå (ko-tavle.js). Gjennom en
   // vakt: fila lastes etter denne, og kallet skjer først ved tegning.
   if (typeof koTavleSynligNaa === 'function') koTavleSynligNaa();
+  if (typeof koPlanSynligNaa === 'function') koPlanSynligNaa();
 }
 
 // Stripa over konsollen: ett kort per skjult vindu, med navnet sitt. Den er
@@ -276,7 +283,7 @@ function koVisVindu(navn) {
   koTegnOppsett(koOppsett);
 }
 
-// «⇄» i hodet til tavla og ressursoversikten: bytt til partneren.
+// «⇄» i hodet til vinduene som deler plass: bytt til partneren.
 function koByttPar(navn) {
   if (KO_PAR[navn]) koVisVindu(KO_PAR[navn]);
 }

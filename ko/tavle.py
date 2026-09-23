@@ -352,9 +352,11 @@ def sett_planlagt_slutt(plassering, til, *, naa=None) -> Tavleplassering:
             raise Ugyldig('Planlagt slutt må være fram i tid.')
         if til - naa > MAKS_PLANLAGT:
             raise Ugyldig('Planlagt slutt kan ikke være mer enn et døgn fram.')
-    if plassering.planlagt_til != til:
+    # En egen tid — eller ingen — tar plassen til «følger konserten».
+    if plassering.planlagt_til != til or plassering.folger_id is not None:
         plassering.planlagt_til = til
-        plassering.save(update_fields=['planlagt_til'])
+        plassering.folger = None
+        plassering.save(update_fields=['planlagt_til', 'folger'])
     return plassering
 
 
@@ -512,6 +514,10 @@ def lagre_oppsett(*, skjulte_ider, fulgte_ider) -> None:
 
 # ── Det klienten får ──────────────────────────────────────────────────────────
 
+def program_poster(vakt) -> list[dict]:
+    from .program import poster
+    return poster(vakt)
+
 
 def _iso(t):
     return t.isoformat() if t else None
@@ -533,7 +539,8 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         if r.gruppe_id not in grupper:
             grupper[r.gruppe_id] = {'id': r.gruppe_id, 'navn': r.gruppe.navn,
                                     'ikon': r.gruppe.ikon or ''}
-    plasseringer = list(Tavleplassering.objects.filter(vakt=vakt).order_by('fra', 'id'))
+    plasseringer = list(Tavleplassering.objects.filter(vakt=vakt).select_related('folger')
+                        .order_by('fra', 'id'))
     ute = set(skjulte())
     return {
         'naa': naa.isoformat(),
@@ -572,7 +579,13 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
             'hendelse_nummer': p.hendelse_nummer,
             'fra': _iso(p.fra),
             'til': _iso(p.til),
-            'planlagt_til': _iso(p.planlagt_til),
+            # Den gjeldende slutten: konsertens når laget følger den — flyttes
+            # konserten, følger slutten med uten at noen retter noe.
+            'planlagt_til': _iso(p.folger.til if p.folger_id else p.planlagt_til),
+            'folger_id': p.folger_id,
         } for p in plasseringer],
+        # Programmet (steg 2): båndene bak radene, og det «følger konserten»
+        # kan velge mellom.
+        'program': program_poster(vakt),
     }
 

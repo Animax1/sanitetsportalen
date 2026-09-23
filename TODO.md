@@ -148,19 +148,16 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
 ### KO: tavleplanleggeren — under bygging (23. sep. 2026)
 
 *Skissene og svarene står i Artifact «Tavleplanleggeren» og i CHANGELOG. Steg 1 (planlagt
-slutt og overtid) er levert. Hvert steg slettes herfra når det er levert.*
+slutt og overtid) og steg 2 (programmet, og planleggervinduet med liste og skjema) er levert.
+Hvert steg slettes herfra når det er levert.*
 
-- [ ] **Steg 2 — program og beredskapsnivå.** Konserttyper og kjennetegn som lister
-      KO-leder setter opp (pyro først); konserter og faste behov per sted og vakt, med
-      beredskapsnivå grønn/gul/oransje/rød og behov per ressursgruppe skrevet inn for
-      hånd — **typen setter ingen ressurser** (André). Bånd bak radene på tavla, og
-      «følger konserten» på plasseringen.
 - [ ] **Steg 3 — behov i drift.** «2 / 4 lag» per rad og ressursgruppe mens en konsert
       pågår, fra programmet mot plasseringene.
-- [ ] **Steg 4 — planleggervindu i KO-rutenettet.** Eget vindu som deler plass med
-      oppdragslista og står parkert som standard (André: «inni i ko rutenettet med samme
-      løsning som tavlen, at den er minimert»). Hele døgnet, programmet redigeres av
-      KO-leder, dekningsstripe per ressursgruppe mot vaktlistas skift.
+- [ ] **Steg 4 — tidslinja og dekningsstripa i planleggeren.** Vinduet finnes (steg 2, deler
+      plass med oppdragslista, parkert som standard) med liste per døgn og sted og skjema.
+      Mangler: programmet som tidslinje over hele døgnet, med samme rader som tavla, og en
+      dekningsstripe per ressursgruppe — behovet time for time mot lagene vaktlista har på
+      vakt.
 - [ ] **Steg 5 — endringer og plan mot faktisk.** Systemlinje ved hver programendring,
       plan mot faktisk per konsert (også tidligere år), og «kopier programmet» til ny vakt.
 - [ ] **Ekstra: planleggeren i eget nettleservindu på skjerm to** (André, 23. sep. 2026:

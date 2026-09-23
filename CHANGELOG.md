@@ -4,6 +4,70 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Programmet: konserter med beredskapsnivå og behov, planleggervinduet, bånd på tavla  `#ko` `#tavle` `#planlegger`
+
+Steg 2 av tavleplanleggeren. André: «Kunne legge inn type konserter på ulike konsertsteder.
+… Risikonivå med farge. Og planlegge for antall lag og andre ressurser», og svarene før
+koden: beredskapsnivå **«grønn, gul, oransje og rød … en standardisert form»**,
+**«Konserttyper skal ikke automatisk sette ressurser»**, «Spesiallag er en fast type lag»,
+**«KO-leder»** legger programmet, og planleggeren **«inni i ko rutenettet med samme løsning
+som tavlen, at den er minimert»**.
+
+**Planleggervinduet** — det sjette vinduet i KO. Det **deler plass med oppdragslista** og
+står **parkert i stripa som standard** («Skjult: Planlegger»). Hentes det fram, kan tavla og
+planleggeren stå side om side i nederste rad. «⇄ Planlegger» i oppdragslistas hode og
+«⇄ Oppdragsliste» i planleggerens bytter.
+
+- **Konsertene per døgn og sted**: tid, navn, type, beredskapsnivå, behov («4 Lag · 2
+  Ambulanse»), forventet publikum og kjennetegn. Døgnknappene i hodet, fra vaktstart og
+  hvert døgn som har en konsert.
+- **«+ Konsert» og klikk på en konsert er KO-lederens** (`skriv_leder` i KO); alle med `les`
+  ser programmet.
+- **Skjemaet**: sted, navn, døgn, fra–til, type, forventet publikum, beredskapsnivå
+  (grønn/gul/oransje/rød eller «ikke satt» for et fast behov), kjennetegn og **behov per
+  ressursgruppe i vaktlista** — ett tallfelt per gruppe, skrevet inn for hånd. **Typen fyller
+  ikke inn noe.** Et klokkeslett før døgnstarten hører til natta etter («01:00 fredag» er natt
+  til lørdag), og 22:00–00:30 går over midnatt av seg selv.
+- **Konserttyper og kjennetegn er lister KO-leder setter opp**, som ansvarsområdene: nye
+  faner i KO-innstillinger. Seedet med forslaget fra skissene — typene Headliner, Hiphop /
+  rap, Rock / metal, Pop, Elektronisk / DJ, Akustisk / lokal, Fast post; kjennetegnene
+  **Pyro**, Sittende publikum, Moshing ventet, Mye barn, Alkoholservering. Svaret fra
+  samarbeidspartneren legges inn der den dagen det kommer, uten en ny versjon av portalen.
+  En type eller et kjennetegn i bruk — også i fjorårets program — slettes ikke, men kan
+  deaktiveres.
+- **Spesiallag**: opprettes som en ressursgruppe i vaktlistas oppsett. Ingen kode.
+
+**På tavla**: konsertene står som **bånd bak radene** — skravur og en kant øverst i
+beredskapsfargen, med navnet, og hele teksten i verktøytipset. Formen er bevisst en annen
+enn prioriteten på hendelsene, så «rødt» ikke betyr to ting på samme skjerm.
+
+**«Følg konserten»**: i «Tider og slutt» for et lag som står på et sted med en konsert, kan
+slutten settes til konsertens. **Forsinkes konserten, følger lagets slutt med** uten at noen
+retter noe. Bare samme sted, og bare en konsert som ikke er over. Egen tid og «følg» er
+aldri begge; slettes konserten, har laget ingen planlagt slutt lenger.
+
+**Under panseret:** `ko/program.py`; modellene `Konserttype`, `Kjennetegn`, `Programpost`,
+`Programbehov` og `Tavleplassering.folger` (migrasjon `0016`, forslaget i `0017`). Alt
+valideres før noe skrives, og lagringen er én transaksjon — en konsert blir aldri stående
+uten behovet sitt. Sted, type og ressursgruppe fryses som navn, så programmet kan leses år
+etter år; pekerne ut av modulen strippes i backupen. Endepunkter: `/ko/api/program/`,
+`/ko/api/program/<pk>/`, og de to listene. `ko-plan.js` er KOs femte JS-fil.
+
+**Mutasjonstesting: 43 mutanter.** Tjenesten tungt (hver grense i navn, tid, antall og
+publikum; hver sperre på sted, type, gruppe, beredskap og kjennetegn; behovet som byttes ut;
+transaksjonen; «følg»-reglene), portene (lederkravet på POST og PUT/DELETE, vaktscopet,
+`folger_id`) og JS-reglene (døgnstarten `<` mot `<=`, «til» etter «fra», døgnvalget,
+kroppen, lederknappen, båndenes filter, «følg» i kroppen og rekkefølgen bånd–stolpe).
+**Tre overlevde første runde, og alle tre var hull i testene:** en test gjorde sted *og*
+type inaktive samtidig, så feilen kunne komme fra typen; transaksjonen var usynlig fordi
+valideringen skjer før all skriving (testen feiler nå skrivingen halvveis med en mock); og
+**ingen test gikk gjennom `koTavleRader` med et program**, så kallstedet kunne fjernes —
+nøyaktig fella CLAUDE.md beskriver. Tettet.
+
+**Funnet i nettleseren:** beredskapsmerket i planleggeren var grått. Standardfargen sto som
+`--bf` på grunnregelen, senere i fila enn `.ko-beredskap-*` og med samme spesifisitet — den
+vant. Står nå i `var(--bf, …)`.
+
 ## 2026-09-23 — Tavla: planlagt slutt på plasseringen, og overtid  `#ko` `#tavle`
 
 Steg 1 av tavleplanleggeren. André: «planlegge tid per plassering med beskjed/tegn på

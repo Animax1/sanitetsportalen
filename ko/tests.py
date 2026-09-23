@@ -342,8 +342,9 @@ class SidenHarIngenFanerTests(TestCase):
         self.assertEqual(markup.count('class="ko-splitter-v"'), 2)
         self.assertEqual(markup.count('class="ko-splitter-h"'), 1)
         # Hvert vindu har håndtaket som bytter plass — tavla også, som deler
-        # plass med ressursoversikten og står parkert fra start (22. sep. 2026).
-        self.assertEqual(markup.count('ko-grip'), 5)
+        # plass med ressursoversikten og står parkert fra start (22. sep. 2026),
+        # og planleggeren, som deler plass med oppdragslista (23. sep. 2026).
+        self.assertEqual(markup.count('ko-grip'), 6)
         tavle = markup[markup.index('data-vindu="tavle"') - 200:markup.index('data-vindu="tavle"')]
         self.assertIn('d-none', tavle, 'tavla står parkert til noen henter den')
 

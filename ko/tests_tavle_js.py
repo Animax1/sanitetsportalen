@@ -31,7 +31,9 @@ HARNESS = (
              'koTavleBesokHtml', 'koTavleIkkeVaertHtml', 'koTavleSkjemaData',
              'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleOppsettHtml',
              # Planlagt slutt (23. sep. 2026).
-             'koTavleSlutt', 'koTavleSluttHtml')),
+             'koTavleSlutt', 'koTavleSluttHtml',
+             # Programmet (steg 2).
+             'koTavleProgram', 'koTavleKonsertHtml')),
 )
 
 #: Klokka i testene: 22. sep. 2026 kl. 20:00 UTC.
