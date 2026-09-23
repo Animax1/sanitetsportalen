@@ -259,6 +259,15 @@ function koLoggHodeTekst() {
 function koTegnLoggHode() {
   const el = document.getElementById('ko-logg-antall');
   if (el) el.textContent = koLoggHodeTekst();
+  // Et loggvindu for seg bærer hendelsen i fanetittelen — to slike i
+  // oppgavelinja skal kunne skilles uten å åpne dem.
+  if (typeof koEgetVinduAktivt !== 'undefined' && koEgetVinduAktivt === 'logg') {
+    document.title = koLoggVinduTittel(koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null);
+  }
+}
+
+function koLoggVinduTittel(h) {
+  return (h ? h.kode + ' · ' + h.tittel : 'Loggstrøm') + ' · KO';
 }
 
 function koTaImotHendelser(liste) {

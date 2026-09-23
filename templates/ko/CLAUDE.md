@@ -28,7 +28,10 @@ vinduer vi har i flaten vår»). Samme side med `?vindu=<navn>` (`koEgetVinduNav
 kjent navn), ikke en egen mal — ett sted vinduet tegnes. Der vises bare det vinduet, og
 oppsettet **lagres ikke**: det er hovedvinduets. I hovedvinduet skjules det og står i
 stripa; det siste synlige blir stående, og står da to steder. Tidslinja synkes mellom
-vinduene over `BroadcastChannel('ko-tid')`.
+vinduene over `BroadcastChannel('ko-tid')`. **Står en hendelse åpen i loggvinduet, er det
+hendelsen som åpnes** (`&hendelse=<id>`, ett nettleservindu per hendelse), og strømmen
+står igjen i hovedvinduet — loggen og hendelsen deler vinduet, og ↗ åpnet strømmen til
+André sa fra.
 
 **Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
 Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad

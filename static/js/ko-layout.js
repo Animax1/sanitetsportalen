@@ -428,15 +428,54 @@ function koEgetVinduNavn(sok) {
   }
 }
 
-function koEgetVinduUrl(navn) {
-  return KO_VINDUER.includes(navn) ? '/ko/?vindu=' + encodeURIComponent(navn) : null;
+//: Vinduet denne siden viser alene (`?vindu=`), eller `null` i hovedvinduet.
+let koEgetVinduAktivt = null;
+
+// **Hendelsen som står åpen i loggvinduet følger med** (André, 23. sep. 2026:
+// «Når vi skal åpne en hendelse som ligger i loggstrøms vinduets plass og vil
+// åpne som et eget vindu så åpner du loggstrøms vinduet istedenfor»). Loggen
+// og hendelsen deler vinduet, og den nye siden visste ikke hvilken av dem
+// som sto der. `&hendelse=` gjelder bare `logg`, og bare et positivt heltall.
+function koEgetVinduHendelse(sok) {
+  try {
+    const p = new URLSearchParams(sok || '');
+    if (p.get('vindu') !== 'logg') return null;
+    const raa = p.get('hendelse') || '';
+    return /^[1-9]\d{0,9}$/.test(raa) ? Number(raa) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function koEgetVinduUrl(navn, hendelseId) {
+  if (!KO_VINDUER.includes(navn)) return null;
+  const h = navn === 'logg' && Number.isInteger(hendelseId) && hendelseId > 0 ? '&hendelse=' + hendelseId : '';
+  return '/ko/?vindu=' + encodeURIComponent(navn) + h;
+}
+
+// Hendelsen som står åpen i loggvinduet, eller `null`. Gjennom en vakt:
+// ko-hendelser.js lastes etter denne fila.
+function koAapenHendelseILoggen(navn) {
+  if (navn !== 'logg' || typeof koApenHendelseId === 'undefined') return null;
+  return Number.isInteger(koApenHendelseId) ? koApenHendelseId : null;
 }
 
 // Knappen i vinduets hode. Navngitt mål, så et nytt trykk henter fram det
 // samme nettleservinduet i stedet for å åpne et til.
+//
+// **Står en hendelse åpen i loggvinduet, er det den som får eget vindu** —
+// ett per hendelse (`ko-hendelse-<id>`), så to hendelser kan stå side om side.
+// Her lukkes den, og strømmen står igjen: den skal ikke vises to steder, og
+// loggvinduet skal ikke skjules for å gi plass til noe som alt er flyttet ut.
 function koApneEgetVindu(navn) {
-  const url = koEgetVinduUrl(navn);
+  const hendelse = koAapenHendelseILoggen(navn);
+  const url = koEgetVinduUrl(navn, hendelse);
   if (!url) return;
+  if (hendelse !== null) {
+    window.open(url, 'ko-hendelse-' + hendelse, 'popup,width=1100,height=800');
+    if (typeof koLukkDetalj === 'function') koLukkDetalj();
+    return;
+  }
   window.open(url, 'ko-' + navn, 'popup,width=1280,height=800');
   const ny = koSkjul(koOppsett || koLesOppsett(), navn);
   if (ny.skjult.length === ((koOppsett && koOppsett.skjult) || []).length) return;
@@ -471,6 +510,10 @@ function koTegnEgetVindu(navn) {
 function koOppsettStart() {
   const eget = koEgetVinduNavn(window.location.search);
   if (eget) {
+    koEgetVinduAktivt = eget;
+    // Hendelsen settes før første tegning; lista kommer med første poll.
+    const hendelse = koEgetVinduHendelse(window.location.search);
+    if (hendelse !== null && typeof koApenHendelseId !== 'undefined') koApenHendelseId = hendelse;
     koOppsett = koLesOppsett();
     koTegnEgetVindu(eget);
     koSettKonsollhoyde();

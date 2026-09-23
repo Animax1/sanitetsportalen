@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — ↗ på en åpen hendelse åpner hendelsen, ikke loggstrømmen  `#ko` `#vinduer`
+
+André: «Når vi skal åpne en hendelse som ligger i loggstrøms vinduets plass og vil åpne som
+et eget vindu så åpner du loggstrøms vinduet istedenfor.»
+
+**Årsaken:** hendelsen åpnes inne i loggvinduet — de deler plassen — og ↗ sendte bare
+`?vindu=logg`. Den nye siden visste ikke hvilken hendelse som sto der, og viste strømmen.
+
+- **Står en hendelse åpen, er det den som får eget vindu:** `/ko/?vindu=logg&hendelse=<id>`,
+  og siden åpner den ved oppstart. Fanetittelen er hendelsen («H1 · Fall ved scenen · KO»),
+  så to slike kan skilles i oppgavelinja.
+- **Ett nettleservindu per hendelse** (`ko-hendelse-<id>`): to hendelser kan stå side om
+  side på skjerm to, og ↗ på samme hendelse igjen henter fram det som alt er åpent.
+- **I hovedvinduet lukkes hendelsen, og strømmen står igjen** — loggvinduet skjules *ikke*,
+  slik det gjør når hele loggstrømmen flyttes ut. Uten åpen hendelse er alt som før.
+- `&hendelse=` leses som data: bare for `logg`, og bare et positivt heltall.
+
+**Mutasjonstesting:** 9 mutanter (`koEgetVinduHendelse`, `koEgetVinduUrl`,
+`koApneEgetVindu`, kallstedet i `koOppsettStart`, fanetittelen), alle drept. Kallstedet
+prøves gjennom `koOppsettStart` med en tom DOM, ikke bare lesingen av adressen. Prøvd i
+nettleseren: H1 åpen → ↗ → nytt vindu med H1, hovedvinduet viser strømmen.
+
 ## 2026-09-23 — Tavla og konsertplanleggeren, runde 2: framover i tid, «+ Planlegg» på alle rader, «Flytt nå», felles tidslinje og egne vinduer  `#ko` `#tavle` `#planlegger`
 
 André etter test på staging: «Tidslinjen på tavlen er litt rar. Når du drar over en enhet så

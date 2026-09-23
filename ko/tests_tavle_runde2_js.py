@@ -363,3 +363,81 @@ class KonsertplanleggerenFolgerTavlaJsTests(SimpleTestCase):
         self.assertEqual(ut[0], 'false true true')
         # 15:00 (¼ av tolv timer før 18) og 13 timer; så i morgen fra 18:00.
         self.assertEqual(json.loads(ut[1]), ['-3|12', '24|12'])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class HendelsenIEgetVinduJsTests(SimpleTestCase):
+    """André, 23. sep. 2026: «Når vi skal åpne en hendelse som ligger i
+    loggstrøms vinduets plass og vil åpne som et eget vindu så åpner du
+    loggstrøms vinduet istedenfor.» Prøvd gjennom knappens egen inngang,
+    `koApneEgetVindu`."""
+
+    HARNESS = (
+        (KO_JS, ('koEgetVinduNavn', 'koEgetVinduHendelse', 'koEgetVinduUrl', 'koAapenHendelseILoggen',
+                 'koApneEgetVindu', 'koLoggVinduTittel', 'koOppsettStart', 'koTegnEgetVindu', 'koVinduElement',
+                 'koSettKonsollhoyde')),
+    )
+
+    def _kjor(self, kode):
+        pre = _konst(LAYOUT_JS, 'KO_VINDUER') + """
+            let koApenHendelseId = null; let koOppsett = null;
+            const aapnet = []; let lukket = 0; let skjult = [];
+            globalThis.window = { open: (url, navn) => aapnet.push([url, navn]) };
+            function koLukkDetalj() { lukket += 1; koApenHendelseId = null; }
+            function koLesOppsett() { return {skjult: []}; }
+            function koSkjul(o, navn) { skjult.push(navn); return {skjult: [navn]}; }
+            function koLagreOppsett() {}
+            function koTegnOppsett() {}
+        """
+        ut = run_node(build_harness(self.HARNESS), kode, preamble=pre).splitlines()
+        return ut[:-1] if ut and ut[-1] == 'OK' else ut
+
+    def test_hendelsen_som_staar_aapen_faar_vinduet_og_stroemmen_blir(self):
+        ut = self._kjor("""
+            koApenHendelseId = 12;
+            koApneEgetVindu('logg');
+            console.log(JSON.stringify([aapnet, lukket, skjult]));
+        """)
+        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=logg&hendelse=12', 'ko-hendelse-12']], 1, []],
+                         'hendelsen i eget vindu, lukket her, og loggvinduet ikke skjult')
+
+    def test_uten_aapen_hendelse_er_det_loggstroemmen(self):
+        ut = self._kjor("""
+            koApneEgetVindu('logg');
+            koApenHendelseId = 12;
+            koApneEgetVindu('tavle');
+            console.log(JSON.stringify([aapnet, lukket, skjult]));
+        """)
+        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=logg', 'ko-logg'], ['/ko/?vindu=tavle', 'ko-tavle']],
+                                             0, ['logg', 'tavle']],
+                         'en åpen hendelse gjelder bare loggvinduet')
+
+    def test_adressen_leses_som_data(self):
+        ut = self._kjor("""
+            console.log(JSON.stringify([koEgetVinduHendelse('?vindu=logg&hendelse=12'),
+              koEgetVinduHendelse('?vindu=tavle&hendelse=12'), koEgetVinduHendelse('?vindu=logg&hendelse=0'),
+              koEgetVinduHendelse('?vindu=logg&hendelse=12abc'), koEgetVinduHendelse('?vindu=logg&hendelse=-3'),
+              koEgetVinduHendelse('?vindu=logg'), koEgetVinduHendelse(null),
+              koEgetVinduUrl('logg', 7), koEgetVinduUrl('tavle', 7), koEgetVinduUrl('logg', '7'),
+              koLoggVinduTittel({kode: 'H3', tittel: 'Fall'}), koLoggVinduTittel(null)]));
+        """)
+        self.assertEqual(json.loads(ut[0]), [12, None, None, None, None, None, None,
+                                             '/ko/?vindu=logg&hendelse=7', '/ko/?vindu=tavle', '/ko/?vindu=logg',
+                                             'H3 · Fall · KO', 'Loggstrøm · KO'])
+
+    def test_siden_aapner_hendelsen_fra_adressen_ved_oppstart(self):
+        """Kallstedet i `koOppsettStart`, ikke bare lesingen av adressen."""
+        ut = self._kjor("""
+            let koEgetVinduAktivt = null;
+            globalThis.document = { getElementById: () => null, querySelector: () => null,
+                                    querySelectorAll: () => [], title: '' };
+            window.location = { search: '?vindu=logg&hendelse=5' };
+            window.addEventListener = () => {};
+            koOppsettStart();
+            console.log(koApenHendelseId, koEgetVinduAktivt);
+            koApenHendelseId = null;
+            window.location = { search: '?vindu=tavle&hendelse=5' };
+            koOppsettStart();
+            console.log(koApenHendelseId, koEgetVinduAktivt);
+        """)
+        self.assertEqual(ut, ['5 logg', 'null tavle'])
