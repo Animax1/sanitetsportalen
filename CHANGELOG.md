@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Forslag: kartmodul med værlag (vind, nedbør, farevarsler)  `#kart` `#docs`
+
+Ingen kode. Utredning lagt i `docs/FORSLAG_KARTMODUL.md` og som eget prosjekt under
+«Ideer / backlog» i `TODO.md` — **ikke noe som gjøres i år** (André, 23. sep. 2026), men
+arbeidet med kilder og arkitektur skal ikke måtte gjøres på nytt.
+
+**Avgjort av André:** kart med topografi og flyfoto/satellitt, farevarsler,
+vindretningspiler og nedbørsmengde, fra **MET, Kartverket og NVE/Varsom**. Ingen
+kommersielle kilder (Windy og OpenWeatherMap ble vurdert og valgt bort). Nødfall uten nett
+tas ikke i første omgang. Kildehenvisningen står som vannmerke nede til høyre.
+
+**Kostnad: 0 kr i data.** Alle tre er åpne data (NLOD / CC BY 4.0). En helg med ti
+lokasjoner er rundt 1 000 kall mot MET; grensen er 20 forespørsler per sekund.
+
+**Tre funn som styrer arkitekturen:**
+- **Portalen har ingen kart, ingen værdata, og `oppdrag.Lokasjon` har ingen
+  koordinater** — kontrollert i koden.
+- **CSP-en blokkerer kartflisene i stillhet** (`img-src 'self' data:`). Grått kart, ingen
+  feilmelding — samme felle som `media-src blob:`.
+- **MET krever `User-Agent`, som JavaScript ikke kan sette** — derfor henter serveren
+  værdataene og cacher dem, mens nettleseren henter flisene direkte fra Kartverket.
+
+**Og flyfotoet er ikke åpent lenger.** Kartverket har lagt ned de åpne WMTS-tjenestene
+for Norge i bilder; den nye tjenesten krever GeoID-token og er for parter i Norge
+digitalt. Står som åpent spørsmål i notatet (§6.1), med Sentinel-2 som reserve.
+
+---
 ## 2026-09-23 — Avtalte pauser i vaktlista, og KO-tavla henter dem  `#vaktliste` `#ko` `#pauser`
 
 André: «vi har planer om å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er
