@@ -208,6 +208,7 @@ KO_LOGG_BYGGERE = (
     'koTavleStolpeHtml',
     'koTavleSluttHtml',
     'koTavleKonsertHtml',
+    'koTavleBehovHtml',
     # ko-plan.js (23. sep. 2026): planleggeren.
     'koPlanBeredskapHtml',
     'koPlanPostHtml',

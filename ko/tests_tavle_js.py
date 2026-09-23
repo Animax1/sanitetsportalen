@@ -33,7 +33,9 @@ HARNESS = (
              # Planlagt slutt (23. sep. 2026).
              'koTavleSlutt', 'koTavleSluttHtml',
              # Programmet (steg 2).
-             'koTavleProgram', 'koTavleKonsertHtml')),
+             'koTavleProgram', 'koTavleKonsertHtml',
+             # Behovet i drift (steg 3).
+             'koTavleBehovNaa', 'koTavleBehovHtml')),
 )
 
 #: Klokka i testene: 22. sep. 2026 kl. 20:00 UTC.
@@ -81,6 +83,7 @@ class TavlereglerTests(SimpleTestCase):
         self.harness = build_harness(HARNESS)
         self.pre = (_konst(TAVLE_JS, 'KO_TAVLE_LENGE_MIN')
                     + _konst(TAVLE_JS, 'KO_TAVLE_PAUSE_FORVARSEL_MIN')
+                    + _konst(TAVLE_JS, 'KO_TAVLE_BEHOV_FORVARSEL_MIN')
                     + 'let koTavleValgt = null;\n'
                     + 'let koKanSkriveSvar = true;\n'
                     + 'function koKanSkrive() { return koKanSkriveSvar; }\n'

@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-23 — Tavla: behovet i drift, «Lag 2/4» per sted  `#ko` `#tavle`
+
+Steg 3 av tavleplanleggeren. Under stedsnavnet på tavla står nå **behovet til konserten
+som pågår — mot det som står der**: «Lag 2/4», «Ambulanse 0/1». **Gult når noe mangler,
+grønt når det holder**, og verktøytipset sier det med ord.
+
+- **Fra 30 minutter før konserten begynner**, så lagene er på plass når den starter
+  (`KO_TAVLE_BEHOV_FORVARSEL_MIN`), og til den er slutt.
+- **Det som teller som «står der»**: en åpen plassering på stedet, **og** et lag på en
+  hendelse eller en bil på et oppdrag der — opptatt på stedet er fortsatt på stedet. Et lag
+  i pause eller på et annet sted teller ikke.
+- **To konserter samtidig på samme sted legges sammen.**
+- Gruppa matches på id, og på navnet når id-en er borte (en gjenopprettet backup stripper
+  pekeren til vaktlista).
+
+**Mutasjonstesting: 13 mutanter** — forvarselets grense (`<=` mot `<`), slutten, filteret på
+sted, `kommer`, summeringen (`+=`), lukket plassering, opptatt på stedet, navnematchen,
+«mangler» på grensen, og begge kallstedene (`koTavleRader` og `koTavleRadHtml`). Alle drept.
+
 ## 2026-09-23 — Programmet: konserter med beredskapsnivå og behov, planleggervinduet, bånd på tavla  `#ko` `#tavle` `#planlegger`
 
 Steg 2 av tavleplanleggeren. André: «Kunne legge inn type konserter på ulike konsertsteder.

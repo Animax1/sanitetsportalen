@@ -25,6 +25,7 @@ HARNESS = (
              'koTavleKonsertHtml', 'koTavleRadHtml', 'koTavleStolpeHtml', 'koTavleSluttHtml',
              'koTavleSkjemaData', 'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleVarighet',
              'koTavleRader', 'koTavleSynlig', 'koTavleKanDras', 'koTavlePauseStatus', 'koTavleSlutt',
+             'koTavleBehovNaa', 'koTavleBehovHtml',
              'koPlanDognene', 'koPlanTid', 'koPlanTil', 'koPlanGruppert', 'koPlanBehovTekst',
              'koPlanKropp', 'koPlanBeredskapHtml', 'koPlanPostHtml', 'koPlanListeHtml',
              'koPlanDognvalgHtml', 'koPlanSkjemaData', 'koPlanSkjemaHtml', 'koPlanSteder',
@@ -50,6 +51,7 @@ class PlanreglerTests(SimpleTestCase):
     def setUp(self):
         self.harness = build_harness(HARNESS)
         self.pre = (_konst(PLAN_JS, 'KO_PLAN_DOGN') + _konst(TAVLE_JS, 'KO_TAVLE_LENGE_MIN')
+                    + _konst(TAVLE_JS, 'KO_TAVLE_BEHOV_FORVARSEL_MIN')
                     + _konst(TAVLE_JS, 'KO_TAVLE_PAUSE_FORVARSEL_MIN') + 'let koTavleValgt = null;\n' + FORSPILL)
 
     def _kjor(self, kode):
@@ -276,3 +278,79 @@ class ProgrammetPaaTavlaJsTests(PlanreglerTests):
         self.assertNotIn('planlagt_til', med)
         self.assertNotIn('folger_id', uten)
         self.assertIsNone(uten['planlagt_til'])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class BehovIDriftJsTests(PlanreglerTests):
+    """Steg 3: «Lag 2/4» på raden — behovet til konsertene som pågår (eller
+    begynner innen forvarselet), mot det som står der nå."""
+
+    DATA = """
+        const BEHOV = [{gruppe_id: 10, gruppe_navn: 'Lag', antall: 3}, {gruppe_id: 20, gruppe_navn: 'Ambulanse', antall: 1}];
+        const data = {
+          rader: [{id: 1, navn: 'Park'}, {id: 2, navn: 'Club'}], pauser: [],
+          grupper: [{id: 10, navn: 'Lag'}, {id: 20, navn: 'Ambulanse'}],
+          ressurser: [
+            {id: 101, navn: 'Lag 1', gruppe_id: 10, bil: false, opptatt: null},
+            {id: 102, navn: 'Lag 2', gruppe_id: 10, bil: false, opptatt: null},
+            {id: 103, navn: 'Lag 3', gruppe_id: 10, bil: false, opptatt: {merke: 'På H1', tekst: '', lokasjon_id: 1,
+                                                                        fra: I(L(25, 21)), hendelse_id: 1}},
+            {id: 104, navn: 'Lag 4', gruppe_id: 10, bil: false, opptatt: null},
+            {id: 201, navn: 'Amb 1', gruppe_id: 20, bil: true, opptatt: null},
+          ],
+          plasseringer: [
+            {id: 1, ressurs_id: 101, lokasjon_id: 1, pause: false, fra: I(L(25, 20)), til: null},
+            {id: 2, ressurs_id: 102, lokasjon_id: 1, pause: false, fra: I(L(25, 19)), til: I(L(25, 20))},
+            {id: 3, ressurs_id: 104, lokasjon_id: 2, pause: false, fra: I(L(25, 20)), til: null},
+            {id: 4, ressurs_id: 201, lokasjon_id: 1, pause: false, fra: I(L(25, 20)), til: null},
+          ],
+          program: [POST(1, 'Park', 1, L(25, 21), L(25, 23), {behov: BEHOV})],
+        };
+        const B = (naa) => JSON.stringify(koTavleBehovNaa(data, 1, naa).map((b) => [b.navn, b.har, b.trengs, b.mangler, b.kommer]));
+    """
+
+    def test_teller_det_som_staar_der_naa_ogsaa_paa_hendelse(self):
+        ut = self._kjor(self.DATA + 'console.log(B(L(25, 22)));')
+        # Lag 1 åpen på Park, Lag 3 på en hendelse på Park. Lag 2 er gått, Lag 4 er på Club.
+        self.assertEqual(json.loads(ut[0]), [['Lag', 2, 3, True, False], ['Ambulanse', 1, 1, False, False]])
+
+    def test_foer_forvarselet_og_etter_slutt_ingenting_innenfor_kommer(self):
+        ut = self._kjor(self.DATA + """
+            console.log(B(L(25, 20, 29))); console.log(B(L(25, 20, 30))); console.log(B(L(25, 23)));
+        """)
+        self.assertEqual(ut[0], '[]', 'mer enn 30 min før')
+        self.assertEqual(json.loads(ut[1])[0][4], True, 'innen forvarselet: kommer')
+        self.assertEqual(ut[2], '[]', 'konserten er over')
+
+    def test_to_konserter_legges_sammen_og_et_annet_sted_teller_ikke(self):
+        ut = self._kjor(self.DATA + """
+            data.program.push(POST(2, 'Park', 1, L(25, 22), L(25, 23), {behov: [{gruppe_id: 10, gruppe_navn: 'Lag', antall: 2}]}));
+            data.program.push(POST(3, 'Club', 2, L(25, 21), L(25, 23), {behov: [{gruppe_id: 10, gruppe_navn: 'Lag', antall: 9}]}));
+            console.log(B(L(25, 22, 30)));
+        """)
+        self.assertEqual(json.loads(ut[0])[0][:3], ['Lag', 2, 5])
+
+    def test_gruppa_matches_paa_navn_naar_id_en_er_borte(self):
+        ut = self._kjor(self.DATA + """
+            data.program[0].behov = [{gruppe_id: null, gruppe_navn: 'Lag', antall: 1}];
+            console.log(B(L(25, 22)));
+        """)
+        self.assertEqual(json.loads(ut[0]), [['Lag', 2, 1, False, False]])
+
+    def test_gjennom_den_ekte_inngangen_og_pause_raden_har_ingen(self):
+        ut = self._kjor(self.DATA + """
+            const rader = koTavleRader(data, koTavleVindu(L(25, 22), 12), 'alle');
+            const park = rader.find((r) => r.id === 1);
+            console.log(JSON.stringify([park.behov.length, rader.find((r) => r.pause).behov.length]));
+            console.log(koTavleRadHtml(park));
+        """)
+        self.assertEqual(json.loads(ut[0]), [2, 0])
+        self.assertIn('ko-tavle-behov-mangler', ut[1])
+        self.assertIn('Lag 2/3', ut[1])
+        self.assertIn('ko-tavle-behov-ok', ut[1])
+
+    def test_behovet_escapes(self):
+        ut = self._kjor("""
+            console.log(koTavleBehovHtml([{navn: '<img src=x>', har: 1, trengs: 2, mangler: true, kommer: false}]));
+        """)
+        self.assertNotIn('<img', ut[0])

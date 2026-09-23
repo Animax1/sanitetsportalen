@@ -171,5 +171,6 @@ se, finnes ikke). Flytting er `skriv_full` i KO.
 | `koPlanKropp` sier fra ved knappen (`{feil}`); tomt antall er null og tas ut | Samme regel som «Velg…» ellers |
 | Bare KO-leder får «+ Konsert» og klikk på en post (`koPlanKanLede` → `koKanFjerne`) | En knapp som fører til en vegg er verre enn ingen |
 | **Båndene bak radene** (`koTavleProgram`, `koTavleKonsertHtml`): skravur og kant i beredskapsfargen, `ko-beredskap-<nivå>`; ukjent nivå får ingen farge | Samme form som skissene, og en annen enn prioriteten på hendelsene — så «rødt» ikke betyr to ting |
+| **Behovet i drift** (`koTavleBehovNaa`, steg 3): «Lag 2/4» under stedsnavnet for konsertene som pågår eller begynner innen `KO_TAVLE_BEHOV_FORVARSEL_MIN` (30). Teller åpne plasseringer på stedet **og** de som er opptatt der (hendelse, oppdrag); to konserter samtidig legges sammen; gruppa matches på navn når id-en er borte | Lagene skal være på plass når konserten starter. Opptatt der er fortsatt der |
 | **«Følg konserten»** i «Tider og slutt»: konsertene på stedet som ikke er over; valgt sendes `folger_id`, ikke en egen tid | Flyttes konserten, følger slutten med |
 | Standardfargen står i `var(--bf, …)`, ikke som `--bf` på grunnregelen | Satt der, vant den over `.ko-beredskap-*` senere i fila, og merket ble grått |

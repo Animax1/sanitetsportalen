@@ -49,6 +49,10 @@ let koTavleBesokValg = { lokasjon: null, maal: 'antall' };
 //: «Pause nå» dukker opp så mange minutter før pausen er planlagt.
 const KO_TAVLE_PAUSE_FORVARSEL_MIN = 10;
 
+//: Behovet til en konsert står på raden så mange minutter før den begynner —
+//: lagene skal være på plass når den starter, ikke etter.
+const KO_TAVLE_BEHOV_FORVARSEL_MIN = 30;
+
 function koTavleKanSkrive() {
   return typeof koKanSkrive === 'function' ? koKanSkrive() : false;
 }
@@ -169,6 +173,40 @@ function koTavleProgram(data, radId, vindu) {
   }));
 }
 
+// Behovet i drift (steg 3): for konsertene på stedet som pågår — eller
+// begynner innen forvarselet — hvor mange av hver ressursgruppe som trengs,
+// og hvor mange som **står der nå**: en åpen plassering på stedet, eller
+// opptatt på en hendelse eller et oppdrag der. To konserter samtidig på samme
+// sted legges sammen. Gruppa matches på id, og på navnet når id-en er borte
+// (en gjenopprettet backup stripper den).
+function koTavleBehovNaa(data, radId, naaMs) {
+  const aktive = (data.program || []).filter((k) => k.lokasjon_id === radId
+    && Date.parse(k.fra) - KO_TAVLE_BEHOV_FORVARSEL_MIN * 60000 <= naaMs && naaMs < Date.parse(k.til));
+  if (!aktive.length) return [];
+  const gruppeNavn = new Map((data.grupper || []).map((g) => [g.id, g.navn]));
+  const trengs = new Map();
+  const kommer = aktive.every((k) => Date.parse(k.fra) > naaMs);
+  aktive.forEach((k) => (k.behov || []).forEach((b) => {
+    const nokkel = b.gruppe_id ? 'id:' + b.gruppe_id : 'navn:' + b.gruppe_navn;
+    const f = trengs.get(nokkel) || { gruppe_id: b.gruppe_id, navn: b.gruppe_navn, trengs: 0 };
+    f.trengs += b.antall;
+    trengs.set(nokkel, f);
+  }));
+  const ressurser = new Map((data.ressurser || []).map((r) => [r.id, r]));
+  const her = new Set();
+  (data.plasseringer || []).forEach((p) => { if (!p.til && !p.pause && p.lokasjon_id === radId) her.add(p.ressurs_id); });
+  (data.ressurser || []).forEach((r) => { if (r.opptatt && r.opptatt.lokasjon_id === radId) her.add(r.id); });
+  const har = (f) => Array.from(her).filter((id) => {
+    const r = ressurser.get(id);
+    if (!r) return false;
+    return f.gruppe_id ? r.gruppe_id === f.gruppe_id : gruppeNavn.get(r.gruppe_id) === f.navn;
+  }).length;
+  return Array.from(trengs.values()).map((f) => {
+    const n = har(f);
+    return { navn: f.navn, trengs: f.trengs, har: n, mangler: n < f.trengs, kommer };
+  });
+}
+
 // Radene med stolpene sine. **Pause-raden står øverst og er ikke en
 // lokasjon.** En stolpe er en plassering som overlapper vinduet, eller en
 // ressurs som er opptatt på en hendelse eller et oppdrag med lokasjon —
@@ -254,6 +292,7 @@ function koTavleRader(data, vindu, filter) {
              naa: treff.filter((t) => t.aapen || t.opptatt).length,
              over: stolper.filter((s) => s.slutt && s.slutt.over).length,
              program: rad.pause ? [] : koTavleProgram(data, rad.id, vindu),
+             behov: rad.pause ? [] : koTavleBehovNaa(data, rad.id, vindu.naa),
              fulgt: !rad.pause && (data.fulgte || []).includes(rad.id) };
   });
 }
@@ -375,6 +414,21 @@ function koTavleKonsertHtml(k) {
     + '</span></div>';
 }
 
+// «Lag 2/4» under stedsnavnet: gult når noe mangler, grønt når det holder.
+// «om litt» når konserten ikke har begynt ennå.
+function koTavleBehovHtml(behov) {
+  if (!behov || !behov.length) return '';
+  const merker = behov.map((b) => {
+    // Tittelen settes sammen som en liste og escapes som én tekst.
+    const tittel = [b.navn, ': ', b.har, ' står her, ', b.trengs, ' trengs',
+                    b.kommer ? ' når konserten begynner' : ''].join('');
+    return '<span class="ko-tavle-behov' + (b.mangler ? ' ko-tavle-behov-mangler' : ' ko-tavle-behov-ok')
+      + '" title="' + escapeHtml(tittel) + '">' + escapeHtml(b.navn) + ' '
+      + escapeHtml(String(b.har)) + '/' + escapeHtml(String(b.trengs)) + '</span>';
+  }).join('');
+  return '<div class="ko-tavle-behovene">' + merker + '</div>';
+}
+
 function koTavleRadHtml(rad) {
   const hoyde = rad.baner * 28 + 8;
   // Båndene først, så stolpene legger seg over dem.
@@ -389,7 +443,8 @@ function koTavleRadHtml(rad) {
       : '')
     + (rad.over ? '<span class="ko-tavle-over-tall" title="Står over planlagt slutt">' + escapeHtml(String(rad.over))
       + ' over</span>' : '')
-    + '<span class="ko-tavle-radtall">' + escapeHtml(rad.naa ? String(rad.naa) : '–') + '</span></div>'
+    + '<span class="ko-tavle-radtall">' + escapeHtml(rad.naa ? String(rad.naa) : '–') + '</span>'
+    + koTavleBehovHtml(rad.behov) + '</div>'
     + '<div class="ko-tavle-spor" style="height:' + escapeHtml(String(hoyde)) + 'px">'
     + stolper + '</div></div>';
 }
