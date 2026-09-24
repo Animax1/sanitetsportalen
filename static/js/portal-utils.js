@@ -112,6 +112,68 @@ async function apiFetch(url, options = {}) {
 }
 
 // ════════════════════════════════════════════════════════
+// ENDRINGSNUMMERET (core/endringer.py)
+// ════════════════════════════════════════════════════════
+//
+// Fanen spør om ett tall per område hvert 2,5 sekund, og henter en liste bare
+// når tallet for den er nytt. **Ett spørsmål for alle områdene fanen følger**
+// (24. sep. 2026): `/ko/` følger tavla, oppdragene og loggen samtidig, og tre
+// løkker ville tredoblet trafikken — og en delt drifts-PC med fire vinduer
+// ville nådd bremsen på 240/m. Sikkerhetsnettet (listas egen, langsomme
+// polling) står hos hver liste: klokka endrer ting uten at noen skriver, og
+// uten cache er tallet tomt.
+
+const ENDRING_MS = 2500;
+
+//: `[{omrade, hent, aktiv, versjon}]` — én per liste som følger et område.
+const endringFolgere = [];
+let endringTimer = null;
+let endringPaagaar = false;
+
+// Skal lista hentes? **Likhet, ikke størrelse**: et tall som er annerledes
+// enn sist, også mindre — cachen kan ha startet på nytt. Et tomt svar (ingen
+// tilgang, cachen nede) henter ikke; sikkerhetsnettet tar det.
+function endringSkalHente(forrige, ny) {
+  return typeof ny === 'string' && ny !== '' && ny !== forrige;
+}
+
+// Meld inn en liste: `hent()` kalles når tallet for `omrade` er nytt, men bare
+// mens `aktiv()` sier ja — en tavle som ikke står framme, spør ikke. Løkka
+// startes første gang noen melder seg; en side uten følgere spør aldri.
+function folgEndringer(omrade, hent, aktiv) {
+  endringFolgere.push({ omrade, hent, aktiv: aktiv || (() => true), versjon: null });
+  if (endringTimer === null) endringTimer = setInterval(sjekkEndringer, ENDRING_MS);
+}
+
+async function sjekkEndringer() {
+  if (endringPaagaar) return;
+  // En skjult fane eller en PC med skjermsparer spør ikke, og henter ved
+  // neste synlige runde.
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  const aktive = endringFolgere.filter((f) => f.aktiv());
+  if (!aktive.length) return;
+  const omrader = [...new Set(aktive.map((f) => f.omrade))].sort();
+  endringPaagaar = true;
+  try {
+    const res = await apiFetch('/api/endringer/?omrader=' + encodeURIComponent(omrader.join(',')));
+    if (!res.ok) return;
+    const svar = (await res.json()) || {};
+    // Alle hentingene startes før noen av dem venter, så én som feiler,
+    // stopper ikke de andre. (En egen `try` rundt hver sto til
+    // mutasjonstestingen viste at den ikke endret noe.)
+    await Promise.all(aktive.filter((f) => endringSkalHente(f.versjon, svar[f.omrade])).map((f) => {
+      f.versjon = svar[f.omrade];
+      return f.hent();
+    }));
+  } catch (e) {
+    // Nettet er borte, eller en henting feilet; neste runde eller
+    // sikkerhetsnettet prøver igjen.
+  } finally {
+    endringPaagaar = false;
+  }
+}
+
+// ════════════════════════════════════════════════════════
 // SUBMIT GUARD (forhindrer dobbeltklikk-registrering)
 // ════════════════════════════════════════════════════════
 

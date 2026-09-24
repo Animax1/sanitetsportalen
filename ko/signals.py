@@ -45,10 +45,12 @@ from oppdrag.models import (
 )
 from vaktliste.models import Pause, Ressurs, Vaktpost
 
+from oppdrag import endringer as oppdrag_endringer
+
 from . import endringer as ko_endringer
 from . import systemlinjer
-from .models import (Hendelse, HendelseLag, PlanlagtPause, Programbehov, Programpost,
-                     Tavleplassering)
+from .models import (Hendelse, HendelseDeltaker, HendelseLag, Linjedeling, Logglinje, PlanlagtPause,
+                     Programbehov, Programpost, Tavleplassering)
 from .services import systemlinje
 
 logger = logging.getLogger(__name__)
@@ -355,3 +357,51 @@ def tavleinnstilling_endret(sender, instance=None, **kwargs):
     registrering, og hver av dem ville fått alle fanene til å hente tavla."""
     if instance is not None and str(instance.key).startswith('ko.tavle'):
         ko_endringer.tavla_endret()
+
+
+# ── Endringsnummeret for loggen og oppdragslista (24. sep. 2026) ─────────────
+#
+# **`logg`: alt `logg_view` sender.** Linjene (også festing, fjerning og
+# deling, som endrer en rad uten ny id), hendelsene med lag og deltakere — og
+# oppdragene, fordi hendelseslista teller de åpne på hver hendelse. Samme
+# regler som tavlas mottaker over.
+
+@receiver(post_save, sender=Logglinje)
+@receiver(post_delete, sender=Logglinje)
+@receiver(post_save, sender=Linjedeling)
+@receiver(post_delete, sender=Linjedeling)
+@receiver(post_save, sender=Hendelse)
+@receiver(post_delete, sender=Hendelse)
+@receiver(post_save, sender=HendelseLag)
+@receiver(post_delete, sender=HendelseLag)
+@receiver(post_save, sender=HendelseDeltaker)
+@receiver(post_delete, sender=HendelseDeltaker)
+@receiver(post_save, sender=Oppdrag)
+@receiver(post_delete, sender=Oppdrag)
+@ikke_under_loaddata
+def loggen_endret(sender, instance=None, **kwargs):
+    """Noe loggstrømmen eller hendelseslista viser, er endret."""
+    ko_endringer.loggen_endret()
+
+
+# **`oppdrag` for det KO skriver på oppdragene i sentralbordets liste**:
+# hendelsens prioritet (H-merket), lagene og de delte linjene står på raden
+# (`oppdrag_til_dict`), men lagres i KO — oppdragsmodulens egne mottakere ser
+# dem ikke. En linje utenfor en hendelse står aldri på et oppdrag, og øker
+# ikke tallet: ellers ville hver linje i loggstrømmen fått sentralbordet til å
+# hente begge listene.
+
+@receiver(post_save, sender=Hendelse)
+@receiver(post_delete, sender=Hendelse)
+@receiver(post_save, sender=HendelseLag)
+@receiver(post_delete, sender=HendelseLag)
+@receiver(post_save, sender=Linjedeling)
+@receiver(post_delete, sender=Linjedeling)
+@receiver(post_save, sender=Logglinje)
+@receiver(post_delete, sender=Logglinje)
+@ikke_under_loaddata
+def oppdragslista_endret(sender, instance=None, **kwargs):
+    """Noe KO eier, som står på et oppdrag i sentralbordets liste, er endret."""
+    if sender is Logglinje and not getattr(instance, 'hendelse_id', None):
+        return
+    oppdrag_endringer.oppdrag_endret()

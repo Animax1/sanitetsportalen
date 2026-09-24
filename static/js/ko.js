@@ -111,10 +111,12 @@ function koSidebarLyttere() {
 // ha alt, kronologisk (TODO.md). Festede linjer står øverst i egen boks.
 // ════════════════════════════════════════════════════════════════════════════
 
-// 15 sekunder. Loggen er det eneste på sida som endrer seg i sekunder: to
+// **Sikkerhetsnettet**, 30 sekunder. Loggen endrer seg i sekunder — to
 // operatører fører samtidig, og en linje som kommer et halvt minutt for sent
-// er en linje man rekker å skrive på nytt. Bremsen er 240/m.
-const KO_LOGG_MS = 15000;
+// er en linje man rekker å skrive på nytt — så hentingen styres av
+// endringsnummeret (`folgEndringer('logg', …)`, 2,5 s). Nettet tar et tall
+// som ikke kom fram. Var 15 sekunder til 24. sep. 2026, da det var den eneste.
+const KO_LOGG_MS = 30000;
 
 // **`?siden=<id>` og ikke full henting** (§7.1). Arbeidet i KO er påføringer,
 // og polling skalerer fint så lenge nesten alt er nye rader. WebSockets er
@@ -832,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   koHentLogg();
   setInterval(koHentLogg, KO_LOGG_MS);
+  folgEndringer('logg', koHentLogg);
 
   // Vaktlistas ressurser uten oppdragsenhet (pulje 6). Bare når flata finnes
   // — den tegnes ikke uten vaktlistetilgang.

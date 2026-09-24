@@ -28,6 +28,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | «Avreist → Annet sted» har et **fritekstfelt** (`Statusmelding.sted_tekst`, 19. sep.): bilen og føringen sender det i kroppen, bare ved `annet`; arves av korreksjon; aldri verdilogget | `_sted_tekst`, `STEMPLING_TILLATTE_NOKLER`, `choices.sted_navn_for`, `stempleAnnetSted` i bilen |
 | «Nytt oppdrag» bygges **ikke om** mens operatøren står i det: `fyllNedtrekk` venter når fokus er i det viste skjemaet, og rører ikke uendret markup | `skjemaErIBruk()` i `oppdrag-sentral-lasting.js`; `koFyllHendelsevalg` samme regel |
 | **Verdiene endres ett felt om gangen, og hver endring står i tidslinjen** (23. sep.). Hastegraden alene beholder problemstillingen om den passer, ellers «Udefinert» (merket `automatisk`). Notatet logges uten verdier | `Oppdragsendring`, `services.problemstilling_etter_hastegrad`, `logg_endringer`; PUT i `oppdrag_detalj_view` |
+| **Endringsnummeret `oppdrag`** (24. sep.): enhets- og oppdragslista hentes når tallet er nytt, 2,5 s — også i `/ko/`. KO øker det for prioritet, lag og delte linjer; bilen følger det ikke | `oppdrag/endringer.py`, mottakeren i `signals.py` |
 | Bilen ser bare det lista viser (30 min etter Ledig) — også på detalj, stempling, grovsortering og antall; og aldri flåten, flytting eller verdimengdene | `views._synlig_for_bilen`, `er_enhetskonto`-sjekkene |
 
 **Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.

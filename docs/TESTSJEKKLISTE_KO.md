@@ -82,8 +82,9 @@ gjennomgang av §2 og §10 på en liten skjerm.
 - [ ] **Oppgi et tidspunkt** i tidsfeltet → linja får det tidspunktet, ikke nå.
 - [ ] **Tom tekst** → skjemaet sier fra, ingenting lagres.
 - [ ] **Maks lengde** håndheves (feltet stopper), og lang tekst brytes i strømmen.
-- [ ] **To faner, én vakt.** Skriv en linje i fane A → den står i fane B innen 15 sekunder
-      uten at du gjorde noe. *Pollen er 15 s for loggen.*
+- [ ] **To faner, én vakt.** Skriv en linje i fane A → den står i fane B innen 2–3
+      sekunder uten at du gjorde noe (endringsnummeret). Opprett et oppdrag i A → det
+      står i Bs oppdragsliste, og på `/oppdrag/`, like fort.
 - [ ] **Rett en linje** (`skriv_full`) → den rettede teksten står, og den opprinnelige er
       synlig som rettet, ikke borte. Rett rettelsen → linja **hopper ikke** i strømmen.
 - [ ] **Fjern en linje** (`test-ko-leder`) → teksten er borte fra strømmen i *begge* faner.

@@ -7,11 +7,8 @@ som står feil til sikkerhetsnettet slår inn — derfor prøves hver kilde.
 """
 from __future__ import annotations
 
-import ast
 from datetime import timedelta
-from pathlib import Path
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_delete, post_save
 from django.test import SimpleTestCase, override_settings
@@ -19,6 +16,7 @@ from django.utils import timezone
 
 from core import endringer
 from core.models import AppSetting
+from core.test_helpers import koblet, skrivinger_utenom_signalene
 from ko import signals as ko_signals
 from ko import tavle
 from ko.endringer import TAVLE
@@ -80,11 +78,7 @@ class TavlasModellerErKobletTests(SimpleTestCase):
     SLETTING = tuple(m for m in LAGRING if m not in ('oppdrag.Enhet', 'oppdrag.Lokasjon'))
 
     def _koblet(self, signal, etikett):
-        """Er `tavla_endret` blant mottakerne? Django 5 gir `(synkrone,
-        asynkrone)`; mottakeren vår er synkron."""
-        from django.apps import apps
-        synkrone, _asynkrone = signal._live_receivers(apps.get_model(etikett))
-        return any(r is ko_signals.tavla_endret for r in synkrone)
+        return koblet(signal, etikett, ko_signals.tavla_endret)
 
     def test_lagring_og_sletting(self):
         mangler = [f'post_save {m}' for m in self.LAGRING if not self._koblet(post_save, m)]
@@ -100,7 +94,6 @@ class TavleEndringerFangesTests(SimpleTestCase):
     rad, og er ikke med."""
 
     SPORET = {m.split('.')[1] for m in TavlasModellerErKobletTests.LAGRING}
-    UTENOM = {'update', 'bulk_create', 'bulk_update'}
 
     VURDERT = {
         'ko/tavle.py: Tavleplassering.update': 'avslutt_for_hendelse kalles fra services.sett_lag, '
@@ -110,25 +103,7 @@ class TavleEndringerFangesTests(SimpleTestCase):
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):
-        funn = set()
-        for app in ('ko', 'vaktliste', 'oppdrag', 'core', 'patients', 'statistikk', 'backlog',
-                    'accounts', 'audit'):
-            for fil in sorted((Path(settings.BASE_DIR) / app).rglob('*.py')):
-                if 'migrations' in fil.parts or fil.name.startswith(('tests', 'test_')):
-                    continue
-                for n in ast.walk(ast.parse(fil.read_text(encoding='utf-8'))):
-                    if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
-                            and n.func.attr in self.UTENOM):
-                        continue
-                    k, modell = n.func.value, None
-                    while isinstance(k, (ast.Call, ast.Attribute)):
-                        if isinstance(k, ast.Attribute) and k.attr == 'objects' and isinstance(k.value, ast.Name):
-                            modell = k.value.id
-                            break
-                        k = k.func if isinstance(k, ast.Call) else k.value
-                    if modell in self.SPORET:
-                        rel = fil.relative_to(settings.BASE_DIR).as_posix()
-                        funn.add(f'{rel}: {modell}.{n.func.attr}')
+        funn = skrivinger_utenom_signalene(self.SPORET)
         self.assertEqual(sorted(funn - set(self.VURDERT)), [],
                          'ny skriving utenom signalene — øker den tavlas tall? Vurder og før den inn')
         self.assertEqual(sorted(set(self.VURDERT) - funn), [], 'står i VURDERT, men finnes ikke lenger')

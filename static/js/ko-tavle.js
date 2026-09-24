@@ -27,12 +27,6 @@
 //: 24. sep. 2026, da det var den eneste hentingen.
 const KO_TAVLE_MS = 60000;
 
-//: **Endringsnummeret** (`core/endringer.py`, 24. sep. 2026): hvert 2,5
-//: sekund spør tavla om tallet, og henter hele bildet bare når det er et
-//: annet enn sist. To på tavla fordeler arbeidet muntlig — 15 sekunder var
-//: lenge å vente på at kollegaens flytting viste seg.
-const KO_TAVLE_VERSJON_MS = 2500;
-
 //: Så lenge står «Per · nå» på en stolpe som noen andre nettopp satte.
 const KO_TAVLE_FLYTTET_MS = 30000;
 
@@ -48,7 +42,6 @@ const KO_TAVLE_DRAGRENSE_PX = 6;
 const KO_TAVLE_LENGE_MIN = 180;
 
 let koTavle = null;          // svaret fra /ko/api/tavle/
-let koTavleVersjon = null;   // endringsnummeret tavla sist ble hentet på
 let koTavleKlokkeavvik = 0;  // serverens klokke minus nettleserens, i ms
 let koTavleValgt = null;     // ressursen som er valgt for klikk-så-rad
 let koTavleDrag = null;      // pågående drag: {id, x, y, drar, spokelse}
@@ -64,13 +57,6 @@ const KO_TAVLE_PAUSE_FORVARSEL_MIN = 10;
 //: Behovet til en konsert står på raden så mange minutter før den begynner —
 //: lagene skal være på plass når den starter, ikke etter.
 const KO_TAVLE_BEHOV_FORVARSEL_MIN = 30;
-
-// Skal tavla hentes? **Likhet, ikke størrelse**: et tall som er annerledes
-// enn sist, også mindre — cachen kan ha startet på nytt. Et tomt svar (ingen
-// tilgang, cachen nede) henter ikke; sikkerhetsnettet tar det.
-function koTavleSkalHente(forrige, ny) {
-  return typeof ny === 'string' && ny !== '' && ny !== forrige;
-}
 
 // Hvem som nettopp satte den åpne plasseringen, når det var **noen andre**,
 // og bare de første `KO_TAVLE_FLYTTET_MS`. Ellers tom.
@@ -1368,29 +1354,6 @@ function koTavleErFramme() {
   return Boolean(vindu && !vindu.classList.contains('d-none'));
 }
 
-// Spør om endringsnummeret, og hent tavla når det er nytt. **Bare når tavla
-// står framme og fana er synlig**: en skjult fane eller en PC med
-// skjermsparer spør ikke, og henter ved neste synlige runde.
-let koTavleSporPaagaar = false;
-async function koSjekkTavleVersjon() {
-  if (koTavleSporPaagaar || !koTavleErFramme()) return;
-  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-  koTavleSporPaagaar = true;
-  try {
-    const res = await apiFetch('/api/endringer/?omrader=tavle');
-    if (!res.ok) return;
-    const ny = ((await res.json()) || {}).tavle;
-    if (koTavleSkalHente(koTavleVersjon, ny)) {
-      koTavleVersjon = ny;
-      await koHentTavle();
-    }
-  } catch (e) {
-    // Sikkerhetsnettet henter om litt.
-  } finally {
-    koTavleSporPaagaar = false;
-  }
-}
-
 async function koHentTavle() {
   try {
     const res = await apiFetch('/ko/api/tavle/');
@@ -1414,7 +1377,10 @@ function koTavleStart() {
   koTavleLyttere();
   koTavleSynligNaa();
   setInterval(() => { if (koTavleErFramme()) koHentTavle(); }, KO_TAVLE_MS);
-  setInterval(koSjekkTavleVersjon, KO_TAVLE_VERSJON_MS);
+  // **Endringsnummeret** (`core/endringer.py`, 24. sep. 2026): tavla hentes
+  // når tallet er nytt, og bare mens den står framme. To på tavla fordeler
+  // arbeidet muntlig — 15 sekunder var lenge å vente på en kollegas flytting.
+  folgEndringer('tavle', koHentTavle, koTavleErFramme);
   // Nå-streken flytter seg mellom rundene, uten et kall.
   setInterval(() => { if (koTavleErFramme()) koTegnTavle(); }, 60000);
 }

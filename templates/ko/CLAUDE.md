@@ -77,6 +77,11 @@ sidebaren, ikke skjermen; nummer og farge står. Kanten dras (`koHSideBredde`, h
 nettleser). En hendelse en annen lukker **blir stående, merket «Lukket»**, og går ut av
 sidebaren. H-merket og lagkortet (`koApneHendelse`) henter fram en skjult hendelseslogg.
 
+**Loggen og sentralbordet følger endringsnummeret** (24. sep. 2026): `folgEndringer('logg',
+koHentLogg)` i ko.js og `folgEndringer('oppdrag', lastAlt)` i sentralbordets lastefil, i én
+forespørsel med tavla (`portal-utils.js`). Sikkerhetsnettet er 30 s for begge. Hva som øker
+tallene: `ko/signals.py` og `oppdrag/signals.py`.
+
 **Skjerm 2** (`BroadcastChannel('ko-hendelse')`): «Eget vindu» i hendelsen og ↗ i hodet
 åpner *samme* navngitte vindu, `ko-hendelser`, som melder seg hvert 5. s. Mens det lever
 (`koFolgerTilstede`, 12 s) går `koApneHendelse` dit, tabellen står med raden merket, og
@@ -162,7 +167,7 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 | **Ett tidsvindu for tavla og konsertplanleggeren**: `koTidAnker` er starten når noen har rullet, `null` følger nå. ◀ Nå ▶ (`koTidNyttAnker`, `steg_min`), dra på aksen (`[data-tid-akse]`, `koTidEtterDrag`). Nå utenfor gir «Du ser ikke nå · Tilbake til nå», og ingen nå-strek klemt til kanten | «går jeg frem i tid på planleggeren, skjer det samme med tavlen». Ikke i `localStorage`: en fane som lastes, følger nå |
 | Stolpene **vokser framover** fra starten til `max(72px, …)`; den åpne ligger over sin stiplede slutt | Til runde 2 vokste de bakover, og navnet sto «i fortid» |
 | **Ingen `min-width` på rutenettet** | Tavla står ofte i den smale plassen; rullet tidslinja vannrett, forsvant nå-streken |
-| **Endringsnummeret** (24. sep. 2026): spør `/api/endringer/?omrader=tavle` hvert 2,5 s, bare når tavla står framme og fana er synlig, og henter hele tavla bare når tallet er et annet (`koTavleSkalHente` — likhet, ikke størrelse). Sikkerhetsnett hvert 60. s. «Per · nå» på en stolpe noen andre satte de siste 30 s (`koTavleFlyttetAv`) | To på tavla fordeler arbeidet muntlig; 15 s var lenge å vente på kollegaens flytting. Hva som øker tallet: `ko/signals.py` |
+| **Endringsnummeret** (24. sep. 2026): tavla melder seg med `folgEndringer('tavle', koHentTavle, koTavleErFramme)` — spurt hvert 2,5 s sammen med `logg` og `oppdrag`, bare når tavla står framme. Sikkerhetsnett hvert 60. s. «Per · nå» på en stolpe noen andre satte de siste 30 s (`koTavleFlyttetAv`) | To på tavla fordeler arbeidet muntlig; 15 s var lenge å vente på kollegaens flytting. Hva som øker tallet: `ko/signals.py` |
 | Filteret er vaktlistas ressursgrupper, huskes per nettleser (`ko.tavle.filter`) | Gruppene finnes alt; fire faste valg ville vært en taksonomi til |
 | **Et klikk er en flytting når et lag er valgt**; ellers åpner det skjemaet til en planlagt pause eller en lukket plassering. Den åpne rettes fra «Rett tidene» i linja over | `koTavleKlikk` — rekkefølgen er regelen. En knapp (`data-action`) velger aldri noe |
 | **Retting er et skjema, ikke et dra i kanten** (skisse 3). Klokkeslett, ikke dato: `koTavleTidNaer` gir nærmeste tidspunkt rundt det som rettes | Et feildrag på en travel tavle skal ikke flytte historikken stille; «20:00» på en vakt over midnatt betyr nesten alltid den nærmeste |

@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Endringsnummeret for resten av /ko: loggen og sentralbordet oppdaterer seg på 2,5 sekunder  `#ko` `#oppdrag` `#rammeverk`
+
+André: «Okei la oss ta resten av /ko som vi snakket om». Skissen fra tavla (Artifact
+«Tavlas endringsnummer») sa: «Loggen og oppdragslista kobles på samme tall i neste runde,
+når dere har sett tavla virke.»
+
+**Før:** tavla fulgte endringsnummeret, men loggen hentet hvert 15. sekund og
+sentralbordets lister (enheter og oppdrag) hvert 30. — i `/ko/` og på `/oppdrag/`. En bil
+som stemplet, eller et nytt oppdrag, kunne stå usett i et halvt minutt hos kollegaen.
+**Nå:** alle tre hentes når tallet er nytt. **Prøvd i nettleseren med to brukere: Kari så
+Andrés logglinje etter 0,2 s og hans nye oppdrag etter 2,5 s, både i `/ko/` og på
+`/oppdrag/`.**
+
+**Ett spørsmål for alle områdene — `folgEndringer()` i `portal-utils.js`**
+- Listene melder seg: `folgEndringer('logg', koHentLogg)`, `folgEndringer('oppdrag',
+  lastAlt)`, `folgEndringer('tavle', koHentTavle, koTavleErFramme)`. Fanen spør **én gang**
+  hvert 2,5 sekund om alle (`/api/endringer/?omrader=logg,oppdrag,tavle`) og henter bare de
+  som er nye. Tre løkker ville tredoblet trafikken, og en delt drifts-PC med fire vinduer
+  ville nådd bremsen på 240/m.
+- Tavlas egen løkke (`koSjekkTavleVersjon`, `koTavleSkalHente`) er borte; regelen «likhet,
+  ikke størrelse» bor nå i `endringSkalHente()`.
+- En skjult fane spør ikke; en liste som ikke står framme (tavla parkert), er ikke med.
+- **Sikkerhetsnettet er 30 s** for loggen (var 15) og sentralbordet, 60 s for tavla.
+
+**`oppdrag` — meldt inn av oppdragsmodulen** (`oppdrag/endringer.py`), ikke av KO: lista er
+sentralbordets, og `/oppdrag/` skal være like raskt uten KO. Øker på oppdrag,
+koblingsrader, statusmeldinger, enhetshendelser, enhetsbytter, enheter, enhetstyper og
+lokasjoner. **KO øker det for det KO eier på oppdragsraden** — prioriteten (H-merket),
+lagene og delte linjer — men **ikke for en vanlig linje i strømmen**: da ville hver linje
+fått sentralbordet til å hente begge listene. Gate: `les` i oppdrag. **Bilens skjerm
+følger det ikke** (TODO).
+
+**`logg` — KO** (`ko/endringer.py`): alt `logg_view` sender — linjene (også festing,
+fjerning og deling, som endrer en rad uten ny id), hendelsene med lag og deltakere, og
+oppdragene, fordi hendelseslista teller de åpne. Gate: `les` i KO.
+
+**Skrivinger utenom signalene** (`.update()`, `bulk_*`) finnes nå med én felles leser,
+`core/test_helpers.skrivinger_utenom_signalene()`, brukt av tavla, oppdrag og loggen.
+Den fant én ny: `Linjedeling.bulk_create` i `korriger()` — vurdert: funksjonen er atomisk,
+og tallet øker ved commit, etter delingene.
+
+**Mutasjonstesting: 30 mutanter, 28 drept.** To overlevde:
+- Den indre `try` rundt hver henting i `sjekkEndringer` var en no-op — alle hentingene er
+  startet før `Promise.all` feiler. **Fjernet.**
+- «Bare linjer *i en hendelse* øker oppdragslista» kunne utvides til «bare rader med
+  `hendelse_id`» uten at noe ble rødt: testene gikk gjennom tjenester som *også* skriver en
+  linje i hendelsen, så `Hendelse` og `Linjedeling` alene ble aldri prøvd. **To tester lagt
+  til** — redigering av hodet (ingen systemlinje) og deling med ett oppdrag.
+
 ## 2026-09-24 — Hendelsen åpnes i hendelsesloggen, med de pågående i en sidebar, og skjerm 2 følger klikkene  `#ko` `#hendelser`
 
 André: «Så må vi se på det med å åpne hendelser fra hendelsesloggen som vises over

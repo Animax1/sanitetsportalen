@@ -31,3 +31,9 @@ class OppdragConfig(AppConfig):
         # `core/driftstatus.py`.
         from .driftstatus import register_handlers as register_driftstatus
         register_driftstatus()
+
+        # Endringsnummeret (24. sep. 2026). Uten registreringen svarer
+        # `/api/endringer/` ingenting for `oppdrag`, og sentralbordet henter
+        # bare på sikkerhetsnettet hvert 30. sekund.
+        from .endringer import register_handlers as register_endringer
+        register_endringer()

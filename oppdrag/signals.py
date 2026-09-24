@@ -26,7 +26,9 @@ from django.dispatch import receiver
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import Oppdrag
+from . import endringer as oppdrag_endringer
+from .models import (Enhet, Enhetsbytte, Enhetshendelse, Enhetstype, Lokasjon, Oppdrag, Oppdragsenhet,
+                     Statusmelding)
 
 TABELLNAVN = 'oppdrag_oppdrag'
 
@@ -164,3 +166,33 @@ def oppdrag_post_delete(sender, instance, **kwargs):
         user=bruker,
         ip=ip,
     )
+
+
+# ── Endringsnummeret for sentralbordet (24. sep. 2026) ───────────────────────
+#
+# **Alt enhets- og oppdragslista leser, øker tallet** — `oppdrag/endringer.py`.
+# Signaler og ikke kall i tjenestene: da blir også skrivinger ingen har tenkt
+# på fanget. Skrivinger utenom signalene (`.update()`), holdes av
+# `OppdragEndringerFangesTests`. Stablet og eksplisitt, én linje per modell og
+# signal: `SignalerFyrerIkkeUnderLoaddataTests` leser `@receiver(...)`.
+#
+# Enhet, enhetstype og lokasjon slettes ikke i drift — de deaktiveres.
+# Et tall for mye er billig: listene svarer 304 når ingenting de viser endret seg.
+
+@receiver(post_save, sender=Oppdrag)
+@receiver(post_delete, sender=Oppdrag)
+@receiver(post_save, sender=Oppdragsenhet)
+@receiver(post_delete, sender=Oppdragsenhet)
+@receiver(post_save, sender=Statusmelding)
+@receiver(post_delete, sender=Statusmelding)
+@receiver(post_save, sender=Enhetshendelse)
+@receiver(post_delete, sender=Enhetshendelse)
+@receiver(post_save, sender=Enhetsbytte)
+@receiver(post_delete, sender=Enhetsbytte)
+@receiver(post_save, sender=Enhet)
+@receiver(post_save, sender=Enhetstype)
+@receiver(post_save, sender=Lokasjon)
+@ikke_under_loaddata
+def oppdrag_endret(sender, instance=None, **kwargs):
+    """Noe sentralbordets lister viser, er endret."""
+    oppdrag_endringer.oppdrag_endret()

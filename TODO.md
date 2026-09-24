@@ -151,12 +151,12 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
 (hendelseslogg, tavle), 1 KO-leder som rullerer mellom hendelseslogg, tavle og
 konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plass.*
 
-- [ ] **Endringsnummeret for oppdragslista og loggen.** Rammeverket (`core/endringer.py`)
-      og tavla er levert 24. sep. 2026. Neste: området `oppdrag`, meldt inn av
-      oppdragsmodulen selv (den får ikke kjenne KO), så sentralbordets liste går fra 30 s
-      til 2,5 s både i `/ko/` og `/oppdrag/`; deretter `logg` og ev. `program`. Pasientene
-      bare hvis sykestua ber om det. Kollisjonssperren (409 «Per flyttet Lag 3 for 4 s
-      siden») venter til dere har sett om merket er nok.
+- [ ] **Endringsnummeret videre, når det trengs.** Tavla, loggen og sentralbordet følger det
+      (24. sep. 2026). Tre ting står utenfor med vilje: bilens skjerm (egen polling hvert
+      15. s — å følge `oppdrag` ville hentet ved hver endring i hele vakta), konsert-
+      planleggeren (60 s) og pasientene (bare hvis sykestua ber om det).
+      Kollisjonssperren på tavla (409 «Per flyttet Lag 3 for 4 s siden») venter til dere
+      har sett om «Per · nå»-merket er nok.
 - [ ] **Oppsett per rolle** under «Oppsett»: Utalarm, Tavle, KO-leder, Liten bemanning —
       per skjerm, siden hver plass får to. Mulig kobling til Ansvar-nedtrekket
       (`ko.Ansvarsomraade`). To ting er ikke avklart og avgjør oppsettene: hvem fører

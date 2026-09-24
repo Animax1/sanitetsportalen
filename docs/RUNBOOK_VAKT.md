@@ -218,12 +218,13 @@ SELECT count(*), state FROM pg_stat_activity
 En connection pooler (PgBouncer) er vurdert og **ikke nødvendig** på denne skalaen — se
 avklaringen av F8 i `TODO.md` og CHANGELOG.
 
-**KO er ikke målt ennå** (24. sep. 2026). Tallene over er pasientsidens. KO-endepunktene
-har **ingen ETag**: tavla henter hele bildet hvert 15. sekund fra hver fane som har den
-framme, og loggen henter nye linjer hvert 15. sekund. I kjernetid er det 5 operatører med
-to skjermer hver. Anslaget er noen få forespørsler i sekundet — lite for 2 × 4 — men det
-er et anslag. Mål på staging, og før tallene inn her. Endringsnummeret (TODO) vil gjøre
-en uendret tavle nesten gratis å spørre om.
+**KO er ikke målt ennå** (24. sep. 2026). Tallene over er pasientsidens. Hver fane i
+`/ko/` og på sentralbordet spør **én gang hvert 2,5 sekund** om endringsnumrene
+(`/api/endringer/`, holdt utenfor P95) og henter tavla, loggen og sentralbordets lister
+bare når tallet deres er nytt; sikkerhetsnettet er 60 s for tavla og 30 s for resten. I
+kjernetid er det 5 operatører med to skjermer hver — rundt 4 små spørsmål i sekundet, pluss
+hentingene når noe skjer. Lite for 2 × 4, men et anslag. Mål på staging, og før tallene
+inn her.
 
 ---
 

@@ -329,9 +329,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   } finally {
     // Pollingen settes uansett hvordan oppstarten gikk — det er den som
     // henter lista når nettet er tilbake.
-    // Samme kadens som pasientlista. ETag gjør at et poll uten endring koster
-    // en 304 uten kropp.
+    // **Sikkerhetsnettet**, 30 sekunder. Hentingen styres av endringsnummeret
+    // (`core/endringer.py`, området `oppdrag`, 24. sep. 2026): en bil som
+    // stempler, vises på 2,5 sekunder både her og i `/ko/`. Nettet tar det
+    // ingen skrev og et tall som ikke kom fram; ETag gjør at en runde uten
+    // endring koster en 304 uten kropp.
     setInterval(lastAlt, 30000);
+    folgEndringer('oppdrag', lastAlt);
     // «12 min siden» eldes uten at serveren sier noe — lista svarer 304 når
     // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
     // — men ikke over LASTEFEIL: en liste som ikke er hentet har ingen tall.
