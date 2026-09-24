@@ -59,6 +59,8 @@ Hvis Redis-tjenesten ikke finnes:
 
 1. Web-tjenesten → **Variables**
 2. `WEB_WORKERS` → endre til `2` → Save
+   - **`WEB_THREADS` skal stå på `4`, eller ikke være satt** (standard er 4). Står den
+     igjen på 6 fra en tidligere vakt, er ikke vakt-modus det §2 regner fra.
 3. Triggeren ny redeploy automatisk
 
 #### Steg 4: Verifiser i admin-dashbord
@@ -108,6 +110,18 @@ enten P95 eller 5xx har nådd grensen, gjelder — 5xx alene kan gi rødt.
 
 **Under 20 forespørsler siste 5 min sier kortet «få målinger»**: da er P95 i praksis den
 ene tregeste forespørselen, og trinnet er ikke noe å handle på. 5xx gjelder uansett.
+
+**Workers eller tråder? Se CPU.** Tiltakene over øker workers og lar trådene stå på 4.
+Python kjører bare én tråd om gangen i en prosess (GIL), så tråder hjelper bare når
+forespørslene *venter* — på databasen eller en ekstern tjeneste. Workers er egne
+prosesser og kan *regne* samtidig. Det meste portalen gjør er regning i Python (tavla,
+listene, statistikken), og derfor workers først. Se CPU i Railway (web-tjenesten →
+**Metrics**) samtidig med P95:
+
+| CPU | P95 | Betyr | Tiltak |
+|---|---|---|---|
+| Høy | Høy | Den regner | Flere **workers** — trinnene over |
+| Lav | Høy | Den venter | Se «Database». Rask database og likevel kø → flere **tråder** (§5) |
 
 **Én endring av gangen**, og se P95 i 3 minutter før neste. Hver endring er en redeploy
 på ~60 sek, og to på rad gjør det umulig å si hvilken som virket.
@@ -175,9 +189,25 @@ Regn derfor kapasitet på *pollende lesere*, ikke på brukertall. Tommelfingerre
 «5–8 brukere per worker» i seksjon 4 ble kalibrert før ETag og `select_related`, og er
 etter det for pessimistisk.
 
-**Postgres-forbindelser:** appen bruker `workers × threads`, holdt åpne i 10 minutter av
-`conn_max_age=600`. Ved 4 workers × 4 threads er det 16 mot grensen på 100. Sjekk faktisk
-bruk under vakt med:
+**Postgres-forbindelser:** hver tråd som har svart på en forespørsel holder sin egen
+tilkobling, åpen i 10 minutter (`conn_max_age=600`). I tillegg har **hver worker sin egen
+backupklokke** (`core/backup/klokke.py`, én tråd per prosess), og reservenettet i
+middlewaren kan starte én til. Regn derfor:
+
+> **tilkoblinger ≈ workers × (tråder + 2)** + cron-jobbene + release-fasen + deg i `psql`
+
+| Oppsett | Regnestykket | Omtrent |
+|---|---|---|
+| Vakt-modus 2 × 4 | 2 × 6 | 12 |
+| Rødt 4 × 4 | 4 × 6 | 24 |
+| §5 4 × 6 | 4 × 8 | 32 |
+| 10 × 8 | 10 × 10 | **100 — taket** |
+
+**Grensen er 100** (`max_connections`), og den er et tak, ikke en fartsgrense: forespørselen
+som trenger tilkobling nummer 101 får `too many clients`, og brukeren får 500 — på hver
+side som trenger en ny tilkobling, samtidig. Hold dere under ~80 så cron-jobbene og en
+deploy har plass. `BeredskapstrinnTilkoblingerTests` prøver at trinnene i §2 og §5 gjør
+det. Sjekk faktisk bruk under vakt med:
 
 ```sql
 SHOW max_connections;
@@ -280,8 +310,10 @@ og flere prosesser gir da bare flere som venter på det samme. Se §5.
 1. **Finn flaskehalsen før du skalerer mer.** «Tregeste stier» sier hvilken side;
    «Database» sier om svartiden på `SELECT 1` har steget. Er det databasen: §8.
 2. Er det én side, og den ikke er nødvendig nå (statistikk, historikk): be folk lukke den.
-3. Først da: `WEB_THREADS` = `6` (4 × 6 = 24 samtidige). Tråder hjelper når
-   forespørslene venter på databasen, ikke når CPU-en er full.
+3. Først da, og **bare når CPU-en i Railway (Metrics) er lav mens P95 er høy**:
+   `WEB_THREADS` = `6` (4 × 6 = 24 samtidige). Da venter forespørslene, og en ledig tråd
+   kan ta neste mens den første venter. Er CPU-en høy, gir flere tråder bare lengre kø
+   for samme prosess (GIL).
 
 ---
 

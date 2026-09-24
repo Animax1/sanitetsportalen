@@ -148,3 +148,24 @@ class DashbordetTests(TestCase):
         self.assertLess(html.index('id="tregeste"'), html.index('id="cron-rader"'))
         for id_ in ('beredskap-nivaa', 'beredskap-tiltak', 'metrikk-kilde', 'driftsmodus'):
             self.assertIn(f'id="{id_}"', html)
+
+
+class BeredskapstrinnTilkoblingerTests(SimpleTestCase):
+    """Høyeste trinn skal holde seg under Postgres-taket med margin
+    (runbook §3c): workers × (tråder + 2), der de to er backupklokka og
+    reservenettet i hver prosess."""
+
+    POSTGRES_TAK = 100
+    MARGIN = 20          # cron-jobbene, release-fasen, en psql-økt
+    TRADER_I_PARAGRAF_5 = 6
+
+    def test_hoeyeste_trinn_med_flest_traader_er_under_taket(self):
+        workers = max(t['workers'] or VAKTMODUS['workers'] for t in BEREDSKAPSTRINN)
+        tilkoblinger = workers * (self.TRADER_I_PARAGRAF_5 + 2)
+        self.assertLessEqual(tilkoblinger, self.POSTGRES_TAK - self.MARGIN,
+                             f'{workers} workers × {self.TRADER_I_PARAGRAF_5} tråder gir ~{tilkoblinger}')
+
+    def test_runbooken_sier_seks_traader_i_paragraf_5(self):
+        tekst = RUNBOOK.read_text(encoding='utf-8')
+        m = re.search(r'^## 5\. .*?(?=^## 6\. )', tekst, re.S | re.M)
+        self.assertIn(f'`WEB_THREADS` = `{self.TRADER_I_PARAGRAF_5}`', m.group(0))

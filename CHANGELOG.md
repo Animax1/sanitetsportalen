@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Runbooken: workers eller tråder (se CPU), og taket på databasetilkoblinger  `#drift` `#runbook`
+
+André: «Det skal bare øke workers og ikke tråder?» og «kan jeg i teorien ha 10 workers og
+8 tråder og da er jeg på 80 connections?»
+
+- **Workers eller tråder avgjøres av CPU** (§2, §5). Python kjører én tråd om gangen per
+  prosess (GIL): tråder hjelper når forespørslene *venter*, workers når de *regner*. Høy
+  CPU og høy P95 → workers; lav CPU og høy P95 → se «Database», deretter tråder. Til nå
+  sa §5 bare «tråder hjelper når de venter», uten å si hvor man ser det.
+- **§1c: `WEB_THREADS` skal stå på 4** (eller ikke være satt) ved vaktstart — en 6-er
+  igjen fra forrige vakt betyr at vakt-modus ikke er det §2 regner fra.
+- **Tilkoblingene regnet riktig** (§3c): ikke `workers × tråder`, men **≈ workers ×
+  (tråder + 2)** — hver worker har sin egen backupklokke-tråd, og reservenettet i
+  middlewaren kan starte én til. 10 × 8 er da ~100, altså **taket**: tilkobling 101 gir
+  `too many clients` og 500 på hver side som trenger en ny. Hold dere under ~80.
+- **Test:** `BeredskapstrinnTilkoblingerTests` — høyeste trinn med §5-trådene (4 × 6 → ~32)
+  holder seg under 100 minus 20 i margin, og §5 sier fortsatt 6 tråder.
+
 ## 2026-09-24 — Server-status og runbooken regnet fra vakt-modus: P95 først, trinnene ett sted  `#drift` `#runbook` `#server-status`
 
 André: «før vakten skal starte spinner vi opp redis og 2 workers og 4 tråder», og Railway
