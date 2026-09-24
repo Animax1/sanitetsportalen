@@ -24,7 +24,7 @@ HARNESS = (
              'koTavleDognnokkel', 'koTavleDognnavn', 'koTavleTidNaer', 'koTavleProgram',
              'koTavleKonsertHtml', 'koTavleRadHtml', 'koTavleStolpeHtml', 'koTavlePauseKildetekst', 'koTavleSluttHtml',
              'koTavleSkjemaData', 'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleVarighet',
-             'koTavleRader', 'koTavleSynlig', 'koTavleKanDras', 'koTavlePauseStatus', 'koTavleSlutt',
+             'koTavleRader', 'koTavleFlyttetAv', 'koTavleSynlig', 'koTavleKanDras', 'koTavlePauseStatus', 'koTavleSlutt',
              'koTavleBehovNaa', 'koTavleBehovHtml',
              'koTavleTilEtter', 'koTavleIVinduet',
              'koPlanDognene', 'koPlanTid', 'koPlanGruppert', 'koPlanDognListe', 'koPlanBehovTekst',

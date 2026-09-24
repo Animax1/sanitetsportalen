@@ -753,6 +753,10 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
             # konserten, følger slutten med uten at noen retter noe.
             'planlagt_til': _iso(p.folger.til if p.folger_id else p.planlagt_til),
             'folger_id': p.folger_id,
+            # Hvem som satte den (24. sep. 2026): «Per · nå» på stolpen de
+            # første sekundene, så den andre på tavla ser at noen alt har
+            # flyttet laget. Brukernavnet, som `window.KO_BRUKERNAVN`.
+            'av_navn': p.av_navn,
         } for p in plasseringer],
         # Programmet (steg 2): båndene bak radene, og det «følger konserten»
         # kan velge mellom.

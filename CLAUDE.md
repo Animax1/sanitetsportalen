@@ -609,6 +609,7 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 | `core/portalinnstillinger.py` | Felter på `/portal-admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
 | `core/kontokobling.py` | Kort på `/portal-admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
 | `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
+| `core/endringer.py` | Endringsnummer per område — `registrer(navn, gate)`, `endret(navn)` | `<app>/endringer.py` |
 
 **Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
 Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går
@@ -984,8 +985,8 @@ og sende det inn, ellers finnes den ikke for dashbordet.
 ### Er det et menneske i den fana? (core/middleware.BrukerAktivitetMiddleware)
 
 **«Pålogget» er ikke «til stede»** (André, 16. sep. 2026). `SESSION_SAVE_EVERY_REQUEST`
-fornyer sesjonen ved **hver** forespørsel, og portalen poller seg selv hvert 5.–30. sekund —
-lydvarselet 5 s, offline-køen 15 s, tavla og auto-refresh 30 s. En glemt fane holder derfor
+fornyer sesjonen ved **hver** forespørsel, og portalen poller seg selv hvert 2,5.–30. sekund —
+tavlas endringsnummer 2,5 s, lydvarselet 5 s, offline-køen 15 s, auto-refresh 30 s. En glemt fane holder derfor
 sesjonen fersk i åtte timer uten at noen er der, og `expire_date` er ikke et *dårlig* mål på
 tilstedeværelse; det er ikke et mål på det i det hele tatt.
 

@@ -62,7 +62,12 @@ ROT = Path(settings.BASE_DIR)
 #: delingen av vaktlistefila la én rad i kartet over modulfilene. Kartet *er*
 #: rammeverk — testen under krever at hver modulfil står der — og raden er det
 #: eneste som kom til; selve innholdet flyttet ut av rota, ikke inn.
-ROT_TEGNGRENSE = 65_700
+#:
+#: **Hevet til 65 800 den 24. sep. 2026, bevisst:** `core/endringer.py` er et
+#: nytt register i rammeverket, og tabellen over registrene står i rota fordi
+#: den forteller modulene hvordan de melder seg inn. Én rad, kortet ned til det
+#: nødvendige; setningen om pollingen er rettet, ikke utvidet.
+ROT_TEGNGRENSE = 65_800
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer

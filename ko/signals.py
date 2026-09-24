@@ -22,10 +22,11 @@ from __future__ import annotations
 
 import logging
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from audit.utils import ikke_under_loaddata
+from core.models import AppSetting
 # `ko` → `oppdrag` er den tillatte retningen (`ko/tests_avhengighet.py`).
 # **Klasser og ikke strengreferanser**: `SignalerFyrerIkkeUnderLoaddataTests`
 # leser `@receiver(post_save, sender=Klasse)` med en regex, og `sender='...'`
@@ -34,14 +35,20 @@ from audit.utils import ikke_under_loaddata
 # idiomet her følger de andre modulene.
 from oppdrag import choices
 from oppdrag.models import (
+    Enhet,
     Enhetshendelse,
+    Lokasjon,
     Oppdrag,
     Oppdragsenhet,
     Statusmelding,
     Vaktmodusperiode,
 )
+from vaktliste.models import Pause, Ressurs, Vaktpost
 
+from . import endringer as ko_endringer
 from . import systemlinjer
+from .models import (Hendelse, HendelseLag, PlanlagtPause, Programbehov, Programpost,
+                     Tavleplassering)
 from .services import systemlinje
 
 logger = logging.getLogger(__name__)
@@ -290,3 +297,61 @@ def vaktmodus_satt(sender, instance, created, **kwargs):
         {'enhet': _enhetsnavn(instance.enhet), 'modus': instance.modus},
         tidspunkt=instance.fra,
     )
+
+
+# ── Endringsnummeret for tavla (24. sep. 2026) ───────────────────────────────
+#
+# **Alt tavla leser, øker tallet** — i KO, vaktlista, oppdragsmodulen og
+# innstillingene. Signaler og ikke kall i tjenestene: da blir også skrivinger
+# ingen har tenkt på fanget, som et skift rettet i vaktlista eller en bil som
+# stempler. Skrivinger som går utenom signalene (`.update()`), holdes av
+# `TavleEndringerFangesTests`.
+#
+# **Stablet og eksplisitt**, én linje per modell og signal, ikke en løkke med
+# `.connect()`: `SignalerFyrerIkkeUnderLoaddataTests` leser `@receiver(...)`
+# med en regex, og en løkke ville gått rett forbi den. En gjenoppretting øker
+# ikke tallet (vakten under) — fanene henter på sikkerhetsnettet etterpå.
+#
+# Et tall for mye er billig — fanene henter tavla én gang. Et for lite er et
+# bilde som står feil til sikkerhetsnettet slår inn, 60 sekunder senere.
+
+@receiver(post_save, sender=Tavleplassering)
+@receiver(post_delete, sender=Tavleplassering)
+@receiver(post_save, sender=PlanlagtPause)
+@receiver(post_delete, sender=PlanlagtPause)
+@receiver(post_save, sender=Programpost)
+@receiver(post_delete, sender=Programpost)
+@receiver(post_save, sender=Programbehov)
+@receiver(post_delete, sender=Programbehov)
+@receiver(post_save, sender=Hendelse)
+@receiver(post_delete, sender=Hendelse)
+@receiver(post_save, sender=HendelseLag)
+@receiver(post_delete, sender=HendelseLag)
+@receiver(post_save, sender=Pause)
+@receiver(post_delete, sender=Pause)
+@receiver(post_save, sender=Vaktpost)
+@receiver(post_delete, sender=Vaktpost)
+@receiver(post_save, sender=Ressurs)
+@receiver(post_delete, sender=Ressurs)
+@receiver(post_save, sender=Oppdrag)
+@receiver(post_delete, sender=Oppdrag)
+@receiver(post_save, sender=Statusmelding)
+@receiver(post_delete, sender=Statusmelding)
+@receiver(post_save, sender=Oppdragsenhet)
+@receiver(post_delete, sender=Oppdragsenhet)
+@receiver(post_save, sender=Enhet)
+@receiver(post_save, sender=Lokasjon)
+@ikke_under_loaddata
+def tavla_endret(sender, instance=None, **kwargs):
+    """Noe tavla viser, er endret."""
+    ko_endringer.tavla_endret()
+
+
+@receiver(post_save, sender=AppSetting)
+@ikke_under_loaddata
+def tavleinnstilling_endret(sender, instance=None, **kwargs):
+    """«På tavla», «Følg besøk», rullingen, tidsvinduet og døgnstarten —
+    `ko.tavle_*`. Ikke hver `AppSetting`: pasienttelleren skrives ved hver
+    registrering, og hver av dem ville fått alle fanene til å hente tavla."""
+    if instance is not None and str(instance.key).startswith('ko.tavle'):
+        ko_endringer.tavla_endret()

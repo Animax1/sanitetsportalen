@@ -15,6 +15,8 @@ from datetime import timedelta
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
+from core.ratelimit import rate_limit
+
 from accounts.models import LoginEvent
 from core.models import ModuleSettings
 from core.modules import get_dashboard_modules
@@ -134,3 +136,27 @@ def profile_view(request):
         'recent_events': recent_events,
         'weekly_login_count': weekly_login_count,
     })
+
+
+@login_required
+@require_GET
+@rate_limit(group='core:endringer', rate='240/m', method='GET')
+def endringer_view(request):
+    """Endringsnumrene: `?omrader=tavle,logg` → `{"tavle": "…"}`.
+
+    Spurt om hvert 2,5 sekund fra hver fane som har et område framme, så det
+    skal være billig: ingen modul, ingen spørring utover innlogging og
+    gatene. Svaret har bare områdene brukeren får se — se `core/endringer.py`.
+    240/m holder for fire faner med samme konto, som er to skjermer med
+    tavla og et vindu for seg.
+
+    Holdt utenfor request-metrikkene (`RequestMetricsMiddleware`): fire raske
+    svar i sekundet ville trukket P95 ned, og trinnet på server-status vist
+    grønt mens tavla var treg.
+    """
+    from django.http import JsonResponse
+
+    from core import endringer
+
+    navn = [n.strip() for n in (request.GET.get('omrader') or '').split(',') if n.strip()][:10]
+    return JsonResponse(endringer.versjoner(request, navn))

@@ -510,6 +510,10 @@ class RequestMetricsMiddleware:
         '/portal-admin/server-status/',
         '/portal-admin/server-status/json/',
         '/healthz/',  # #2: hyppige health-checks skal ikke støye metrikkene
+        # Endringsnumrene (24. sep. 2026): spurt om hvert 2,5 sekund fra hver
+        # fane. Målt med, ville de trukket P95 ned og beredskapstrinnet vist
+        # grønt mens tavla var treg.
+        '/api/endringer/',
     )
 
     def __init__(self, get_response):

@@ -151,13 +151,12 @@ Sammenhengen, rekkefølgen og de åpne valgene står i
 (hendelseslogg, tavle), 1 KO-leder som rullerer mellom hendelseslogg, tavle og
 konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plass.*
 
-- [ ] **Endringsnummer — tavla først, så loggen og oppdragslista.** Et lite endepunkt som
-      svarer med ett tall; fanene spør hvert 2.–3. sekund og henter hele bildet bare når
-      tallet har endret seg. Telleren i cachen (Redis på vakt, delt mellom workerne).
-      Med «flyttet av Per for 10 s siden» på stolpen — de to på tavla fordeler arbeidet
-      muntlig og kan flytte samme lag hver sin vei. **Skisseres for André før bygging.**
-      WebSocket er vurdert og utsatt: krever ASGI, og «trafikken er klokka» for
-      e-postutsendingen.
+- [ ] **Endringsnummeret for oppdragslista og loggen.** Rammeverket (`core/endringer.py`)
+      og tavla er levert 24. sep. 2026. Neste: området `oppdrag`, meldt inn av
+      oppdragsmodulen selv (den får ikke kjenne KO), så sentralbordets liste går fra 30 s
+      til 2,5 s både i `/ko/` og `/oppdrag/`; deretter `logg` og ev. `program`. Pasientene
+      bare hvis sykestua ber om det. Kollisjonssperren (409 «Per flyttet Lag 3 for 4 s
+      siden») venter til dere har sett om merket er nok.
 - [ ] **En hendelse åpnes i loggvinduet — også når det er skjult.** Ingen av de fire
       rolleoppsettene har loggstrømmen oppe, så et klikk på en hendelse ser ut som om det
       ikke skjer noe (`koApneHendelse` tegner i `#ko-hendelse-detalj` og henter ikke fram

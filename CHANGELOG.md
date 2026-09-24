@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Endringsnummeret: tavla oppdaterer seg på 2,5 sekunder, med «Per · nå» på stolpen  `#ko` `#tavle` `#rammeverk`
+
+André: «ta core og tavla fyst». Skissert først (Artifact «Tavlas endringsnummer»), med
+forslagene derfra: 2,5 s, merket i 30 s og bare for andre enn deg, ingen kollisjonssperre
+ennå, tavla alene først.
+
+**Før:** hver fane hentet hele tavla hvert 15. sekund, også når ingenting hadde skjedd, og
+den andre på tavla så en flytting 0–15 sekunder senere. **Nå:** fanen spør om et tall hvert
+2,5 sekund og henter tavla bare når tallet er nytt. **Prøvd i nettleseren med to brukere:
+Kari så «andre · nå» 0,8 sekunder etter at André flyttet laget.**
+
+**Rammeverket — `core/endringer.py`** (nytt register, som `driftstatus` og `opprydding`)
+- Modulene melder inn områder med en gate: `registrer('tavle', gate)`. Endepunktet
+  `/api/endringer/?omrader=tavle` svarer bare om områdene brukeren har tilgang til — et tall
+  uten tilgang sier at noe har skjedd.
+- `endret(navn)` øker tallet **etter commit** (`transaction.on_commit`): ellers kunne fanen
+  hentet det gamle bildet, sett det nye tallet og blitt stående feil.
+- **Likhet, ikke størrelse.** Tømt cache (omstart, Redis) gir en ny startverdi, og alle
+  henter én gang. Tallet ligger i Redis på vakt, delt mellom workerne.
+- **Holdt utenfor P95** (`RequestMetricsMiddleware`, som `/healthz/`): fire raske svar i
+  sekundet ville trukket P95 ned og beredskapstrinnet vist grønt mens tavla var treg.
+- Kaster aldri: en cache som er nede skal ikke stoppe en flytting.
+
+**Tavla — `ko/endringer.py`, `ko/signals.py`**
+- **Alt tavla leser, øker tallet**, gjennom signaler: plasseringer, planer, programmet,
+  hendelser og lag i KO; pauser, skift og ressurser i vaktlista; oppdrag, statusmeldinger,
+  enheter og lokasjoner i oppdragsmodulen; og `ko.tavle_*`-innstillingene — **ikke**
+  pasienttelleren, som skrives ved hver registrering. Lagring og sletting.
+- **Skrivinger utenom signalene** (`.update()`, `bulk_*`) finnes med AST og må stå i en
+  vurdert liste (`TavleEndringerFangesTests`). To står der i dag, begge i samme transaksjon
+  som noe som øker tallet. Skanningen fant også et hull i første utkast: sletting av et
+  oppdrag eller en hendelse (bilen blir ledig) var ikke med.
+- Sikkerhetsnett: hele tavla hvert 60. sekund (var 15 s som eneste henting), for det ingen
+  skrev — et skift som begynner.
+- Spør bare når tavla står framme **og** fana er synlig.
+- **«Per · nå»** på en stolpe noen *andre* satte de siste 30 sekundene (`av_navn` er nå med
+  i svaret). Gult merke; flyttingen står også i loggstrømmen som før.
+
+**Mutasjonstesting:** 25 mutanter. **Første runde løy:** alle JS-mutantene «drept» med 5
+feil hver — også en som fjernet et kall ingen test rørte. Testfila var selv i stykker
+(samme funksjon to ganger i harnessen), så hver kjøring feilet uansett mutant. Rettet og
+kjørt på nytt. Da overlevde to: **(1)** `setInterval(koSjekkTavleVersjon, …)` kunne fjernes
+fra `koTavleStart` — alle testene av funksjonen var grønne mens tavla aldri spurte. Ny test
+går gjennom `koTavleStart`. **(2)** `cache.add` i økningen endret ingenting — `versjon()`
+setter uansett en ny start ved neste lesing. Fjernet fra koden. Resten drept.
+
+**Dokumenter:** 181 ruter (tallfasit), registeret i rot-CLAUDE.md (taket hevet til 65 800
+med begrunnelse), pollingsetningen der rettet, tavlas rad i `templates/ko/CLAUDE.md`.
+
 ## 2026-09-24 — TODO: kontooppryddingen i prod er gjort  `#todo`
 
 André: «Kontooppryddingen er gjort, slett punktet». Punktet «⚠️ Kontoopprydding i prod —

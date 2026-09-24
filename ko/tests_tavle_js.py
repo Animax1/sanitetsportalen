@@ -21,7 +21,7 @@ TAVLE_JS = KO_JS[2]
 HARNESS = (
     (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml',)),
     (KO_JS, ('koTavleKanSkrive', 'koTavleVindu', 'koTavleProsent', 'koTavleSynlig',
-             'koTavleKanDras', 'koTavleMaal', 'koTavleVarighet', 'koTavleRader',
+             'koTavleKanDras', 'koTavleMaal', 'koTavleVarighet', 'koTavleRader', 'koTavleFlyttetAv',
              'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleRadHtml',
              'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk', 'koTavlePauseRef', 'koTavlePauseKildetekst',
              # Steg 2.

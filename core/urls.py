@@ -66,6 +66,10 @@ urlpatterns = [
         name='notification_api_mark_all_read',
     ),
 
+    # Endringsnumrene (24. sep. 2026, `core/endringer.py`). Før legacy-
+    # redirecten under, som ellers ville sendt `/api/…` til `/pasienter/`.
+    path('api/endringer/', views_portal.endringer_view, name='endringer'),
+
     # ── Legacy-redirects ───────────────────────────────────────────────
     # Gamle URL-er som flyttet til /pasienter/ i Fase 2.
     # OBS: Disse må stå ETTER alle vanlige routes for å unngå at de "stjeler"
