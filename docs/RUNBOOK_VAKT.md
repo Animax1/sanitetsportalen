@@ -137,7 +137,9 @@ inn — ikke når serveren er treg.
 Hvis P95 ligger på 300–500 ms vedvarende, reduser polling-trykket:
 
 1. Be brukere lukke faner de ikke aktivt trenger
-2. Be leads lukke statistikk-fanen mellom oppslag
+2. Be dem som har **flere faner av samme side** oppe, lukke de ekstra. Hvilke sider som
+   spør mest, står i §3d. (Rådet om statistikk-fanen er borte: `/statistikk/` spør ikke
+   av seg selv, den henter bare når den lastes.)
 3. **Logg ut sesjoner som har vært inaktive over én time** (steg 3b). «Aktive sesjoner»
    viser hvor lenge siden hver fane ble brukt. **Ikke** en KO-operatør som er aktiv nå:
    med to skjermer er det to faner per person, og en utlogget operatør mister
@@ -221,10 +223,99 @@ avklaringen av F8 i `TODO.md` og CHANGELOG.
 **KO er ikke målt ennå** (24. sep. 2026). Tallene over er pasientsidens. Hver fane i
 `/ko/` og på sentralbordet spør **én gang hvert 2,5 sekund** om endringsnumrene
 (`/api/endringer/`, holdt utenfor P95) og henter tavla, loggen og sentralbordets lister
-bare når tallet deres er nytt; sikkerhetsnettet er 60 s for tavla og 30 s for resten. I
-kjernetid er det 5 operatører med to skjermer hver — rundt 4 små spørsmål i sekundet, pluss
-hentingene når noe skjer. Lite for 2 × 4, men et anslag. Mål på staging, og før tallene
-inn her.
+bare når tallet deres er nytt. Alle intervallene, og hva en fane koster, står i §3d. Lite
+for 2 × 4, men et anslag. Mål på staging, og før tallene inn her.
+
+---
+
+## 3d. Oppdateringsintervallene — hvem spør hvor ofte (24. sep. 2026)
+
+Hver løkke i nettleseren, side for side. **Nett = ja** betyr at den sender en forespørsel;
+de andre tegner bare på nytt lokalt og koster ingenting på serveren. Alle står stille når
+fanen lukkes. `core/tests_oppdateringsintervaller.py` krever at hver JS-fil med en løkke
+står her, og at tallene for de navngitte konstantene stemmer med koden.
+
+**Endringsnummeret** (`core/endringer.py`): sider med lister som endrer seg i sekunder,
+spør om et lite tall hvert 2,5 s, og henter lista bare når tallet er nytt. Den langsomme
+hentingen står igjen som **sikkerhetsnett** — for det klokka endrer uten at noen skriver
+(et skift som begynner), og for når cachen er nede.
+
+**Alle sider i portalen** (`base_portal`)
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Varselbjella (antall uleste) | 30 s | ja | fanen er skjult | `notifications.js` · `pollCount` |
+| Klokka i toppen | 1 s | nei | — | `portal-clock.js` |
+| Endringsnummeret, alle områdene i **én** forespørsel | 2,5 s (`ENDRING_MS`) | ja | fanen er skjult, eller ingen liste på siden har meldt seg | `portal-utils.js` · `sjekkEndringer` |
+
+**`/ko/`**
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Loggstrømmen og hendelseslista | ved endring, ellers 30 s (`KO_LOGG_MS`) | ja | — | `ko.js` · `koHentLogg`, område `logg` |
+| Sentralbordets enheter og oppdrag (2 forespørsler, ETag) | ved endring, ellers 30 s | ja | — | `oppdrag-sentral-lasting.js` · `lastAlt`, område `oppdrag` |
+| Tavla | ved endring, ellers 60 s (`KO_TAVLE_MS`) | ja | tavla står ikke framme | `ko-tavle.js` · `koHentTavle`, område `tavle` |
+| Nå-streken på tavla | 60 s | nei | tavla står ikke framme | `ko-tavle.js` · `koTegnTavle` |
+| Konsertplanleggeren | 60 s (`KO_PLAN_MS`) | ja | planleggeren står ikke framme | `ko-plan.js` · `koHentPlan` |
+| Vaktlistas ressurser uten enhet (lagene) | 30 s (`KO_RESSURSER_MS`) | ja | uten vaktlistetilgang | `ko.js` · `koHentRessurser` |
+| «Pålogget»-lista | 30 s (`KO_TILSTEDE_MS`) | ja | nedtrekket er lukket (standard) | `ko.js` · `koHentTilstede` |
+| Skjerm 2 sier «jeg lever» til hovedvinduet | 5 s (`KO_FOLGER_PULS_MS`) | nei — mellom vinduene i nettleseren | uten hendelsesvindu for seg | `ko-hendelser.js` · `koMeldTilstede` |
+| «12 min siden» på oppdrag og enheter | 60 s | nei | — | `oppdrag-sentral-lasting.js` |
+
+**`/oppdrag/` — sentralbordet**
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Enheter og oppdrag | ved endring, ellers 30 s | ja | — | `oppdrag-sentral-lasting.js` · `lastAlt` |
+| «12 min siden» | 60 s | nei | — | `oppdrag-sentral-lasting.js` |
+
+**`/oppdrag/` — bilens skjerm**
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Egne oppdrag (ETag), og sender køen først hvis noe ligger usendt | 15 s | ja | — | `oppdrag-enhet.js` · `pollOgSynk` |
+| Lydvarselet (pip for ventende oppdrag) | 5 s | nei | — | `oppdrag-enhet.js` · `lydTikk` |
+| Bilinnstillingene (lyd, terskler) | 5 min | ja | — | `oppdrag-enhet.js` · `lastBilinnstillinger` |
+
+Bilen følger **ikke** endringsnummeret: den ville hentet ved hver endring i hele vakta.
+Et nytt oppdrag når bilen på 0–15 s, og beskjeden går uansett over nødnett.
+
+**`/pasienter/`**
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Pasientlista, førstehjelpere, helsepersonell (+ tavla når den fanen er åpen), alle med ETag | 30 s | ja | fanen er skjult — og henter straks når den kommer tilbake | `patients-app.js` · `doAutoRefresh` |
+| Klokka | 1 s | nei | — | `patients-utils.js` |
+
+**`/vaktliste/`**
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Sender køen av stemplinger gjort uten nett | 15 s | bare når noe ligger i køen | køen er tom | `vaktliste-offline.js` · `synkKo` |
+
+Vaktlista henter **ikke** data av seg selv: en endring en annen gjør, vises når siden
+lastes på nytt.
+
+**Ingen løkke:** `/statistikk/`, `/backlog/`, portalinnstillingene og brukeradministrasjonen
+henter bare når siden lastes eller noen trykker.
+
+**Admin: `/portal-admin/server-status/`** — hele dashbordet hvert **10 s**
+(`templates/patients/admin_status.html` · `refresh`). Lukk den når den ikke trengs: ingen
+annen side spør oftere med full henting.
+
+**Hva en fane koster, i forespørsler per sekund når ingenting skjer** (anslag, 24. sep. 2026):
+
+| Fane | ≈ forespørsler/s | Regnestykket |
+|---|---|---|
+| `/ko/` med tavla framme | 0,58 | 0,4 endringsnummer + 0,07 sentralbord + 0,03 logg + 0,03 lag + 0,03 bjelle + 0,02 tavle |
+| `/oppdrag/` sentralbordet | 0,5 | 0,4 + 0,07 + 0,03 bjelle |
+| `/pasienter/` | 0,13 | 3 lister / 30 s + bjella |
+| Bilens skjerm | 0,1 | 1 / 15 s + bjella |
+| `/vaktliste/` | 0,03 | bare bjella |
+
+I kjernetid på KO — 5 operatører × 2 skjermer — blir det rundt **6 små forespørsler i
+sekundet**, pluss hentingene når noe faktisk skjer. Endringsnummeret er holdt utenfor P95
+(§3c), så dashbordet måler det brukerne venter på, ikke disse spørsmålene. Mål på staging.
 
 ---
 

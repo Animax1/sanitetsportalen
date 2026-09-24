@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Oversikt over oppdateringsintervallene: runbook §3d  `#drift` `#dokumentasjon`
+
+André: «Kan du skrive ned i runbook evt en annen plass som er egnet
+oppdateringsintervallene på enhver ting /pasiwnter /ko /vaktliste osv så vi har oversikt?»
+
+**`docs/RUNBOOK_VAKT.md` §3d** — ved siden av §3c, der lasten regnes på. Én tabell per side
+(alle sider, `/ko/`, sentralbordet, bilens skjerm, `/pasienter/`, `/vaktliste/`,
+server-status) med hva som hentes, hvor ofte, om det går over nettet, når løkka står
+stille, og fil · funksjon. Nederst: hva én fane koster i forespørsler per sekund når
+ingenting skjer — `/ko/` ≈ 0,58, sentralbordet ≈ 0,5, `/pasienter/` ≈ 0,13, bilen ≈ 0,1,
+`/vaktliste/` ≈ 0,03 — og rundt 6 i sekundet i kjernetid på KO.
+
+**Holdt i live av `core/tests_oppdateringsintervaller.py`:** hver fil med `setInterval` i
+`static/js/` og malene skal stå i §3d (funnet ved å lete, ikke fra en liste), og tallet for
+hver navngitt konstant (`KO_LOGG_MS`, `ENDRING_MS` …) skal stemme med raden. Et tall skrevet
+rett i kallet kontrolleres ikke — grensen står i testen.
+**Mutasjonstesting: 4 mutanter, 4 drept** — etter én rettelse: «2,5 s» inneholder «5 s»,
+så `ENDRING_MS` endret til 5000 gikk først grønt. Testen krever nå hele tallet.
+
+**Funnet underveis:** §3 rådet til å «lukke statistikk-fanen mellom oppslag». `/statistikk/`
+har ingen løkke, og henter bare når den lastes, så rådet hjalp ikke. Det er byttet ut med «lukk
+ekstra faner av samme side». Vaktlista henter heller ikke data av seg selv; bare køen av
+stemplinger gjort uten nett sendes hvert 15. s.
+
 ## 2026-09-24 — Endringsnummeret for resten av /ko: loggen og sentralbordet oppdaterer seg på 2,5 sekunder  `#ko` `#oppdrag` `#rammeverk`
 
 André: «Okei la oss ta resten av /ko som vi snakket om». Skissen fra tavla (Artifact
