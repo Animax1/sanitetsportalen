@@ -18,8 +18,8 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 
-from .admin_status import (BEREDSKAPSTRINN, KRITISK, VAKTMODUS, beredskapsnivaa, driftsmodus,
-                           metrikkilde)
+from .admin_status import (BEREDSKAPSTRINN, KRITISK, TRADER_VED_VENTING, TRAADREGEL, VAKTMODUS,
+                           beredskapsnivaa, driftsmodus, metrikkilde)
 
 RUNBOOK = Path(settings.BASE_DIR) / 'docs' / 'RUNBOOK_VAKT.md'
 
@@ -149,6 +149,13 @@ class DashbordetTests(TestCase):
         for id_ in ('beredskap-nivaa', 'beredskap-tiltak', 'metrikk-kilde', 'driftsmodus'):
             self.assertIn(f'id="{id_}"', html)
 
+    def test_traadregelen_staar_ved_tabellen(self):
+        """Regelen sto i runbook §5, men ikke der man ser under stress."""
+        html = self.client.get(reverse('portaladmin:admin_server_status')).content.decode()
+        self.assertIn('id="traadregel"', html)
+        self.assertIn(f'WEB_THREADS={TRADER_VED_VENTING}', html)
+        self.assertIn(f'WEB_THREADS={TRADER_VED_VENTING}', TRAADREGEL)
+
 
 class BeredskapstrinnTilkoblingerTests(SimpleTestCase):
     """Høyeste trinn skal holde seg under Postgres-taket med margin
@@ -157,7 +164,7 @@ class BeredskapstrinnTilkoblingerTests(SimpleTestCase):
 
     POSTGRES_TAK = 100
     MARGIN = 20          # cron-jobbene, release-fasen, en psql-økt
-    TRADER_I_PARAGRAF_5 = 6
+    TRADER_I_PARAGRAF_5 = TRADER_VED_VENTING
 
     def test_hoeyeste_trinn_med_flest_traader_er_under_taket(self):
         workers = max(t['workers'] or VAKTMODUS['workers'] for t in BEREDSKAPSTRINN)

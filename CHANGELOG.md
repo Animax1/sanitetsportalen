@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Tråderegelen står på dashbordet, ved tiltakstabellen  `#drift` `#server-status`
+
+André: «er du ikke enig i å legge inn flere tråder i runbook/beredskap under vakt da tråder
+gir kjappere database?» Nei — **tråder gjør ikke databasen raskere**, de lar appen sende
+flere spørringer samtidig. De hjelper når appen venter på seg selv (lav CPU, rask database,
+likevel høy P95), og gjør det verre når det er databasen som er treg. Derfor er de ikke et
+trinn i tabellen. Men regelen sto bare i runbook §5, ikke på dashbordet, der man ser under
+stress.
+
+- **Under tiltakstabellen på server-status:** «Workers eller tråder? Lav CPU i Railway
+  (Metrics) og rask database, men likevel høy P95? … `WEB_THREADS=6` i stedet for flere
+  workers (runbook §5). Er det databasen som er treg, gjør flere tråder det verre.»
+- Teksten og tallet står ett sted (`TRAADREGEL`, `TRADER_VED_VENTING` i
+  `core/admin_status.py`), og testen som holder §5 og tilkoblingstaket i takt leser
+  samme konstant.
+
 ## 2026-09-24 — Runbooken: workers eller tråder (se CPU), og taket på databasetilkoblinger  `#drift` `#runbook`
 
 André: «Det skal bare øke workers og ikke tråder?» og «kan jeg i teorien ha 10 workers og

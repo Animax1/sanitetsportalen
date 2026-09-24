@@ -458,6 +458,16 @@ BEREDSKAPSTRINN = (
                'workers — se «Database» og Railway-loggen.'},
 )
 
+#: **Tråder er et annet verktøy enn workers, ikke et trinn over dem** (runbook §5,
+#: André 24. sep. 2026: «tråder gir kjappere database?»). De gjør ikke databasen
+#: raskere — de lar appen sende flere spørringer samtidig. Det hjelper bare når
+#: appen venter på seg selv: lav CPU, rask database, likevel høy P95. Er det
+#: databasen som er treg, gir flere tråder mer trykk på flaskehalsen.
+TRADER_VED_VENTING = 6
+TRAADREGEL = (f'Lav CPU i Railway (Metrics) og rask database, men likevel høy P95? Da venter appen '
+              f'på seg selv: WEB_THREADS={TRADER_VED_VENTING} i stedet for flere workers (runbook §5). '
+              'Er det databasen som er treg, gjør flere tråder det verre.')
+
 #: Siste utvei, ikke et trinn dashbordet setter selv: det krever at tiltakene
 #: over er prøvd.
 KRITISK = {'navn': 'Kritisk', 'terskel': 'Fortsatt tregt etter alle tiltak',
@@ -564,6 +574,7 @@ def admin_status_view(request):
         'payload': payload,
         'trinn': BEREDSKAPSTRINN,
         'kritisk': KRITISK,
+        'traadregel': TRAADREGEL,
         'vaktmodus': VAKTMODUS,
         'payload_json': json.dumps(payload, indent=2, ensure_ascii=False),
     })
