@@ -431,15 +431,14 @@ function koEgetVinduNavn(sok) {
 //: Vinduet denne siden viser alene (`?vindu=`), eller `null` i hovedvinduet.
 let koEgetVinduAktivt = null;
 
-// **Hendelsen som står åpen i loggvinduet følger med** (André, 23. sep. 2026:
-// «Når vi skal åpne en hendelse som ligger i loggstrøms vinduets plass og vil
-// åpne som et eget vindu så åpner du loggstrøms vinduet istedenfor»). Loggen
-// og hendelsen deler vinduet, og den nye siden visste ikke hvilken av dem
-// som sto der. `&hendelse=` gjelder bare `logg`, og bare et positivt heltall.
+// **Hendelsen som står åpen følger med** (André, 23. sep. 2026: «Når vi skal
+// åpne en hendelse … og vil åpne som et eget vindu så åpner du loggstrøms
+// vinduet istedenfor»). Fra 24. sep. står hendelsen i hendelsesloggens vindu,
+// så `&hendelse=` gjelder bare `hendelser`, og bare et positivt heltall.
 function koEgetVinduHendelse(sok) {
   try {
     const p = new URLSearchParams(sok || '');
-    if (p.get('vindu') !== 'logg') return null;
+    if (p.get('vindu') !== 'hendelser') return null;
     const raa = p.get('hendelse') || '';
     return /^[1-9]\d{0,9}$/.test(raa) ? Number(raa) : null;
   } catch (e) {
@@ -449,34 +448,28 @@ function koEgetVinduHendelse(sok) {
 
 function koEgetVinduUrl(navn, hendelseId) {
   if (!KO_VINDUER.includes(navn)) return null;
-  const h = navn === 'logg' && Number.isInteger(hendelseId) && hendelseId > 0 ? '&hendelse=' + hendelseId : '';
+  const h = navn === 'hendelser' && Number.isInteger(hendelseId) && hendelseId > 0 ? '&hendelse=' + hendelseId : '';
   return '/ko/?vindu=' + encodeURIComponent(navn) + h;
 }
 
-// Hendelsen som står åpen i loggvinduet, eller `null`. Gjennom en vakt:
+// Hendelsen som står åpen i hendelsesloggen, eller `null`. Gjennom en vakt:
 // ko-hendelser.js lastes etter denne fila.
-function koAapenHendelseILoggen(navn) {
-  if (navn !== 'logg' || typeof koApenHendelseId === 'undefined') return null;
+function koAapenHendelseIVinduet(navn) {
+  if (navn !== 'hendelser' || typeof koApenHendelseId === 'undefined') return null;
   return Number.isInteger(koApenHendelseId) ? koApenHendelseId : null;
 }
 
 // Knappen i vinduets hode. Navngitt mål, så et nytt trykk henter fram det
-// samme nettleservinduet i stedet for å åpne et til.
-//
-// **Står en hendelse åpen i loggvinduet, er det den som får eget vindu** —
-// ett per hendelse (`ko-hendelse-<id>`), så to hendelser kan stå side om side.
-// Her lukkes den, og strømmen står igjen: den skal ikke vises to steder, og
-// loggvinduet skal ikke skjules for å gi plass til noe som alt er flyttet ut.
+// samme nettleservinduet i stedet for å åpne et til — for hendelsesloggen er
+// det også vinduet som følger klikkene (`ko-hendelser`, ko-hendelser.js).
+// Står en hendelse åpen, følger den med og lukkes her: den skal ikke vises
+// to steder.
 function koApneEgetVindu(navn) {
-  const hendelse = koAapenHendelseILoggen(navn);
+  const hendelse = koAapenHendelseIVinduet(navn);
   const url = koEgetVinduUrl(navn, hendelse);
   if (!url) return;
-  if (hendelse !== null) {
-    window.open(url, 'ko-hendelse-' + hendelse, 'popup,width=1100,height=800');
-    if (typeof koLukkDetalj === 'function') koLukkDetalj();
-    return;
-  }
   window.open(url, 'ko-' + navn, 'popup,width=1280,height=800');
+  if (hendelse !== null && typeof koLukkDetalj === 'function') koLukkDetalj();
   const ny = koSkjul(koOppsett || koLesOppsett(), navn);
   if (ny.skjult.length === ((koOppsett && koOppsett.skjult) || []).length) return;
   koOppsett = ny;

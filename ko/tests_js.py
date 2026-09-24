@@ -17,6 +17,7 @@ import unittest
 
 from django.test import SimpleTestCase
 
+from oppdrag.tests_runde_d import _konst
 from patients.js_test_utils import (JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
                                     extract_function, node_available, read_js, run_node)
 
@@ -175,6 +176,9 @@ KO_LOGG_BYGGERE = (
     'koHendelseOppdragEnheterHtml',
     'koPrioKnapperHtml',
     'koTegnDetalj',
+    # Sidebaren med de pågående, ved siden av den åpne (24. sep. 2026).
+    'koHSideRadHtml',
+    'koTegnHSide',
     'koFyllLokasjoner',
     '_koFyllSkjema',
     'koHendelseValg',
@@ -535,6 +539,9 @@ PRIORITET_PREAMBLE = (
     'let koLinjer = new Map(); let oppdragsliste = [];\n'
     # Loggfilteret (21. sep. 2026): `koLoggHodeTekst()` teller det filtrerte.
     "let koLoggfilter = 'alle';\n"
+    # Skjerm 2 (24. sep. 2026): raden som er merket, er den skjerm 2 viser.
+    'let koFolgerSett = 0; let koFolgerViser = null; let koHendelseKanal = null;\n'
+    + _konst(KO_JS[1], 'KO_FOLGER_FRIST_MS')
 )
 
 HENDELSE_HARNESS = (
@@ -543,7 +550,8 @@ HENDELSE_HARNESS = (
     (KO_JS, ('koSorterHendelser', 'koHendelseTreffer', 'koSynligeHendelser', 'koApneHendelser',
              'koPrioriteter', 'koPrioritetNavn', 'koPrioritetRang', 'koPrioMerke', 'koPrioIkon',
              'koOppdragForHendelse', 'koHendelseRadHtml', 'koKlokke', 'koKanSkrive',
-             'koIStrommen', 'koLinjeMerke', 'koHendelseLinjer', 'koOperatorlinjer')),
+             'koIStrommen', 'koLinjeMerke', 'koHendelseLinjer', 'koOperatorlinjer',
+             'koMerketHendelse', 'koFolgerTilstede', 'koErFolger')),
 )
 
 
@@ -686,7 +694,7 @@ class HendelsesradenTests(SimpleTestCase):
 
 #: Et DOM-stubb for vinduene: `getElementById` lager elementet første gang
 #: det spørres etter, med `classList` og `innerHTML`, så synligheten lar seg
-#: lese etterpå. Bare det `koTegnHendelser`, `koVisStrommen` og
+#: lese etterpå. Bare det `koTegnHendelser`, `koVisDetaljen`, `koTegnHSide` og
 #: `koTegnDetalj` rører.
 VINDU_DOM = """
     const elementer = new Map();
@@ -700,18 +708,24 @@ VINDU_DOM = """
       }
       return elementer.get(id);
     }
-    globalThis.document = { getElementById: el, activeElement: null, querySelectorAll: () => [] };
+    globalThis.document = { getElementById: el, activeElement: null, querySelectorAll: () => [], title: '' };
     const skjult = (id) => el(id).klasser.has('d-none');
+    let koEgetVinduAktivt = null;
     function koTegnRessurser() {}
     function withSubmitGuard() {}
     function koBevarFelter() { return () => {}; }
+    const sendt = [];
+    function kanal() { koHendelseKanal = { postMessage: (m) => sendt.push(m) }; }
 """
 
 VINDU_HARNESS = HENDELSE_HARNESS + (
     (PORTAL_UTILS_JS, ('fmtMin',)),
-    (KO_JS, ('koLoggfilterTreffer',
-             'koTegnHendelser', 'koVisStrommen', 'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj',
-             'koApneHendelse', 'koVippHendelse', 'koLukkDetalj', 'koRullTilLoggvinduet',
+    (KO_JS, ('koLoggfilterTreffer', 'koEgetVinduUrl',
+             'koTegnHendelser', 'koVisDetaljen', 'koTegnHendelseTittel', 'koHendelseVinduTittel',
+             'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj', 'koTegnHSide', 'koHSideRadHtml',
+             'koApneHendelse', 'koVelgHendelse', 'koFramHendelsesvinduet', 'koRullTilHendelsesvinduet',
+             'koLukkDetalj', 'koHendelseIEgetVindu', 'koSkjerm2Tekst', 'koMeldTilstede',
+             'koHendelseMelding', 'koHendelseKanalMottak',
              'koDetaljLinjeHtml', 'koHendelseOppdragHtml', 'koPrioKnapperHtml', 'koLagBrikkeHtml',
              'koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koMittBrukernavn', 'koSiden',
              'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett')),
@@ -719,80 +733,262 @@ VINDU_HARNESS = HENDELSE_HARNESS + (
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class HendelsenILoggvinduetTests(SimpleTestCase):
-    """Hendelsen åpnes i **loggstrømmens** vindu (André, 21. sep. 2026: «viktig
-    å ha oversikten i hendelsesloggen foran loggstrømmen»). Lista står med
-    raden merket, strømmen og skrivefeltet skjules imens, og hodet på
-    loggvinduet sier hvilken hendelse som står der."""
+class HendelsenIHendelsesvinduetTests(SimpleTestCase):
+    """Hendelsen åpnes i **hendelsesloggens** vindu, med de pågående i en
+    sidebar (André, 24. sep. 2026, skisse v2). Loggstrømmen viser aldri en
+    hendelse («3. nei»). Finnes et hendelsesvindu for seg, går klikkene dit
+    («når en trykker på en hendelse i hendelsesloggen så oppdateres den
+    hendelses vinduet»)."""
 
-    H5 = dict(HendelsesradenTests.H, id=5, kode='H5', tittel='Bevisstløs person')
-    H6 = dict(HendelsesradenTests.H, id=6, kode='H6', tittel='Slagsmål', prioritet='rod')
+    H5 = dict(HendelsesradenTests.H, id=5, nummer=5, kode='H5', tittel='Bevisstløs person')
+    H6 = dict(HendelsesradenTests.H, id=6, nummer=6, kode='H6', tittel='Slagsmål', prioritet='rod')
+    H7 = dict(HendelsesradenTests.H, id=7, nummer=7, kode='H7', tittel='Ferdig', status='lukket',
+              lukket_at='2026-09-18T22:00:00')
 
     def _kjor(self, script, nivaa='skriv_full'):
-        preamble = PRIORITET_PREAMBLE.replace("ko: 'skriv_full'", f"ko: '{nivaa}'")
-        return run_node(build_harness(VINDU_HARNESS), VINDU_DOM
-                        + f'koHendelser = new Map({json.dumps([[5, self.H5], [6, self.H6]])});\n'
-                        + "koLinjer = new Map([[1, {id: 1, rot: 1, kilde: 'operator', hendelse_id: null, systemkode: ''}],"
-                        + " [2, {id: 2, rot: 2, kilde: 'operator', hendelse_id: 5, systemkode: ''}]]);\n"
-                        + script, preamble=preamble).splitlines()
+        preamble = (PRIORITET_PREAMBLE.replace("ko: 'skriv_full'", f"ko: '{nivaa}'")
+                    + _konst(KO_JS[0], 'KO_VINDUER'))
+        ut = run_node(build_harness(VINDU_HARNESS), VINDU_DOM
+                      + 'koHendelser = new Map('
+                      + json.dumps([[5, self.H5], [6, self.H6], [7, self.H7]]) + ');\n'
+                      + "koLinjer = new Map([[1, {id: 1, rot: 1, kilde: 'operator', hendelse_id: null, systemkode: ''}],"
+                      + " [2, {id: 2, rot: 2, kilde: 'operator', hendelse_id: 5, systemkode: ''}]]);\n"
+                      + script, preamble=preamble).splitlines()
+        return ut[:-1] if ut and ut[-1] == 'OK' else ut
 
-    def test_aapen_hendelse_staar_i_loggvinduet_og_lista_blir_staaende(self):
+    def test_hendelsen_erstatter_tabellen_og_loggen_blir_staaende(self):
         ut = self._kjor("""
             koTegnHendelser();
-            console.log(skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), skjult('ko-logg-skjema'), el('ko-logg-antall').textContent);
+            const logg = () => [skjult('ko-logg-liste'), skjult('ko-logg-skjema'), el('ko-logg-antall').textContent].join(' ');
+            koTegnLoggHode();
+            console.log(skjult('ko-hendelser-liste'), skjult('ko-hendelse-visning'), logg());
             koApneHendelse('5');
-            console.log(skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), skjult('ko-logg-skjema'), el('ko-logg-antall').textContent);
-            console.log(skjult('ko-hendelser-liste'), el('ko-hendelser-liste').innerHTML.includes('h-apen'),
-                        (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length,
-                        el('ko-hendelse-detalj').innerHTML.includes('Bevisstløs person'),
-                        el('ko-hendelse-detalj').innerHTML.includes('data-action="koLukkDetalj"'),
-                        el('ko-hendelser-liste').innerHTML.includes('data-action="koVippHendelse"'));
+            console.log(skjult('ko-hendelser-liste'), skjult('ko-hendelse-visning'),
+                        el('ko-vindu-hendelser').klasser.has('ko-h-detaljmodus'), logg());
+            const d = el('ko-hendelse-detalj').innerHTML;
+            console.log(d.includes('Bevisstløs person'), d.includes('data-action="koLukkDetalj"'),
+                        d.includes('Alle hendelser'), d.includes('data-action="koHendelseIEgetVindu" data-id="5"'));
+            koLukkDetalj();
+            console.log(koApenHendelseId, skjult('ko-hendelser-liste'), skjult('ko-hendelse-visning'),
+                        el('ko-vindu-hendelser').klasser.has('ko-h-detaljmodus'), logg());
+            console.log(JSON.stringify(document.title));
         """)
-        self.assertEqual(ut[0], 'true false false · 1 linjer', 'før: strømmen, med linja uten hendelse talt')
-        self.assertEqual(ut[1], 'false true true · H5 · Bevisstløs person', 'åpen: detaljen i loggvinduet, strømmen og feltet borte')
-        self.assertEqual(ut[2], 'false true 1 true true true', 'lista står, med nøyaktig én rad merket, og radene vipper')
+        self.assertEqual(ut[0], 'false true false false · 1 linjer', 'før: tabellen')
+        self.assertEqual(ut[1], 'true false true false false · 1 linjer',
+                         'åpen: hendelsen i hendelsesvinduet — strømmen, feltet og hodet der er urørt')
+        self.assertEqual(ut[2], 'true true true true')
+        self.assertEqual(ut[3], 'null false true false false false · 1 linjer', 'tilbake til tabellen')
+        self.assertEqual(ut[4], '""', 'hovedvinduets fanetittel er sidens, ikke hendelsens')
 
-    def test_klikk_paa_raden_vipper_og_merkene_bare_aapner(self):
+    def test_sidebaren_har_bare_de_paagaaende_i_tabellens_rekkefolge(self):
         ut = self._kjor("""
-            koVippHendelse('5'); console.log(koApenHendelseId, skjult('ko-logg-liste'));
-            koVippHendelse('6'); console.log(koApenHendelseId, el('ko-logg-antall').textContent);
-            koVippHendelse('6'); console.log(koApenHendelseId, skjult('ko-logg-liste'), skjult('ko-hendelse-detalj'), el('ko-logg-antall').textContent);
-            koApneHendelse('5'); koApneHendelse('5'); console.log(koApenHendelseId, 'merket lukker ikke');
-            koLukkDetalj(); console.log(koApenHendelseId, skjult('ko-logg-liste'), (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length);
+            koApneHendelse('5');
+            const s = el('ko-hendelse-sidebar').innerHTML;
+            console.log(JSON.stringify((s.match(/data-id="\\d+"/g) || [])));
+            console.log((s.match(/ aktiv"/g) || []).length, s.includes('aria-current'), s.includes('data-action="koVelgHendelse"'));
         """)
-        self.assertEqual(ut[0], '5 true')
-        self.assertEqual(ut[1], '6 · H6 · Slagsmål', 'en annen rad bytter direkte, uten å gå via strømmen')
-        self.assertEqual(ut[2], 'null false true · 1 linjer', 'samme rad igjen lukker, og hodet teller linjer igjen')
-        self.assertEqual(ut[3], '5 merket lukker ikke')
-        self.assertEqual(ut[4], 'null false 0')
+        self.assertEqual(json.loads(ut[0]), ['data-id="5"', 'data-id="6"'], 'Viktig før Rød, og H7 (lukket) er ikke med')
+        self.assertEqual(ut[1], '1 true true', 'nøyaktig én rad er den åpne')
 
-    def test_skrivefeltet_kommer_ikke_tilbake_for_les(self):
-        """`les` fikk feltet skjult ved oppstart. Å vise strømmen igjen skal
-        ikke gi det tilbake — det er en vegg man går inn i."""
+    def test_sidebaren_bytter_paa_stedet(self):
         ut = self._kjor("""
-            el('ko-logg-skjema').classList.add('d-none');
-            koApneHendelse('5'); koLukkDetalj();
-            console.log(skjult('ko-logg-liste'), skjult('ko-logg-skjema'));
-        """, nivaa='les')
-        self.assertEqual(ut[0], 'false true')
+            koApneHendelse('5');
+            koVelgHendelse('6');
+            console.log(koApenHendelseId, el('ko-hendelse-detalj').innerHTML.includes('Slagsmål'), skjult('ko-hendelser-liste'));
+        """)
+        self.assertEqual(ut[0], '6 true true')
 
-    def test_hendelse_som_forsvinner_gir_stroemmen_tilbake(self):
+    def test_lukket_av_en_annen_blir_staaende_merket_og_gaar_ut_av_sidebaren(self):
+        """André: «Noen skal kanskje registrere noe etterpå.»"""
+        ut = self._kjor("""
+            koApneHendelse('6');
+            koHendelser.set(6, Object.assign({}, koHendelser.get(6), {status: 'lukket', lukket_at: '2026-09-18T22:10:00', lukket_av: 'per'}));
+            koTegnHendelser();
+            console.log(koApenHendelseId, skjult('ko-hendelse-visning'),
+                        el('ko-hendelse-detalj').innerHTML.includes('Lukket'),
+                        el('ko-hendelse-detalj').innerHTML.includes('av per'),
+                        el('ko-hendelse-sidebar').innerHTML.includes('data-id="6"'));
+        """)
+        self.assertEqual(ut[0], '6 false true true false')
+
+    def test_hendelse_som_forsvinner_gir_tabellen_tilbake(self):
         """Pollen sender hele lista; er den åpne borte (nullstilt), står
-        strømmen der igjen — ikke et tomt vindu."""
+        tabellen der igjen — ikke et tomt vindu."""
         ut = self._kjor("""
-            koApneHendelse('5'); koHendelser.delete(5); koTegnDetalj();
-            console.log(koApenHendelseId, skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), el('ko-logg-antall').textContent);
+            koApneHendelse('5'); koHendelser.delete(5); koTegnHendelser();
+            console.log(koApenHendelseId, skjult('ko-hendelse-visning'), skjult('ko-hendelser-liste'));
         """)
-        self.assertEqual(ut[0], 'null true false · 1 linjer')
+        self.assertEqual(ut[0], 'null true false')
+
+    def test_skjult_hendelseslogg_hentes_fram(self):
+        """«En hendelse åpnes i loggvinduet — også når det er skjult» (TODO):
+        H-merket og lagkortet går gjennom `koApneHendelse`."""
+        ut = self._kjor("""
+            let koOppsett = {skjult: ['hendelser']}; const vist = [];
+            function koErSkjult(o, navn) { return o.skjult.includes(navn); }
+            function koVisVindu(navn) { vist.push(navn); koOppsett = {skjult: []}; }
+            koApneHendelse('5'); koApneHendelse('6');
+            console.log(JSON.stringify(vist), koApenHendelseId);
+            koEgetVinduAktivt = 'hendelser'; koOppsett = {skjult: ['hendelser']};
+            koApneHendelse('5');
+            console.log(JSON.stringify(vist));
+        """)
+        self.assertEqual(ut[0], '["hendelser"] 6', 'hentet fram én gang, ikke ved hvert klikk')
+        self.assertEqual(ut[1], '["hendelser"]', 'et vindu for seg har ingenting å hente fram')
 
     def test_rullingen_gjelder_bare_smal_skjerm(self):
         ut = self._kjor("""
-            let rullet = 0; el('ko-vindu-logg').scrollIntoView = () => { rullet += 1; };
+            let rullet = 0; el('ko-vindu-hendelser').scrollIntoView = () => { rullet += 1; };
             window.matchMedia = (q) => ({ matches: q.includes('1199.98px') && globalThis.smal });
             globalThis.smal = false; koApneHendelse('5'); console.log(rullet);
             globalThis.smal = true; koApneHendelse('6'); console.log(rullet);
         """)
         self.assertEqual(ut[:2], ['0', '1'])
+
+    def test_med_skjerm_2_gaar_klikket_dit_og_tabellen_staar(self):
+        ut = self._kjor("""
+            kanal(); koFolgerSett = Date.now(); koFolgerViser = null;
+            koTegnHendelser();
+            console.log(el('ko-hendelser-skjerm2').textContent);
+            koApneHendelse('6');
+            console.log(JSON.stringify(sendt), koApenHendelseId, skjult('ko-hendelser-liste'),
+                        (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length,
+                        el('ko-hendelser-liste').innerHTML.includes('h-rod h-apen'),
+                        el('ko-hendelser-skjerm2').textContent);
+            // Livstegnet stopper: etter fristen åpner klikket seg her igjen.
+            koFolgerSett = Date.now() - KO_FOLGER_FRIST_MS - 1;
+            koApneHendelse('5');
+            console.log(sendt.length, koApenHendelseId, el('ko-hendelser-skjerm2').textContent === '',
+                        (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length);
+        """)
+        self.assertEqual(ut[0], '· skjerm 2 følger')
+        self.assertEqual(ut[1], '[{"vis":6}] null false 1 true · H6 vises på skjerm 2')
+        self.assertEqual(ut[2], '1 5 true 0', 'skjerm 2 borte: klikket åpner her, og merket er borte')
+
+    def test_eget_vindu_fra_hendelsen(self):
+        ut = self._kjor("""
+            const aapnet = []; let blokkert = false;
+            window.open = (url, navn) => { aapnet.push([url, navn]); return blokkert ? null : {}; };
+            koApneHendelse('5');
+            koHendelseIEgetVindu('5');
+            console.log(JSON.stringify(aapnet), koApenHendelseId, skjult('ko-hendelser-liste'),
+                        el('ko-hendelser-liste').innerHTML.includes('h-viktig h-apen'));
+            blokkert = true; koFolgerSett = 0;
+            koApneHendelse('6'); koHendelseIEgetVindu('6');
+            console.log(koApenHendelseId, skjult('ko-hendelser-liste'));
+        """)
+        self.assertEqual(json.loads(ut[0].split(' ')[0]), [['/ko/?vindu=hendelser&hendelse=5', 'ko-hendelser']])
+        self.assertEqual(ut[0].split(' ', 1)[1], 'null false true', 'tabellen står, med raden merket')
+        self.assertEqual(ut[1], '6 true', 'et blokkert vindu lar hendelsen bli stående her')
+
+    def test_meldingene_leses_som_data(self):
+        ut = self._kjor("""
+            console.log(JSON.stringify([{sporr: true}, {borte: true}, {tilstede: true, viser: 5},
+              {tilstede: true, viser: '5'}, {tilstede: true}, {vis: 7}, {vis: '7'}, {vis: 0}, {vis: -1},
+              {vis: 1.5}, null, 'vis', {}].map(koHendelseMelding)));
+        """)
+        self.assertEqual(json.loads(ut[0]), [
+            {'sporr': True}, {'borte': True}, {'tilstede': True, 'viser': 5},
+            {'tilstede': True, 'viser': None}, {'tilstede': True, 'viser': None}, {'vis': 7},
+            None, None, None, None, None, None, None])
+
+    def test_hovedvinduet_folger_livstegnet(self):
+        ut = self._kjor("""
+            kanal();
+            koHendelseKanalMottak({tilstede: true, viser: 5}, 1000);
+            console.log(koFolgerSett, koFolgerViser);
+            koHendelseKanalMottak({vis: 6}, 2000);
+            console.log(koApenHendelseId, 'hovedvinduet tar ikke imot vis');
+            koHendelseKanalMottak({borte: true}, 3000);
+            console.log(koFolgerSett, koFolgerViser);
+        """)
+        self.assertEqual(ut, ['1000 5', 'null hovedvinduet tar ikke imot vis', '0 null'])
+
+    def test_vinduet_for_seg_folger_klikkene_og_svarer(self):
+        ut = self._kjor("""
+            kanal(); koEgetVinduAktivt = 'hendelser';
+            koHendelseKanalMottak({vis: 6});
+            console.log(koApenHendelseId, skjult('ko-hendelse-visning'), document.title);
+            koHendelseKanalMottak({sporr: true});
+            koHendelseKanalMottak({tilstede: true, viser: 5});
+            console.log(JSON.stringify(sendt), koFolgerSett);
+            koLukkDetalj();
+            console.log(JSON.stringify(sendt[sendt.length - 1]), document.title);
+        """)
+        self.assertEqual(ut[0], '6 false H6 · Slagsmål · KO')
+        self.assertEqual(ut[1], '[{"tilstede":true,"viser":6},{"tilstede":true,"viser":6}] 0',
+                         'svarer på vis og på spørsmålet; bryr seg ikke om andre vinduer for seg')
+        self.assertEqual(ut[2], '{"tilstede":true,"viser":null} Hendelseslogg · KO')
+
+    def test_sidebarraden_escaper_og_baerer_alle_fire(self):
+        ond = '<img src=x onerror=alert(1)>'
+        ut = self._kjor('console.log(koHSideRadHtml(' + json.dumps(dict(
+            self.H5, tittel=ond, lokasjon_navn=ond, opprettet_at='2026-09-18T21:00:00')) + ', '
+            'new Date("2026-09-18T21:23:00").getTime()));')
+        self.assertNotIn('<img', ut[0])
+        for klasse in ('ko-hs-nr', 'ko-hs-tittel', 'ko-hs-sted', 'ko-hs-tid'):
+            self.assertIn(klasse, ut[0])
+        self.assertIn('>23 min<', ut[0])
+        self.assertIn('h-viktig', ut[0])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class SidebarBreddenTests(SimpleTestCase):
+    """`koHSideBredde()`: aldri smalere enn nummeret, aldri over 60 % av
+    vinduet — hendelsen er det man jobber i."""
+
+    def test_grensene(self):
+        pre = _konst(KO_JS[1], 'KO_HSIDE_MIN')
+        ut = run_node(build_harness(((KO_JS, ('koHSideBredde',)),)),
+                      'console.log(JSON.stringify([koHSideBredde(10, 1000), koHSideBredde(200, 1000),'
+                      ' koHSideBredde(900, 1000), koHSideBredde(200.4, 1000), koHSideBredde("x", 1000),'
+                      ' koHSideBredde(200, 50)]));', preamble=pre).splitlines()
+        self.assertEqual(json.loads(ut[0]), [56, 200, 600, 200, None, 56])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class HendelseKanalenStarterTests(SimpleTestCase):
+    """Kallstedet i ko.js og det `koHendelseVinduStart()` gjør: vinduet for
+    seg melder seg og pulserer, hovedvinduet spør."""
+
+    def test_ko_js_starter_den_etter_oppsettet(self):
+        """Den ekte kroken kjøres, med hvert navn den kaller byttet mot en
+        opptaker (`with` over en Proxy). Rekkefølgen teller: `koErFolger()`
+        leser `koEgetVinduAktivt`, som `koOppsettStart()` setter."""
+        kilde = read_js(KO_JS)
+        start = kilde.index("document.addEventListener('DOMContentLoaded', ")
+        krok = kilde[start + len("document.addEventListener('DOMContentLoaded', "):kilde.rindex(');')]
+        ut = run_node('', 'const kall = [];\n'
+                      'const stub = new Proxy({}, { has: (t, k) => k !== "kall",'
+                      ' get: (t, k) => k === "document" ? { getElementById: () => null }'
+                      ' : (...a) => { kall.push(String(k)); return null; } });\n'
+                      'new Function("stub", "with (stub) { (" + ' + json.dumps(krok) + ' + ")(); }")(stub);\n'
+                      'console.log(JSON.stringify(kall.slice(0, 2)));').splitlines()
+        self.assertEqual(json.loads(ut[0]), ['koOppsettStart', 'koHendelseVinduStart'])
+
+    def _kjor(self, eget):
+        pre = (_konst(KO_JS[1], 'KO_HENDELSE_KANAL') + _konst(KO_JS[1], 'KO_FOLGER_PULS_MS')
+               + f"let koHendelseKanal = null; let koApenHendelseId = 4; let koEgetVinduAktivt = {json.dumps(eget)};\n"
+               + """
+            const sendt = []; const pulser = []; const lyttere = [];
+            globalThis.BroadcastChannel = function (navn) { this.navn = navn; this.postMessage = (m) => sendt.push([navn, m]); };
+            globalThis.setInterval = (f, ms) => pulser.push(ms);
+            globalThis.window = { addEventListener: (h) => lyttere.push(h) };
+            globalThis.document = { getElementById: () => null, addEventListener() {} };
+            function koHSideLyttere() {}
+            function koHendelseKanalMottak() {}
+        """)
+        ut = run_node(build_harness(((KO_JS, ('koHendelseVinduStart', 'koErFolger', 'koMeldTilstede')),)),
+                      'koHendelseVinduStart(); console.log(JSON.stringify([sendt, pulser, lyttere]));',
+                      preamble=pre).splitlines()
+        return json.loads(ut[0])
+
+    def test_vinduet_for_seg_melder_seg_pulserer_og_sier_fra_ved_lukking(self):
+        self.assertEqual(self._kjor('hendelser'),
+                         [[['ko-hendelse', {'tilstede': True, 'viser': 4}]], [5000], ['pagehide']])
+
+    def test_hovedvinduet_spor(self):
+        self.assertEqual(self._kjor(None), [[['ko-hendelse', {'sporr': True}]], [], []])
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

@@ -131,13 +131,17 @@ gjennomgang av §2 og §10 på en liten skjerm.
       skjulingen står. Hent alt tilbake → stripa forsvinner.
 - [ ] **Loggstrømmen: Alle | Meldinger | System.** Tallene skal summere til «Alle», de
       **festede linjene står uansett**, hodet teller det filtrerte, og valget overlever en
-      sidelasting. Åpne en hendelse → knapperaden skjules; lukk → den er tilbake med
-      samme valg.
-- [ ] **Hendelsen åpnes i loggstrømmens vindu**, ikke i en modal: hendelsesloggen står
-      med raden merket blått, og ressursoversikten og oppdragslista er synlige mens du
-      arbeider i den. Klikk på samme rad igjen → lukkes; klikk på en annen rad → bytter.
-      «← Loggstrøm» gir strømmen og skrivefeltet tilbake — **ikke** skrivefeltet for en
-      konto med bare `les`.
+      sidelasting. Åpne en hendelse → strømmen og knapperaden står urørt.
+- [ ] **Hendelsen åpnes i hendelsesloggens vindu**, med de pågående i en sidebar til
+      venstre. Loggstrømmen viser fortsatt strømmen. Dra sidebarens kant smalere → tid
+      forsvinner først, så sted, så tittel; nummer og farge står. «← Alle hendelser» gir
+      tabellen tilbake. Skjul hendelsesloggen og klikk et H-merke i strømmen → den kommer
+      fram med hendelsen åpen.
+- [ ] **Skjerm 2.** «Eget vindu» i hendelsen → nytt vindu med hendelsen, og hovedvinduet
+      viser tabellen med raden merket og «H… vises på skjerm 2». Klikk en annen rad →
+      skjerm 2 bytter. Lukk skjerm 2 → teksten forsvinner, og neste klikk åpner i
+      hovedvinduet. La en kollega lukke hendelsen du har åpen → den blir stående,
+      merket «Lukket», og går ut av sidebaren.
 - [ ] **Rediger hodet i to faner samtidig.** Åpne samme hendelse i A og B, lagre i A, lagre
       så i B → B får **409** og en beskjed om at noen andre har endret, ikke en stille
       overskriving.

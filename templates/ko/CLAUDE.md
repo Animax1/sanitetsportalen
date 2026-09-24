@@ -28,10 +28,8 @@ vinduer vi har i flaten vår»). Samme side med `?vindu=<navn>` (`koEgetVinduNav
 kjent navn), ikke en egen mal — ett sted vinduet tegnes. Der vises bare det vinduet, og
 oppsettet **lagres ikke**: det er hovedvinduets. I hovedvinduet skjules det og står i
 stripa; det siste synlige blir stående, og står da to steder. Tidslinja synkes mellom
-vinduene over `BroadcastChannel('ko-tid')`. **Står en hendelse åpen i loggvinduet, er det
-hendelsen som åpnes** (`&hendelse=<id>`, ett nettleservindu per hendelse), og strømmen
-står igjen i hovedvinduet — loggen og hendelsen deler vinduet, og ↗ åpnet strømmen til
-André sa fra.
+vinduene over `BroadcastChannel('ko-tid')`. **Hendelsesloggen for seg følger klikkene i
+hovedvinduet** — se «Hendelsesloggen» under; en åpen hendelse tas med (`&hendelse=<id>`).
 
 **Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
 Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad
@@ -70,10 +68,20 @@ skjerm i et kommandopunkt.
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, prioritet, nummer.
 **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, logg, lag).
-**Hendelsen åpnes i loggstrømmens vindu** (André, 21. sep. 2026), ikke i en modal og ikke
-over lista: oversikten skal stå mens én hendelse er åpen. Strømmen og skrivefeltet
-skjules imens (`koVisStrommen`; `les` får ikke feltet tilbake); raden vipper
-(`koVippHendelse`), merkene i strømmen åpner bare. **Loggstrømmen viser linjene uten
+**Hendelsen åpnes i hendelsesloggens vindu, med de pågående i en sidebar** (André, 24. sep.
+2026, skisse v2 — fram til da sto den i loggstrømmens, der den skjulte strømmen).
+**Loggstrømmen viser aldri en hendelse.** Tabellen byttes mot hendelsen (`koVisDetaljen`),
+og hodets tabellvalg skjules imens. Sidebaren (`koTegnHSide`) har bare åpne, i tabellens
+rekkefølge, og **taper tid, så sted, så tittel** når den smalner — container-spørringer på
+sidebaren, ikke skjermen; nummer og farge står. Kanten dras (`koHSideBredde`, huskes per
+nettleser). En hendelse en annen lukker **blir stående, merket «Lukket»**, og går ut av
+sidebaren. H-merket og lagkortet (`koApneHendelse`) henter fram en skjult hendelseslogg.
+
+**Skjerm 2** (`BroadcastChannel('ko-hendelse')`): «Eget vindu» i hendelsen og ↗ i hodet
+åpner *samme* navngitte vindu, `ko-hendelser`, som melder seg hvert 5. s. Mens det lever
+(`koFolgerTilstede`, 12 s) går `koApneHendelse` dit, tabellen står med raden merket, og
+hodet sier «H12 vises på skjerm 2»; sidebaren (`koVelgHendelse`) bytter alltid på stedet.
+Uten livstegn åpnes klikket her igjen. Én skjerm 2, ingen «fest» (André). **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO). **Alle | Meldinger | System** filtrerer strømmen
 (`koLoggfilterTreffer`, huskes per nettleser); **festede står uansett**, og hodet teller

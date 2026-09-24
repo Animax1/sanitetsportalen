@@ -157,10 +157,6 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
       til 2,5 s både i `/ko/` og `/oppdrag/`; deretter `logg` og ev. `program`. Pasientene
       bare hvis sykestua ber om det. Kollisjonssperren (409 «Per flyttet Lag 3 for 4 s
       siden») venter til dere har sett om merket er nok.
-- [ ] **En hendelse åpnes i loggvinduet — også når det er skjult.** Ingen av de fire
-      rolleoppsettene har loggstrømmen oppe, så et klikk på en hendelse ser ut som om det
-      ikke skjer noe (`koApneHendelse` tegner i `#ko-hendelse-detalj` og henter ikke fram
-      vinduet). Åpne hendelsen der hendelsesloggen står, eller hent loggvinduet fram.
 - [ ] **Oppsett per rolle** under «Oppsett»: Utalarm, Tavle, KO-leder, Liten bemanning —
       per skjerm, siden hver plass får to. Mulig kobling til Ansvar-nedtrekket
       (`ko.Ansvarsomraade`). To ting er ikke avklart og avgjør oppsettene: hvem fører

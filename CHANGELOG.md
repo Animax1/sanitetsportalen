@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Hendelsen åpnes i hendelsesloggen, med de pågående i en sidebar, og skjerm 2 følger klikkene  `#ko` `#hendelser`
+
+André: «Så må vi se på det med å åpne hendelser fra hendelsesloggen som vises over
+loggstrømmen. Der lurer jeg på om vi heller bør ha hendelser i hendelsesloggen men når det
+vises i det vinduet så får du en sidebar fra venstre med pågående hendelser (ingen
+lukkede)», og «Hendelser bør og kunne åpnes som egen vindu og da når en trykker på en
+hendelse i hendelsesloggen så oppdateres den hendelses vinduet». Skissert først (skisse
+v2), med svarene: «1 ja. 2. kan sidebaren justeres på slik at vi «taper» mer informasjon
+fra den dess mindre den blir? Prioritetsfaege og nummer består, tittel er det siste som
+fjernes. 3. nei. 4. enig. Noen skal kanskje registrere noengerdig. 5. ikke noe frst per nå.»
+
+**Før:** et klikk på en hendelse åpnet den i **loggstrømmens** vindu, der den skjulte
+strømmen og skrivefeltet. Ingen av rolleoppsettene har loggstrømmen oppe, så klikket så ut
+som om det ikke skjedde noe når loggvinduet var skjult. ↗ på loggvinduet åpnet hendelsen i
+et nytt vindu per hendelse.
+
+**Nå:**
+- **Hendelsen står i hendelsesloggens vindu.** Tabellen byttes mot hendelsen, med de
+  pågående (åpne) hendelsene i en sidebar til venstre, i tabellens rekkefølge: nummer,
+  prioritetsfarge, tittel, sted, tid siden opprettet. «← Alle hendelser» gir tabellen
+  tilbake. Søket, «Vis lukkede» og ↗ i hodet skjules imens.
+- **Sidebaren taper informasjon når den smalner**: tid først, så sted, så tittel —
+  nummeret og fargen står alltid. Container-spørringer, så det er sidebarens bredde som
+  teller, ikke skjermens. Kanten kan dras, og bredden huskes per nettleser.
+- **Loggstrømmen viser aldri en hendelse** («3. nei»). Strømmen, filteret og skrivefeltet
+  står der uansett.
+- **H-merket i strømmen og lagkortet henter fram en skjult hendelseslogg** — punktet «En
+  hendelse åpnes i loggvinduet — også når det er skjult» er borte fra TODO.
+- **Skjerm 2:** «Eget vindu» i hendelsen (eller ↗ i hodet) åpner ett navngitt vindu,
+  `ko-hendelser`. Mens det lever går klikk i hovedvinduet dit; tabellen blir stående med
+  raden merket, og hodet sier «H12 vises på skjerm 2». Lukkes det, åpner klikkene seg på
+  stedet igjen. Ingen «fest» (svar 5). Hovedvinduet vet om skjerm 2 finnes gjennom et
+  livstegn hvert 5. sekund på `BroadcastChannel('ko-hendelse')` (frist 12 s, og «borte» når
+  vinduet lukkes) — ikke `localStorage`, der et lukket vindu ville blitt stående som
+  «finnes».
+- **En hendelse en annen lukker, blir stående åpen, merket «Lukket»** («4. enig»), og går
+  ut av sidebaren.
+- Gårsdagens `?vindu=logg&hendelse=` er erstattet av `?vindu=hendelser&hendelse=`.
+
+**Prøvd i nettleseren:** sidebaren ved 260/190/140/80/56 px (alt → uten tid → uten sted →
+bare nummer), draing av kanten, skjerm 2 som bytter hendelse på klikk i hovedvinduet,
+«vises på skjerm 2» som forsvinner når vinduet lukkes, og skjult hendelseslogg som kommer
+fram på et H-merke. Ingen JS-feil.
+
+**Mutasjonstesting: 39 mutanter, 36 drept.** Tre overlevde:
+- `koErFolger()`-vakten i `koFolgerTilstede` var en no-op: et vindu for seg setter aldri
+  `koFolgerSett`. **Fjernet.**
+- Merket som skulle forsvinne når skjerm 2 er borte, og at hovedvinduets fanetittel ikke
+  røres, var utestet. **To påstander lagt til; begge mutantene drept.**
+- Kallstedet i ko.js prøves ved å kjøre den ekte `DOMContentLoaded`-kroken med hvert navn
+  byttet mot en opptaker — også rekkefølgen (`koOppsettStart` før `koHendelseVinduStart`).
+
 ## 2026-09-24 — Endringsnummeret: tavla oppdaterer seg på 2,5 sekunder, med «Per · nå» på stolpen  `#ko` `#tavle` `#rammeverk`
 
 André: «ta core og tavla fyst». Skissert først (Artifact «Tavlas endringsnummer»), med

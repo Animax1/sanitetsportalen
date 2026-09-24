@@ -168,7 +168,7 @@ function koHendelseRadHtml(h) {
   const prio = escapeHtml(h.prioritet || 'gronn');
   const lukket = h.status !== 'apen';
   const klasser = 'h-rad h-' + prio + (lukket ? ' h-lukket' : '')
-    + (h.id === koApenHendelseId ? ' h-apen' : '');
+    + (h.id === koMerketHendelse() ? ' h-apen' : '');
   // Siste linje i hendelsens logg står under tittelen — det nyeste er det
   // man skummer etter.
   const linjer = koOperatorlinjer(h);
@@ -189,7 +189,7 @@ function koHendelseRadHtml(h) {
     : '<span class="badge badge-apen">Åpen</span>';
   const melder = h.melder_tekst
     ? '<div class="h-under">Meldt av ' + escapeHtml(h.melder_tekst) + '</div>' : '';
-  return '<tr class="' + klasser + '" data-action="koVippHendelse" data-id="' + escapeHtml(h.id) + '"'
+  return '<tr class="' + klasser + '" data-action="koApneHendelse" data-id="' + escapeHtml(h.id) + '"'
     + ' role="button" tabindex="0">'
     + '<td>' + koPrioIkon(h.prioritet) + '</td>'
     + '<td class="h-nowrap"><span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></td>'
@@ -211,9 +211,10 @@ function koTegnHendelser() {
   const apne = alle.filter((h) => h.status === 'apen').length;
   const tall = document.getElementById('ko-hendelser-antall');
   if (tall) tall.textContent = '· ' + apne + ' åpne · ' + (alle.length - apne) + ' lukket';
-  // Lista tegnes alltid — også med en hendelse åpen. Den åpne står i
-  // loggstrømmens vindu (André, 21. sep. 2026: «viktig å ha oversikten i
-  // hendelsesloggen foran loggstrømmen»), og raden hennes er merket.
+  const skjerm2 = document.getElementById('ko-hendelser-skjerm2');
+  if (skjerm2) skjerm2.textContent = koSkjerm2Tekst();
+  // Tabellen tegnes også med en hendelse åpen — den står skjult bak, og er
+  // der med det samme man går tilbake.
   const rader = koSynligeHendelser();
   if (!rader.length) {
     boks.innerHTML = '<p class="text-muted small p-2 mb-0">'
@@ -224,33 +225,40 @@ function koTegnHendelser() {
       + '<th>Lag</th><th>Oppdrag</th><th>Opprettet av</th><th>Status</th>'
       + '</tr></thead><tbody>' + rader.map(koHendelseRadHtml).join('') + '</tbody></table>';
   }
-  if (koApenHendelseId !== null) koTegnDetalj(); else koVisStrommen(true);
+  if (koApenHendelseId !== null) koTegnDetalj(); else koVisDetaljen(false);
 }
 
-// Strømmen og hendelsen deler loggvinduet, og én av dem er synlig. Skjemaet
-// nederst følger strømmen — men bare for den som kan skrive: `les` fikk det
-// skjult ved oppstart, og en vending her skal ikke gi det tilbake.
-function koVisStrommen(vis) {
-  const detalj = document.getElementById('ko-hendelse-detalj');
-  if (detalj) detalj.classList.toggle('d-none', vis);
-  const liste = document.getElementById('ko-logg-liste');
-  if (liste) liste.classList.toggle('d-none', !vis);
-  const skjema = document.getElementById('ko-logg-skjema');
-  if (skjema) skjema.classList.toggle('d-none', !(vis && koKanSkrive()));
-  // Filteret gjelder strømmen. Står en hendelse i vinduet, filtrerer det ikke
-  // det man ser på, og en knapperad som ikke gjør noe er verre enn ingen.
-  const filter = document.getElementById('ko-loggfilter');
-  if (filter) filter.classList.toggle('d-none', !vis);
-  koTegnLoggHode();
+// **Hendelsen åpnes i hendelsesloggens eget vindu** (André, 24. sep. 2026,
+// skisse v2): tabellen byttes mot hendelsen, med de pågående i en sidebar til
+// venstre. Loggstrømmen viser alltid strømmen — «nei» på spørsmålet om den
+// noen gang skal vise en hendelse. Søket, «Vis lukkede» og ↗ i hodet gjelder
+// tabellen og skjules imens (`ko-h-detaljmodus` i ko.css): en knapp som ikke
+// gjør noe med det man ser på, er verre enn ingen.
+function koVisDetaljen(vis) {
+  const liste = document.getElementById('ko-hendelser-liste');
+  if (liste) liste.classList.toggle('d-none', vis);
+  const visning = document.getElementById('ko-hendelse-visning');
+  if (visning) visning.classList.toggle('d-none', !vis);
+  const vindu = document.getElementById('ko-vindu-hendelser');
+  if (vindu) vindu.classList.toggle('ko-h-detaljmodus', vis);
+  koTegnHendelseTittel();
 }
 
-// Loggvinduets hode: linjene i strømmen, eller hendelsen som står der i
-// stedet for den.
+// Et hendelsesvindu for seg bærer hendelsen i fanetittelen — det er den man
+// leter etter i oppgavelinja.
+function koTegnHendelseTittel() {
+  if (!koErFolger()) return;
+  document.title = koHendelseVinduTittel(koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null);
+}
+
+function koHendelseVinduTittel(h) {
+  return (h ? h.kode + ' · ' + h.tittel : 'Hendelseslogg') + ' · KO';
+}
+
+// Loggvinduets hode: linjene i strømmen. Tallet teller det som faktisk står
+// der, altså etter filteret: et hode som sier 18 over en liste med fire er et
+// tall man ikke kan bruke til noe.
 function koLoggHodeTekst() {
-  const h = koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null;
-  if (h) return '· ' + h.kode + ' · ' + h.tittel;
-  // Tallet teller det som faktisk står der, altså etter filteret: et hode som
-  // sier 18 over en liste med fire er et tall man ikke kan bruke til noe.
   const linjer = Array.from(koLinjer.values())
     .filter((l) => koIStrommen(l) && koLoggfilterTreffer(l, koLoggfilter)).length;
   return '· ' + String(linjer) + ' linjer';
@@ -259,15 +267,185 @@ function koLoggHodeTekst() {
 function koTegnLoggHode() {
   const el = document.getElementById('ko-logg-antall');
   if (el) el.textContent = koLoggHodeTekst();
-  // Et loggvindu for seg bærer hendelsen i fanetittelen — to slike i
-  // oppgavelinja skal kunne skilles uten å åpne dem.
-  if (typeof koEgetVinduAktivt !== 'undefined' && koEgetVinduAktivt === 'logg') {
-    document.title = koLoggVinduTittel(koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null);
+}
+
+// ── Sidebaren: de pågående hendelsene ved siden av den åpne ────────────────
+//
+// Bare åpne hendelser (André: «ingen lukkede»), i tabellens rekkefølge. Raden
+// **taper informasjon når sidebaren blir smalere** — tid først, så sted, så
+// tittel; nummeret og prioritetsfargen står alltid (André, 24. sep. 2026).
+// Det gjøres med container-spørringer i ko.css, så regelen følger sidebarens
+// bredde og ikke skjermens. Hele teksten står i `title` for den smaleste formen.
+
+function koHSideRadHtml(h, naa) {
+  const prio = escapeHtml(h.prioritet || 'gronn');
+  const aktiv = h.id === koApenHendelseId;
+  const hint = [h.kode, h.tittel, h.lokasjon_navn].filter(Boolean).join(' · ');
+  return '<button type="button" class="ko-hs-rad h-' + prio + (aktiv ? ' aktiv' : '') + '"'
+    + ' data-action="koVelgHendelse" data-id="' + escapeHtml(h.id) + '" title="' + escapeHtml(hint) + '"'
+    + (aktiv ? ' aria-current="true"' : '') + '>'
+    + '<span class="ko-hs-nr">' + koPrioIkon(h.prioritet) + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></span>'
+    + '<span class="ko-hs-tittel">' + escapeHtml(h.tittel) + '</span>'
+    + '<span class="ko-hs-sted">' + escapeHtml(h.lokasjon_navn || '') + '</span>'
+    + '<span class="ko-hs-tid">' + escapeHtml(koSiden(h.opprettet_at, naa)) + '</span>'
+    + '</button>';
+}
+
+function koTegnHSide() {
+  const boks = document.getElementById('ko-hendelse-sidebar');
+  if (!boks) return;
+  const apne = koApneHendelser();
+  const naa = Date.now();
+  boks.innerHTML = apne.length ? apne.map((h) => koHSideRadHtml(h, naa)).join('')
+    : '<p class="text-muted small p-1 mb-0">Ingen pågående.</p>';
+}
+
+//: Sidebarens bredde når den er dratt, i px — per nettleser, som oppsettet.
+const KO_HSIDE_NOKKEL = 'ko.hendelse_sidebar';
+const KO_HSIDE_MIN = 56;
+
+// Bredden som gjelder: aldri smalere enn nummeret, aldri mer enn 60 % av
+// vinduet — hendelsen er det man jobber i.
+function koHSideBredde(px, total) {
+  const b = Math.round(Number(px));
+  if (!Number.isFinite(b)) return null;
+  const maks = Math.max(KO_HSIDE_MIN, Math.floor((Number(total) || 0) * 0.6));
+  return Math.min(maks, Math.max(KO_HSIDE_MIN, b));
+}
+
+function koHSideSett(px) {
+  const visning = document.getElementById('ko-hendelse-visning');
+  if (!visning) return;
+  const b = koHSideBredde(px, visning.getBoundingClientRect().width);
+  if (b === null) return;
+  visning.style.setProperty('--ko-hs-bredde', b + 'px');
+  try { localStorage.setItem(KO_HSIDE_NOKKEL, String(b)); } catch (e) { /* privat modus */ }
+}
+
+// Standarden er en andel av vinduet (ko.css); en dratt bredde vinner.
+function koHSideLyttere() {
+  try {
+    const husket = Number(localStorage.getItem(KO_HSIDE_NOKKEL));
+    const visning = document.getElementById('ko-hendelse-visning');
+    if (husket > 0 && visning) visning.style.setProperty('--ko-hs-bredde', Math.max(KO_HSIDE_MIN, husket) + 'px');
+  } catch (e) { /* privat modus */ }
+  let drar = null;
+  document.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest ? e.target.closest('.ko-hs-dra') : null;
+    const side = document.getElementById('ko-hendelse-sidebar');
+    if (!h || !side || e.button > 0) return;
+    drar = { x: e.clientX, fra: side.getBoundingClientRect().width };
+    document.body.classList.add('ko-hs-drar');
+    e.preventDefault();
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (drar) koHSideSett(drar.fra + e.clientX - drar.x);
+  });
+  window.addEventListener('pointerup', () => {
+    if (!drar) return;
+    drar = null;
+    document.body.classList.remove('ko-hs-drar');
+  });
+}
+
+// ── Hendelsesvinduet for seg: følger klikkene i hovedvinduet ────────────────
+//
+// André, 24. sep. 2026: «når en trykker på en hendelse i hendelsesloggen så
+// oppdateres den hendelses vinduet». Ett vindu (`ko-hendelser`, `?vindu=
+// hendelser`), ingen «fest». Hovedvinduet vet om det finnes gjennom et
+// livstegn på en `BroadcastChannel` — ikke `localStorage`: et vindu som er
+// lukket, skal ikke bli stående som «finnes» i en nøkkel ingen rydder.
+//
+// Finnes det, går klikkene dit, tabellen blir stående med raden merket, og
+// hodet sier «vises på skjerm 2». Lukkes det, stopper livstegnet, og etter
+// fristen åpner klikkene seg på stedet igjen.
+
+const KO_HENDELSE_KANAL = 'ko-hendelse';
+const KO_FOLGER_PULS_MS = 5000;
+//: Over to pulser: ett tapt livstegn skal ikke sende klikket feil vei.
+const KO_FOLGER_FRIST_MS = 12000;
+
+let koHendelseKanal = null;
+//: Siste livstegn fra et hendelsesvindu for seg (ms), og hva det viser.
+let koFolgerSett = 0;
+let koFolgerViser = null;
+
+function koErFolger() {
+  return typeof koEgetVinduAktivt !== 'undefined' && koEgetVinduAktivt === 'hendelser';
+}
+
+// Et vindu for seg setter aldri `koFolgerSett` — mottaket returnerer før det —
+// så det svarer alltid nei. (En egen `koErFolger()`-vakt her sto til
+// mutasjonstestingen viste at den ikke endret noe.)
+function koFolgerTilstede(naa) {
+  if (!koFolgerSett) return false;
+  return ((naa === undefined ? Date.now() : naa) - koFolgerSett) < KO_FOLGER_FRIST_MS;
+}
+
+// Raden som er merket i tabellen: den skjerm 2 viser. Uten skjerm 2 ingen —
+// en åpen hendelse her dekker tabellen.
+function koMerketHendelse() {
+  return koFolgerTilstede() ? koFolgerViser : null;
+}
+
+function koSkjerm2Tekst() {
+  if (!koFolgerTilstede()) return '';
+  const h = koFolgerViser !== null ? koHendelser.get(koFolgerViser) : null;
+  return h ? '· ' + h.kode + ' vises på skjerm 2' : '· skjerm 2 følger';
+}
+
+// En melding fra et annet vindu er data, og leses deretter: bare kjente
+// former, og en id er et positivt heltall.
+function koHendelseMelding(data) {
+  if (!data || typeof data !== 'object') return null;
+  const id = (v) => (Number.isInteger(v) && v > 0 ? v : null);
+  if (data.sporr === true) return { sporr: true };
+  if (data.borte === true) return { borte: true };
+  if (data.tilstede === true) return { tilstede: true, viser: id(data.viser) };
+  const vis = id(data.vis);
+  return vis === null ? null : { vis };
+}
+
+function koMeldTilstede() {
+  if (koHendelseKanal && koErFolger()) koHendelseKanal.postMessage({ tilstede: true, viser: koApenHendelseId });
+}
+
+function koHendelseKanalMottak(data, naa) {
+  const m = koHendelseMelding(data);
+  if (!m) return;
+  if (koErFolger()) {
+    if (m.sporr) koMeldTilstede();
+    if (m.vis) koVelgHendelse(m.vis);
+    return;
+  }
+  const tid = naa === undefined ? Date.now() : naa;
+  if (m.tilstede) {
+    // Tegn bare når noe er nytt: livstegnet kommer hvert femte sekund.
+    const nytt = !koFolgerTilstede(tid) || koFolgerViser !== m.viser;
+    koFolgerSett = tid;
+    koFolgerViser = m.viser;
+    if (nytt) koTegnHendelser();
+  } else if (m.borte) {
+    koFolgerSett = 0;
+    koFolgerViser = null;
+    koTegnHendelser();
   }
 }
 
-function koLoggVinduTittel(h) {
-  return (h ? h.kode + ' · ' + h.tittel : 'Loggstrøm') + ' · KO';
+// Kalles fra ko.js. Uten `BroadcastChannel` virker alt, bare hvert vindu for seg.
+function koHendelseVinduStart() {
+  koHSideLyttere();
+  if (typeof BroadcastChannel !== 'function') return;
+  koHendelseKanal = new BroadcastChannel(KO_HENDELSE_KANAL);
+  koHendelseKanal.onmessage = (e) => koHendelseKanalMottak(e.data);
+  if (koErFolger()) {
+    koMeldTilstede();
+    setInterval(koMeldTilstede, KO_FOLGER_PULS_MS);
+    window.addEventListener('pagehide', () => koHendelseKanal.postMessage({ borte: true }));
+  } else {
+    // Et hovedvindu som nettopp ble lastet, spør om skjerm 2 finnes.
+    koHendelseKanal.postMessage({ sporr: true });
+  }
 }
 
 function koTaImotHendelser(liste) {
@@ -349,29 +527,65 @@ function koOppdragTomMelding() {
 
 // ── Hendelsen åpnet inne i vinduet ──────────────────────────────────────────
 
+// Inngangen for alt som *peker på* en hendelse: raden i tabellen, H-merket i
+// strømmen, lagkortet. Finnes skjerm 2, går klikket dit og tabellen står;
+// ellers åpnes hendelsen i hendelsesloggens vindu — hentet fram om det er
+// skjult (André: «også når det er skjult»).
 function koApneHendelse(id) {
-  koApenHendelseId = Number(id);
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return;
+  if (koFolgerTilstede() && koHendelseKanal) {
+    koHendelseKanal.postMessage({ vis: n });
+    koFolgerViser = n;
+    koTegnHendelser();
+    return;
+  }
+  koFramHendelsesvinduet();
+  koVelgHendelse(n);
+  koRullTilHendelsesvinduet();
+}
+
+// Bytt hendelse **på stedet** — sidebaren, og skjerm 2 når hovedvinduet sier
+// fra. Går aldri videre til et annet vindu.
+function koVelgHendelse(id) {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return;
+  koApenHendelseId = n;
   koTegnHendelser();
-  koRullTilLoggvinduet();
+  koMeldTilstede();
 }
 
-// Raden i tabellen vipper: et klikk på den som alt er åpen lukker henne.
-// Merkene i strømmen og på lagkortene åpner bare (`koApneHendelse`) — et
-// H5-merke i en loggline skal ikke lukke H5 fordi den tilfeldigvis sto oppe.
-function koVippHendelse(id) {
-  if (Number(id) === koApenHendelseId) koLukkDetalj(); else koApneHendelse(id);
+// Hovedvinduet: hendelsesloggen er skjult → vis den. Et vindu for seg viser
+// bare seg selv, og har ingenting å hente fram.
+function koFramHendelsesvinduet() {
+  if (koErFolger() || typeof koOppsett === 'undefined' || !koOppsett) return;
+  if (typeof koErSkjult === 'function' && koErSkjult(koOppsett, 'hendelser')) koVisVindu('hendelser');
 }
 
-// Under 1200 px stables vinduene, og hendelsen åpner seg da et stykke ned på
-// sida — uten rullingen ser klikket ut som om det ikke gjorde noe.
-function koRullTilLoggvinduet() {
+// Under 1200 px stables vinduene, og hendelsen åpner seg da et stykke unna —
+// uten rullingen ser klikket ut som om det ikke gjorde noe.
+function koRullTilHendelsesvinduet() {
   const w = globalThis.window;
   if (!w || typeof w.matchMedia !== 'function' || !w.matchMedia('(max-width: 1199.98px)').matches) return;
-  const vindu = document.getElementById('ko-vindu-logg');
+  const vindu = document.getElementById('ko-vindu-hendelser');
   if (vindu && typeof vindu.scrollIntoView === 'function') vindu.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function koLukkDetalj() {
+  koApenHendelseId = null;
+  koTegnHendelser();
+  koMeldTilstede();
+}
+
+// «↗» i hendelsen: den flytter til skjerm 2, og tabellen står her med raden
+// merket. Samme navngitte vindu som ↗ i hodet, så det finnes bare ett.
+// Blokkerer nettleseren vinduet, blir hendelsen stående her.
+function koHendelseIEgetVindu(id) {
+  const n = Number(id);
+  const url = koEgetVinduUrl('hendelser', n);
+  if (!url || !window.open(url, 'ko-hendelser', 'popup,width=1100,height=800')) return;
+  koFolgerSett = Date.now();
+  koFolgerViser = n;
   koApenHendelseId = null;
   koTegnHendelser();
 }
@@ -653,10 +867,11 @@ function koBevarFelter(ider) {
 function koTegnDetalj() {
   const boks = document.getElementById('ko-hendelse-detalj');
   const h = koHendelser.get(koApenHendelseId);
-  if (!boks || !h) { koApenHendelseId = null; koVisStrommen(true); return; }
+  if (!boks || !h) { koApenHendelseId = null; koVisDetaljen(false); return; }
   const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid',
                                      'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
-  koVisStrommen(false);
+  koVisDetaljen(true);
+  koTegnHSide();
   const kan = koKanSkrive();
   const lukket = h.status !== 'apen';
   const deltar = (h.deltakere || []).map((n) => '<span class="navn">' + escapeHtml(n) + '</span>').join(', ');
@@ -706,7 +921,10 @@ function koTegnDetalj() {
   const prio = escapeHtml(h.prioritet || 'gronn');
   boks.innerHTML = '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">'
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koLukkDetalj">'
-    + '<i class="bi bi-arrow-left me-1"></i>Loggstrøm</button>'
+    + '<i class="bi bi-arrow-left me-1"></i>Alle hendelser</button>'
+    + '<button type="button" class="btn btn-sm btn-outline-secondary ko-h-eget" data-action="koHendelseIEgetVindu"'
+    + ' data-id="' + escapeHtml(h.id) + '" title="Flytt hendelsen til et eget vindu — klikk i hendelsesloggen oppdaterer det">'
+    + '<i class="bi bi-box-arrow-up-right me-1"></i>Eget vindu</button>'
     + '<span class="ko-deltar ms-auto"><i class="bi bi-people me-1"></i>På hendelsen: '
     + (deltar || '<span class="text-muted">ingen ennå</span>') + '</span>' + bliMed + '</div>'
     + '<div class="h-hode h-' + prio + (lukket ? ' h-lukket' : '') + ' mb-2">'

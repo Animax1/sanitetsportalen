@@ -371,14 +371,14 @@ class KonsertplanleggerenFolgerTavlaJsTests(SimpleTestCase):
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class HendelsenIEgetVinduJsTests(SimpleTestCase):
-    """André, 23. sep. 2026: «Når vi skal åpne en hendelse som ligger i
-    loggstrøms vinduets plass og vil åpne som et eget vindu så åpner du
-    loggstrøms vinduet istedenfor.» Prøvd gjennom knappens egen inngang,
-    `koApneEgetVindu`."""
+    """André, 23. sep. 2026: «Når vi skal åpne en hendelse … og vil åpne som et
+    eget vindu så åpner du loggstrøms vinduet istedenfor.» Fra 24. sep. står
+    hendelsen i **hendelsesloggens** vindu, og det er det som tar den med seg.
+    Prøvd gjennom knappens egen inngang, `koApneEgetVindu`."""
 
     HARNESS = (
-        (KO_JS, ('koEgetVinduNavn', 'koEgetVinduHendelse', 'koEgetVinduUrl', 'koAapenHendelseILoggen',
-                 'koApneEgetVindu', 'koLoggVinduTittel', 'koOppsettStart', 'koTegnEgetVindu', 'koVinduElement',
+        (KO_JS, ('koEgetVinduNavn', 'koEgetVinduHendelse', 'koEgetVinduUrl', 'koAapenHendelseIVinduet',
+                 'koApneEgetVindu', 'koHendelseVinduTittel', 'koOppsettStart', 'koTegnEgetVindu', 'koVinduElement',
                  'koSettKonsollhoyde')),
     )
 
@@ -396,38 +396,40 @@ class HendelsenIEgetVinduJsTests(SimpleTestCase):
         ut = run_node(build_harness(self.HARNESS), kode, preamble=pre).splitlines()
         return ut[:-1] if ut and ut[-1] == 'OK' else ut
 
-    def test_hendelsen_som_staar_aapen_faar_vinduet_og_stroemmen_blir(self):
+    def test_hendelsen_som_staar_aapen_foelger_hendelsesloggen(self):
         ut = self._kjor("""
             koApenHendelseId = 12;
-            koApneEgetVindu('logg');
+            koApneEgetVindu('hendelser');
             console.log(JSON.stringify([aapnet, lukket, skjult]));
         """)
-        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=logg&hendelse=12', 'ko-hendelse-12']], 1, []],
-                         'hendelsen i eget vindu, lukket her, og loggvinduet ikke skjult')
+        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=hendelser&hendelse=12', 'ko-hendelser']], 1, ['hendelser']],
+                         'hendelsen i vinduet som følger klikkene, lukket her, og vinduet skjult her')
 
-    def test_uten_aapen_hendelse_er_det_loggstroemmen(self):
+    def test_loggstroemmen_tar_aldri_med_en_hendelse(self):
         ut = self._kjor("""
-            koApneEgetVindu('logg');
             koApenHendelseId = 12;
+            koApneEgetVindu('logg');
             koApneEgetVindu('tavle');
+            koApenHendelseId = null;
+            koApneEgetVindu('hendelser');
             console.log(JSON.stringify([aapnet, lukket, skjult]));
         """)
-        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=logg', 'ko-logg'], ['/ko/?vindu=tavle', 'ko-tavle']],
-                                             0, ['logg', 'tavle']],
-                         'en åpen hendelse gjelder bare loggvinduet')
+        self.assertEqual(json.loads(ut[0]), [[['/ko/?vindu=logg', 'ko-logg'], ['/ko/?vindu=tavle', 'ko-tavle'],
+                                              ['/ko/?vindu=hendelser', 'ko-hendelser']],
+                                             0, ['logg', 'tavle', 'hendelser']])
 
     def test_adressen_leses_som_data(self):
         ut = self._kjor("""
-            console.log(JSON.stringify([koEgetVinduHendelse('?vindu=logg&hendelse=12'),
-              koEgetVinduHendelse('?vindu=tavle&hendelse=12'), koEgetVinduHendelse('?vindu=logg&hendelse=0'),
-              koEgetVinduHendelse('?vindu=logg&hendelse=12abc'), koEgetVinduHendelse('?vindu=logg&hendelse=-3'),
-              koEgetVinduHendelse('?vindu=logg'), koEgetVinduHendelse(null),
-              koEgetVinduUrl('logg', 7), koEgetVinduUrl('tavle', 7), koEgetVinduUrl('logg', '7'),
-              koLoggVinduTittel({kode: 'H3', tittel: 'Fall'}), koLoggVinduTittel(null)]));
+            console.log(JSON.stringify([koEgetVinduHendelse('?vindu=hendelser&hendelse=12'),
+              koEgetVinduHendelse('?vindu=logg&hendelse=12'), koEgetVinduHendelse('?vindu=hendelser&hendelse=0'),
+              koEgetVinduHendelse('?vindu=hendelser&hendelse=12abc'), koEgetVinduHendelse('?vindu=hendelser&hendelse=-3'),
+              koEgetVinduHendelse('?vindu=hendelser'), koEgetVinduHendelse(null),
+              koEgetVinduUrl('hendelser', 7), koEgetVinduUrl('logg', 7), koEgetVinduUrl('hendelser', '7'),
+              koHendelseVinduTittel({kode: 'H3', tittel: 'Fall'}), koHendelseVinduTittel(null)]));
         """)
         self.assertEqual(json.loads(ut[0]), [12, None, None, None, None, None, None,
-                                             '/ko/?vindu=logg&hendelse=7', '/ko/?vindu=tavle', '/ko/?vindu=logg',
-                                             'H3 · Fall · KO', 'Loggstrøm · KO'])
+                                             '/ko/?vindu=hendelser&hendelse=7', '/ko/?vindu=logg', '/ko/?vindu=hendelser',
+                                             'H3 · Fall · KO', 'Hendelseslogg · KO'])
 
     def test_siden_aapner_hendelsen_fra_adressen_ved_oppstart(self):
         """Kallstedet i `koOppsettStart`, ikke bare lesingen av adressen."""
@@ -435,13 +437,13 @@ class HendelsenIEgetVinduJsTests(SimpleTestCase):
             let koEgetVinduAktivt = null;
             globalThis.document = { getElementById: () => null, querySelector: () => null,
                                     querySelectorAll: () => [], title: '' };
-            window.location = { search: '?vindu=logg&hendelse=5' };
+            window.location = { search: '?vindu=hendelser&hendelse=5' };
             window.addEventListener = () => {};
             koOppsettStart();
             console.log(koApenHendelseId, koEgetVinduAktivt);
             koApenHendelseId = null;
-            window.location = { search: '?vindu=tavle&hendelse=5' };
+            window.location = { search: '?vindu=logg&hendelse=5' };
             koOppsettStart();
             console.log(koApenHendelseId, koEgetVinduAktivt);
         """)
-        self.assertEqual(ut, ['5 logg', 'null tavle'])
+        self.assertEqual(ut, ['5 hendelser', 'null logg'])

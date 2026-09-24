@@ -201,6 +201,56 @@ body.ko-drar-h { cursor: row-resize; }
 /* ── Hendelsen åpnet inne i vinduet ─────────────────────────────────────── */
 
 .ko-detalj { display: flex; flex-direction: column; }
+
+/* Hendelsen står i hendelsesloggens vindu, med de pågående i en sidebar
+   (24. sep. 2026). Hodets tabellvalg — søk, «Vis lukkede», ↗ — gjelder ikke
+   det man ser på, og skjules imens. */
+.ko-h-detaljmodus .ko-h-listevalg { display: none !important; }
+.ko-skjerm2 { color: #93c5fd; }
+.ko-h-visning { display: flex; padding: 0; overflow: hidden; }
+.ko-h-visning.d-none { display: none !important; }
+.ko-h-visning > .ko-detalj { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 0.5rem 0.6rem; }
+.ko-hs {
+  container-type: inline-size;
+  flex: none; width: var(--ko-hs-bredde, clamp(4.5rem, 24%, 17rem));
+  overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 0.4rem;
+}
+.ko-hs-dra { flex: none; width: 5px; cursor: col-resize; background: var(--border-color); opacity: 0.5; }
+.ko-hs-dra:hover, body.ko-hs-drar .ko-hs-dra { opacity: 1; background: var(--portal-accent); }
+body.ko-hs-drar { cursor: col-resize; user-select: none; }
+
+/* Raden: nummer og farge alltid; tittel, sted og tid så lenge det er plass.
+   Grensene er sidebarens bredde, ikke skjermens — `container-type` over. */
+.ko-hs-rad {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "nr tittel tid" "nr sted sted";
+  align-items: center; column-gap: 0.4rem;
+  text-align: left; color: inherit; font-size: 0.8rem; line-height: 1.25;
+  background: var(--surface-1); border: 1px solid transparent; border-left: 4px solid #16a34a;
+  border-radius: 6px; padding: 0.3rem 0.4rem;
+}
+.ko-hs-rad:hover { background: #1e293b; }
+/* Den åpne: rammen rundt, men fargekanten beholdes — den er prioriteten. */
+.ko-hs-rad.aktiv {
+  background: #1e3a5f;
+  border-top-color: var(--portal-accent); border-right-color: var(--portal-accent); border-bottom-color: var(--portal-accent);
+}
+.ko-hs-rad.h-gul   { border-left-color: #eab308; }
+.ko-hs-rad.h-rod, .ko-hs-rad.h-viktig { border-left-color: #ef4444; }
+.ko-hs-rad.h-drift { border-left-color: #3b82f6; }
+.ko-hs-rad.h-plassering { border-left-color: #a855f7; }
+.ko-hs-nr { grid-area: nr; display: flex; align-items: center; white-space: nowrap; }
+.ko-hs-nr .h-ikon { width: auto; font-size: 0.85rem; margin-right: 0.2rem; }
+.ko-hs-tittel { grid-area: tittel; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ko-hs-sted { grid-area: sted; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ko-hs-sted:empty { display: none; }
+.ko-hs-tid { grid-area: tid; color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@container (max-width: 13rem) { .ko-hs-tid { display: none; } .ko-hs-rad { grid-template-areas: "nr tittel tittel" "nr sted sted"; } }
+@container (max-width: 10rem) { .ko-hs-sted { display: none; } }
+@container (max-width: 6.5rem) {
+  .ko-hs-tittel { display: none; }
+  .ko-hs-rad { grid-template-columns: 1fr; grid-template-areas: "nr"; justify-items: center; padding: 0.3rem 0.2rem; }
+}
 .h-hode {
   border: 1px solid var(--border-color); border-left-width: 4px; border-radius: 8px;
   padding: 0.6rem 0.8rem; background: var(--surface-2);
@@ -613,6 +663,7 @@ body.ko-tid-drar, body.ko-tid-drar [data-tid-akse] { cursor: grabbing; user-sele
 body.ko-eget-vindu .ko-skjul-knapp,
 body.ko-eget-vindu [data-action="koByttPar"],
 body.ko-eget-vindu [data-action="koApneEgetVindu"],
+body.ko-eget-vindu [data-action="koHendelseIEgetVindu"],
 body.ko-eget-vindu .ko-grip,
 body.ko-eget-vindu #ko-skjulte { display: none !important; }
 

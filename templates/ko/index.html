@@ -151,6 +151,7 @@
           <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
           <i class="bi bi-flag"></i><span class="ko-vindu-tittel">Hendelseslogg</span>
           <span class="ko-vindu-tall" id="ko-hendelser-antall"></span>
+          <span class="ko-vindu-tall ko-skjerm2" id="ko-hendelser-skjerm2"></span>
           <span class="ms-auto d-flex align-items-center gap-2">
             {% comment %}
               Søket (André, 18. sep. 2026: «en søk knapp som åpner et søkefelt
@@ -158,15 +159,15 @@
               følger med hver poll — på nummer, tittel, sted, melder og
               beskrivelse. Som søket i oppdragshistorikken.
             {% endcomment %}
-            <span class="input-group input-group-sm ko-sok d-none" id="ko-hendelse-sok-felt">
+            <span class="input-group input-group-sm ko-sok ko-h-listevalg d-none" id="ko-hendelse-sok-felt">
               <input type="search" class="form-control" id="ko-hendelse-sok"
                      placeholder="H-nr, tittel, sted, melder …" aria-label="Søk i hendelser">
             </span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="ko-hendelse-sok-knapp"
+            <button type="button" class="btn btn-sm btn-outline-secondary ko-h-listevalg" id="ko-hendelse-sok-knapp"
                     data-action="koVippSok" title="Søk i hendelser" aria-label="Søk i hendelser">
               <i class="bi bi-search"></i>
             </button>
-            <label class="form-check form-switch m-0 small d-flex align-items-center gap-1">
+            <label class="form-check form-switch m-0 small d-flex align-items-center gap-1 ko-h-listevalg">
               <input class="form-check-input" type="checkbox" id="ko-vis-lukkede"
                      data-action="koVippLukkede" data-hendelse="change">
               <span class="form-check-label text-muted">Vis lukkede</span>
@@ -177,9 +178,9 @@
               <i class="bi bi-plus-lg me-1"></i>Ny hendelse
             </button>
             {% endif %}
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-h-listevalg"
                   data-action="koApneEgetVindu" data-arg="hendelser"
-                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne hendelsesloggen i eget vindu">
+                  title="Åpne i eget vindu — for skjerm to. Klikk på en hendelse her i hovedvinduet oppdaterer det" aria-label="Åpne hendelsesloggen i eget vindu">
               <i class="bi bi-box-arrow-up-right"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
@@ -191,6 +192,19 @@
         </div>
         <div class="ko-vindu-kropp" id="ko-hendelser-liste">
           <p class="text-muted small p-2 mb-0">Laster …</p>
+        </div>
+        {% comment %}
+          **Hendelsen åpnes her, ikke i loggstrømmen** (André, 24. sep. 2026,
+          skisse v2): tabellen byttes mot hendelsen, med de pågående i en
+          sidebar til venstre. Sidebaren taper tid, så sted, så tittel når den
+          blir smalere — nummer og prioritetsfarge står (container-spørringer i
+          ko.css). Den dras bredere og smalere i kanten (`koHSideLyttere()`).
+          Tegnes av `koTegnDetalj()` og `koTegnHSide()` i ko-hendelser.js.
+        {% endcomment %}
+        <div class="ko-vindu-kropp ko-h-visning d-none" id="ko-hendelse-visning">
+          <nav class="ko-hs" id="ko-hendelse-sidebar" aria-label="Pågående hendelser"></nav>
+          <div class="ko-hs-dra" role="separator" aria-orientation="vertical" title="Dra for å endre bredden"></div>
+          <div class="ko-detalj" id="ko-hendelse-detalj"></div>
         </div>
       </section>
 
@@ -208,8 +222,6 @@
             Huskes per nettleser som Alle | Biler | Lag i ressursoversikten.
             **Festede linjer står uansett** — de er festet med vilje, og et
             filter som tok dem bort ville gjort festingen utilregnelig.
-            Skjules mens en hendelse står i vinduet: da filtrerer den ikke
-            det man ser på.
           {% endcomment %}
           <div class="btn-group btn-group-sm ms-auto" role="group"
                aria-label="Vis i loggstrømmen" id="ko-loggfilter">
@@ -219,7 +231,7 @@
           </div>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
                   data-action="koApneEgetVindu" data-arg="logg"
-                  title="Åpne i eget vindu — står en hendelse åpen, er det hendelsen som åpnes" aria-label="Åpne loggstrømmen i eget vindu">
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne loggstrømmen i eget vindu">
             <i class="bi bi-box-arrow-up-right"></i>
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
@@ -228,15 +240,6 @@
             <i class="bi bi-eye-slash"></i>
           </button>
         </div>
-        {% comment %}
-          Hendelsen åpnes **inne i et vindu**, ikke i en modal (André, 18. sep.
-          2026): ressursene og oppdragene skal være synlige mens man jobber i
-          H14. Og vinduet er **loggstrømmens**, ikke hendelsesloggens (André,
-          21. sep.): oversikten over hendelsene skal stå mens én av dem er
-          åpen. Strømmen og skrivefeltet skjules imens — `koVisStrommen()` i
-          ko-hendelser.js — og tegnes av `koTegnDetalj()`.
-        {% endcomment %}
-        <div class="ko-vindu-kropp ko-detalj d-none" id="ko-hendelse-detalj"></div>
         <div class="ko-vindu-kropp" id="ko-logg-liste">
           <p class="text-muted small p-2 mb-0">Laster …</p>
         </div>
