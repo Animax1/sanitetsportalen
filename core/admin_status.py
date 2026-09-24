@@ -424,17 +424,126 @@ def _get_cache_health():
         }
 
 
+# ── Beredskapstrinnene (24. sep. 2026) ────────────────────────────────────
+#
+# **Ett sted for tersklene og tiltakene.** De sto skrevet to steder — i
+# `docs/RUNBOOK_VAKT.md` §2 og i hurtigreferansen nederst på dashbordet — og
+# begge regnet fra 1 worker, mens vakt-modus starter på 2 (André: «før vakten
+# skal starte spinner vi opp redis og 2 workers og 4 tråder», og Railway Pro
+# på vakt). «Oransje: oppgrader til 2 workers» var da et tiltak som alt var
+# gjort. Dashbordet tegner tabellen herfra, og `BeredskapstrinneneIRunbookenTests`
+# holder §2 i takt.
+
+#: Grunnlinja på vakt. Tiltakene under regnes fra denne.
+VAKTMODUS = {'workers': 2, 'threads': 4, 'cache': 'redis', 'plan': 'Pro'}
+
+#: Trinnene, i rekkefølge. `p95_fra` og `feil_5xx_fra` er nedre grense for
+#: trinnet — det høyeste trinnet der én av dem er nådd, gjelder. `workers` er
+#: hva `WEB_WORKERS` skal settes til, eller `None` når tiltaket ikke er flere.
+BEREDSKAPSTRINN = (
+    {'nivaa': 'gronn', 'navn': 'Grønt', 'p95_fra': 0, 'feil_5xx_fra': None, 'workers': None,
+     'terskel': '< 300 ms, 0 feil',
+     'tiltak': 'Ingen endring. Fortsett å observere.'},
+    {'nivaa': 'gul', 'navn': 'Gult', 'p95_fra': 300, 'feil_5xx_fra': None, 'workers': None,
+     'terskel': '300–500 ms, 0 feil',
+     'tiltak': 'Observer, og se «Tregeste stier». Varer det over 15 min: be om at faner som '
+               'ikke brukes lukkes, og logg ut sesjoner som har vært inaktive over én time.'},
+    {'nivaa': 'oransje', 'navn': 'Oransje', 'p95_fra': 500, 'feil_5xx_fra': 1, 'workers': 3,
+     'terskel': '500–1000 ms, eller 1–2 5xx',
+     'tiltak': 'Se «Tregeste stier» og «Database» først — er databasen treg, hjelper ikke '
+               'flere workers (§8). Ellers WEB_WORKERS=3.'},
+    {'nivaa': 'rod', 'navn': 'Rødt', 'p95_fra': 1000, 'feil_5xx_fra': 3, 'workers': 4,
+     'terskel': '> 1000 ms, eller ≥ 3 5xx',
+     'tiltak': 'WEB_WORKERS=4. Faller ikke P95 innen 3 min, er flaskehalsen noe annet enn '
+               'workers — se «Database» og Railway-loggen.'},
+)
+
+#: Siste utvei, ikke et trinn dashbordet setter selv: det krever at tiltakene
+#: over er prøvd.
+KRITISK = {'navn': 'Kritisk', 'terskel': 'Fortsatt tregt etter alle tiltak',
+           'tiltak': 'Last-shed (§9): papir for pasienter, nødnett for oppdrag. '
+                     '«Logg ut alle» bare når ingen registrerer.'}
+
+
+#: Under så mange forespørsler siste 5 min er P95 i praksis den tregeste
+#: enkeltforespørselen — tre treff og én treg side gir «Oransje» (sett på
+#: dashbordet 24. sep. 2026). Trinnet står, men kortet sier at det er tynt.
+FA_MAALINGER = 20
+
+
+def beredskapsnivaa(p95_ms, feil_5xx, antall=None) -> dict:
+    """Trinnet P95 og 5xx siste 5 min gir. Det høyeste trinnet der én av de
+    to har nådd grensen, gjelder — 5xx alene kan gi rødt.
+
+    `fa_maalinger` er sann når `antall` er kjent og under `FA_MAALINGER`: da
+    står trinnet, men det er ikke noe å handle på ennå. 5xx er likevel 5xx."""
+    p95 = p95_ms or 0
+    feil = feil_5xx or 0
+    gjeldende = BEREDSKAPSTRINN[0]
+    for trinn in BEREDSKAPSTRINN:
+        if p95 >= trinn['p95_fra'] or (trinn['feil_5xx_fra'] is not None and feil >= trinn['feil_5xx_fra']):
+            gjeldende = trinn
+    fa = antall is not None and antall < FA_MAALINGER and not feil
+    return dict(gjeldende, fa_maalinger=fa, antall=antall)
+
+
+def _heltall_fra_env(verdi, standard):
+    """`WEB_WORKERS` kan stå som «1 (default)» fra `_get_worker_config`."""
+    try:
+        return int(str(verdi).split()[0])
+    except (ValueError, IndexError):
+        return standard
+
+
+def driftsmodus(worker_config, cache_health) -> dict:
+    """Står appen i vakt-modus, lavkostnad-modus — eller i noe midt imellom
+    som ikke skal kjøres? Runbook §1b. **2+ workers uten virkende Redis er en
+    feil**, ikke en modus: rate-limit og cache blir per prosess (§4)."""
+    workers = _heltall_fra_env((worker_config or {}).get('workers'), 1)
+    ch = cache_health or {}
+    redis_ok = ch.get('backend') == 'redis' and ch.get('healthy') is True
+    if workers >= 2 and not redis_ok:
+        return {'modus': 'feil', 'ok': False,
+                'tekst': f'{workers} workers uten virkende Redis — rate-limit og cache deles ikke. '
+                         'Aktiver Redis, eller sett WEB_WORKERS=1.'}
+    if workers >= VAKTMODUS['workers']:
+        return {'modus': 'vakt', 'ok': True, 'tekst': f'Vakt-modus: {workers} workers, Redis OK'}
+    if redis_ok:
+        return {'modus': 'halvveis', 'ok': True,
+                'tekst': 'Redis er på, men bare 1 worker — sett WEB_WORKERS=2 før vakt (§1c).'}
+    return {'modus': 'lavkostnad', 'ok': True, 'tekst': 'Lavkostnad-modus (mellom vakter)'}
+
+
+def metrikkilde(snapshot, worker_config) -> dict:
+    """Hvor tallene på dashbordet kommer fra. Med flere workers og uten
+    Redis er de bare denne workerens — da skal kortet si det."""
+    workers = _heltall_fra_env((worker_config or {}).get('workers'), 1)
+    snap = snapshot or {}
+    if snap.get('source') == 'redis':
+        n = snap.get('unique_workers')
+        return {'ok': True, 'tekst': f'Samlet fra {n} workers' if n else 'Samlet fra alle workers'}
+    if workers >= 2:
+        return {'ok': False, 'tekst': 'Bare denne workeren — ikke hele appen'}
+    return {'ok': True, 'tekst': 'Én worker'}
+
+
 def _build_status_payload():
     """Samle alle status-data i én dict."""
+    m5 = metrics_store.snapshot(window_seconds=300)
+    workers = _get_worker_config()
+    cache_helse = _get_cache_health()
     return {
+        'beredskap': beredskapsnivaa(m5.get('p95_ms'), m5.get('errors_5xx'), m5.get('count')),
+        'driftsmodus': driftsmodus(workers, cache_helse),
+        'metrikkilde': metrikkilde(m5, workers),
         'timestamp': timezone.now().isoformat(),
-        'metrics_5min': metrics_store.snapshot(window_seconds=300),
+        'metrics_5min': m5,
         'metrics_1min': metrics_store.snapshot(window_seconds=60),
         'memory': _get_memory_mb(),
         'active_sessions': _get_session_count(),
         'last_backup': _get_last_backup_info(),
-        'worker_config': _get_worker_config(),
-        'cache_health': _get_cache_health(),
+        'worker_config': workers,
+        'cache_health': cache_helse,
         'db_health': _get_db_health(),
         'disk': _get_disk(),
         'tregeste': metrics_store.tregeste_stier(window_seconds=300),
@@ -453,6 +562,9 @@ def admin_status_view(request):
     payload = _build_status_payload()
     return render(request, 'patients/admin_status.html', {
         'payload': payload,
+        'trinn': BEREDSKAPSTRINN,
+        'kritisk': KRITISK,
+        'vaktmodus': VAKTMODUS,
         'payload_json': json.dumps(payload, indent=2, ensure_ascii=False),
     })
 

@@ -155,7 +155,7 @@ class TidsvinduetJsTests(SimpleTestCase):
         """Uten kallstedet ruller ikke tavla med planleggeren."""
         ut = self._kjor("""
             koTavle = DATA;
-            koTavleKlokkeavvik = NAA - Date.now();
+            Date.now = () => NAA;
             koTegnTavle();
             const naa = ELS['ko-tavle'].innerHTML;
             koTidAnker = NAA + 24 * T;
@@ -350,8 +350,12 @@ class KonsertplanleggerenFolgerTavlaJsTests(SimpleTestCase):
                                   classList: { toggle() {}, add() {}, remove() {} } });
             globalThis.document = { getElementById: (id) => (ELS[id] = ELS[id] || nyEl()), querySelectorAll: () => [] };
         """)
+        # Klokka fryses. Med `koTavleKlokkeavvik = NAA - Date.now()` leste
+        # `koTegnPlan` klokka noen millisekunder senere, vinduet begynte like
+        # etter hel time, og timene ble 13 i stedet for 12 — rødt av og til
+        # (23.–24. sep. 2026, først uforklart).
         ut = run_node(build_harness(PLAN_HARNESS), """
-            koTavleKlokkeavvik = NAA - Date.now();
+            Date.now = () => NAA;
             koTegnPlan();
             const idag = ELS['ko-plan'].innerHTML;
             koTidAnker = NAA + 24 * T;

@@ -145,6 +145,30 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
+### KO med fem operatører — flyten André beskrev 24. sep. 2026
+
+*Kjernetid: 2 på utalarm (ressursoversikt, oppdragsliste, hendelseslogg), 2 på tavla
+(hendelseslogg, tavle), 1 KO-leder som rullerer mellom hendelseslogg, tavle og
+konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plass.*
+
+- [ ] **Endringsnummer — tavla først, så loggen og oppdragslista.** Et lite endepunkt som
+      svarer med ett tall; fanene spør hvert 2.–3. sekund og henter hele bildet bare når
+      tallet har endret seg. Telleren i cachen (Redis på vakt, delt mellom workerne).
+      Med «flyttet av Per for 10 s siden» på stolpen — de to på tavla fordeler arbeidet
+      muntlig og kan flytte samme lag hver sin vei. **Skisseres for André før bygging.**
+      WebSocket er vurdert og utsatt: krever ASGI, og «trafikken er klokka» for
+      e-postutsendingen.
+- [ ] **En hendelse åpnes i loggvinduet — også når det er skjult.** Ingen av de fire
+      rolleoppsettene har loggstrømmen oppe, så et klikk på en hendelse ser ut som om det
+      ikke skjer noe (`koApneHendelse` tegner i `#ko-hendelse-detalj` og henter ikke fram
+      vinduet). Åpne hendelsen der hendelsesloggen står, eller hent loggvinduet fram.
+- [ ] **Oppsett per rolle** under «Oppsett»: Utalarm, Tavle, KO-leder, Liten bemanning —
+      per skjerm, siden hver plass får to. Mulig kobling til Ansvar-nedtrekket
+      (`ko.Ansvarsomraade`). To ting er ikke avklart og avgjør oppsettene: hvem fører
+      loggstrømmen i kjernetid, og hvem trykker «Flytt nå».
+- [ ] **Mål KO-trafikken på staging** og før tallene inn i runbook §3c — i dag står KO
+      der som «ikke målt ennå». KO-endepunktene har ingen ETag.
+
 ### KO: hvem som planlegger på tavla — kan strammes inn (André, 23. sep. 2026)
 
 - [ ] **«+ Planlegg» er `skriv_full` i KO i dag** — André: «Alle i første omgang, kan være vi

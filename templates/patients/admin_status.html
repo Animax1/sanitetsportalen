@@ -48,6 +48,17 @@
   .sessions-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; gap: 0.5rem; flex-wrap: wrap; }
   .sessions-empty { padding: 1rem; text-align: center; color: var(--portal-text-muted); font-size: 0.85rem; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  /* Delene og trinnene (24. sep. 2026). Fargen bærer ikke trinnet alene —
+     navnet står i merket. */
+  .del-tittel { font-size: 0.9rem; color: var(--portal-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.6rem; }
+  .beredskap-boks { margin: 1.5rem 0 0; padding: 1rem; background: var(--portal-surface); border: 1px solid var(--portal-border); border-radius: 10px; }
+  .beredskap-merke { display: inline-block; margin-top: 0.35rem; font-size: 0.8rem; font-weight: 700; padding: 0.1rem 0.55rem; border-radius: 999px; border: 1px solid currentColor; }
+  .beredskap-gronn { color: #86efac; font-weight: 600; }
+  .beredskap-gul { color: #fde047; font-weight: 600; }
+  .beredskap-oransje { color: #fdba74; font-weight: 600; }
+  .beredskap-rod { color: #fca5a5; font-weight: 600; }
+  .status-card .big-number.beredskap-gronn, .status-card .big-number.beredskap-gul,
+  .status-card .big-number.beredskap-oransje, .status-card .big-number.beredskap-rod { font-weight: 700; }
 </style>
 {% endblock %}
 
@@ -59,23 +70,24 @@
     <div class="refresh-indicator"><span class="dot"></span>Oppdaterer hvert 10. sek – <span id="last-update">…</span></div>
   </div>
 
+  <!-- **To deler** (24. sep. 2026): det som svarer på «har vi et problem, og
+       hvor?» øverst, sjekklista fra runbook §1 under. -->
+  <h2 class="del-tittel">Under belastning</h2>
   <div class="status-grid" id="status-grid">
-    <!-- Requests siste 1 min -->
-    <div class="status-card">
-      <h3>Requests siste 1 min</h3>
-      <div><span class="big-number" id="rps-1min">–</span><span class="unit">req/s</span></div>
-      <div class="sub" id="count-1min">–</div>
-    </div>
-
-    <!-- Responstid siste 5 min -->
+    <!-- Responstid siste 5 min. **P95 er det store tallet** (24. sep. 2026):
+         runbooken sier det er det viktigste, og snittet skjuler halen P95
+         fanger. Trinnet og kilden står under — se `beredskapsnivaa()` og
+         `metrikkilde()` i core/admin_status.py. -->
     <div class="status-card">
       <h3>Responstid siste 5 min</h3>
-      <div><span class="big-number" id="avg-5min">–</span><span class="unit">ms snitt</span></div>
+      <div><span class="big-number" id="p95-5min">–</span><span class="unit">ms P95</span></div>
+      <div class="beredskap-merke" id="beredskap-nivaa">–</div>
+      <div class="sub" id="beredskap-tiltak">–</div>
+      <div class="status-row"><span class="label">Snitt</span><span class="val" id="avg-5min">–</span></div>
       <div class="status-row"><span class="label">P50</span><span class="val" id="p50-5min">–</span></div>
-      <div class="status-row"><span class="label">P95</span><span class="val" id="p95-5min">–</span></div>
       <div class="status-row"><span class="label">Max</span><span class="val" id="max-5min">–</span></div>
+      <div class="sub" id="metrikk-kilde">–</div>
     </div>
-
     <!-- Feil siste 5 min -->
     <div class="status-card">
       <h3>Feilresponser siste 5 min</h3>
@@ -84,26 +96,11 @@
       <div class="sub" style="margin-top:0.5rem;">Av <span id="count-5min">–</span> requests totalt</div>
     </div>
 
-    <!-- Sesjoner med liste og handlinger -->
-    <div class="status-card sessions-card">
-      <h3>Aktive sesjoner</h3>
-      <div><span class="big-number" id="sessions">–</span><span class="unit">påloggede brukere</span></div>
-      <div class="sub">Tabellen oppdateres hvert 10. sekund. Bruk “Logg ut” for å frigjøre ressurser ved høy last.</div>
-      <div class="sessions-list" id="sessions-list">
-        <div class="sessions-empty">Laster…</div>
-      </div>
-      <div class="sessions-toolbar">
-        <span class="sub" id="sessions-status"></span>
-        <button class="btn-kill-all" id="btn-kill-all" type="button" title="Logger ut alle brukere unntatt deg selv">Nødbrems: logg ut alle (unntatt meg)</button>
-      </div>
-    </div>
-
-    <!-- Minnebruk -->
+    <!-- Tregeste stier -->
     <div class="status-card">
-      <h3>Minne (RSS)</h3>
-      <div><span class="big-number" id="memory">–</span><span class="unit">MB nå</span></div>
-      <div class="status-row"><span class="label">Topp siden oppstart</span><span class="val" id="memory-peak">–</span></div>
-      <div class="sub">Denne worker-prosessen. Toppen går aldri ned — det er «nå» som sier om noe lekker.</div>
+      <h3>Tregeste stier siste 5 min</h3>
+      <div id="tregeste"><div class="sub">–</div></div>
+      <div class="sub" style="margin-top:0.5rem;">P95 per sti, stier med under tre treff er utelatt. Gjør «P95 er høy» om til «det er den siden».</div>
     </div>
 
     <!-- Database -->
@@ -115,18 +112,10 @@
       <div class="sub" id="db-hint" style="margin-top:0.5rem;">–</div>
     </div>
 
-    <!-- Disk -->
-    <div class="status-card">
-      <h3>Disk (volumet)</h3>
-      <div><span class="big-number" id="disk-used">–</span><span class="unit">% brukt</span></div>
-      <div class="status-row"><span class="label">Ledig</span><span class="val" id="disk-free">–</span></div>
-      <div class="status-row"><span class="label">Backupfiler</span><span class="val" id="disk-backups">–</span></div>
-      <div class="sub" id="disk-path">–</div>
-    </div>
-
     <!-- Worker-config -->
     <div class="status-card">
       <h3>Worker-konfigurasjon</h3>
+      <div class="beredskap-merke" id="driftsmodus">–</div>
       <div class="status-row"><span class="label">WEB_WORKERS</span><span class="val" id="cfg-workers">–</span></div>
       <div class="status-row"><span class="label">WEB_THREADS</span><span class="val" id="cfg-threads">–</span></div>
       <div class="status-row"><span class="label">MAX_REQUESTS</span><span class="val" id="cfg-maxreq">–</span></div>
@@ -143,15 +132,76 @@
       <div class="sub" id="cache-hint" style="margin-top:0.5rem;">–</div>
     </div>
 
-    <!-- Backup -->
+    <!-- Requests siste 1 min -->
     <div class="status-card">
-      <h3>Siste vellykkede backup</h3>
-      <div><span class="big-number" id="backup-age">–</span><span class="unit">min siden</span></div>
-      <div class="sub" id="backup-details">–</div>
-      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Offsite (Scaleway)</span><span class="val" id="offsite-status">–</span></div>
-      <div class="sub" id="offsite-details">–</div>
+      <h3>Requests siste 1 min</h3>
+      <div><span class="big-number" id="rps-1min">–</span><span class="unit">req/s</span></div>
+      <div class="sub" id="count-1min">–</div>
     </div>
 
+    <!-- Minnebruk -->
+    <div class="status-card">
+      <h3>Minne (RSS)</h3>
+      <div><span class="big-number" id="memory">–</span><span class="unit">MB nå</span></div>
+      <div class="status-row"><span class="label">Topp siden oppstart</span><span class="val" id="memory-peak">–</span></div>
+      <div class="sub">Denne worker-prosessen. Toppen går aldri ned — det er «nå» som sier om noe lekker.</div>
+    </div>
+
+    <!-- Sesjoner med liste og handlinger -->
+    <div class="status-card sessions-card">
+      <h3>Aktive sesjoner</h3>
+      <div><span class="big-number" id="sessions">–</span><span class="unit">påloggede brukere</span></div>
+      <div class="sub">Tabellen oppdateres hvert 10. sekund. Bruk “Logg ut” for å frigjøre ressurser ved høy last.</div>
+      <div class="sessions-list" id="sessions-list">
+        <div class="sessions-empty">Laster…</div>
+      </div>
+      <div class="sessions-toolbar">
+        <span class="sub" id="sessions-status"></span>
+        <button class="btn-kill-all" id="btn-kill-all" type="button" title="Logger ut alle brukere unntatt deg selv">Nødbrems: logg ut alle (unntatt meg)</button>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- Beredskap under vakt. **Tegnes fra `BEREDSKAPSTRINN`** (core/admin_status.py),
+       den samme lista som farger P95 over — og runbook §2 holdes i takt av
+       `BeredskapstrinneneIRunbookenTests`. Til 24. sep. 2026 var tabellen
+       skrevet for hånd her og i runbooken, og begge regnet fra 1 worker. -->
+  <div class="beredskap-boks">
+    <h2 class="del-tittel">Beredskap under vakt</h2>
+    <p style="margin:0 0 0.75rem;font-size:0.88rem;">
+      Vakt-modus er grunnlinja: <strong>{{ vaktmodus.workers }} workers × {{ vaktmodus.threads }} tråder,
+      Redis, Railway {{ vaktmodus.plan }}</strong>. Tiltakene regnes derfra. Les av <strong>P95</strong> —
+      trinnet står på kortet over. Full prosedyre i <code>docs/RUNBOOK_VAKT.md</code> §2.
+    </p>
+    <div class="table-responsive">
+    <table class="table table-sm" style="font-size:0.82rem;">
+      <thead><tr><th>P95 / 5xx</th><th>Status</th><th>Handling</th></tr></thead>
+      <tbody>
+        {% for t in trinn %}
+        <tr id="trinn-{{ t.nivaa }}">
+          <td>{{ t.terskel }}</td>
+          <td><span class="beredskap-{{ t.nivaa }}">{{ t.navn }}</span></td>
+          <td>{{ t.tiltak }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td>{{ kritisk.terskel }}</td>
+          <td><span class="beredskap-rod">{{ kritisk.navn }}</span></td>
+          <td>{{ kritisk.tiltak }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--portal-text-muted);">
+      <strong>Viktig:</strong> 2+ workers krever at Cache-backend viser <code>REDIS / OK</code> — «Worker-konfigurasjon»
+      sier fra når de to ikke stemmer. Gjør én endring av gangen, og se P95 i 3 minutter før neste.
+    </p>
+  </div>
+
+  <h2 class="del-tittel" style="margin-top:1.5rem;">Sjekk før vakt</h2>
+  <div class="status-grid" id="status-grid-for-vakt">
     <!-- Vaktbildet -->
     <div class="status-card">
       <h3>Vaktbildet</h3>
@@ -163,36 +213,13 @@
       <div class="sub" id="vakt-hint" style="margin-top:0.5rem;">–</div>
     </div>
 
-    <!-- Tregeste stier -->
+    <!-- Backup -->
     <div class="status-card">
-      <h3>Tregeste stier siste 5 min</h3>
-      <div id="tregeste"><div class="sub">–</div></div>
-      <div class="sub" style="margin-top:0.5rem;">P95 per sti, stier med under tre treff er utelatt. Gjør «P95 er høy» om til «det er den siden».</div>
-    </div>
-
-    <!-- Innlogging -->
-    <div class="status-card">
-      <h3>Innlogging siste time</h3>
-      <div><span class="big-number" id="login-failed">–</span><span class="unit">feilede forsøk</span></div>
-      <div class="status-row"><span class="label">Vellykkede</span><span class="val" id="login-ok">–</span></div>
-      <div class="status-row"><span class="label">Brukernavn / IP-er bak feilene</span><span class="val" id="login-spread">–</span></div>
-      <div class="status-row"><span class="label">MFA-koder avvist</span><span class="val" id="login-mfa">–</span></div>
-      <div class="sub" id="login-hint" style="margin-top:0.5rem;">Mange feil fra én IP er et angrep. Mange feil fra mange brukere er et passord ingen husker.</div>
-    </div>
-
-    <!-- Konfigsjekk -->
-    <div class="status-card">
-      <h3>Konfigsjekk <span id="konfig-sum" class="unit"></span></h3>
-      <div id="konfig-rader"><div class="sub">–</div></div>
-      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Versjon</span><span class="val" id="konfig-versjon">–</span></div>
-      <div class="sub" style="margin-top:0.5rem;">Reglene gjelder prod. Lokalt vil DEBUG og HTTPS stå rødt, og det er riktig.</div>
-    </div>
-
-    <!-- Cron -->
-    <div class="status-card">
-      <h3>Cron-jobber (Railway)</h3>
-      <div id="cron-rader"><div class="sub">–</div></div>
-      <div class="sub" style="margin-top:0.5rem;">Siste kjøring, registrert av jobben selv. «Aldri» betyr at jobben ikke har kjørt siden sporingen kom, eller at cron ikke er satt opp.</div>
+      <h3>Siste vellykkede backup</h3>
+      <div><span class="big-number" id="backup-age">–</span><span class="unit">min siden</span></div>
+      <div class="sub" id="backup-details">–</div>
+      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Offsite (Scaleway)</span><span class="val" id="offsite-status">–</span></div>
+      <div class="sub" id="offsite-details">–</div>
     </div>
 
     <!-- Backup-klokka. Står for seg selv og ikke blant cron-jobbene: den er
@@ -206,6 +233,21 @@
       <div class="sub" style="margin-top:0.5rem;">Tråd i web-prosessen, ikke en cron-jobb. Står noe forsinket, har tråden stoppet — og backup tas da bare av reservenettet, som krever trafikk.</div>
     </div>
 
+    <!-- Cron -->
+    <div class="status-card">
+      <h3>Cron-jobber (Railway)</h3>
+      <div id="cron-rader"><div class="sub">–</div></div>
+      <div class="sub" style="margin-top:0.5rem;">Siste kjøring, registrert av jobben selv. «Aldri» betyr at jobben ikke har kjørt siden sporingen kom, eller at cron ikke er satt opp.</div>
+    </div>
+
+    <!-- Konfigsjekk -->
+    <div class="status-card">
+      <h3>Konfigsjekk <span id="konfig-sum" class="unit"></span></h3>
+      <div id="konfig-rader"><div class="sub">–</div></div>
+      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Versjon</span><span class="val" id="konfig-versjon">–</span></div>
+      <div class="sub" style="margin-top:0.5rem;">Reglene gjelder prod. Lokalt vil DEBUG og HTTPS stå rødt, og det er riktig.</div>
+    </div>
+
     <!-- E-post -->
     <div class="status-card">
       <h3>E-post</h3>
@@ -214,49 +256,25 @@
       <div class="status-row"><span class="label">Siste feil</span><span class="val" id="epost-feil">–</span></div>
       <div class="sub" id="epost-hint" style="margin-top:0.5rem;">–</div>
     </div>
-  </div>
+    <!-- Innlogging -->
+    <div class="status-card">
+      <h3>Innlogging siste time</h3>
+      <div><span class="big-number" id="login-failed">–</span><span class="unit">feilede forsøk</span></div>
+      <div class="status-row"><span class="label">Vellykkede</span><span class="val" id="login-ok">–</span></div>
+      <div class="status-row"><span class="label">Brukernavn / IP-er bak feilene</span><span class="val" id="login-spread">–</span></div>
+      <div class="status-row"><span class="label">MFA-koder avvist</span><span class="val" id="login-mfa">–</span></div>
+      <div class="sub" id="login-hint" style="margin-top:0.5rem;">Mange feil fra én IP er et angrep. Mange feil fra mange brukere er et passord ingen husker.</div>
+    </div>
 
-  <!-- Beredskap under vakt -->
-  <div style="margin-top:1.5rem;padding:1rem;background:var(--portal-surface);border:1px solid var(--portal-border);border-radius:10px;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--portal-text-muted);text-transform:uppercase;">Beredskap under vakt</h3>
-    <p style="margin:0 0 0.75rem;font-size:0.88rem;">
-      Les av <strong>P95 (siste 5 min)</strong> på dashbordet — det er det viktigste tallet. Tabellen under er en hurtigreferanse; full prosedyre i <code>RUNBOOK_VAKT.md</code>.
-    </p>
-    <table class="table table-sm" style="font-size:0.82rem;">
-      <thead>
-        <tr><th>P95 / 5xx</th><th>Status</th><th>Handling</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>&lt; 300 ms, 0 feil</td>
-          <td><span style="color:var(--success,#22c55e);font-weight:600;">Grønt</span></td>
-          <td>Ingen endring. Fortsett å observere.</td>
-        </tr>
-        <tr>
-          <td>300–500 ms, 0 feil</td>
-          <td><span style="color:#eab308;font-weight:600;">Gult</span></td>
-          <td>Observer. Hvis vedvarer &gt; 15 min: logg ut inaktive sesjoner («Aktive sesjoner»-kortet → per bruker).</td>
-        </tr>
-        <tr>
-          <td>500–1000 ms eller 1–2 5xx</td>
-          <td><span style="color:#f97316;font-weight:600;">Oransje</span></td>
-          <td><strong>Sjekk først at Cache-backend = REDIS / OK</strong>. Sett deretter <code>WEB_WORKERS=2</code> i Railway → Save (auto-redeploy ~60 sek).</td>
-        </tr>
-        <tr>
-          <td>&gt; 1000 ms eller ≥3 5xx</td>
-          <td><span style="color:#ef4444;font-weight:600;">Rødt</span></td>
-          <td>Krever Redis. Sett <code>WEB_WORKERS=2 WEB_THREADS=6</code>. Hvis fortsatt problem: nødbrems med <code>RATELIMIT_ENABLE=false</code>.</td>
-        </tr>
-        <tr>
-          <td>Fortsatt tregt etter alle tiltak</td>
-          <td><span style="color:#dc2626;font-weight:600;">Kritisk</span></td>
-          <td>Nødbrems alle sesjoner («Logg ut alle unntatt meg»). Eskaler til Railway-status og vurder Pro-plan.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--portal-text-muted);">
-      <strong>Viktig:</strong> 2+ workers krever at Cache-backend-kortet viser <code>REDIS / OK</code>. Med LocMemCache vil rate-limit og stats-cache fragmenteres mellom workers.
-    </p>
+    <!-- Disk -->
+    <div class="status-card">
+      <h3>Disk (volumet)</h3>
+      <div><span class="big-number" id="disk-used">–</span><span class="unit">% brukt</span></div>
+      <div class="status-row"><span class="label">Ledig</span><span class="val" id="disk-free">–</span></div>
+      <div class="status-row"><span class="label">Backupfiler</span><span class="val" id="disk-backups">–</span></div>
+      <div class="sub" id="disk-path">–</div>
+    </div>
+
   </div>
 
   <!-- JSON preview -->
@@ -284,11 +302,30 @@ const ADMIN_URLS = {
     return n;
   }
 
-  function classifyP95(p95) {
-    if (p95 < 300) return 'status-ok';
-    if (p95 < 500) return 'status-ok';
-    if (p95 < 1000) return 'status-warn';
-    return 'status-crit';
+  // Trinnet regnes på serveren (`beredskapsnivaa()`), ikke her: da er det
+  // samme terskler som i tabellen nederst og i runbooken. Til 24. sep. 2026
+  // sto en egen regel her, og den farget 300–500 ms grønt mens runbooken
+  // sa gult.
+  function renderBeredskap(b, kilde, modus) {
+    const nivaa = (b && b.nivaa) || '';
+    const merke = document.getElementById('beredskap-nivaa');
+    merke.textContent = (b && b.navn) || '–';
+    merke.className = 'beredskap-merke' + (nivaa ? ' beredskap-' + nivaa : '');
+    document.getElementById('p95-5min').className = 'big-number' + (nivaa ? ' beredskap-' + nivaa : '');
+    document.getElementById('beredskap-tiltak').textContent = b && b.fa_maalinger
+      ? 'Bare ' + b.antall + ' forespørsler siste 5 min — P95 er da én treg forespørsel. Vent før du handler.'
+      : ((b && b.tiltak) || '');
+    if (b && b.fa_maalinger) merke.textContent += ' · få målinger';
+    const k = document.getElementById('metrikk-kilde');
+    k.textContent = (kilde && kilde.tekst) || '';
+    k.className = 'sub' + (kilde && kilde.ok === false ? ' status-crit' : '');
+    const m = document.getElementById('driftsmodus');
+    m.textContent = (modus && modus.tekst) || '–';
+    m.className = 'beredskap-merke ' + (modus && modus.ok === false ? 'beredskap-rod'
+      : (modus && modus.modus === 'vakt' ? 'beredskap-gronn' : ''));
+    document.querySelectorAll('[id^="trinn-"]').forEach((rad) => {
+      rad.style.outline = rad.id === 'trinn-' + nivaa ? '2px solid currentColor' : '';
+    });
   }
 
   async function refresh() {
@@ -315,12 +352,10 @@ const ADMIN_URLS = {
     document.getElementById('rps-1min').textContent = fmt(m1.rps);
     document.getElementById('count-1min').textContent = fmt(m1.count) + ' requests totalt';
 
-    document.getElementById('avg-5min').textContent = fmt(m5.avg_ms);
+    document.getElementById('avg-5min').textContent = fmt(m5.avg_ms) + ' ms';
     document.getElementById('p50-5min').textContent = fmt(m5.p50_ms) + ' ms';
-
-    const p95El = document.getElementById('p95-5min');
-    p95El.textContent = fmt(m5.p95_ms) + ' ms';
-    p95El.className = 'val ' + classifyP95(m5.p95_ms || 0);
+    document.getElementById('p95-5min').textContent = fmt(m5.p95_ms);
+    renderBeredskap(d.beredskap, d.metrikkilde, d.driftsmodus);
 
     document.getElementById('max-5min').textContent = fmt(m5.max_ms) + ' ms';
     document.getElementById('err-4xx').textContent = fmt(m5.errors_4xx);

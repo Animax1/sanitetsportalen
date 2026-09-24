@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — Server-status og runbooken regnet fra vakt-modus: P95 først, trinnene ett sted  `#drift` `#runbook` `#server-status`
+
+André: «før vakten skal starte spinner vi opp redis og 2 workers og 4 tråder», og Railway
+Pro på vakt. Gjennomgangen av runbooken mot dashbordet viste at begge var skrevet som om
+man **starter** på 1 worker og skalerer opp ved belastning.
+
+**Det som var feil**
+- **Tiltakene startet på feil trinn.** «Oransje: oppgrader til 2 workers» — i runbook §2 og
+  i hurtigreferansen nederst på dashbordet. I vakt-modus er det alt gjort. «Rødt» var
+  «2 workers + 6 tråder».
+- **Dashbordet farget 300–500 ms grønt** (`classifyP95` i malen); runbooken sa gult.
+- **Det viktigste tallet var det minste.** Runbooken sier P95; det store tallet på kortet
+  var *snittet*, og P95 sto som en liten rad under.
+- **Runbook §4 sa at metrikkene er per prosess og «hopper»** — utdatert siden de ble samlet
+  i Redis, og i strid med §1c, som ber deg sjekke nettopp det.
+- **«Logg ut inaktive»** var gult-tiltaket for alle med flere pålogget enn personell. Med
+  KO-operatører på to skjermer er det en operatør som mister vaktbildet.
+- **§11 anbefalte Hobby for opptil 40 brukere**, og §5 satte `WEB_WORKERS=2` som «tyngre
+  skalering».
+
+**Nå**
+- **Trinnene står ett sted:** `BEREDSKAPSTRINN` i `core/admin_status.py`, regnet fra
+  `VAKTMODUS` (Pro, 2 × 4, Redis). Grønt < 300 ms · Gult 300–500 · **Oransje 500–1000 eller
+  1–2 5xx → `WEB_WORKERS=3`**, etter å ha sett på «Tregeste stier» og «Database» · **Rødt
+  > 1000 eller ≥ 3 5xx → `WEB_WORKERS=4`** · Kritisk → last-shed. Dashbordet tegner tabellen
+  herfra, og `BeredskapstrinneneIRunbookenTests` holder runbook §2 i takt.
+- **`beredskapsnivaa()` regner trinnet på serveren**: det høyeste trinnet der P95 *eller*
+  5xx har nådd grensen — 5xx alene kan gi rødt. **Under 20 forespørsler siste 5 min sier
+  kortet «få målinger»**: sett på dashbordet — tre forespørsler og én treg ga «Oransje».
+- **P95 er det store tallet**, farget etter trinnet, med tiltaket under og raden i
+  tabellen markert. Kortet sier om tallene er **«Samlet fra 2 workers»** eller **«Bare
+  denne workeren»** (rødt når det er flere workers uten Redis).
+- **Worker-kortet sier modusen** (`driftsmodus()`): «Vakt-modus: 2 workers, Redis OK»,
+  «Lavkostnad-modus», «Redis er på, men bare 1 worker», eller **rødt ved 2+ workers uten
+  virkende Redis**.
+- **Dashbordet i to deler:** «Under belastning» (responstid, feil, tregeste stier,
+  database, workers, cache, requests, minne, sesjoner) øverst, «Sjekk før vakt» (vaktbildet,
+  backup, klokka, cron, konfig, e-post, innlogging, disk) under.
+- **Runbooken:** vakt-modus = Pro + Redis + 2 × 4 (§1b–1c, Pro er ikke lenger «valgfritt»),
+  §2 som over, §3/3b logger bare ut sesjoner inaktive over én time, §3c sier at KO ikke er
+  målt, §4–5 regnet fra 2 workers og «finn flaskehalsen før du skalerer mer», §10c
+  nedgraderer Pro etter vakt, §11 og vedlegget peker på trinnene. **Rate-limit-nødbremsen
+  er tatt ut av «Kritisk»** — den hjelper mot 429, ikke mot en treg server.
+
+**Mutasjonstesting:** 13 mutanter (trinngrensene, 5xx-leddet, `>=` mot `>`, «få
+målinger», modusene, kilden, kallstedet i payloaden, og runbookens `WEB_WORKERS=3`), alle
+drept. Prøvd i nettleseren.
+
+**Og den uforklarte røde testen fra 23. sep. er forklart.** `KonsertplanleggerenFolgerTavlaJsTests`
+satte `koTavleKlokkeavvik = NAA - Date.now()`, og `koTegnPlan` leste klokka noen
+millisekunder senere: vinduet begynte da like etter hel time, og timene ble 13 i stedet
+for 12. Rød av og til under full last. Klokka fryses nå (`Date.now = () => NAA`), også i
+tavle-testen med samme mønster. Feilen var i testen, ikke i koden — 13 timer er riktig
+for et vindu som ikke begynner på en hel time.
+
+**TODO:** KO med fem operatører — endringsnummeret, hendelsen i et skjult loggvindu,
+oppsett per rolle og måling av KO-trafikken.
+
 ## 2026-09-23 — ↗ på en åpen hendelse åpner hendelsen, ikke loggstrømmen  `#ko` `#vinduer`
 
 André: «Når vi skal åpne en hendelse som ligger i loggstrøms vinduets plass og vil åpne som

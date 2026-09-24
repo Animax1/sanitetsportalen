@@ -18,12 +18,17 @@ Konkrete handlingsregler når pasientregistreringssystemet er under belastning.
 
 ### 1b. Driftsmodus — lavkostnad mellom vakter, vakt-modus før vakt
 
-Appen kjøres i to ulike modus styrt av én env-variabel: `REDIS_URL`. Standardtilstand mellom vakter er **lavkostnad-modus** (1 worker, Redis frakoblet, LocMemCache). Før hver vakt veksles til **vakt-modus** (2 workers + Redis aktivt). Etter vakt veksles tilbake.
+Appen kjøres i to ulike modus styrt av én env-variabel: `REDIS_URL`. Standardtilstand mellom vakter er **lavkostnad-modus** (1 worker, Redis frakoblet, LocMemCache). Før hver vakt veksles til **vakt-modus** (Railway Pro, 2 workers × 4 tråder, Redis aktivt). Etter vakt veksles tilbake.
 
-| Modus | `REDIS_URL` | `WEB_WORKERS` | Cache | Når |
-|---|---|---|---|---|
-| **Lavkostnad** (default) | tom / fjernet | 1 | LocMemCache | Mellom vakter |
-| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | 2 | RedisCache | Før og under vakt |
+| Modus | `REDIS_URL` | `WEB_WORKERS` × `WEB_THREADS` | Cache | Plan | Når |
+|---|---|---|---|---|---|
+| **Lavkostnad** (default) | tom / fjernet | 1 × 4 | LocMemCache | Hobby | Mellom vakter |
+| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | **2 × 4** | RedisCache | **Pro** | Før og under vakt |
+
+**Vakt-modus er grunnlinja tiltakene i §2 regnes fra** (24. sep. 2026). Til da regnet
+tabellen fra 1 worker, og «oransje: oppgrader til 2 workers» var et tiltak som alt var
+gjort. Dashbordet viser hvilken modus som faktisk kjører — «Worker-konfigurasjon»-kortet
+sier «Vakt-modus: 2 workers, Redis OK», og rødt hvis det står 2+ workers uten Redis.
 
 Kodebasen bytter automatisk — ingen kodeendring, ingen migrasjon. Detaljer i `TEKNISK_DOKUMENTASJON.md` §8E.
 
@@ -73,9 +78,11 @@ Når ny deploy er live (sjekk Deployments → siste "Active"):
    - `unique_workers` skal høynes til 2 etter at begge workere har fått requests
 5. **Test rate-limit funker delt**: prøv 11 mislykkede innlogginger — du skal låses ute uavhengig av hvilken worker som svarer.
 
-#### Steg 5 (valgfritt): Vurder Pro-plan
+#### Steg 5: Railway Pro
 
-Hvis du venter 20+ samtidige brukere: Railway-prosjekt → Settings → Plan → oppgrader til Pro. Kan nedgraderes igjen rett etter vakt (proratert billing).
+Railway-prosjekt → Settings → Plan → **Pro**. Del av vakt-modus (André, 24. sep. 2026), ikke
+et valg: tiltakene i §2 går til 3 og 4 workers, og det er på Pro de gir noe. Nedgraderes
+etter vakt (§10c, proratert billing).
 
 **Hvorfor:** Med 2+ workere uten Redis blir rate-limit-telleren per-prosess (effektivt doblet), stats-cache fragmentert og request-metrikker viser bare én workers tall. Vakt-modus fikser alle tre.
 
@@ -83,15 +90,31 @@ Hvis du venter 20+ samtidige brukere: Railway-prosjekt → Settings → Plan →
 
 ## 2. Terskler og handlinger
 
-Les av **P95** (Responstid siste 5 min → P95) på dashbordet. Dette er det viktigste tallet.
+Les av **P95** — det store tallet på «Responstid siste 5 min». Kortet viser også trinnet
+og tiltaket, regnet av `beredskapsnivaa()` i `core/admin_status.py`. **Tabellen under og
+tabellen nederst på dashbordet er samme liste** (`BEREDSKAPSTRINN`); en test holder dem
+i takt.
 
-| P95 responstid | 5xx-feil | Tiltak |
+**Regnet fra vakt-modus: 2 workers × 4 tråder, Redis, Pro.** Det høyeste trinnet der
+enten P95 eller 5xx har nådd grensen, gjelder — 5xx alene kan gi rødt.
+
+| Trinn | P95 / 5xx siste 5 min | Tiltak |
 |---|---|---|
-| < 300 ms | 0 | **Grønt.** Ingen endring. Fortsett å observere. |
-| 300–500 ms | 0 | **Gult.** Observer. Hvis vedvarer > 15 min, gjør nedbremsing (steg 3). |
-| 500–1000 ms | 0 eller 1–2 | **Oransje.** Oppgrader til 2 workers (steg 4). |
-| > 1000 ms | ≥ 3 | **Rødt.** Oppgrader til 2 workers + 6 threads (steg 5). |
-| Systemet tregt etter alle tiltak | Vedvarende 5xx | **Kritisk.** Nødbrems rate-limit (steg 7). |
+| **Grønt** | < 300 ms, 0 feil | Ingen endring. Fortsett å observere. |
+| **Gult** | 300–500 ms, 0 feil | Observer, og se «Tregeste stier». Varer det over 15 min: nedbremsing (§3). |
+| **Oransje** | 500–1000 ms, eller 1–2 5xx | Se «Tregeste stier» og «Database» først — er databasen treg, hjelper ikke flere workers (§8). Ellers `WEB_WORKERS=3` (§4). |
+| **Rødt** | > 1000 ms, eller ≥ 3 5xx | `WEB_WORKERS=4` (§4). Faller ikke P95 innen 3 min, er flaskehalsen noe annet enn workers (§5). |
+| **Kritisk** | Fortsatt tregt etter alle tiltak | Last-shed (§9). |
+
+**Under 20 forespørsler siste 5 min sier kortet «få målinger»**: da er P95 i praksis den
+ene tregeste forespørselen, og trinnet er ikke noe å handle på. 5xx gjelder uansett.
+
+**Én endring av gangen**, og se P95 i 3 minutter før neste. Hver endring er en redeploy
+på ~60 sek, og to på rad gjør det umulig å si hvilken som virket.
+
+**Rate-limit-nødbremsen (§7) er ikke et belastningstiltak.** Den stod i «Kritisk» til
+24. sep. 2026, men den hjelper bare når rate-limitingen selv gir 429 til folk som skal
+inn — ikke når serveren er treg.
 
 ---
 
@@ -101,7 +124,10 @@ Hvis P95 ligger på 300–500 ms vedvarende, reduser polling-trykket:
 
 1. Be brukere lukke faner de ikke aktivt trenger
 2. Be leads lukke statistikk-fanen mellom oppslag
-3. **Logg ut inaktive brukere via dashbordet** (steg 3b). Hver aktiv sesjon koster minne og polling – å frigjøre glemt-innloggede faner gir umiddelbar effekt uten redeploy.
+3. **Logg ut sesjoner som har vært inaktive over én time** (steg 3b). «Aktive sesjoner»
+   viser hvor lenge siden hver fane ble brukt. **Ikke** en KO-operatør som er aktiv nå:
+   med to skjermer er det to faner per person, og en utlogget operatør mister
+   vaktbildet midt i jobben. Gevinsten er liten uansett — pollingen er billig (§3c).
 
 Ingen redeploy trengs.
 
@@ -109,7 +135,8 @@ Ingen redeploy trengs.
 
 ## 3b. Logg ut brukere via dashbordet
 
-**Når:** Du ser flere påloggede brukere enn det reelt er aktivt personell, eller du trenger å frigjøre ressurser raskt.
+**Når:** Det står sesjoner som har vært inaktive i over én time — en glemt fane på en PC
+ingen sitter ved. «Pålogget» er ikke «til stede»; se aktivitetskolonnen, ikke antallet.
 
 1. Admin-dashbord → “Aktive sesjoner”-kortet
 2. Listen viser alle påloggede brukere med rolle
@@ -161,6 +188,13 @@ SELECT count(*), state FROM pg_stat_activity
 En connection pooler (PgBouncer) er vurdert og **ikke nødvendig** på denne skalaen — se
 avklaringen av F8 i `TODO.md` og CHANGELOG.
 
+**KO er ikke målt ennå** (24. sep. 2026). Tallene over er pasientsidens. KO-endepunktene
+har **ingen ETag**: tavla henter hele bildet hvert 15. sekund fra hver fane som har den
+framme, og loggen henter nye linjer hvert 15. sekund. I kjernetid er det 5 operatører med
+to skjermer hver. Anslaget er noen få forespørsler i sekundet — lite for 2 × 4 — men det
+er et anslag. Mål på staging, og før tallene inn her. Endringsnummeret (TODO) vil gjøre
+en uendret tavle nesten gratis å spørre om.
+
 ---
 
 ## 4. Workers og threads — styring og tuning
@@ -171,17 +205,17 @@ avklaringen av F8 i `TODO.md` og CHANGELOG.
 - **Threads** = parallelle spor inne i én worker. Deler minne. Bytter aktivt ved I/O-venting (DB-spørringer).
 - **Total samtidig kapasitet** = workers × threads.
 
-### Anbefalt konfigurasjon etter forventet last
+### Trinnene fra vakt-modus
 
-| Samtidige aktive brukere | `WEB_WORKERS` | `WEB_THREADS` | Total kapasitet |
+| Når | `WEB_WORKERS` | `WEB_THREADS` | Samtidige forespørsler |
 |---|---|---|---|
-| 1–5 | 1 | 4 | 4 requests |
-| 5–15 | 2 | 4 | 8 requests |
-| 15–30 | 2–3 | 4 | 8–12 requests |
-| 30–60 | 3–4 | 4 | 12–16 requests |
-| 60+ | 4+ | 4 | 16+ requests (vurder Pro-plan) |
+| Mellom vakter (lavkostnad) | 1 | 4 | 4 |
+| **Vakt-modus** (grunnlinja) | **2** | 4 | 8 |
+| Oransje (§2) | 3 | 4 | 12 |
+| Rødt (§2) | 4 | 4 | 16 |
 
-**Tommelfingerregel:** ca. 5–8 samtidige brukere per worker for denne appen. Workers gir mest gevinst; threads er mindre viktig (behold default 4).
+Workers gir mest gevinst; tråder er mindre viktig (behold 4). Regn kapasitet på
+*pollende lesere*, ikke på antall pålogget (§3c).
 
 ### Slik endrer du verdiene
 
@@ -200,7 +234,7 @@ Ingen kodeendring eller git-push nødvendig. Verdiene leses av Procfile ved hver
 - Stats-cache fragmentert (lavere hit-rate, høyere DB-last)
 - Innloggings-blokkering inkonsistent
 
-**Sjekk først** i admin-dashbord at Cache-backend-kortet viser `REDIS / OK`. Hvis det viser `LOCMEM`, se seksjon 11 om Redis-aktivering først.
+**Sjekk først** i admin-dashbord at Cache-backend-kortet viser `REDIS / OK`. Hvis det viser `LOCMEM`, aktiver Redis først (§1c).
 
 ### Konsekvenser når du øker workers
 
@@ -211,39 +245,43 @@ Ingen kodeendring eller git-push nødvendig. Verdiene leses av Procfile ved hver
 - Rate-limit og stats-cache (delt via Redis)
 
 **Det du må være obs på:**
-- **RequestMetrics** i admin er per-prosess. Med 2 workers ser du metrikker fra én worker av gangen, og hvilken varierer mellom polls. RPS og latency kan hoppe litt — dette er normalt og betyr IKKE at appen har problemer.
+- **Metrikkene er samlet fra alle workers når Redis er på** — kortet «Responstid» sier
+  «Samlet fra 2 workers». Står det «Bare denne workeren», er Redis ikke i bruk, og tallet
+  gjelder én prosess. (Til 24. sep. 2026 sto det her at metrikkene alltid var
+  per prosess; det har ikke vært sant siden aggregeringen i Redis kom.)
+- **Minnekortet er per prosess** — det viser workeren som svarte.
 - **Memory-bruk øker lineært:** ~100–200 MB per worker ved oppstart; vokser gradvis over tid (reset ved redeploy eller worker-restart). 2 workers ~300–400 MB peak etter lengre drift, 3 workers ~450–600 MB. Hobby-planen har 8 GB — ikke et problem i praksis.
 - **Oppstartstid:** 2 workers ~30 sek, 4 workers ~50 sek.
 
 ### Når skal du øke i løpet av en vakt?
 
-**Når:** P95 500–1000 ms eller 5xx begynner å dukke opp i admin-dashbord.
+**Når:** Trinnet på dashbordet er oransje eller rødt (§2).
 
 **Steg:**
 1. Åpne Railway → web-tjenesten → Variables
-2. Sett `WEB_WORKERS` til én høyere enn nåværende verdi
+2. Sett `WEB_WORKERS` til trinnets tall — 3 på oransje, 4 på rødt
 3. Save → vent 60 sek
 4. Observer P95 i 3 minutter → skal falle
 
 Gjør kun én endring av gangen. Hvis P95 ikke faller, er problemet noe annet enn worker-kapasitet (sjekk DB, Redis, eller eksterne tjenester).
 
-### Maks på Hobby-planen
+### Over 4 workers
 
-- Realistisk maks: **4–5 workers**. Over det gir delt CPU lite gevinst.
-- For høyere kapasitet: oppgrader til Pro-planen ($20/mnd, dedikert CPU). Kan downgrades igjen etter vakt.
+På vakt kjører dere Pro. Mer enn 4 workers er ikke et trinn i §2 med vilje: har ikke 3 og
+4 hjulpet, er flaskehalsen nesten alltid databasen eller én treg side («Tregeste stier»),
+og flere prosesser gir da bare flere som venter på det samme. Se §5.
 
 ---
 
 ## 5. Tyngre skalering (reserveplan)
 
-**Når:** Steg 4 hjalp ikke tilstrekkelig. P95 fortsatt > 1000 ms.
+**Når:** Rødt, og 4 workers hjalp ikke. P95 fortsatt > 1000 ms.
 
-1. Railway → Variables
-2. `WEB_WORKERS` = `2`
-3. `WEB_THREADS` = `6`
-4. Save → redeploy
-
-Total samtidig request-kapasitet: 2 × 6 = 12. RAM ~400–450 MB.
+1. **Finn flaskehalsen før du skalerer mer.** «Tregeste stier» sier hvilken side;
+   «Database» sier om svartiden på `SELECT 1` har steget. Er det databasen: §8.
+2. Er det én side, og den ikke er nødvendig nå (statistikk, historikk): be folk lukke den.
+3. Først da: `WEB_THREADS` = `6` (4 × 6 = 24 samtidige). Tråder hjelper når
+   forespørslene venter på databasen, ikke når CPU-en er full.
 
 ---
 
@@ -577,7 +615,8 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 1. Sett variabler tilbake til default hvis du endret noe:
    - `WEB_THREADS` → fjern (default 4)
    - `RATELIMIT_ENABLE` → `true`
-2. Hvis du oppgraderte til Pro-plan: Settings → Plan → nedgrader til Hobby (proratert billing)
+2. **Pro → Hobby:** Settings → Plan → nedgrader (proratert billing). Pro er del av vakt-modus
+   og skal ned igjen etter vakt, som Redis.
 3. Noter erfaringer i en kort logg (dato, antall pasienter, peak-tall, eventuelle tiltak)
 
 ---
@@ -586,15 +625,9 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 
 ### Anbefalt oppsett etter forventet last
 
-| Samtidige brukere | Workers | Cache | Plan |
-|---|---|---|---|
-| 1–10 | 1 | LocMemCache | Hobby |
-| 10–20 | 2 | **Redis** | Hobby |
-| 20–40 | 2–3 | **Redis** | Hobby/Pro |
-| 40–100 | 3–4 | **Redis** | Pro |
-| 100–300 | 4+ | **Redis** | Pro + ev. egen DB |
-
-**Tommelfingerregel:** ca. 5–10 samtidige brukere per worker for typisk Django-webapp.
+Se §1b og §4 — vakt-modus (Pro, 2 × 4, Redis) er oppsettet for hver vakt, og §2 sier
+når dere går til 3 og 4 workers. Tabellen som sto her regnet på antall brukere og ga
+Hobby for opptil 40; den er erstattet av trinnene, som regner på målt P95.
 
 ### Hvorfor Redis når workers ≥ 2
 
@@ -706,7 +739,9 @@ skjer via to kilder:
 - `FEIL`: cache er nede, sjekk Redis-tjenestens status i Railway
 
 **Worker-konfig**
-- Viser nåværende `WEB_WORKERS` og `WEB_THREADS`. Match med ditt tiltenkte oppsett (se seksjon 4).
+- Merket øverst sier modusen: «Vakt-modus: 2 workers, Redis OK» (grønt), «Lavkostnad-modus»,
+  eller rødt når det står 2+ workers uten virkende Redis. Under står `WEB_WORKERS` og
+  `WEB_THREADS` (se §4).
 
 **Siste backup**
 - Skal være < 35 min gammel (backup-schedule er 30 min + litt slakk)
