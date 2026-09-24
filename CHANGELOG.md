@@ -4,6 +4,14 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — TODO: kontooppryddingen i prod er gjort  `#todo`
+
+André: «Kontooppryddingen er gjort, slett punktet». Punktet «⚠️ Kontoopprydding i prod —
+MÅ gjøres før deploy til prod» (besluttet 28. aug. 2026: slett alle kontoer unntatt
+admin og én les/skriv-konto, backup av `accounts` først, kontroller at en admin står
+igjen) er slettet fra TODO. Punktet om `skriv_handling` for bilkontoer sto under samme
+overskrift og har fått sin egen.
+
 ## 2026-09-24 — Tråderegelen står på dashbordet, ved tiltakstabellen  `#drift` `#server-status`
 
 André: «er du ikke enig i å legge inn flere tråder i runbook/beredskap under vakt da tråder

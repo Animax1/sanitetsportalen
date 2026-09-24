@@ -917,28 +917,7 @@ skal ligge der.
 - [ ] **Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til
       modulnivåer.** Den beskriver fortsatt `role`-verdier som ikke finnes.
 
-### ⚠️ Kontoopprydding i prod — MÅ gjøres før deploy til prod
-
-- [ ] **Slett alle kontoer unntatt admin-kontoen(e) og én les/skriv-konto.**
-      Bestemt av André 28. aug. 2026. Kollegaen som skal bruke les/skriv-kontoen videre
-      beholder den; resten er testkontoer og gamle kontoer som ikke skal med over.
-      - [ ] **Noter hvilken konto som beholdes, og hvilket nivå den skal ha**, før noe
-            slettes. Etter slettingen finnes ikke fasiten noe sted.
-      - [ ] **Ta backup først.** `CustomUser` er bevisst utelatt fra begge
-            backup-handlerne (se CLAUDE.md), så en slettet konto er *ikke* i noen
-            portal-backup. Ta en `dumpdata accounts` manuelt, eller aksepter at
-            slettingen er endelig.
-      - [ ] **Sletting av en bruker fjerner `ModulTilgang`-radene** (CASCADE) og setter
-            `Forstehjelper.user`/`Helsepersonell.user` til NULL (SET_NULL). Navnene
-            beholdes på historiske pasienter — det er meningen — men koblingen må settes
-            opp på nytt for kontoen som beholdes.
-      - [ ] **Auditloggen beholder radene.** `AuditLog.record_id` er en ren integer uten
-            FK nettopp for at sporet skal overleve slettingen. `AuditLog.user` blir NULL,
-            så «hvem gjorde dette» går tapt for de slettede — det er en bevisst
-            avveining, men verdt å vite før man sletter.
-      - [ ] **Kontroller etterpå at minst én admin står igjen og kan logge inn.**
-            Sletter du deg selv ut, finnes det ingen vei inn utenom `create_admin` på
-            Railway-konsollen.
+### Oppdragsmodulen: `skriv_handling` for bilkontoer
 
 - [ ] **`skriv: handling` for bil-/ambulansekontoer.** Nivået er definert; bruken er
       planlagt i `docs/BESLUTNING_OPPDRAGSMODULEN.md` §5.1. Invarianten fra §3.2 er
