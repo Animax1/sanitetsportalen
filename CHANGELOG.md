@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-24 — TODO: les av indeksene i Postgres etter en vakt  `#drift` `#database`
+
+André: «Den databasen om indekserte kan du skrive det som en todo for meg med konkret
+instruks og så poster jeg det til deg for vurdering.» Punktet står under «Krever Andre»:
+fire spørringer som bare leser (`pg_stat_database`, `pg_stat_user_tables`,
+`pg_stat_user_indexes`, `pg_extension`), `railway connect Postgres`, og hva som skal
+vurderes. Tallene skal leses **etter en vakt med ekte last**; statistikken gjelder fra
+Postgres sist startet, og spørring A sier når det var. Ingenting tyder på et
+indeksproblem i dag; dette er en helsesjekk.
+
 ## 2026-09-24 — Oversikt over oppdateringsintervallene: runbook §3d  `#drift` `#dokumentasjon`
 
 André: «Kan du skrive ned i runbook evt en annen plass som er egnet
