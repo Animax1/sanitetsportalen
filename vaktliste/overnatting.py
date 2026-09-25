@@ -26,6 +26,7 @@ ikke for en brannliste.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from datetime import datetime, time, timedelta
 
 from django.db import IntegrityError, transaction
@@ -45,6 +46,19 @@ NATT_TIL = time(6, 0)
 MAKS_NETTER = 31
 
 MAKS_BRANNRUTINE = 2000
+
+#: **Lagringstiden** (André, 25. sep. 2026: «Gjør A»). Hvem som sov hvor har
+#: ingen verdi etter vakta — den finnes for brannsikkerheten mens folk sover
+#: der. Tretti dager gir rom for å se hva som skjedde om en natt faktisk ble en
+#: hendelse, og så går den. Regnes **per natt**, ikke fra vaktas slutt: da
+#: virker fristen også når planlagt slutt mangler, og en natt er like gammel
+#: uansett hvor lang vakta rundt den var. Rommene står — de kopieres til neste år.
+OPPBEVARING_DAGER = 30
+
+#: Satt mens `slett_utlopte()` kjører. Slettesignalet tier da: det auditlogger
+#: hver plassering med navn, rom og natt, og ville skrevet nøyaktig det som
+#: skal bort inn i en logg med 730 dagers lagringstid.
+_rydder = ContextVar('overnatting_rydder', default=False)
 
 
 class Ugyldig(ValueError):
@@ -258,6 +272,34 @@ def plasser(rom, mannskap, netter_raa, *, flytt=False) -> list:
 
 def fjern(overnatting) -> None:
     overnatting.delete()
+
+
+def rydder_naa() -> bool:
+    return _rydder.get()
+
+
+def utlopte(naa=None):
+    """Plasseringene som har passert lagringstiden: natta er mer enn
+    `OPPBEVARING_DAGER` gammel, regnet i lokal dato."""
+    naa = naa or timezone.now()
+    grense = timezone.localtime(naa).date() - timedelta(days=OPPBEVARING_DAGER)
+    return Overnatting.objects.filter(natt__lt=grense)
+
+
+def slett_utlopte(naa=None) -> int:
+    """Slett det som har løpt ut. Kalles av `purge_old_logs` gjennom
+    `vaktliste/opprydding.py`. Antallet står i cron-jobbens kjøringslogg —
+    uten navn, som er hele poenget."""
+    qs = utlopte(naa)
+    antall = qs.count()
+    if antall:
+        token = _rydder.set(True)
+        try:
+            with transaction.atomic():
+                qs.delete()
+        finally:
+            _rydder.reset(token)
+    return antall
 
 
 # ── På vakt i natt ───────────────────────────────────────────────────────────

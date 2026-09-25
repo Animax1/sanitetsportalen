@@ -469,3 +469,71 @@ class FilaOgAuditTests(_Overnatting):
         self.assertTrue(AuditLog.objects.filter(
             table_name='vaktliste_vaktliste', field_name='brannrutine',
             new_value='Samleplass nord').exists())
+
+
+class LagringstidenTests(_Overnatting):
+    """Plasseringene slettes 30 dager etter natta (André, 25. sep. 2026: «Gjør
+    A»). **Prøvd gjennom `purge_old_logs`**, ikke gjennom hjelperen: registeret
+    er koblingen, og en test som hopper over det ville ikke merket at den røk."""
+
+    def _natt(self, dager_siden, mannskap=None, rom=None):
+        from datetime import timedelta
+        from django.utils import timezone
+        natt = timezone.localtime().date() - timedelta(days=dager_siden)
+        return Overnatting.objects.create(rom=rom or self.rom,
+                                          mannskap=mannskap or self.p_hgsd, natt=natt)
+
+    def _purge(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('purge_old_logs', *args, stdout=ut)
+        return ut.getvalue()
+
+    def test_registrert_med_fristen_modulen_bruker(self):
+        from core.opprydding import all_handlers
+        handler = next(h for h in all_handlers() if h.slug == 'vaktliste')
+        self.assertEqual(handler.frist_dager(), overnatting.OPPBEVARING_DAGER)
+        self.assertEqual(overnatting.OPPBEVARING_DAGER, 30)
+
+    def test_eldre_enn_tretti_dager_slettes_rommene_staar(self):
+        gammel = self._natt(31)
+        grensen = self._natt(30, mannskap=self.p_karmoy)
+        ut = self._purge()
+        self.assertFalse(Overnatting.objects.filter(pk=gammel.pk).exists())
+        self.assertTrue(Overnatting.objects.filter(pk=grensen.pk).exists())
+        self.assertTrue(Overnattingsrom.objects.filter(pk=self.rom.pk).exists())
+        self.assertIn('Slettet 1 overnattingsplasseringer', ut)
+
+    def test_toerrkjoering_sletter_ingenting(self):
+        self._natt(40)
+        ut = self._purge('--dry-run')
+        self.assertEqual(Overnatting.objects.count(), 1)
+        self.assertIn('Ville slettet 1 overnattingsplasseringer', ut)
+
+    def test_ryddingen_skriver_ikke_navnene_inn_i_auditloggen(self):
+        """Slettesignalet logger navn, rom og natt. Fyrte det under ryddingen,
+        ville det bevart i 730 dager det som skulle bort etter 30."""
+        self._natt(31)
+        AuditLog.objects.all().delete()
+        self._purge()
+        self.assertFalse(AuditLog.objects.filter(
+            table_name='vaktliste_overnatting').exists())
+
+    def test_en_vanlig_fjerning_logges_fortsatt(self):
+        """Flagget skal bare gjelde ryddingen — og slippes etterpå."""
+        self._natt(31)
+        self._purge()
+        rad = self._natt(1)
+        overnatting.fjern(rad)
+        self.assertTrue(AuditLog.objects.filter(
+            table_name='vaktliste_overnatting', action='DELETE').exists())
+
+    def test_fristen_regnes_i_norsk_dato(self):
+        """23:30 UTC 31. okt. er 00:30 1. nov. i Norge (vintertid). Natta fra
+        1. okt. er da 31 dager gammel og skal ut; med `.date()` rett på
+        UTC-tidspunktet ville den stått én dag til."""
+        from datetime import datetime, timezone as dt_timezone
+        Overnatting.objects.create(rom=self.rom, mannskap=self.p_hgsd, natt=date(2026, 10, 1))
+        naa = datetime(2026, 10, 31, 23, 30, tzinfo=dt_timezone.utc)
+        self.assertEqual(overnatting.utlopte(naa).count(), 1)

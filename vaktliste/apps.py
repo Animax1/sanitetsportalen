@@ -36,3 +36,9 @@ class VaktlisteConfig(AppConfig):
         # `core/portalinnstillinger.py`.
         from .portalinnstillinger import register_handlers as register_innstillinger
         register_innstillinger()
+
+        # Lagringstiden for overnattingen (25. sep. 2026): plasseringene
+        # slettes 30 dager etter natta av `purge_old_logs`. Uten registreringen
+        # blir de liggende — og jobben er fortsatt grønn.
+        from .opprydding import register_handlers as register_opprydding
+        register_opprydding()

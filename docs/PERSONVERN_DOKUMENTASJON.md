@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 29. august 2026  
-**Versjon:** 1.10  
+**Siste oppdatering:** 25. september 2026  
+**Versjon:** 1.12  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -342,6 +342,33 @@ Registrene `Korps`, `Kompetanse` og `VaktRolle` er organisasjonsoppsett uten
 personopplysninger. Vaktposter (hvem som var på vakt hvor, med tider) kommer i
 modulens fase 2 og føres inn her da.
 
+#### Overnatting (`Overnattingsrom`, `Overnatting`) — 25. september 2026
+
+**Formålet er brannsikkerhet**: når brannalarmen går om natta, skal den som teller opp vite
+hvem som skal være i hvilket rom. Det er en opplysning om **hvor en navngitt frivillig
+befinner seg om natta** — vanlig personopplysning, ikke særlig kategori, men en som ikke
+skal ligge lenger enn formålet varer. Grunnlag: berettiget interesse (art. 6(1)(f)), og
+formålet er også i mannskapets egen interesse.
+
+| Felt | Innhold | Kategori |
+|---|---|---|
+| `Overnatting.mannskap` | Hvem (peker på mannskapsregisteret — bare registrerte frivillige, ingen fritekstnavn) | Vanlig personopplysning |
+| `Overnatting.rom` / `natt` | Hvilket rom, hvilken natt | Vanlig personopplysning (oppholdssted) |
+| `Overnattingsrom` (navn, plassering, kapasitet, merknad) | Rommet. Merknaden er om rommet («nødutgang: vindu»), **aldri om en person** — hjelpeteksten sier det | Ikke personopplysning |
+| `Vaktliste.brannrutine` | Stedets rutine ved alarm, skrevet av vaktleder | Ikke personopplysning |
+
+**Tilgang:** alle med lesetilgang til vaktlista ser alle rom og navn — den som teller opp
+trenger hele lista. **Telefonnummer vises bare** for egne korps eller for dem som ser alle
+korps, som ellers i modulen.
+
+**Lagringstid:** plasseringene slettes **30 dager etter natta**, automatisk (se A.9).
+Rommene blir stående. **To steder lever opplysningen lenger, og det er bevisst:**
+revisjonsloggen har en rad for hver plassering som ble opprettet, flyttet eller fjernet av
+en person (hvem gjorde det, og hvem det gjaldt), med revisjonsloggens frist på 730 dager —
+«hvem flyttet Per ut av rom 2B» er nettopp det man leter etter når opptellingen ikke
+stemte. Og modulbackupen følger backupfristene. **Selve ryddingen skriver ingenting i
+revisjonsloggen** — ellers ville den bevart i to år det som skulle bort etter 30 dager.
+
 ### KO-loggen (`ko.Logglinje`)
 
 Hendelsesloggen i KO-modulen (KO pulje 2, 17. september 2026). Den dekker **det som skjer
@@ -454,6 +481,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Railway databasebackup | Styres av Railways plattformvilkår | Railway (databehandler) | Kun aktiv i den perioden abonnementet er oppgradert, ca. én måned i året |
 | Mannskapsregister (`Mannskap`) | Så lenge personen er aktiv frivillig; pensjoneres (`er_aktiv=False`) ved avgang og slettes manuelt når ingen vaktposter refererer | Manuell (admin) | Berettiget interesse opphører når personen slutter; historiske vaktposter (fase 2) krever PROTECT inntil arkivering |
 | Korps/kompetanse/rolle-registre (vaktliste) | Ingen fast grense | Manuell | Organisasjonsoppsett uten personopplysninger |
+| **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
@@ -672,7 +700,7 @@ Den gamle offline-modusen (lokal SQLite-kopi av pasientdata på en laptop) ble l
 
 | Aspekt | Beskrivelse |
 |---|---|
-| Vaktlista som fil på e-post | Én HTML-fil med navn, korps, rolle, skift, telefon og ISSI — ikke e-post, notat eller merknad. Sendes ukryptert til en fast mottakerliste satt av global admin, ved «Sett i drift», på knapp og på intervall mens lista er i drift. Hver utsending logges (hvem, når, hvilke adresser). Fila sier selv «slett etter vakta». Vurdering: alminnelige personopplysninger, se `docs/BESLUTNING_VAKTLISTE.md` §12 |
+| Vaktlista som fil på e-post | Én HTML-fil med navn, korps, rolle, skift, telefon og ISSI — ikke e-post, notat eller merknad. Fra 25. sep. 2026 også **brannlista**: hvem som sover i hvilket rom per natt, med telefon. Sendes ukryptert til en fast mottakerliste satt av global admin, ved «Sett i drift», på knapp og på intervall mens lista er i drift. Hver utsending logges (hvem, når, hvilke adresser). Fila sier selv «slett etter vakta». Vurdering: alminnelige personopplysninger, se `docs/BESLUTNING_VAKTLISTE.md` §12 |
 | Offline drift på drifts-PC-en | Nettleseren holder siden og siste vaktliste lokalt (service worker). Møtt/av vakt legges i kø når serveren ikke svarer og sendes når den svarer igjen. Kopien inneholder de samme opplysningene som fila, i nettleserens cache på den PC-en |
 | Pasientdata | Ingen lokal kopi. Ved bortfall føres pasienter på papir/Excel etter organisasjonens rutine |
 
@@ -1119,9 +1147,15 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.11 – sist oppdatert 14. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.12 – sist oppdatert 25. september 2026*
 
 **Endringslogg:**
+
+- **v1.12 (25.09.2026):** **A.6:** ny underseksjon for overnatting i vaktlista — hvem
+  som sover i hvilket rom per natt, for brannsikkerheten. **A.9:** plasseringene slettes
+  30 dager etter natta av `purge_old_logs`, uten å skrive navnene inn i revisjonsloggen.
+  Vaktlista som fil på e-post inneholder nå også brannlista. Versjonshodet sto på 1.10
+  mens endringsloggen var på 1.11; rettet.
 
 - **v1.11 (14.09.2026):** **Gjennomgang mot faktisk kode, del av dokumentrunden.** Tre
   materielle rettelser og ett dokumentert hull.

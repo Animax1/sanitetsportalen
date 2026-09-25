@@ -4,7 +4,8 @@ Rydder:
   - ``AuditLog`` og ``LoginEvent``  – standard 730 dager (2 år)
   - ``core.Notification``           – standard 30 dager
   - **modulenes egne fristdata** via ``core.opprydding``-registeret
-    (KO-loggen, 730 dager — se ``ko/opprydding.py``)
+    (KO-loggen, 730 dager — se ``ko/opprydding.py``; overnattingsplasseringene
+    i vaktlista, 30 dager etter natta — se ``vaktliste/opprydding.py``)
 
 Kjøres som:
   python manage.py purge_old_logs                      # bruk standardgrensene

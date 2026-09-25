@@ -398,6 +398,13 @@ def overnatting_post_save(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Overnatting)
 def overnatting_post_delete(sender, instance, **kwargs):
+    # Lagringstiden som løper ut er ikke en handling noen gjorde, og en rad per
+    # sletting ville skrevet navn, rom og natt inn i en logg med 730 dagers
+    # lagringstid — altså bevart det ryddingen skal fjerne. Se
+    # `overnatting.slett_utlopte()`.
+    from .overnatting import rydder_naa
+    if rydder_naa():
+        return
     _logg_slettet(instance, OVERNATTING_TABELLNAVN, _beskriv_overnatting(instance))
 
 

@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Overnatting: plasseringene slettes 30 dager etter natta, og personvernprotokollen  `#vaktliste` `#personvern`
+
+André valgte «A» av tre: hvem som sov hvor har ingen verdi etter vakta, og fila sa
+allerede «slett etter vakta». **Plasseringene slettes 30 dager etter natta** av
+`purge_old_logs`, gjennom `core/opprydding.py` (`vaktliste/opprydding.py`). Rommene står,
+så de kan kopieres til neste år. Fristen regnes **per natt i norsk dato**, ikke fra vaktas
+slutt — da virker den også når planlagt slutt mangler.
+
+**Fella som ble unngått:** slettesignalet auditlogger hver plassering med navn, rom og
+natt. En vanlig `delete()` i ryddingen ville skrevet nøyaktig det som skulle bort inn i
+revisjonsloggen, som har 730 dagers lagringstid. `slett_utlopte()` setter et flagg
+(`ContextVar`) som får signalet til å tie; antallet står i cron-jobbens kjøringslogg, uten
+navn. En vanlig fjerning av en person logges som før.
+
+**Personvernprotokollen, v1.12:** A.6 har fått en underseksjon for overnatting (felter,
+kategori, tilgang, og at revisjonsloggen og backupen bevisst lever lenger), A.9 en rad for
+lagringstiden, og raden om fila på e-post nevner brannlista. **Dette skulle vært med i
+leveransen av overnattingen** — det ble oppdaget ved gjennomgangen etterpå. Versjonshodet
+sto på 1.10 mens endringsloggen var på 1.11; rettet.
+
+**Tester:** seks nye i `LagringstidenTests`, gjennom kommandoen og ikke hjelperen —
+grensen på 30/31 dager, tørrkjøring, at ryddingen ikke skriver i auditloggen, at flagget
+slippes etterpå, og at fristen regnes i norsk dato (23:30 UTC er neste dag i Norge).
+**Mutasjonstesting:** 9 mutanter — grensen, fristen, datoen, flagget satt og sluppet,
+slettingen, signalets sjekk, registreringen i `apps.ready()` og tørrkjøringen. Alle drept.
+Datomutanten ville overlevd uten testen med et tidspunkt etter midnatt: testene går på
+dagtid, der UTC og norsk dato er like.
+
 ## 2026-09-25 — Staging-grenen heter `staging`, ikke `rollemodell`  `#drift` `#deploy`
 
 André ga grenen nytt navn i GitHub og byttet grenen staging-tjenesten deployer fra i
