@@ -9,7 +9,7 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 André: «Okei kan du skrive det viktigste i runbooken for meg?» og «helt ærlig jeg vet ikke om
 dette er fra prod elelr staging».
 
-**Første avlesning** (ukjent miljø, tellerne aldri nullstilt — `stats_reset` tom): **320
+**Første avlesning** (**staging** — bekreftet etterpå med `railway status`; tellerne aldri nullstilt, `stats_reset` tom): **320
 indekser**, alle fremmednøkler og unike felt dekket, og sammensatte indekser på de varme
 stiene (`ko_logg_vakt_id_idx`, `oppdrag_vakt_status_idx`, `core_notif_user_read_idx`).
 Største tabell `ko_logglinje` med 377 rader, så Postgres leser alt rad for rad med vilje.

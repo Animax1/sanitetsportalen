@@ -142,8 +142,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [ ] **Databasen før og etter neste vakt — runbook §8a.** Før: kjør `railway status`
       (bekreft *production*), så `SELECT pg_stat_reset();` i psql (§1c steg 6). Etter,
       før arkiveringen: steg 3 og 4 i §8a, og send utskriften til Claude. Første
-      avlesning 25. sep. 2026 viste ingen manglende indekser, men tellerne var aldri
-      nullstilt og miljøet ikke bekreftet — derfor en ny runde med ekte vakttall.
+      avlesning 25. sep. 2026 var fra **staging** og viste ingen manglende indekser;
+      bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
 ## Pågående / neste
 

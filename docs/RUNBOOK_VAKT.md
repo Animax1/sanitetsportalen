@@ -521,7 +521,7 @@ SELECT relname AS tabell, indexrelname AS indeks, idx_scan, pg_size_pretty(pg_re
 - **Ubrukte indekser fjernes ikke på dette grunnlaget alene** — noen brukes bare av
   nattjobben eller arkiveringen, og de koster noen kB hver.
 
-**Første avlesning, 25. sep. 2026** (miljøet ikke bekreftet, tellerne aldri nullstilt):
+**Første avlesning, 25. sep. 2026 — staging** (tellerne aldri nullstilt):
 320 indekser, alle fremmednøkler og unike felt dekket, største tabell 377 rader. Ingen
 indeks mangler; de ubrukte ligger på tabeller som ikke søkes på de kolonnene.
 `pg_stat_statements` er ikke slått på, og trengs ikke.
