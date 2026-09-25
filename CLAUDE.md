@@ -167,7 +167,7 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `CLAUDE.md` (denne) | overalt | Det som gjelder alle moduler — se overskriftene |
 | `patients/CLAUDE.md` | `patients/` | API-mønsteret og viewdelingen |
 | `oppdrag/CLAUDE.md` | `oppdrag/` | Statusmaskinen, verdimengdene, bilens utganger, historikk mot arkiv |
-| `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, pausene, offline |
+| `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, pausene, overnattingen, offline |
 | `templates/vaktliste/CLAUDE.md` | `templates/vaktliste/` | Fanene, ressurskortene, regnearket, tidsfeltene, JS-filene |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
 | `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
@@ -729,7 +729,7 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-32 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
+33 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
 `/oppdrag/`.
 
@@ -768,7 +768,7 @@ håndhever det på cellebredden.
 | `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `templates/oppdrag/CLAUDE.md` |
-| `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
+| `vaktliste-*.js` (sju) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 

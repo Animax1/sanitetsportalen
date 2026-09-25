@@ -20,12 +20,18 @@
   td.tall { font-variant-numeric: tabular-nums; white-space: nowrap; }
   tr.ledig td { color: #7b8499; font-style: italic; }
   .tom { color: #7b8499; }
+  .brann h2 { border-bottom-color: #b3261e; }
+  .rutine { margin: 8px 0; padding: 8px 12px; border: 2px solid #b3261e; font-weight: 600; }
+  .rom { margin: 12px 0 2px; }
+  td.hake, th.hake { width: 2rem; text-align: center; }
   @media print {
     body { padding: 0; }
     h2 { break-after: avoid; }
     h3 { break-after: avoid; }
     tr { break-inside: avoid; }
     .merk { border-color: #000; background: none; color: #000; }
+    .brann { break-before: page; }
+    .rutine { border-color: #000; }
   }
 </style>
 </head>
@@ -58,5 +64,31 @@
 {% empty %}
 <p class="tom">Ingen er satt opp på vakta.</p>
 {% endfor %}
+{% if brannliste %}
+<section class="brann">
+<h2>Brannliste – hvem sover hvor</h2>
+{% if brannrutine %}<p class="rutine">{{ brannrutine|linebreaksbr }}</p>
+{% endif %}{% for n in brannliste %}
+<h3>{{ n.tittel }} <small>· {{ n.antall }} overnatter{% if n.paa_vakt %} · {{ n.paa_vakt }} på vakt · {{ n.inne }} skal være inne{% endif %}</small></h3>
+{% for r in n.rom %}
+<p class="rom"><strong>{{ r.navn }}</strong>{% if r.plassering %} · {{ r.plassering }}{% endif %} · {{ r.antall }}{% if r.kapasitet %} av {{ r.kapasitet }}{% endif %}{% if r.merknad %}<br><span class="meta">{{ r.merknad }}</span>{% endif %}</p>
+<table>
+  <thead><tr><th class="hake">✓</th><th>Navn</th><th>Korps</th><th>Telefon</th><th>På vakt</th></tr></thead>
+  <tbody>
+  {% for p in r.folk %}
+    <tr>
+      <td class="hake">☐</td>
+      <td>{{ p.navn }}</td>
+      <td>{{ p.korps }}</td>
+      <td class="tall">{{ p.telefon|default:"—" }}</td>
+      <td>{{ p.paa_vakt }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+{% endfor %}
+</section>
+{% endif %}
 </body>
 </html>

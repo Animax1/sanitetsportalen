@@ -936,7 +936,7 @@ class FanenHeterTimeoversiktTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-            (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad',
+            (VAKTLISTE_JS, ('tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad',
                             '_mannskapsfane', 'iDrift', '_tilstede',
                             '_ikkePlassert', '_grupperMedRessurser',
                             '_ressurserIGruppe', '_posterFor', 'kanLede', '_erAdmin', '_nivaa', '_mittKorpsId')),
@@ -952,6 +952,7 @@ class FanenHeterTimeoversiktTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt'; globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede'; globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MITT_KORPS = 'mitt-korps';
             globalThis.belastning = null; globalThis.register = null;
@@ -1002,7 +1003,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
     står om hverandre, så dette måtte rettes før utseendet ga mening.
     """
 
-    FUNKSJONER = ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
+    FUNKSJONER = ('tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
                   'iDrift', '_tilstede', '_ikkePlassert', '_grupperMedRessurser',
                   '_ressurserIGruppe', '_posterFor', 'kanLede', '_erAdmin',
                   '_nivaa', '_mittKorpsId', '_synligePoster')
@@ -1028,6 +1029,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
             globalThis.TILSTEDE='tilstede'; globalThis.BELASTNING='belastning';
             globalThis.PLANLEGGER='planlegger'; globalThis.IKKE_PLASSERT='ikke-plassert';
             globalThis.MITT_KORPS='mitt-korps';
+            globalThis.OVERNATTING='overnatting'; globalThis.overnattingNatt=null;
             globalThis.belastning=null; globalThis.register=null;
             globalThis.utskriftDag=null; globalThis.korpsfilter=null;
             globalThis.aktivListe = {{
@@ -1067,7 +1069,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
         self.assertEqual(rekke, [
             'Oversikt', 'Mannskap',
             '│', 'Ambulanse', 'Lag', 'Ny ressurs', '│',
-            'Mitt korps', 'Timeoversikt', 'Planlegger', 'Ikke plassert'])
+            'Mitt korps', 'Overnatting', 'Timeoversikt', 'Planlegger', 'Ikke plassert'])
 
     def test_bare_gruppefanene_baerer_gruppeklassen(self):
         """Utseendet André ba om. «Ny ressurs» hører til bolken og bærer den
@@ -1088,6 +1090,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
             globalThis.MANNSKAP='mannskap'; globalThis.TILSTEDE='tilstede';
             globalThis.BELASTNING='belastning'; globalThis.PLANLEGGER='planlegger';
             globalThis.IKKE_PLASSERT='ikke-plassert'; globalThis.MITT_KORPS='mitt-korps';
+            globalThis.OVERNATTING='overnatting'; globalThis.overnattingNatt=null;
             globalThis.belastning=null; globalThis.register=null;
             globalThis.utskriftDag=null; globalThis.korpsfilter=null;
             globalThis.aktivListe = {

@@ -750,6 +750,105 @@
     </div>
   </div>
 </div>
+{% comment %}
+  Overnatting (25. sep. 2026): rommene er lederens, plasseringen følger
+  personens korps, og brannrutinen er lederens. Byggerne og handlingene står i
+  `vaktliste-overnatting.js`.
+{% endcomment %}
+<div class="modal fade" id="romModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rom-tittel">Nytt rom</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label" for="rom-navn">Navn</label>
+          <input type="text" id="rom-navn" class="form-control" maxlength="80"
+                 placeholder="Klasserom 2B">
+        </div>
+        <div class="mb-2">
+          <label class="form-label" for="rom-plassering">Plassering</label>
+          <input type="text" id="rom-plassering" class="form-control" maxlength="120"
+                 placeholder="Skolen, 2. etasje">
+        </div>
+        <div class="mb-2">
+          <label class="form-label" for="rom-kapasitet">Kapasitet</label>
+          <input type="number" id="rom-kapasitet" class="form-control" min="1" max="500"
+                 inputmode="numeric" placeholder="Tomt = ikke satt">
+          <div class="form-text">Høyst så mange skal sove her. Portalen varsler, men sperrer ikke.</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" for="rom-merknad">Merknad om rommet</label>
+          <input type="text" id="rom-merknad" class="form-control" maxlength="200"
+                 placeholder="Nødutgang: vindu mot gården">
+          <div class="form-text">Om rommet — ikke om personene som sover der.</div>
+        </div>
+        <div id="rom-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger me-auto d-none" id="rom-slett-knapp"
+                data-action="slettRom">Fjern rommet</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="rom-knapp"
+                data-action="lagreRom">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="plasserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="plasser-tittel">Plasser</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label" for="plasser-mannskap">Mannskap</label>
+          <select id="plasser-mannskap" class="form-select"></select>
+        </div>
+        <div class="mb-2">
+          <div class="form-label">Netter</div>
+          <div id="plasser-netter"></div>
+        </div>
+        <div id="plasser-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-warning me-auto d-none" id="plasser-flytt"
+                data-action="lagrePlassering" data-arg="ja">Flytt hit</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="plasser-knapp"
+                data-action="lagrePlassering">Plasser</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="brannrutineModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Brannrutine</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="brannrutine-tekst">Står øverst på brannlista</label>
+        <textarea id="brannrutine-tekst" class="form-control" rows="5" maxlength="2000"
+                  placeholder="Samleplass ved alarm: parkeringsplassen nord. Nattevakta ringer 110 og teller opp."></textarea>
+        <div id="brannrutine-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="brannrutine-knapp"
+                data-action="lagreBrannrutine">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="nyVaktpostModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1080,5 +1179,6 @@ deler.
 <script src="{% static 'js/vaktliste-oversikt.js' %}"></script>
 <script src="{% static 'js/vaktliste-handlinger.js' %}"></script>
 <script src="{% static 'js/vaktliste-offline.js' %}"></script>
+<script src="{% static 'js/vaktliste-overnatting.js' %}"></script>
 <script src="{% static 'js/vaktliste-register.js' %}"></script>
 {% endblock %}

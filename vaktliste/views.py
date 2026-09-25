@@ -56,8 +56,9 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.ratelimit import rate_limit
 
-from . import choices, fil, pauser, services
-from .models import (Belastningsgrenser, Korps, Mannskap, Pause, Ressurs, Utsending,
+from . import choices, fil, overnatting, pauser, services
+from .models import (Belastningsgrenser, Korps, Mannskap, Overnatting, Overnattingsrom,
+                     Pause, Ressurs, Utsending,
                      Ressursgruppe, Ressursrolle, Vaktliste, Vaktpost)
 
 
@@ -427,6 +428,14 @@ def vaktliste_detalj_view(request, pk):
                 if timetak < 0:
                     return _feil('Timetaket kan ikke være negativt.')
 
+        # Brannrutinen (25. sep. 2026) står øverst på brannlista. Lederens,
+        # som resten av det som gjelder hele vakta.
+        if 'brannrutine' in data:
+            brannrutine = str(data.get('brannrutine') or '').strip()
+            if len(brannrutine) > overnatting.MAKS_BRANNRUTINE:
+                return _feil(f'Brannrutinen kan være høyst '
+                             f'{overnatting.MAKS_BRANNRUTINE} tegn.')
+
         with transaction.atomic():
             if 'startet' in data:
                 vl.vakt.startet = start
@@ -441,6 +450,9 @@ def vaktliste_detalj_view(request, pk):
             if 'timetak' in data:
                 vl.timetak = timetak
                 felter.append('timetak')
+            if 'brannrutine' in data:
+                vl.brannrutine = brannrutine
+                felter.append('brannrutine')
             if felter:
                 vl.save(update_fields=felter)
 
@@ -469,6 +481,11 @@ def vaktliste_detalj_view(request, pk):
         # og ressursene er infrastruktur som sendes alle.
         'pauser': [pauser.til_dict(p) for p in
                    Pause.objects.filter(ressurs__vaktliste=vl).order_by('fra', 'id')],
+        # **Overnattingen sendes alle, uten korpsfilter** (André, 25. sep.
+        # 2026): brannlista er hele lista, ellers stemmer ikke opptellingen.
+        # Telefonen følger korpsfilteret — se `overnatting.vis_telefon`. Står
+        # i hovedsvaret så den følger med i offline-kopien.
+        'overnatting': overnatting.data_for(vl, request.user),
         'korps': [
             {'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn}
             for k in Korps.objects.filter(er_aktiv=True)
@@ -1444,6 +1461,109 @@ def pause_detalj_view(request, pk):
     except pauser.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok', 'data': pauser.til_dict(pause)})
+
+
+# ── Overnatting (25. sep. 2026) ─────────────────────────────────────────────
+#
+# Reglene står i `overnatting.py`. Tre terskler: rommene er lederens
+# (`kan_sette_opp`), å plassere en person følger personens korps
+# (`kan_plassere`), og å se lista er `les` — som hele siden.
+
+def _svar_rom(rom):
+    return JsonResponse({'status': 'ok', 'data': overnatting.rom_til_dict(rom)})
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:overnattingsrom', rate='60/m', method='POST')
+def overnattingsrom_view(request, pk):
+    """Nytt rom på en vaktliste. Lederens, som ressursene."""
+    if not overnatting.kan_sette_opp(request.user):
+        return _nektet('Rommene settes opp av den som setter opp vakta.')
+    vl = Vaktliste.objects.select_related('vakt').filter(pk=pk).first()
+    if vl is None:
+        return _feil('Vaktliste ikke funnet', status=404)
+    try:
+        rom = overnatting.lagre_rom(vl, _json_body(request))
+    except overnatting.Ugyldig as e:
+        return _feil(str(e))
+    svar = _svar_rom(rom)
+    svar.status_code = 201
+    return svar
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:overnattingsrom-skriv', rate='120/m', method=['PUT', 'DELETE'])
+def overnattingsrom_detalj_view(request, pk):
+    """Endre eller fjern et rom.
+
+    **DELETE krever `{"confirm": true}`**, som en ressurs: plasseringene går
+    med rommet, og en brannliste som mister et rom uten at noen mente det er
+    verre enn en som mangler et.
+    """
+    if not overnatting.kan_sette_opp(request.user):
+        return _nektet('Rommene settes opp av den som setter opp vakta.')
+    rom = Overnattingsrom.objects.select_related('vaktliste').filter(pk=pk).first()
+    if rom is None:
+        return _feil('Rommet finnes ikke', status=404)
+    data = _json_body(request)
+    if request.method == 'DELETE':
+        if not data.get('confirm'):
+            return _feil('Bekreftelse mangler. Send {"confirm": true}.')
+        antall = overnatting.slett_rom(rom)
+        return JsonResponse({'status': 'ok', 'data': {'fjernet_plasseringer': antall}})
+    try:
+        rom = overnatting.lagre_rom(rom.vaktliste, data, rom=rom)
+    except overnatting.Ugyldig as e:
+        return _feil(str(e))
+    return _svar_rom(rom)
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:overnatting-plasser', rate='120/m', method='POST')
+def overnatting_plasser_view(request, pk):
+    """Legg en person i rommet, én eller flere netter.
+
+    `{"mannskap_id": 7, "netter": ["2026-09-12", ...], "flytt": false}`.
+    Sover hun et annet sted en av nettene, er svaret **409 med nettene** —
+    vinduet spør om hun skal flyttes, og sender da `flytt: true`.
+    """
+    rom = Overnattingsrom.objects.select_related('vaktliste__vakt').filter(pk=pk).first()
+    if rom is None:
+        return _feil('Rommet finnes ikke', status=404)
+    data = _json_body(request)
+    mannskap = Mannskap.objects.filter(pk=_int(data.get('mannskap_id'))).first()
+    if mannskap is None:
+        return _feil('Velg en person fra mannskapsregisteret.')
+    if not overnatting.kan_plassere(request.user, mannskap):
+        return _nektet('Du kan bare plassere mannskap fra ditt eget korps.')
+    try:
+        rader = overnatting.plasser(rom, mannskap, data.get('netter'),
+                                    flytt=data.get('flytt') is True)
+    except overnatting.Konflikt as e:
+        return JsonResponse({'status': 'error', 'message': str(e), 'konflikt': e.netter},
+                            status=409)
+    except overnatting.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': [
+        {'id': o.pk, 'natt': o.natt.isoformat(), 'rom_id': o.rom_id} for o in rader]},
+        status=201)
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['DELETE'])
+@rate_limit(group='vaktliste:overnatting-fjern', rate='120/m', method='DELETE')
+def overnatting_detalj_view(request, pk):
+    """Ta en person ut av rommet én natt. Samme terskel som å plassere."""
+    rad = Overnatting.objects.select_related('mannskap').filter(pk=pk).first()
+    if rad is None:
+        return _feil('Plasseringen finnes ikke', status=404)
+    if not overnatting.kan_plassere(request.user, rad.mannskap):
+        return _nektet('Du kan bare flytte mannskap fra ditt eget korps.')
+    overnatting.fjern(rad)
+    return JsonResponse({'status': 'ok'})
 
 
 @modul_kreves('vaktliste', 'les', svar='json')

@@ -455,8 +455,9 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 
 - [ ] **Vurder om `vaktliste/CLAUDE.md` kan krympes — seksjon for seksjon.** Fila er
       strukturert (17. sep. 2026) og delt (23. sep.: flaten til
-      `templates/vaktliste/CLAUDE.md`), men ikke kortet ned; den er 43 843 tegn og står
-      fortsatt pinnet i `FOR_STORE_I_DAG`. Kutt var **ikke** riktig den dagen, og grunnen bør
+      `templates/vaktliste/CLAUDE.md`), men ikke kortet ned; den er 44 641 tegn og står
+      fortsatt pinnet i `FOR_STORE_I_DAG` — taket ble hevet 800 tegn 25. sep. for
+      overnattingen, med begrunnelsen i testen. Kutt var **ikke** riktig den dagen, og grunnen bør
       stå: hvert avsnitt bærer en regel *og* feilen som lærte oss den, og det er
       begrunnelsen som får reglene til å feste seg. En kortere fil med dårligere
       dokumentasjon er ikke en forbedring.
@@ -596,6 +597,20 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
       allerede står i A.2 med signert DPA.
 
 Fem åpne spørsmål til André står i §6 i notatet.
+
+### Vaktlista: overnatting — videre (25. sep. 2026)
+
+Overnattingen og brannlista er levert (se CHANGELOG 25. sep. 2026 og
+[`vaktliste/CLAUDE.md`](./vaktliste/CLAUDE.md)). To ting er bevisst holdt utenfor:
+
+- [ ] **Opptelling på mobil under alarm.** Avhuking per person på telefonen, med tall
+      som går ned mot null. Valgt bort for nå — André: «vi printer ut», og papiret er ofte
+      raskere enn en skjerm i et trappeoppgang. Tas opp igjen hvis en ekte vakt ber om
+      det; da må den virke offline, og køen i `vaktliste-offline.js` er stedet å starte.
+- [ ] **«Kopier rom fra forrige vakt».** Rommene er per vaktliste, så samme skole hvert
+      år betyr at rommene skrives inn på nytt. `services.kopier_oppsett()` kopierer alt
+      ressursene; rommene kan følge samme vei — **aldri** plasseringene, av samme grunn
+      som den aldri tar personene.
 
 ### Kartmodul med værlag — se [`docs/FORSLAG_KARTMODUL.md`](./docs/FORSLAG_KARTMODUL.md)
 

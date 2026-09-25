@@ -267,6 +267,11 @@ function tegnFaner() {
     });
   }
 
+  // **«Overnatting»** (25. sep. 2026): hvem sover hvor, for brannsikkerheten.
+  // Om fanen finnes, avgjøres i `_overnattingsfane()`.
+  const natteFane = _overnattingsfane();
+  if (natteFane) bak.push(natteFane);
+
   // **Fanen heter «Timeoversikt»** (André, 16. sep. 2026). Den het
   // «Planlegging», og det navnet var opptatt: `Vaktliste.status` har verdien
   // «Planlegging» ved siden av «I drift», så merket øverst på siden og fanen
@@ -366,6 +371,7 @@ function tegnPanel() {
   if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
   if (aktivFane === MITT_KORPS) { el.innerHTML = mkMittKorps(); return; }
+  if (aktivFane === OVERNATTING) { el.innerHTML = mkOvernatting(); return; }
 
   const gruppe = (aktivListe.grupper || [])
     .find((g) => String(g.id) === String(aktivFane));

@@ -51,6 +51,17 @@ urlpatterns = [
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 
+    # Overnatting (25. sep. 2026): rommene under vaktlista, plasseringene
+    # under rommet. Brannrutinen står på vaktlista og settes i dens PUT.
+    path('api/vaktlister/<int:pk>/overnattingsrom/', views.overnattingsrom_view,
+         name='vaktliste_api_overnattingsrom'),
+    path('api/overnattingsrom/<int:pk>/', views.overnattingsrom_detalj_view,
+         name='vaktliste_api_overnattingsrom_detalj'),
+    path('api/overnattingsrom/<int:pk>/plasser/', views.overnatting_plasser_view,
+         name='vaktliste_api_overnatting_plasser'),
+    path('api/overnattinger/<int:pk>/', views.overnatting_detalj_view,
+         name='vaktliste_api_overnatting_detalj'),
+
     # Koblingen til /oppdrag (fase 6). **Vaktlista eier endepunktet**;
     # sentralbordet henter det fra nettleseren. Oppdragsmodulen importerer
     # ikke vaktlista — se §6 i beslutningsnotatet.

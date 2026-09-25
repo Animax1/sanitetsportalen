@@ -1,4 +1,5 @@
-"""Audit-logging for vaktlistemodulen: `Mannskap`, `Vaktpost`, `Ressurs` og `Vaktliste`.
+"""Audit-logging for vaktlistemodulen: `Mannskap`, `Vaktpost`, `Ressurs`, `Vaktliste`,
+`Pause` og overnattingen.
 
 Samme mønster som ``oppdrag/signals.py``, med samme unntak av samme grunn:
 `notat` er fritekst, og fritekst er der helseopplysninger havner når det ikke
@@ -29,7 +30,8 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import Mannskap, Pause, Ressurs, Utsending, Vaktliste, Vaktpost
+from .models import (Mannskap, Overnatting, Overnattingsrom, Pause, Ressurs, Utsending,
+                     Vaktliste, Vaktpost)
 
 TABELLNAVN = 'vaktliste_mannskap'
 
@@ -170,7 +172,10 @@ def mannskap_post_delete(sender, instance, **kwargs):
 # navnet på vakta (det bor på `core.Vakt`).
 
 VAKTLISTE_TABELLNAVN = 'vaktliste_vaktliste'
-VAKTLISTE_FELTER = ('status', 'satt_i_drift_at', 'satt_i_drift_av', 'planlagt_slutt', 'arkivert_at')
+# `brannrutine` (25. sep. 2026) er stedets rutine, ikke noe om en person, og
+# logges med verdi: «hvem flyttet samleplassen» er et spørsmål man stiller.
+VAKTLISTE_FELTER = ('status', 'satt_i_drift_at', 'satt_i_drift_av', 'planlagt_slutt', 'arkivert_at',
+                    'brannrutine')
 
 
 @receiver(pre_save, sender=Vaktliste)
@@ -342,6 +347,58 @@ def pause_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Pause)
 def pause_post_delete(sender, instance, **kwargs):
     _logg_slettet(instance, PAUSE_TABELLNAVN, _beskriv_pause(instance))
+
+
+# ── Overnattingen (25. sep. 2026) ────────────────────────────────────────────
+#
+# Brannlista er det man teller hoder etter, og «hvem flyttet Per ut av 2B»
+# er det man leter etter når tallet ikke stemmer — samme grunn som stemplene.
+# Rommets `merknad` handler om rommet (nødutgang), ikke om en person, og
+# logges med verdi. Sletting av et rom CASCADE-r plasseringene, og hver av dem
+# får sin egen rad, som skiftene under en ressurs.
+
+OVERNATTINGSROM_TABELLNAVN = 'vaktliste_overnattingsrom'
+OVERNATTING_TABELLNAVN = 'vaktliste_overnatting'
+
+
+def _beskriv_overnatting(o) -> str:
+    return f'{o.mannskap.navn} i {o.rom.navn} natt fra {o.natt:%d.%m.%Y}'
+
+
+@receiver(pre_save, sender=Overnattingsrom)
+@ikke_under_loaddata
+def overnattingsrom_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Overnattingsrom, instance, OVERNATTINGSROM_TABELLNAVN)
+
+
+@receiver(post_save, sender=Overnattingsrom)
+@ikke_under_loaddata
+def overnattingsrom_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, OVERNATTINGSROM_TABELLNAVN, instance.navn)
+
+
+@receiver(post_delete, sender=Overnattingsrom)
+def overnattingsrom_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, OVERNATTINGSROM_TABELLNAVN, instance.navn)
+
+
+@receiver(pre_save, sender=Overnatting)
+@ikke_under_loaddata
+def overnatting_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Overnatting, instance, OVERNATTING_TABELLNAVN)
+
+
+@receiver(post_save, sender=Overnatting)
+@ikke_under_loaddata
+def overnatting_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, OVERNATTING_TABELLNAVN, _beskriv_overnatting(instance))
+
+
+@receiver(post_delete, sender=Overnatting)
+def overnatting_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, OVERNATTING_TABELLNAVN, _beskriv_overnatting(instance))
 
 
 # ── Utsendinger av vaktlista som fil ─────────────────────────────────────────

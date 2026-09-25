@@ -121,6 +121,23 @@ Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
 | `vl-skjul-utskrift` når admin har skjult pausene, **og** når linja er tom | «Pauser: ingen» på papiret er en linje man må lese for å se at det ikke står noe |
 | Planleggeren: «Pause (min) etter (timer)», og et **nedtrekk** for forskjøvet/samtidig (`_planleggerPause`) | «Etter» skrives i timer og sendes i minutter (`_planleggerLinjeverdi`). En avkryssing ville sendt «on» uansett — delegeringen leser `value` |
 
+## Overnatting — skjermen og brannlista (25. sep. 2026)
+
+Reglene står i `vaktliste/CLAUDE.md`; her står flaten. Fila er
+`vaktliste-overnatting.js`, og dataene er `aktivListe.overnatting` fra hovedsvaret.
+
+| Valg | Hvorfor |
+|---|---|
+| **Fanen står i bakre bolk, foran «Timeoversikt»**, og finnes når det er rom — eller når brukeren er leder (`_overnattingsfane()`) | En fane som alltid er tom for den som bare leser, er en fane man slutter å se. Lederen må se den for å sette opp det første rommet |
+| **Natta velges med knapper, ikke et nedtrekk** (`_nattvelger`). Standard er natta vi er i, og før klokka tolv natta fra kvelden før (`overnattingStandardnatt`) | En vakt har to–tre netter; alle skal synes. Om morgenen er det fortsatt nattas liste nattevakta står med |
+| **Natta sies med morgenens dag**: «Natt til lørdag 03.10» (`overnattingNattTekst`), men lagres som kvelden (fredag) | Det er slik folk sier det. Lagringen følger `_dagnokkel()` |
+| **Brannlista tegnes i panelet, men vises bare på papiret** (`mkBrannliste`, `.vl-brannliste` i @media print). Skjermdelen er `d-print-none` | Samme utskriftsmekanikk som resten av siden. Én side per natt, avkryssing per person, rutinen i ramme øverst — og uten rutine en linje å skrive samleplassen på |
+| «Brannliste» skriver ut natta som vises; «Alle netter» alle (`skrivUtBrannliste`, `overnattingUtskrift`) | Å skrive ut arkene før vakta er det vanlige; om natta vil man ha ett ark |
+| **«Plasser» huker av alle vaktas netter**, og nedtrekket sier hvor personen alt sover den valgte natta | Samme seng hele vakta er det vanlige. 409 gir meldingen og en gul «Flytt hit» — aldri en stille flytting |
+| Telleren: **overnatter · på vakt · skal være inne** | «Skal være inne» er tallet man teller mot. Den som står på skift i natta er ikke i rommet |
+| «Har vakt dette døgnet, men ingen overnatting» står sammenslått nederst (`overnattingUtenSeng`) | Et hint, ikke en feil — mange sover hjemme. Døgnet er tolv til tolv rundt natta |
+| Knappene gates som serveren: rom og rutine på `kanLede()`, «Plasser» på `kanPlassereNoen()`, ✕ per person på `kanPlassereKorps()` | En knapp som fører til en vegg er verre enn ingen |
+
 ## Tabeller, tid og felter i grensesnittet
 
 - **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
@@ -195,7 +212,7 @@ Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
   den på en delt drifts-PC. Lagringen kaster i privat modus, så begge kallene står i
   `try/catch` — en glemt liste er en bagatell, en side som dør på oppstart er det ikke.
 
-## Frontend — seks filer, og hvor skjøtene går
+## Frontend — sju filer, og hvor skjøtene går
 
 Hva som lastes når står i rota; hva filene gjør står her. Siden var **én fil på 3 801
 linjer** til 14. sep. 2026. Uten bundler deler delene ett globalt navnerom, så delingen er
@@ -209,6 +226,7 @@ dupliseres, eller havner i utakt med `<script>`-rekkefølgen i malen.
 | `vaktliste-oversikt.js` | Oppsummeringene: bemanningskurvene, utskriftslista, belastningen, «Tilstede nå», «Mitt korps» |
 | `vaktliste-handlinger.js` | Det som skriver |
 | `vaktliste-offline.js` | Service worker og kopien |
+| `vaktliste-overnatting.js` | Fanen «Overnatting»: rommene, plasseringene og brannlista på papiret |
 | `vaktliste-register.js` | Mannskapsregisteret. **Sist** — `DOMContentLoaded`-kroken står her |
 
 **Skjøten mellom `tegning` og `oversikt` går mellom regnearket og oppsummeringene**

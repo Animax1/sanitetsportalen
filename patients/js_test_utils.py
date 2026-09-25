@@ -55,9 +55,9 @@ KO_JS = (
     JS_DIR / 'ko-plan.js',
     JS_DIR / 'ko.js',
 )
-#: **Vaktlistesiden er seks filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),
+#: **Vaktlistesiden er sju filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),
 #: og `vaktliste-oversikt.js` skilt ut fra tegningsfila 15. sep. 2026 da den
-#: passerte 1 800 linjer.
+#: passerte 1 800 linjer. `vaktliste-overnatting.js` kom 25. sep. 2026.
 #: Konstanten er derfor en tuppel, og `read_js()` skjøter dem sammen i
 #: lasterekkefølge — så alt som leste `VAKTLISTE_JS` før, leser det samme nå.
 #: Rekkefølgen er den samme som `<script>`-taggene i malen, og
@@ -68,6 +68,7 @@ VAKTLISTE_JS = (
     JS_DIR / 'vaktliste-oversikt.js',
     JS_DIR / 'vaktliste-handlinger.js',
     JS_DIR / 'vaktliste-offline.js',
+    JS_DIR / 'vaktliste-overnatting.js',
     JS_DIR / 'vaktliste-register.js',
 )
 

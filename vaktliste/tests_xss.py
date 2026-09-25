@@ -52,11 +52,34 @@ HTML_BUILDERS = (
     'mkIkkePlassert',
     # Pausene (23. sep. 2026): linja på ressurskortet og regelen i planleggeren.
     '_pauselinje', '_planleggerPause',
+    # Overnatting (25. sep. 2026): navn, rom, plassering og brannrutine er
+    # fritekst, og alt havner i `innerHTML` — også på brannlista.
+    'mkOvernatting', '_nattvelger', '_brannrutineboks', '_sengerad', '_romkort',
+    '_utenSengBolk', 'mkBrannliste', 'apnePlasser',
 )
 
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Overnatting (25. sep. 2026). Hver av disse er markup bygget i
+    # funksjonen selv, med navn, rom og tall escapet inni — eller fra en
+    # bygger som selv står i HTML_BUILDERS og skannes her.
+    '_nattvelger(o.netter, natt)': 'markup fra `_nattvelger`, som selv skannes her',
+    '_brannrutineboks(o.brannrutine)': 'markup fra `_brannrutineboks`, som selv skannes her',
+    '_utenSengBolk(natt)': 'markup fra `_utenSengBolk`, som selv skannes her',
+    'mkBrannliste(utskrift)': 'markup fra `mkBrannliste`, som selv skannes her',
+    'nyttRom': 'knapp bygget lokalt uten data, eller tom streng',
+    'flereNetter': 'knapp bygget lokalt uten data, eller tom streng',
+    'hint': 'hardkodet tekst fra en ternær, eller tom streng',
+    'rom': 'romkortene fra `_romkort`, eller seksjonene bygget lokalt med navnene escapet inni',
+    'fjern': 'knapp bygget lokalt, plasserings-id escapet inni',
+    'plassering': 'bygget lokalt, romplasseringen escapet inni',
+    'fyllMerke': 'hardkodet markup fra en ternær',
+    'plasser': 'knapp bygget lokalt, rom-id escapet inni',
+    'sted': 'bygget lokalt, romplasseringen escapet inni',
+    'rutine': 'bygget lokalt, brannrutinen escapet inni',
+    'tom': 'hardkodet markup, eller tom streng',
+    'ark': 'arkene bygget lokalt i `mkBrannliste`, alt escapet inni',
     # Pausene (23. sep. 2026). Markup bygget i funksjonene, med tidene og
     # id-ene escapet inni; forskyvningen er hardkodede attributter.
     'innhold': 'markup fra `_pauselinje`: pausene escapet inni, eller en fast tekst',
@@ -335,7 +358,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
                         '_posterPerGruppe', '_vaktensSpenn',
-                        'mkIkkePlassert', 'tegnFaner', 'kanPlanlegge', '_fanerad',
+                        'mkIkkePlassert', 'tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad',
                         '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
@@ -452,6 +475,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.belastning = null;
             globalThis.register = null;
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
@@ -480,6 +504,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.belastning = null;
             globalThis.register = null;
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
@@ -1900,7 +1925,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
+        (VAKTLISTE_JS, ('tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
                         '_mittKorpsId', '_synligePoster',
                         'iDrift', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_ressurserIGruppe',
@@ -1927,6 +1952,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
             "globalThis.belastning = null;\n"
             "globalThis.register = null;\n"
             "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
@@ -1993,7 +2019,7 @@ class FanenErGruppaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
+        (VAKTLISTE_JS, ('tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
                         'mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
@@ -2024,6 +2050,7 @@ class FanenErGruppaTests(SimpleTestCase):
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
             "globalThis.belastning = null;\n"
             "globalThis.register = null;\n")
 
@@ -2868,14 +2895,18 @@ class MannskapsfanenTests(SimpleTestCase):
              "globalThis.TILSTEDE = 'tilstede';\n"
              "globalThis.BELASTNING = 'belastning';\n"
              "globalThis.PLANLEGGER = 'planlegger';\n"
+             "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
              "globalThis.belastning = null;\n"
             "globalThis.BELASTNING = 'belastning';\n"
             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
             "globalThis.belastning = null;\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n"
             "globalThis.belastning = null;\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
@@ -4243,6 +4274,7 @@ class PlanleggerenTegnesMedOppsettetTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt';
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.TILSTEDE = 'tilstede';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MITT_KORPS = 'mitt-korps';
@@ -4610,6 +4642,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
             globalThis.MANNSKAP = 'mannskap';
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.aktivFane = 'oversikt';
             let hentet = 0;
             globalThis.lastBelastning = () => { hentet += 1; };
@@ -4641,6 +4674,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
             globalThis.MANNSKAP = 'mannskap';
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             globalThis.aktivFane = 'oversikt';
             let hentet = 0;
             globalThis.lastBelastning = () => { hentet += 1; };
@@ -4661,7 +4695,8 @@ class PlanleggingsfanenTests(SimpleTestCase):
     LASTLISTE_PREAMBLE = (
         'var aktivListe, belastning, aktivFane, korpsfilter;\n'
         "globalThis.BELASTNING = 'belastning';\n"
-        "globalThis.PLANLEGGER = 'planlegger';\n")
+        "globalThis.PLANLEGGER = 'planlegger';\n"
+        "globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;\n")
 
     def _lastListe(self, fane):
         return run_node(self.harness, f"""
@@ -4707,6 +4742,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
         ut = run_node(self.harness, self.VINDU + """
             globalThis.BELASTNING = 'belastning';
             globalThis.PLANLEGGER = 'planlegger';
+            globalThis.OVERNATTING = 'overnatting'; globalThis.overnattingNatt = null;
             assert(faneTrengerBelastning('belastning'), 'belastning');
             assert(faneTrengerBelastning('planlegger'), 'planlegger');
             assert(!faneTrengerBelastning('oversikt'), 'oversikt');

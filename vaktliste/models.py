@@ -475,6 +475,14 @@ class Vaktliste(BaseTimeStampedModel):
         verbose_name='Satt i drift av',
     )
     notat = models.TextField(blank=True, default='', verbose_name='Notat')
+    # **Brannrutinen står øverst på brannlista** (André, 25. sep. 2026:
+    # «tillat oss å skrive det inn selv som skriv leder»). Samleplass,
+    # hvem som ringer 110, hvor nøkkelen henger — det portalen ikke kan vite.
+    # Fritekst og ikke felter, fordi det som skal stå der er stedets rutine,
+    # og den har ikke samme form fra skole til skole.
+    brannrutine = models.TextField(
+        blank=True, default='', verbose_name='Brannrutine',
+        help_text='Står øverst på brannlista: samleplass og hva som gjøres ved alarm.')
 
     class Meta:
         verbose_name = 'Vaktliste'
@@ -810,6 +818,89 @@ class Pause(BaseTimeStampedModel):
 
     def __str__(self) -> str:
         return f'{self.ressurs.navn} · pause'
+
+
+class Overnattingsrom(BaseTimeStampedModel):
+    """Et rom der mannskap sover under vakta (André, 25. sep. 2026).
+
+    **Formålet er brannsikkerhet**: når alarmen går om natta, skal den som
+    teller opp vite hvem som skal være i hvilket rom. Derfor finnes rommet
+    per vaktliste og ikke i et felles register — hver vakt har sitt sted, og
+    et register over skoler og haller ville vært en ny sannhet om noe ingen
+    har bedt om å holde ved like.
+
+    `kapasitet` er taket stedet eller brannvesenet har satt. **Det varsler,
+    det sperrer ikke** — samme linje som timetaket: den som står med en
+    person til og ingen seng, må kunne føre det riktig og ta stilling.
+    """
+
+    vaktliste = models.ForeignKey(
+        Vaktliste, on_delete=models.CASCADE, related_name='overnattingsrom',
+        verbose_name='Vaktliste')
+    navn = models.CharField(max_length=80, verbose_name='Navn')
+    plassering = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Plassering',
+        help_text='Bygg og etasje — det brannvesenet spør om.')
+    kapasitet = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Kapasitet',
+        help_text='Høyst så mange skal sove her. Tom = ikke satt. Varsler, sperrer ikke.')
+    merknad = models.CharField(
+        max_length=200, blank=True, default='', verbose_name='Merknad',
+        help_text='F.eks. nødutgang. Om rommet, aldri om en person.')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Overnattingsrom'
+        verbose_name_plural = 'Overnattingsrom'
+        ordering = ['rekkefolge', 'id']
+        constraints = [
+            # To rom med samme navn på én brannliste er ett rom for mye: den
+            # som teller opp vet ikke hvilken dør hun skal til.
+            models.UniqueConstraint(
+                Lower('navn'), 'vaktliste', name='overnattingsrom_unikt_navn'),
+        ]
+
+    def __str__(self) -> str:
+        return self.navn
+
+
+class Overnatting(BaseTimeStampedModel):
+    """Én person sover i ett rom én natt.
+
+    **`natt` er datoen kvelden natta begynner** — natt til lørdag er fredag.
+    Samme regel som `_dagnokkel()` i vaktlista: det som går over midnatt,
+    hører til dagen det begynte.
+
+    **Én person, ett sted, per natt** — skranken under, og det er den som gjør
+    lista brukbar: står en person i to rom, stemmer ikke opptellingen i noen
+    av dem. Den gjelder på tvers av vaktlistene, med vilje, for ingen sover to
+    steder samme natt.
+
+    PROTECT på mannskapet, som på skiftene: en person som står på en
+    brannliste skal ikke kunne forsvinne fra den ved en sletting i registeret.
+    """
+
+    rom = models.ForeignKey(
+        Overnattingsrom, on_delete=models.CASCADE, related_name='overnattinger',
+        verbose_name='Rom')
+    mannskap = models.ForeignKey(
+        Mannskap, on_delete=models.PROTECT, related_name='overnattinger',
+        verbose_name='Mannskap')
+    natt = models.DateField(
+        verbose_name='Natt', help_text='Datoen kvelden natta begynner.')
+
+    class Meta:
+        verbose_name = 'Overnatting'
+        verbose_name_plural = 'Overnattinger'
+        ordering = ['natt', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['mannskap', 'natt'], name='overnatting_ett_sted_per_natt'),
+        ]
+        indexes = [models.Index(fields=['rom', 'natt'], name='overnatting_rom_natt_idx')]
+
+    def __str__(self) -> str:
+        return f'{self.mannskap.navn} i {self.rom.navn} natt fra {self.natt:%d.%m}'
 
 
 class Utsending(BaseTimeStampedModel):

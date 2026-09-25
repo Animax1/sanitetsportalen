@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **181 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **185 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -474,7 +474,7 @@ for sti, view in sorted(gaa(get_resolver())):
 |---|---|---|---|
 | `/pasienter/` | 17 | `patients/urls.py` | Pasient-CRUD, registre, arkiv, vaktstyring |
 | `/oppdrag/` | 32 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
-| `/vaktliste/` | 32 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, mannskap, drift, service worker |
+| `/vaktliste/` | 36 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
@@ -1527,7 +1527,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 32 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 33 filer i `static/js/`, fordelt
 på sju sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to
 grensesnittene under `/oppdrag/`.
 

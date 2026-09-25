@@ -97,6 +97,16 @@ const IKKE_PLASSERT = 'ikke-plassert';
 // «Mitt korps» (11. sep. 2026): plassene korpset har ansvar for, på tvers
 // av ressursene — sine tildelte, og de som er tildelt alle.
 const MITT_KORPS = 'mitt-korps';
+// «Overnatting» (25. sep. 2026): hvem sover hvor, for brannsikkerheten.
+// Byggerne står i `vaktliste-overnatting.js`.
+const OVERNATTING = 'overnatting';
+//: Natta fanen viser. `null` er «den naturlige» — i natt under vakta, ellers
+//: den første — se `overnattingStandardnatt()`. Ikke lagret: en sidelasting
+//: neste morgen skal åpne på natta som gjelder da.
+let overnattingNatt = null;
+//: 'natt' eller 'alle': hva brannlista på papiret tar med. Settes av
+//: `skrivUtBrannliste()` rett før utskriften og tilbake etterpå.
+let overnattingUtskrift = 'natt';
 
 // Register → hvordan det snakkes om og hvor det ligger.
 // `nyEtikett` er hele knappeteksten, ikke bare ordet: «korps» er intetkjønn

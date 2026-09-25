@@ -17,6 +17,7 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 | Ett skift er én rad | `Vaktpost`, med plan og faktisk i hvert sitt feltpar |
 | Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
 | Pausene | `vaktliste/pauser.py`, `vaktliste.Pause` |
+| Overnattingen og brannlista | `vaktliste/overnatting.py`, `Overnattingsrom`, `Overnatting`, `Vaktliste.brannrutine` |
 
 **Flaten — fanene, ressurskortene, regnearket, tidsfeltene og JS-filene — står i
 `templates/vaktliste/CLAUDE.md`** (delt 23. sep. 2026).
@@ -560,6 +561,17 @@ planleggeren nå**.
 
 **KO leser pausene uten å kopiere dem** — `ko.tavle.effektive_pauser`, retningen `ko` →
 `vaktliste`. Se `ko/CLAUDE.md`.
+
+## Overnatting — hvem sover hvor, for brannsikkerheten (25. sep. 2026)
+
+`vaktliste/overnatting.py`; reglene og Andrés svar står i docstringene der. Det man må vite
+før man rører *annen* kode:
+
+- **Én person, ett sted, per natt — også på tvers av vaktlistene** (`(mannskap, natt)` er
+  unik). En seng på en annen vakt flyttes aldri herfra.
+- **Alle med `les` ser hele lista, men telefonen følger korpsfilteret** (`vis_telefon`).
+- **Dataene står i vaktlistas hovedsvar** (`data_for`), så de følger offline-kopien.
+- **Brannlista står i fila på e-post**, og `fil.signatur()` tar den med bare når den finnes.
 
 ## Drift-reserven: fil på e-post og offline
 

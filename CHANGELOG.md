@@ -4,6 +4,80 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Overnatting i vaktlista: hvem sover hvor, og brannlista på papir  `#vaktliste` `#brannsikkerhet`
+
+André: «Vi skal jobbe med /vaktliste. Jeg vil ha en overnatting-del hvor vi registrerer
+hvilke mannskap som skal sove der og hvor. Det må gå an å sette dette opp samt romnavn.
+Dens funksjon er for brannsikkerhet.» Skissert og planlagt før koden; svarene samme dag:
+**per natt**, **bare mannskap fra registeret**, tilgangen som foreslått, **ingen
+mobilopptelling nå** («vi printer ut», står som idé i TODO), og brannrutinen skal lederen
+kunne skrive selv.
+
+**Ny fane «Overnatting»** på `/vaktliste/` (bakre bolk, foran «Timeoversikt»):
+- **Rom** med navn, plassering (bygg/etasje), kapasitet og merknad (nødutgang). Lederens
+  (`skriv_leder`). Kapasiteten **varsler** («Fullt», gult «Over kapasiteten»), sperrer ikke.
+- **Plassering per natt.** «Natt til lørdag 03.10» — lagret som kvelden (fredag), samme
+  regel som `_dagnokkel()`. Nettene er de der 22:00–06:00 overlapper vaktas spenn; en
+  dagvakt har ingen, og fanen sier at vaktas lengde må settes.
+- **Én person, ett sted, per natt** — unik skranke `(mannskap, natt)`, også på tvers av
+  vaktlister. Sover personen et annet sted, svarer serveren **409** og vinduet tilbyr
+  «Flytt hit»; en seng på en annen vakt flyttes aldri herfra. `plasser()` er én
+  transaksjon — en kollisjon midt i skrivingen etterlater ingenting.
+- **«På vakt i natt»**: den som står på et skift på lista som overlapper natta, merkes, og
+  telleren sier **overnatter · på vakt · skal være inne**. Avmeldte skift teller ikke.
+- **Brannrutinen** (`Vaktliste.brannrutine`) står øverst i fanen og på lista — samleplass og
+  hva som gjøres ved alarm. Lederens, satt i vaktlistas PUT.
+- **Brannlista på papir**: «Brannliste» skriver ut natta som vises, «Alle netter» alle — én
+  side per natt, avkryssingsboks per person, rutinen i ramme (eller en linje å skrive
+  samleplassen på). Den står også i **fila på e-post**, og `fil.signatur()` tar den med
+  når den finnes, så en ny plassering gir ny utsending.
+- **Hint** nederst: «Har vakt dette døgnet, men ingen overnatting registrert» — sammenslått,
+  for mange sover hjemme.
+
+**Tilgang:** rom og rutine `kan_lede`; å plassere og ta ut følger personens korps
+(`kan_fore_korps` — alle for `skriv_full`, eget korps for korps-føreren); **alle med
+`les` ser alle rom og navn**, uten korpsfilter, fordi den som teller opp trenger hele lista.
+**Telefonen følger korpsfilteret** som ellers. Knappene gates i klienten på det samme.
+
+**Offline:** dataene står i vaktlistas hovedsvar (`overnatting.data_for`), så de følger
+med i service workerens kopi uten nytt endepunkt.
+
+**Teknisk:** `vaktliste/overnatting.py` (regler), modellene `Overnattingsrom` og
+`Overnatting` + `Vaktliste.brannrutine` (migrasjon `0022`, bare skjema), fire endepunkter
+(`api/vaktlister/<pk>/overnattingsrom/`, `api/overnattingsrom/<pk>/`,
+`…/plasser/`, `api/overnattinger/<pk>/`), auditlogging (`vaktliste_overnattingsrom`,
+`vaktliste_overnatting`, `brannrutine` med verdi), ny fil `static/js/vaktliste-overnatting.js`
+(sju vaktlistefiler, 33 i `static/js/`), tre vinduer i malen. Ruter: 185 (vaktlista 36).
+Backupen tar de nye tabellene av seg selv (`apps = ['vaktliste']`).
+
+**Dokumentasjon:** reglene står i docstringene i `vaktliste/overnatting.py`; seksjonen i
+`vaktliste/CLAUDE.md` har bare de fire man må kjenne før man rører annen kode, og flaten
+står i `templates/vaktliste/CLAUDE.md`. **Taket på `vaktliste/CLAUDE.md` er hevet 800 tegn**
+(`FOR_STORE_I_DAG`, til 44 750): seksjonen ble kortet fra 3 761 tegn, og de siste 691 ville
+ellers vært hentet ved å stryke begrunnelser andre steder. Krympingen står i TODO.
+
+**Tester:** `vaktliste/tests_overnatting.py` (47 — nettene, rommene, plasseringen,
+«på vakt», tilgangen per nivå, lesingen og telefonen, fila, signaturen, intervallsendingen
+gjennom kallstedet, audit) og `vaktliste/tests_overnatting_js.py` (18 — standardnatta,
+kapasiteten, hvem som får plassere, escaping, knappene per nivå, brannlista, og
+`tegnPanel()` som kallsted). Fanerekka i `FanerekkaHarToBolkerTests` har fått
+«Overnatting»; harnessene som tegner fanene har fått de nye hjelperne.
+
+**Mutasjonstesting:** 78 mutanter — 46 i tjenestelaget, viewene, fila og signalene
+(tungt/middels), 32 i JS-reglene, byggernes gater og kallstedene (middels/lett). **Fire
+overlevde første runde, alle tettet:** grensen i `paa_vakt()` (med to netter henter
+spørringen hele spennet, og da er løkka alene det som holder et dagskift 06–14 utenfor
+natta før), nattfilteret i fila (testen hadde bare én natt), telefonen i fila (assertionen
+traff Kari i vaktlistedelen av fila, ikke i brannlista — nå leses bare bolken), og et tomt
+rom på papiret. **Én var ekvivalent:** tidlig retur i `brannliste()` uten plasseringer — løkka
+gir tom liste uansett. To mutanter traff ikke første gang (feil mønster) og ble kjørt på
+nytt. Før runden: `transaction.atomic()` i `plasser()` var udekket, fordi konflikten
+oppdages før noe skrives — ny test simulerer en kollisjon midt i skrivingen.
+
+**Skjermbilder** tatt i Chromium mot en lokal base: fanen, konfliktvinduet, papirutgaven
+og mobil (390 px). Papirutgaven fikk fast kolonnebredde etter første bilde — «Telefon»
+flyttet seg fra rom til rom.
+
 ## 2026-09-25 — Databasekortet på server-status: henger, eldste transaksjon, låskø og deadlocks  `#drift` `#database`
 
 André: «Ja gjør det» og «la oss gjøre det du skisserte» (Artifact «Databasekortet»), med

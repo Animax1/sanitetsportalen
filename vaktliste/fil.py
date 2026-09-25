@@ -29,7 +29,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
 
-from . import pauser
+from . import overnatting, pauser
 from .models import Pause, Ressursgruppe, Utsending, Vaktpost
 
 logger = logging.getLogger(__name__)
@@ -176,6 +176,11 @@ def bygg_fil(vaktliste, naa=None) -> str:
         'grupper': grupper,
         'antall': antall_skift(grupper),
         'i_drift': vaktliste.i_drift,
+        # Brannlista (25. sep. 2026): hvem sover hvor, per natt. Står i fila
+        # fordi alarmen kan gå når portalen er nede — det er reservens hele
+        # poeng.
+        'brannliste': overnatting.brannliste(vaktliste),
+        'brannrutine': vaktliste.brannrutine,
     })
 
 
@@ -200,7 +205,7 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
         vaktliste=vaktliste, sendt_av=bruker if getattr(bruker, 'pk', None) else None,
         sendt_av_navn=getattr(bruker, 'username', '') or '',
         utloest=utloest, mottakere=', '.join(adresser), antall_rader=antall_skift(grupper),
-        innhold_sha256=signatur(grupper))
+        innhold_sha256=signatur(grupper, overnatting.brannliste(vaktliste)))
     if not adresser:
         rad.feil = 'Ingen mottakere er satt under portalinnstillingene.'
         rad.save()
@@ -227,13 +232,20 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
     return rad
 
 
-def signatur(grupper) -> str:
+def signatur(grupper, brannliste=None) -> str:
     """SHA-256 over det fila bærer — ikke over fila, som har «laget»-tida i
-    seg og derfor aldri er lik seg selv."""
+    seg og derfor aldri er lik seg selv.
+
+    **Brannlista er med når den finnes** (25. sep. 2026), så en ny plassering
+    gir en ny utsending når «bare ved endringer» står på. Uten plasseringer
+    er signaturen den samme som før, så lister uten overnatting sendes ikke
+    på nytt bare fordi koden ble oppdatert.
+    """
     import hashlib
     import json
+    innhold = {'grupper': grupper, 'brannliste': brannliste} if brannliste else grupper
     return hashlib.sha256(
-        json.dumps(grupper, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+        json.dumps(innhold, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
 
 
 def send_planlagte(naa=None) -> list:
@@ -263,7 +275,8 @@ def send_planlagte(naa=None) -> list:
             continue
         if bare_ved_endring():
             sist_sendt = vl.utsendinger.filter(feil='').first()
-            if sist_sendt is not None and sist_sendt.innhold_sha256 == signatur(rader_for(vl)):
+            if sist_sendt is not None and sist_sendt.innhold_sha256 == signatur(
+                    rader_for(vl), overnatting.brannliste(vl)):
                 continue
         ut.append(send_fil(vl, utloest=Utsending.INTERVALL))
     return ut

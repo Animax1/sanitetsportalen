@@ -98,7 +98,15 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # flyttet uendret til `templates/vaktliste/CLAUDE.md`, som KO og oppdrag
     # før den. 43 843 tegn med pauseseksjonen; taket følger ned, med samme
     # slakk, så delingen ikke gror igjen.
-    'vaktliste/CLAUDE.md': 43_950,
+    #
+    # **Hevet 25. sep. 2026 med 800 tegn, for overnattingen.** Seksjonen ble
+    # skrevet som en tabell på 3 761 tegn og kortet til de fire reglene man må
+    # kjenne før man rører *annen* kode; resten står i docstringene i
+    # `vaktliste/overnatting.py`, der reglene bor. Det som gjensto var 691 tegn
+    # over. Å finne dem ved å stryke begrunnelser i andre seksjoner er nettopp
+    # vekslingen over advarer mot — den ekte rettingen er punktet i `TODO.md`
+    # om å krympe fila seksjon for seksjon mot CHANGELOG.
+    'vaktliste/CLAUDE.md': 44_750,
     # 22 615 tegn 21. sep. 2026, og `ko/CLAUDE.md` 22 249. **Begge var på
     # taket, og det er taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
     # og `oppdrag/CLAUDE.md` 11, så kvelden med sju punkter fra André kostet
