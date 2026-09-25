@@ -145,7 +145,51 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       avlesning 25. sep. 2026 var fra **staging** og viste ingen manglende indekser;
       bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
+- [ ] **Avgjør C1 før neste `staging → main`: skal en `les`-bruker se andre korps' skift i
+      overnattingsfanen?** I dag viser den «Ola, Karmøy: Ambulanse 2, 22:00–06:00» for
+      korps hovedkallet filtrerer bort (`vaktliste/overnatting.py:307-363`). Anbefalingen
+      er at bare «på vakt i natt: ja/nei» vises for den som ikke ser alle korps. Finnes bare
+      på staging, og går til prod med neste merge. Se
+      [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md) C1.
+
 ## Pågående / neste
+
+### Kodegjennomgangen 25. sep. 2026 — se [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md)
+
+*Hele appen lest på staging `7c21318`. Alt unntatt C1 finnes også i prod (`main`
+`636e1f2`). Funnene, begrunnelsene og «ferdig når» står i notatet; her står bare puljene,
+i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
+
+- [ ] **Pulje A — åtte feil i drift, før neste vakt.** Bjella ringer ikke for første bil på
+      et oppdrag (A1); ETag-ene mangler felt, så redigering inne i oppdraget gir 304 hos de
+      andre (A2); `_trygt` i `ko/signals.py` uten savepoint, bare feil i PostgreSQL (A3);
+      «Flytt» i Venter beholder gammel bils varsling (A4); PUT uten `update_fields` (A5);
+      arkivert vaktliste i drift styrer fortsatt sentralbord, KO og e-post (A6); 500 på
+      ledig plass i `vaktposter_view` (A7); tilstedeværelsen — bjellas polling sender ikke
+      `X-Portal-Inaktiv`, så synlige faner er alltid «aktiv nå» (A8).
+- [ ] **Pulje B — spor, tilgang og lekkasjer.** Låsemeldingen avslører at brukernavnet
+      finnes (B1); `reset_password`, `unlock`, feltendringer og sletting av backup uten
+      audit (B2); vaktlistas audithull (B3); `accounts/admin.py` (B4);
+      `sikkerhetssjekk.py` mangler KO og backlog (B5); datofiltre gir 500 (B6); rå
+      unntakstekst i `Utsending.feil` (B7); ugyldig førstehjelper-ID forkastes stille (B8).
+- [ ] **Pulje C — avgjørelser.** C1 står øverst. C2: planleggerens kladd er synlig for
+      `les_alle`/`skriv_handling`, stikk i strid med tre kommentarer — rett koden eller
+      løftet. C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
+      predikat for «på vakt», eller fjern feltet.
+- [ ] **Pulje D — verifiseringen.** CI med PostgreSQL og node, og manglende node skal feile,
+      ikke hoppe over ~160 tester (D1, erstatter «Vurder GitHub Actions»); død kode som
+      testene holder i live (D2); XSS-skanner for `backlog.js` og `+`-uttrykk (D3);
+      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
+- [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
+      med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
+      `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og
+      helseprober (E6).
+- [ ] **Pulje F — dokumentasjon som motsier koden.** Tilgangsdocstrings i vaktlista og
+      `accounts` (F1); audit-avsnittet i rot-`CLAUDE.md` er feil (F2); TODO-punkter som er
+      gjort eller dobbelt (F3); ~40 utdaterte kommentarer, tas i forbifarten (F4).
+- [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);
+      store filer (G2); pasientsidens eget skall (G3); N+1 i pollede endepunkter (G4);
+      `requirements.txt` kompilert for 3.11, SW-cachen, polling i skjulte faner (G5).
 
 *De tre vaktlisteønskene under henger sammen — to av dem trenger samme dagruppering.
 Sammenhengen, rekkefølgen og de åpne valgene står i
@@ -559,10 +603,6 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
 `conn_max_age=600` demper ytterligere. Flaskehalsen var spørringer og båndbredde, ikke
 forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
-- [ ] **Vurder GitHub Actions.** Prosjektet har ingen CI, så «husk å kjøre
-      migrasjonsprøvene» er fortsatt hukommelse — og hukommelse er det denne kodebasen
-      gang på gang har erstattet med en test. En workflow med en postgres-service ville
-      kjørt dem ved hver push, uten at noe måtte installeres lokalt.
 
 ## Ideer / backlog
 

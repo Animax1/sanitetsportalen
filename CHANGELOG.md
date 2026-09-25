@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Kodegjennomgang av hele appen: pseudokode og teknisk gjeld, med plan  `#core/dokumentasjon`
+
+**André:** «kjør en runde hvor du ser etter pseudokode og teknisk gjeld i hele appen. Ikke
+endre noe», og så «lag en plan for håndtering så vi kan ta det senere». Ingen kode er
+endret. Planen står i `docs/PLAN_TEKNISK_GJELD_2026-09-25.md`, med puljene A–G i `TODO.md`.
+
+**Grunnlaget:** revisjonen ble gjort på staging `7c21318`. **Alt unntatt ett funn finnes også
+i prod** (`main` `636e1f2`). Unntaket er overnattingsfanen, som ennå bare står på staging.
+
+**Pseudokode fantes nesten ikke.** Det nærmeste er flater som later som de gjør noe:
+bryteren `backup_enabled` uten virkning, filteret `is_active` som ingen setter, feltet
+`avmeldt_at` uten skrivevei, og `manage.py lokasjon` som fortsatt mener at modulen «ikke har
+noen URL ennå».
+
+**Åtte feil i drift, samlet i pulje A.** Stikkordene er med så de kan søkes opp:
+
+- **«Bjella ringer ikke» for den første bilen på et oppdrag.** Broen i `Oppdrag.save()`
+  går utenom `varsle_enhet`.
+- **ETag-ene mangler felt.** En redigering inne i oppdraget gir **304** hos de andre
+  operatørene.
+- **`_trygt` fanger unntak uten savepoint.** Feilen finnes **bare i PostgreSQL**.
+- **«Flytt» i Venter** tar med seg den gamle bilens `varslet_modus`.
+- **PUT uten `update_fields`.**
+- **En arkivert vaktliste i drift** styrer fortsatt sentralbordet og KO, og sendes fortsatt
+  på e-post.
+- **500 på ledig plass** i `vaktposter_view`.
+- **Tilstedeværelsen:** bjellas polling sender ikke `X-Portal-Inaktiv`, så en glemt, synlig
+  fane står som **«aktiv nå»**.
+
+**Og i spor og tilgang:**
+
+- **Låsemeldingen avslører at brukernavnet finnes** (brukernavn-enumerering).
+- **`reset_password` og `unlock` skriver ingen audit.**
+- **Planleggerens kladd er synlig** for `les_alle`/`skriv_handling`.
+
+**Tre rotårsaker går igjen:**
+
+1. Lister som vedlikeholdes for hånd: ETag-feltene, `STENGT_GET`, auditens feltlister.
+2. Tester som kaller hjelperen i stedet for inngangen. Bjella over er eksempelet.
+3. SQLite og ingen CI. Rundt 160 JS-tester hopper stille over når node mangler.
+
+**Kontroll av funnene:** fem lesere tok hvert sitt område. Alle funn merket «Høy» er
+kontrollert mot koden en gang til. «Vurder GitHub Actions» er slått inn i pulje D1.
+
 ## 2026-09-25 — Overnatting: plasseringene slettes 30 dager etter natta, og personvernprotokollen  `#vaktliste` `#personvern`
 
 André valgte «A» av tre: hvem som sov hvor har ingen verdi etter vakta, og fila sa
