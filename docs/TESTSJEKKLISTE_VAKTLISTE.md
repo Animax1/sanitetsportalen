@@ -10,7 +10,7 @@ regelen (badge + reservasjon), stemplingsreglene og belastningstallene er prøvd
 mutanter. Finner du noe her som suiten burde ha funnet, har du funnet **to** ting: feilen,
 og et hull i dekningen.
 
-**Noter byggnummeret i footeren** og hvilken gren miljøet står på (`rollemodell` =
+**Noter byggnummeret i footeren** og hvilken gren miljøet står på (`staging` =
 staging, `main` = prod).
 
 ---

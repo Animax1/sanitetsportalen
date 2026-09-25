@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Staging-grenen heter `staging`, ikke `rollemodell`  `#drift` `#deploy`
+
+André ga grenen nytt navn i GitHub og byttet grenen staging-tjenesten deployer fra i
+Railway. **«rollemodell» betydde to ting**: staging-grenen og tilgangsmodellen
+(`docs/BESLUTNING_ROLLEMODELLEN.md`), og en setning som «ligger på rollemodell» måtte leses
+i sammenheng for å vite hvilken. Ingen kode, test eller CI avhenger av grennavnet — sjekket
+før omdøpingen.
+
+Oppdatert: arbeidsflyten i `CLAUDE.md`, `docs/DEPLOY_GUIDE.md` §9 (tabell og
+push-kommando), testsjekklistene for KO og vaktlista, og `docs/RUNBOOK_VAKT.md`.
+**Historiske dokumenter står urørt** — CHANGELOG, `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`
+og `docs/PLAN_FLYTTING_TIL_CORE.md` beskriver hva som skjedde da grenen het `rollemodell`,
+og en omskriving ville gjort dem feil. `CLAUDE.md` og deploy-guiden sier derfor at grenen
+het det før.
+
+Lokale kloner: `git branch -m rollemodell staging`, `git fetch origin`,
+`git branch -u origin/staging staging`, `git remote set-head origin -a`.
+
 ## 2026-09-25 — Overnatting i vaktlista: hvem sover hvor, og brannlista på papir  `#vaktliste` `#brannsikkerhet`
 
 André: «Vi skal jobbe med /vaktliste. Jeg vil ha en overnatting-del hvor vi registrerer

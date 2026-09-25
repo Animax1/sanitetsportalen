@@ -11,7 +11,7 @@ fra, ikke denne lista. Finner du noe her som suiten burde ha funnet, er funnet *
 ting: feilen, og et hull i dekningen.
 
 **Noter byggnummeret i footeren** før du begynner, og hvilken gren miljøet står på
-(`rollemodell` = staging, `main` = prod). Uten det vet ikke den som leser resultatet hva
+(`staging` = staging, `main` = prod). Uten det vet ikke den som leser resultatet hva
 som ble prøvd.
 
 ---

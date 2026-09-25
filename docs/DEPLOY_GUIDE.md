@@ -283,11 +283,11 @@ Portalen har **to miljøer**:
 
 | Gren | Miljø |
 |---|---|
-| `rollemodell` | Staging – testes her først |
+| `staging` | Staging – testes her først. Het `rollemodell` til 25. sep. 2026 |
 | `main` | Produksjon |
 
 ```bash
-git push origin HEAD:rollemodell     # staging
+git push origin HEAD:staging         # staging
 # verifiser på staging-domenet
 git push origin HEAD:main            # prod
 ```

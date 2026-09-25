@@ -24,9 +24,10 @@ skal stå for *hver* gren som ble pushet, ikke bare den siste. Det er nummeret s
 Railway-deployen, og uten det må den som verifiserer gjette om det hun ser på er det som
 nettopp gikk ut.
 
-**To grener, to miljøer** (`docs/DEPLOY_GUIDE.md` §9): `rollemodell` er staging,
+**To grener, to miljøer** (`docs/DEPLOY_GUIDE.md` §9): `staging` er staging,
 `main` er produksjon, og Railway auto-deployer fra begge. Arbeidet går på en egen gren,
-derfra til `rollemodell`, og til `main` **bare når André har sagt fra**. Regelen sto bare i
+derfra til `staging` (het `rollemodell` til 25. sep. 2026), og til `main` **bare når
+André har sagt fra**. Regelen sto bare i
 deploy-guiden til 17. sep. 2026 — altså i en fil som ikke lastes med mindre noen åpner den,
 mens avsnittet rett over allerede sa «staging/prod» som om det var kjent. Byggnummeret i
 footeren skal stemme med commit-en som ble pushet; det er slik verifiseringen gjøres.

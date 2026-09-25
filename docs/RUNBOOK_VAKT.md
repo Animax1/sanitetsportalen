@@ -782,7 +782,7 @@ et tilbakerull — særlig hvis migrasjonen har skrevet data. Rull tilbake når 
 
 ### Hvorfor dette står her
 
-Staging (`rollemodell`) fanger det meste, og gjorde det 14. sep. 2026: CSP-en som
+Staging (`staging`-grenen) fanger det meste, og gjorde det 14. sep. 2026: CSP-en som
 blokkerte lydvarselet på iOS sto grønt i 2 744 tester og ble bare funnet ved å klikke.
 Men staging fanger ikke alt, og forskjellen mellom staging og prod — ekte data, ekte last,
 offsite-variablene som bare finnes i prod — er nettopp der de gjenværende feilene bor.
