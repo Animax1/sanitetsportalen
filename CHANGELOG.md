@@ -25,6 +25,11 @@ Ubrukte indekser (`idx_scan = 0`) er 16–104 kB, og står. `pg_stat_statements`
 3. Helsa: størrelse, døde rader og autovacuum, cache-treff, med grenser for friskt.
 4. Etter vakt: `seq_scan`/`idx_scan` per tabell og ubrukte indekser, og hvordan de leses.
 
+**Prod, samme dag:** 14 MB, cache-treff 100 %, under 40 døde rader per tabell, ingen
+manglende indeks. Basen har ikke hatt en ekte vakt ennå; det eneste som går, er
+backupklokka (`core_backupplan`, 68 000 oppslag). `n_live_tup` er et anslag, og sto på 0
+for `accounts_customuser`. Ført i §8a.
+
 Alt på én linje per spørring: en skrivefeil (`ORDERY BY`) forkaster hele spørringen i psql.
 Avlesningen står som punkt 4 i §10a, **før** arkiveringen, som sletter oppdragene.
 TODO-punktet er skrevet om til å peke hit.

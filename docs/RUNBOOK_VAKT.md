@@ -526,6 +526,17 @@ SELECT relname AS tabell, indexrelname AS indeks, idx_scan, pg_size_pretty(pg_re
 indeks mangler; de ubrukte ligger på tabeller som ikke søkes på de kolonnene.
 `pg_stat_statements` er ikke slått på, og trengs ikke.
 
+**Første avlesning, 25. sep. 2026 — prod**, før første ekte vakt der: **14 MB**, cache-treff
+**100 %**, døde rader under 40 i alle tabeller. Autovacuum har bare kjørt på
+`django_session` — riktig, den slår til først ved 50 endrede rader + 20 % av tabellen. Den
+mest spurte tabellen er `core_backupplan` (backupklokka ser på planene hvert minutt), og det
+er alt som skjer i en base uten vakt. **Frisk.**
+
+**`rader` (`n_live_tup`) er et anslag**, ikke en telling: det oppdateres av
+autovacuum og `ANALYZE`. I prod sto `accounts_customuser` med 0 rader, selv om brukerne
+finnes. Trengs det riktige tallet, bruk `SELECT count(*) FROM <tabell>;`, eller kjør
+`ANALYZE;` først (leser bare, tar sekunder på denne størrelsen).
+
 ---
 
 ## 8b. Offsite-backup til Scaleway — oppsett, kontroll og gjenoppretting
