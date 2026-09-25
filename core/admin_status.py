@@ -180,7 +180,76 @@ def _get_db_health():
                 ut['maks_tilkoblinger'] = cur.fetchone()[0]
         except Exception as exc:
             ut['error'] = _scrub_secrets(str(exc))[:200]
+        # Egen `try`: feiler den nye spørringen, skal svartid og tilkoblinger
+        # fortsatt stå — samme regel som hver innhenter på dashbordet.
+        try:
+            ut.update(_db_aktivitet(connection))
+            ut['signaler'] = db_signaler(ut)
+        except Exception as exc:
+            ut['aktivitet_feil'] = _scrub_secrets(str(exc))[:200]
     return ut
+
+
+# ── Databasen under vakt (25. sep. 2026, skisse «Databasekortet») ────────────
+#
+# Svartid og tilkoblinger kan stå grønne mens alt står stille: én transaksjon
+# som holder en lås, og forespørslene i kø bak den. Tre tall svarer på «er det
+# databasen som er problemet akkurat nå?». Hentes hvert 10. sekund med resten.
+
+#: «Idle in transaction» kortere enn dette er normalt midt i en lagring.
+DB_HENGER_ETTER_S = 5
+#: Så lenge før en åpen transaksjon er rød — den holder trolig en lås.
+DB_HENGER_ROD_S = 30
+
+_DB_AKTIVITET_SQL = """
+    SELECT
+      count(*) FILTER (WHERE state = 'active'),
+      count(*) FILTER (WHERE state = 'idle'),
+      count(*) FILTER (WHERE state IN ('idle in transaction', 'idle in transaction (aborted)')
+                         AND now() - state_change > make_interval(secs => %s)),
+      count(*) FILTER (WHERE state IN ('idle in transaction', 'idle in transaction (aborted)')
+                         AND now() - state_change > make_interval(secs => %s)),
+      count(*) FILTER (WHERE wait_event_type = 'Lock'),
+      coalesce(extract(epoch FROM max(now() - xact_start)), 0)
+    FROM pg_stat_activity
+    WHERE datname = current_database()
+      AND backend_type = 'client backend'
+      AND pid <> pg_backend_pid()
+"""
+
+
+def _db_aktivitet(connection) -> dict:
+    """Tilkoblingene etter tilstand, eldste åpne transaksjon og låskø — fra
+    appens egne tilkoblinger. Dashbordets egen og Postgres' bakgrunnsprosesser
+    (autovacuum, WAL) er ikke med: de er ikke det som får en side til å henge."""
+    with connection.cursor() as cur:
+        cur.execute(_DB_AKTIVITET_SQL, [DB_HENGER_ETTER_S, DB_HENGER_ROD_S])
+        arbeider, ledige, henger, henger_lenge, venter, eldste = cur.fetchone()
+        cur.execute('SELECT deadlocks, stats_reset FROM pg_stat_database WHERE datname = current_database()')
+        deadlocks, nullstilt = cur.fetchone()
+    return {'arbeider': arbeider, 'ledige': ledige, 'henger': henger, 'henger_lenge': henger_lenge,
+            'venter_laas': venter, 'eldste_s': round(float(eldste), 1), 'deadlocks': deadlocks,
+            'stats_reset': nullstilt.isoformat() if nullstilt else None}
+
+
+_RANG = {'gronn': 0, 'gul': 1, 'oransje': 2, 'rod': 3}
+
+
+def db_signaler(d) -> dict:
+    """Nivået per rad og samlet — **regelen, ikke tegningen**, så kortet og
+    beredskapstrinnet leser det samme. Grensene står i skissen og runbook §8;
+    de justeres etter første vakt med tall, som tersklene i §2."""
+    henger = d.get('henger') or 0
+    eldste = d.get('eldste_s') or 0
+    venter = d.get('venter_laas') or 0
+    per = {
+        'henger': 'rod' if henger >= 3 or (d.get('henger_lenge') or 0) >= 1 else ('gul' if henger else 'gronn'),
+        'eldste': 'rod' if eldste > DB_HENGER_ROD_S else ('gul' if eldste >= DB_HENGER_ETTER_S else 'gronn'),
+        'venter_laas': 'rod' if venter >= 3 else ('gul' if venter else 'gronn'),
+        # Siden forrige `pg_stat_reset()` — runbook §8a nullstiller før vakt.
+        'deadlocks': 'gul' if (d.get('deadlocks') or 0) else 'gronn',
+    }
+    return dict(per, samlet=max(per.values(), key=_RANG.get))
 
 
 def _get_vaktbilde():
@@ -497,6 +566,28 @@ def beredskapsnivaa(p95_ms, feil_5xx, antall=None) -> dict:
     return dict(gjeldende, fa_maalinger=fa, antall=antall)
 
 
+#: Tiltaket når databasen løfter trinnet. Workers-tiltaket i oransje og rødt er
+#: feil her: en lås blir ikke borte av flere prosesser som venter på den.
+DB_TILTAK = ('Databasen: en transaksjon henger, eller forespørsler venter på lås. Flere workers '
+             'hjelper ikke — se «Database» og runbook §8.')
+
+
+def beredskap_med_databasen(trinn, db) -> dict:
+    """**Rødt databasekort løfter trinnet til minst Oransje** (André, 25. sep.
+    2026). P95 stiger først når en hengende lås alt har rammet alle; kortet
+    ser det før. Tiltaket byttes ut, også når P95 alene ga rødt — den som øker
+    workers for en lås, gjør køen lengre."""
+    sig = (db or {}).get('signaler') or {}
+    if sig.get('samlet') != 'rod':
+        return trinn
+    ut = dict(trinn)
+    if _RANG[ut['nivaa']] < _RANG['oransje']:
+        oransje = next(t for t in BEREDSKAPSTRINN if t['nivaa'] == 'oransje')
+        ut.update({k: oransje[k] for k in ('nivaa', 'navn', 'terskel', 'workers')})
+    ut.update(tiltak=DB_TILTAK, fa_maalinger=False, grunn='database')
+    return ut
+
+
 def _heltall_fra_env(verdi, standard):
     """`WEB_WORKERS` kan stå som «1 (default)» fra `_get_worker_config`."""
     try:
@@ -542,8 +633,10 @@ def _build_status_payload():
     m5 = metrics_store.snapshot(window_seconds=300)
     workers = _get_worker_config()
     cache_helse = _get_cache_health()
+    db_helse = _get_db_health()
     return {
-        'beredskap': beredskapsnivaa(m5.get('p95_ms'), m5.get('errors_5xx'), m5.get('count')),
+        'beredskap': beredskap_med_databasen(
+            beredskapsnivaa(m5.get('p95_ms'), m5.get('errors_5xx'), m5.get('count')), db_helse),
         'driftsmodus': driftsmodus(workers, cache_helse),
         'metrikkilde': metrikkilde(m5, workers),
         'timestamp': timezone.now().isoformat(),
@@ -554,7 +647,7 @@ def _build_status_payload():
         'last_backup': _get_last_backup_info(),
         'worker_config': workers,
         'cache_health': cache_helse,
-        'db_health': _get_db_health(),
+        'db_health': db_helse,
         'disk': _get_disk(),
         'tregeste': metrics_store.tregeste_stier(window_seconds=300),
         'vaktbilde': _get_vaktbilde(),

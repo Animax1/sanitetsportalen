@@ -1098,7 +1098,7 @@ Dashbordet viser følgende paneler:
 | Requestmetrics | p50 / p95 / max / feil for 1-min og 5-min vindu | `RequestMetricsMiddleware`-ringbufferen (Redis på tvers av workere når den finnes) |
 | Tregeste stier | P95 og antall per sti siste 5 min, stier med under tre treff utelatt | `metrics_store.tregeste_stier()` |
 | Minne (RSS) | Nå og topp siden oppstart, i MB | `/proc/self/status` (`VmRSS`) og `resource.getrusage().ru_maxrss` |
-| Database | Type, svartid på `SELECT 1`, tilkoblinger mot `max_connections` (PostgreSQL) | `connection.cursor()`, `pg_stat_activity`, `pg_settings` |
+| Database | Type, svartid på `SELECT 1`, tilkoblinger mot `max_connections`; på PostgreSQL også arbeider · ledige · henger, eldste transaksjon, låskø og deadlocks, farget av `db_signaler()`. Rødt løfter beredskapstrinnet (`beredskap_med_databasen()`) | `connection.cursor()`, `pg_stat_activity`, `pg_stat_database`, `pg_settings` |
 | Disk | Brukt/ledig på volumet, størrelsen på backupfilene | `shutil.disk_usage(BACKUP_DIR)` |
 | Aktive sesjoner | Antall ikke-utgåtte `django.contrib.sessions.Session`-rader, med liste og utlogging | DB-spørring |
 | Siste backup | Filnavn, størrelse, tidspunkt og type, pluss offsite-kopien (konfigurert, antall, sist, siste feil) | `Backup`-modellen og `core.offsite.status()` |

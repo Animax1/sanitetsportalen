@@ -11,9 +11,12 @@
   .status-card .big-number { font-size: 1.8rem; font-weight: 700; color: var(--portal-text); }
   .status-card .unit { font-size: 0.9rem; color: var(--portal-text-muted); margin-left: 0.3rem; }
   .status-card .sub { font-size: 0.8rem; color: var(--portal-text-muted); margin-top: 0.3rem; }
-  .status-ok { color: #86efac; }
-  .status-warn { color: #fbbf24; }
-  .status-crit { color: #fca5a5; }
+  /* Også inne i en rad: `.status-row .val` under har høyere spesifisitet og
+     gjorde hver farget verdi hvit — svartid, 5xx, offsite og tilkoblinger sto
+     uten farge til 25. sep. 2026, uten at noe feilet. */
+  .status-ok, .status-row .val.status-ok { color: #86efac; }
+  .status-warn, .status-row .val.status-warn { color: #fbbf24; }
+  .status-crit, .status-row .val.status-crit { color: #fca5a5; }
   .status-row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.25rem 0; border-bottom: 1px dashed var(--portal-border); font-size: 0.88rem; min-width: 0; }
   .status-row:last-child { border-bottom: none; }
   .status-row .label { color: var(--portal-text-muted); }
@@ -109,6 +112,15 @@
       <div class="status-row"><span class="label">Type</span><span class="val" id="db-vendor">–</span></div>
       <div class="status-row"><span class="label">Svartid (SELECT 1)</span><span class="val" id="db-latency">–</span></div>
       <div class="status-row"><span class="label">Tilkoblinger</span><span class="val" id="db-conns">–</span></div>
+      {% comment %}
+        Tre tall under vakt (25. sep. 2026): svartid og tilkoblinger kan stå
+        grønne mens én transaksjon holder en lås og alt står i kø bak den.
+        Fargene regnes på serveren (`db_signaler()`), ikke her.
+      {% endcomment %}
+      <div class="status-row"><span class="label">Arbeider · ledige · henger</span><span class="val" id="db-fordeling">–</span></div>
+      <div class="status-row"><span class="label">Eldste transaksjon</span><span class="val" id="db-eldste">–</span></div>
+      <div class="status-row"><span class="label">Venter på lås</span><span class="val" id="db-laas">–</span></div>
+      <div class="status-row"><span class="label" id="db-deadlocks-etikett">Deadlocks</span><span class="val" id="db-deadlocks">–</span></div>
       <div class="sub" id="db-hint" style="margin-top:0.5rem;">–</div>
     </div>
 
@@ -319,6 +331,8 @@ const ADMIN_URLS = {
       ? 'Bare ' + b.antall + ' forespørsler siste 5 min — P95 er da én treg forespørsel. Vent før du handler.'
       : ((b && b.tiltak) || '');
     if (b && b.fa_maalinger) merke.textContent += ' · få målinger';
+    // Trinnet er løftet av databasekortet, ikke av P95 (`beredskap_med_databasen`).
+    if (b && b.grunn === 'database') merke.textContent += ' · databasen';
     const k = document.getElementById('metrikk-kilde');
     k.textContent = (kilde && kilde.tekst) || '';
     k.className = 'sub' + (kilde && kilde.ok === false ? ' status-crit' : '');
@@ -486,21 +500,54 @@ const ADMIN_URLS = {
     const hint = document.getElementById('db-hint');
     if (!db.healthy) {
       setVal('db-latency', 'FEIL', 'status-crit');
-      setVal('db-conns', '–');
+      ['db-conns', 'db-fordeling', 'db-eldste', 'db-laas', 'db-deadlocks'].forEach((id) => setVal(id, '–'));
       hint.textContent = db.error || 'Databasen svarte ikke.';
       return;
     }
+    renderDbAktivitet(db);
     const lat = db.latency_ms || 0;
     setVal('db-latency', lat + ' ms', lat < 50 ? 'status-ok' : (lat < 200 ? 'status-warn' : 'status-crit'));
     if (db.maks_tilkoblinger) {
       const andel = db.tilkoblinger / db.maks_tilkoblinger;
       setVal('db-conns', db.tilkoblinger + ' / ' + db.maks_tilkoblinger,
         andel < 0.6 ? 'status-ok' : (andel < 0.85 ? 'status-warn' : 'status-crit'));
-      hint.textContent = 'Hver worker holder egne tilkoblinger. Nær taket: ikke øk WEB_WORKERS.';
+      hint.textContent = dbHint(db) || 'Hver worker holder egne tilkoblinger. Nær taket: ikke øk WEB_WORKERS.';
     } else {
       setVal('db-conns', 'n/a');
       hint.textContent = db.vendor === 'sqlite' ? 'SQLite lokalt — ingen tilkoblingsgrense.' : (db.error || '');
     }
+  }
+
+  const DB_KLASSE = { gronn: 'status-ok', gul: 'status-warn', rod: 'status-crit' };
+
+  function renderDbAktivitet(db) {
+    const sig = db.signaler;
+    if (!sig) {
+      const tekst = db.aktivitet_feil ? 'feil' : 'n/a';
+      ['db-fordeling', 'db-eldste', 'db-laas', 'db-deadlocks'].forEach((id) => setVal(id, tekst));
+      return;
+    }
+    setVal('db-fordeling', db.arbeider + ' · ' + db.ledige + ' · ' + db.henger, DB_KLASSE[sig.henger]);
+    setVal('db-eldste', String(db.eldste_s).replace('.', ',') + ' s', DB_KLASSE[sig.eldste]);
+    setVal('db-laas', String(db.venter_laas), DB_KLASSE[sig.venter_laas]);
+    setVal('db-deadlocks', String(db.deadlocks), DB_KLASSE[sig.deadlocks]);
+    document.getElementById('db-deadlocks-etikett').textContent = db.stats_reset
+      ? 'Deadlocks siden ' + new Date(db.stats_reset).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })
+      : 'Deadlocks (aldri nullstilt)';
+  }
+
+  // Hva kortet sier når noe er gult eller rødt — det viktigste først.
+  function dbHint(db) {
+    const sig = db.signaler;
+    if (db.aktivitet_feil) return 'Aktiviteten kunne ikke leses: ' + db.aktivitet_feil;
+    if (!sig || sig.samlet === 'gronn') return '';
+    if (sig.eldste !== 'gronn' || sig.henger !== 'gronn') {
+      return 'En transaksjon har stått åpen i ' + String(db.eldste_s).replace('.', ',') + ' s'
+        + (db.venter_laas ? ', og ' + db.venter_laas + ' venter bak den' : '')
+        + '. Er svartiden fin, er det låsen og ikke basen. Runbook §8.';
+    }
+    if (sig.venter_laas !== 'gronn') return db.venter_laas + ' forespørsler venter på lås. Runbook §8.';
+    return 'Deadlock siden nullstilling: to operasjoner låste hverandre. Si fra — det er en kodefeil.';
   }
 
   function renderDisk(disk) {

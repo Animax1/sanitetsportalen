@@ -112,6 +112,11 @@ enten P95 eller 5xx har nådd grensen, gjelder — 5xx alene kan gi rødt.
 | **Rødt** | > 1000 ms, eller ≥ 3 5xx | `WEB_WORKERS=4` (§4). Faller ikke P95 innen 3 min, er flaskehalsen noe annet enn workers (§5). |
 | **Kritisk** | Fortsatt tregt etter alle tiltak | Last-shed (§9). |
 
+**Databasekortet kan løfte trinnet til Oransje** (25. sep. 2026). Står «Database» rødt —
+en transaksjon har hengt over 30 s, eller tre forespørsler står i kø — sier banneret
+«Oransje · databasen» selv om P95 ennå er grønn, og tiltaket er §8, ikke flere workers:
+en lås blir ikke borte av flere prosesser som venter på den.
+
 **Under 20 forespørsler siste 5 min sier kortet «få målinger»**: da er P95 i praksis den
 ene tregeste forespørselen, og trinnet er ikke noe å handle på. 5xx gjelder uansett.
 
@@ -434,7 +439,22 @@ funksjonen ble aldri bygget. Nummeret står igjen så §7 og oppover peker rikti
 
 ## 8. Database-problemer
 
-Symptomer: P95 stiger samtidig i alle endepunkter, 5xx med database errors i logs.
+Symptomer: P95 stiger samtidig i alle endepunkter, 5xx med database errors i logs — eller
+databasekortet på server-status står gult eller rødt.
+
+**Databasekortet** (server-status) har fire rader i tillegg til svartid og tilkoblinger:
+
+| Rad | Grønn | Gul | Rød | Betyr |
+|---|---|---|---|---|
+| Arbeider · ledige · **henger** | henger 0 | 1–2 | ≥ 3, eller én over 30 s | «Henger» er en åpen transaksjon som ikke gjør noe (*idle in transaction*) i over 5 s. Den kan holde en lås |
+| Eldste transaksjon | < 5 s | 5–30 s | > 30 s | Lengste åpne transaksjon fra appen. Søndag kl. 00 kan ryddejobben (`purge_old_logs`) gi et kort utslag |
+| Venter på lås | 0 | 1–2 | ≥ 3 | Forespørsler i kø bak en annen |
+| Deadlocks siden … | 0 | ≥ 1 | — | To operasjoner låste hverandre. Det er en kodefeil — si fra. Telles fra `pg_stat_reset()` (§8a) |
+
+**Svartiden er grønn og kortet rødt?** Da er det en lås, ikke en treg base. Én redeploy av
+web-tjenesten avslutter tilkoblingene og slipper låsen; Postgres ruller tilbake den
+halvferdige transaksjonen, så ingenting lagres halvt. Noter tidspunktet og hvilken side
+som hang («Tregeste stier»), og send det til Claude — en lås som henger, er en feil i koden.
 
 1. Sjekk Railway PostgreSQL → Metrics → CPU / Connections
 2. Hvis CPU > 80 % vedvarende: PostgreSQL-instansen må oppgraderes (kontakt Railway-support eller oppgrader plan – ikke noe du ordner i løpet av minutter)

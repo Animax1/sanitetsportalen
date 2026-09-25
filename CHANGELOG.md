@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Databasekortet på server-status: henger, eldste transaksjon, låskø og deadlocks  `#drift` `#database`
+
+André: «Ja gjør det» og «la oss gjøre det du skisserte» (Artifact «Databasekortet»), med
+svarene: rødt løfter beredskapstrinnet, deadlocks med nå, grensene som foreslått.
+
+**Før:** kortet viste svartid og tilkoblinger. Begge kunne stå grønne mens én transaksjon
+holdt en lås og alt sto i kø bak den — situasjonen P95 først ser når skaden er skjedd.
+**Nå, fire rader til (PostgreSQL):**
+- **Arbeider · ledige · henger** — «henger» er *idle in transaction* over 5 s. Gul 1–2, rød ≥ 3
+  eller én over 30 s.
+- **Eldste transaksjon** — gul 5–30 s, rød over 30 s.
+- **Venter på lås** — gul 1–2, rød ≥ 3.
+- **Deadlocks siden `pg_stat_reset()`** — gul fra én: to operasjoner låste hverandre, en kodefeil.
+
+Regelen står i `db_signaler()` (`core/admin_status.py`), og kortet fargelegger bare. **Rødt kort
+løfter beredskapstrinnet til minst Oransje** (`beredskap_med_databasen()`), med «· databasen»
+i merket og et eget tiltak: flere workers hjelper ikke på en lås — også når P95 alene ga
+rødt. Dashbordets egen tilkobling og Postgres' bakgrunnsprosesser telles ikke. Aktiviteten
+har sin egen `try`: feiler spørringen, står svartid og tilkoblinger fortsatt.
+
+**Prøvd mot en ekte PostgreSQL 16** (lokal engangsbase): en transaksjon som holdt en lås og
+en forespørsel bak den ga «1 · 1 · 1», eldste 6,5 s, 1 venter — gult. Etter 31 s: rødt, og
+banneret «Oransje · databasen». En fremprovosert deadlock ga `deadlocks = 1`. Så dashbordet
+selv mot samme base i nettleseren: kortet og banneret sa det samme.
+
+**Funnet underveis — statusfargene i radene har aldri vist:** `.status-row .val` har høyere
+spesifisitet enn `.status-ok`/`.status-warn`/`.status-crit`, så **hver farget verdi i en rad
+sto hvit** — svartid, 5xx, offsite-status og tilkoblinger. Ingenting feilet; fargen bare
+uteble. Rettet; målt med `getComputedStyle` etterpå.
+
+**Mutasjonstesting: 15 mutanter, 13 drept.** To overlevde, begge hull i testene: mocken ga
+samme objekt til kortet og banneret, så to databasekall var usynlige; og PostgreSQL-grenen i
+`_get_db_health` kjørte aldri. Tettet i `core/tests_databasekortet.py`; begge drept.
+
+Runbook §2 (løftet av trinnet) og §8 (radene, grensene og hva man gjør når svartiden er grønn
+og kortet rødt). `docs/TEKNISK_DOKUMENTASJON.md`: panelraden oppdatert.
+
 ## 2026-09-25 — Runbook §8a: helsesjekk av databasen, og første avlesning av indeksene  `#drift` `#database`
 
 André: «Okei kan du skrive det viktigste i runbooken for meg?» og «helt ærlig jeg vet ikke om
