@@ -139,40 +139,11 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       → forventet `1`. Loggen fra containeren er allerede beviset; dette er et ekstra
       blikk, ikke et krav.
 
-- [ ] **Indeksene i Postgres: les av tallene etter en vakt, og post svaret til Claude**
-      (24. sep. 2026). Ingenting tyder på et problem i dag — dette er en helsesjekk, og
-      tallene betyr bare noe **etter en vakt med ekte last** (eller en øvelse på staging).
-      Statistikken samles fra Postgres sist startet (ikke web — en redeploy rører den
-      ikke); spørring A viser fra når. Spørringene leser bare, de endrer ingenting.
-
-      1. Koble til: `railway connect Postgres` (åpner `psql` mot prod-basen).
-      2. Lim inn og kjør alle fire, kopier hele utskriften:
-
-         ```sql
-         -- A. Når ble statistikken sist nullstilt? (tallene gjelder fra da)
-         SELECT stats_reset FROM pg_stat_database WHERE datname = current_database();
-
-         -- B. Tabeller som leses rad for rad (den viktigste)
-         SELECT relname AS tabell, n_live_tup AS rader, seq_scan, seq_tup_read, idx_scan
-         FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20;
-
-         -- C. Indekser, sortert fra minst brukt
-         SELECT relname AS tabell, indexrelname AS indeks, idx_scan,
-                pg_size_pretty(pg_relation_size(indexrelid)) AS stoerrelse
-         FROM pg_stat_user_indexes ORDER BY idx_scan ASC, pg_relation_size(indexrelid) DESC LIMIT 25;
-
-         -- D. Finnes pg_stat_statements? (tom = nei, og det er greit)
-         SELECT extname, extversion FROM pg_extension WHERE extname = 'pg_stat_statements';
-         ```
-
-      3. Skriv `\q` for å gå ut, og post utskriften til Claude med datoen for vakta.
-
-      **Hva Claude ser etter:** en stor tabell (tusenvis av rader) med høy
-      `seq_tup_read` og lav `idx_scan` i B — der mangler trolig en indeks, og da
-      finner vi spørringen i koden, prøver den med `EXPLAIN ANALYZE` og legger til
-      indeksen med en migrasjon. Små tabeller (lokasjoner, enhetstyper) leses rad for rad
-      med vilje. Ubrukte indekser i C fjernes ikke på dette grunnlaget alene: noen brukes
-      bare av nattjobben eller arkiveringen.
+- [ ] **Databasen før og etter neste vakt — runbook §8a.** Før: kjør `railway status`
+      (bekreft *production*), så `SELECT pg_stat_reset();` i psql (§1c steg 6). Etter,
+      før arkiveringen: steg 3 og 4 i §8a, og send utskriften til Claude. Første
+      avlesning 25. sep. 2026 viste ingen manglende indekser, men tellerne var aldri
+      nullstilt og miljøet ikke bekreftet — derfor en ny runde med ekte vakttall.
 
 ## Pågående / neste
 

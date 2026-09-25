@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-25 — Runbook §8a: helsesjekk av databasen, og første avlesning av indeksene  `#drift` `#database`
+
+André: «Okei kan du skrive det viktigste i runbooken for meg?» og «helt ærlig jeg vet ikke om
+dette er fra prod elelr staging».
+
+**Første avlesning** (ukjent miljø, tellerne aldri nullstilt — `stats_reset` tom): **320
+indekser**, alle fremmednøkler og unike felt dekket, og sammensatte indekser på de varme
+stiene (`ko_logg_vakt_id_idx`, `oppdrag_vakt_status_idx`, `core_notif_user_read_idx`).
+Største tabell `ko_logglinje` med 377 rader, så Postgres leser alt rad for rad med vilje.
+**Ingen indeks mangler.** Den mest spurte tabellen er `oppdrag_statusmelding` (183 000
+`seq_scan`), og den er den første som vil trenge indeksene sine på en stor vakt.
+`patients_appsetting` leses ved nesten hver forespørsel (166 000), gratis med 13 rader.
+Ubrukte indekser (`idx_scan = 0`) er 16–104 kB, og står. `pg_stat_statements` er av.
+
+**`docs/RUNBOOK_VAKT.md` §8a**:
+1. Hvilken base: `railway status` — staging og prod heter begge `railway`, så psql-prompten
+   sier ingenting.
+2. Før vakt: `SELECT pg_stat_reset();`, også som steg 6 i vakt-modus (§1c).
+3. Helsa: størrelse, døde rader og autovacuum, cache-treff, med grenser for friskt.
+4. Etter vakt: `seq_scan`/`idx_scan` per tabell og ubrukte indekser, og hvordan de leses.
+
+Alt på én linje per spørring: en skrivefeil (`ORDERY BY`) forkaster hele spørringen i psql.
+Avlesningen står som punkt 4 i §10a, **før** arkiveringen, som sletter oppdragene.
+TODO-punktet er skrevet om til å peke hit.
+
 ## 2026-09-24 — TODO: les av indeksene i Postgres etter en vakt  `#drift` `#database`
 
 André: «Den databasen om indekserte kan du skrive det som en todo for meg med konkret

@@ -88,6 +88,10 @@ etter vakt (§10c, proratert billing).
 
 **Hvorfor:** Med 2+ workere uten Redis blir rate-limit-telleren per-prosess (effektivt doblet), stats-cache fragmentert og request-metrikker viser bare én workers tall. Vakt-modus fikser alle tre.
 
+#### Steg 6: Nullstill databasestatistikken
+
+`SELECT pg_stat_reset();` i prod-basen, så tallene etter vakta gjelder bare den (§8a steg 2).
+
 ---
 
 ## 2. Terskler og handlinger
@@ -438,6 +442,92 @@ Symptomer: P95 stiger samtidig i alle endepunkter, 5xx med database errors i log
 
 ---
 
+## 8a. Helsesjekk av databasen — og indeksene (25. sep. 2026)
+
+Ingen akutt prosedyre: dette er hvordan du ser om databasen har det bra, **før og etter
+en vakt**. Alt under leser bare, unntatt nullstillingen i steg 2, som bare rører
+statistikktellerne.
+
+### Steg 1: Hvilken base er du i?
+
+Staging og prod har **samme databasenavn** (`railway`), så psql-prompten sier ingenting.
+Før du kobler til, i terminalen:
+
+```bash
+railway status                 # viser prosjekt og Environment: production eller staging
+railway environment            # bytt miljø om det er feil
+railway connect Postgres       # åpner psql mot basen i miljøet over
+```
+
+Inne i psql kan du dobbeltsjekke på innholdet — sammenlign med vakta portalen viser på
+samme miljø:
+
+```sql
+SELECT id, navn, year FROM core_vakt ORDER BY id DESC LIMIT 3;
+```
+
+Skriv `\pset pager off` først, så slipper du `-- More --`. **Én spørring per linje**: en
+skrivefeil forkaster hele spørringen, og pil opp henter den tilbake.
+
+### Steg 2: Før vakta — nullstill tellerne
+
+```sql
+SELECT pg_stat_reset();
+```
+
+Tellerne står ellers fra basen ble laget, og da kan de ikke si hva én vakt kostet
+(`stats_reset` var tom ved første avlesning). Autovacuum leser de samme tellerne og kan
+komme litt senere i gang rett etterpå — umerkelig på denne størrelsen.
+
+### Steg 3: Helsa — når som helst
+
+```sql
+SELECT pg_size_pretty(pg_database_size(current_database())) AS stoerrelse;
+```
+```sql
+SELECT relname AS tabell, n_live_tup AS rader, n_dead_tup AS doede, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 10;
+```
+```sql
+SELECT round(100.0 * sum(blks_hit) / nullif(sum(blks_hit) + sum(blks_read), 0), 1) AS cache_treff_prosent FROM pg_stat_database WHERE datname = current_database();
+```
+
+| Tall | Friskt | Se nærmere når |
+|---|---|---|
+| Størrelse | Noen titalls MB | Den vokser mye mellom vakter uten at dataene gjør det |
+| Døde rader | Få, og `last_autovacuum` har en dato | `doede` er større enn `rader` på en stor tabell, og autovacuum står tom |
+| Cache-treff | Over 99 % | Under 95 % — basen leser fra disk, instansen har for lite minne |
+| Tilkoblinger | Se §3c | Nær `max_connections` |
+
+### Steg 4: Etter vakta — brukes indeksene?
+
+```sql
+SELECT relname AS tabell, n_live_tup AS rader, seq_scan, seq_tup_read, idx_scan FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20;
+```
+```sql
+SELECT relname AS tabell, indexrelname AS indeks, idx_scan, pg_size_pretty(pg_relation_size(indexrelid)) AS stoerrelse FROM pg_stat_user_indexes ORDER BY idx_scan ASC, pg_relation_size(indexrelid) DESC LIMIT 25;
+```
+
+**Slik leses de:**
+
+- **Små tabeller leses rad for rad med vilje.** Under noen tusen rader er det raskere for
+  Postgres enn å gå via en indeks. Høy `seq_scan` på en tabell med 20 rader er friskt.
+- **Et problem ser slik ut:** en tabell med **tusenvis av rader**, der
+  `seq_tup_read / seq_scan` er omtrent lik `rader` (hele tabellen leses hver gang) og
+  `idx_scan` er lav. Da mangler en indeks — send tallene til Claude, så finner vi
+  spørringen og legger indeksen til med en migrasjon.
+- **`seq_scan` er i praksis en teller for hvor ofte tabellen spørres.** Den mest spurte er
+  `oppdrag_statusmelding` (sentralbordet, bilen og tavla), og det er den som først vil
+  trenge indeksene sine når en vakt blir stor.
+- **Ubrukte indekser fjernes ikke på dette grunnlaget alene** — noen brukes bare av
+  nattjobben eller arkiveringen, og de koster noen kB hver.
+
+**Første avlesning, 25. sep. 2026** (miljøet ikke bekreftet, tellerne aldri nullstilt):
+320 indekser, alle fremmednøkler og unike felt dekket, største tabell 377 rader. Ingen
+indeks mangler; de ubrukte ligger på tabeller som ikke søkes på de kolonnene.
+`pg_stat_statements` er ikke slått på, og trengs ikke.
+
+---
+
 ## 8b. Offsite-backup til Scaleway — oppsett, kontroll og gjenoppretting
 
 Fra 13. sep. 2026 lastes hver ny backup-fil opp til Scaleway Object Storage, kryptert
@@ -689,7 +779,9 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 2. Sjekk at kortet «Offsite-kopi (Scaleway)» på `/portal-admin/backup/` viser en
    opplasting fra i dag uten feil (§8b). Fila på Railway Volume er da alt utenfor Railway
 3. Verifiser at ingen 5xx-feil ligger uten forklaring (admin-dashbord → Metrikk-kort → errors_5xx)
-4. **Arkiver vakta — begge modulene.** Arkiveringen ligger to steder inntil de slås
+4. **Les av databasen** (§8a steg 3 og 4) og send tallene til Claude — **før**
+   arkiveringen under, som sletter oppdragene: da står ikke radene i tallene lenger.
+5. **Arkiver vakta — begge modulene.** Arkiveringen ligger to steder inntil de slås
    sammen, og det er lett å ta den ene og tro man er ferdig:
    - **Pasienter:** `/pasienter/` → Vaktarkiv → «Lagre vakt som arkiv»
    - **Oppdrag:** `/oppdrag/` → Vaktarkiv → «Arkiver oppdragene»
