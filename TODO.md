@@ -62,10 +62,11 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   pasienten, få sette/se grovsorteringen? Adminkontoer er aldri
                   mannskap (avgjort 12. sep.: «Den er utenfor.»).
             - [ ] Deploy 2 (planens G6), i tre steg. **G6a levert 26. sep.:** ingen kode
-                  leser `Oppdrag.enhet`. **G6b:** skrivingene og broene i
-                  `Oppdrag.save()` bort, Django glemmer feltet (kolonnen står).
-                  Opprinnelig betingelse: «la prod gå noen vakter med broene først» —
-                  gjelder G6b til `main`.
+                  leser `Oppdrag.enhet`. **G6b, etter neste vakt:** skrivingene
+                  og broene i `Oppdrag.save()` bort, Django glemmer feltet (kolonnen
+                  står). Betingelsen var «la prod gå noen vakter med broene først», og det
+                  har ikke vært en vakt siden flere enheter kom — neste vakt er den
+                  første. Kolonnen er nødutgangen til modellen har vært i ekte bruk.
                   **G6c, i en senere `main`-push enn G6b:** `DROP COLUMN`, og
                   `Statusmelding.oppdragsenhet` NOT NULL (med `SET CONSTRAINTS ALL
                   IMMEDIATE` om et dataskritt går foran). Backup før.
@@ -143,6 +144,29 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
 ## Pågående / neste
+
+### Veien til neste vakt (om ~240 dager, fra 26. sep. 2026)
+
+*Planen fra 26. sep. 2026. Neste vakt er den første der flere biler per oppdrag brukes i
+virkeligheten, og rekkefølgen under følger av det.*
+
+- [ ] **`staging` til `main` i god tid, i to omganger** — når André har sett over
+      `staging`. Den står flere runder foran prod (tekniske runder 6–8 og G6a); jo større
+      én push er, jo vanskeligere er det å si hva som forårsaket en feil. Kolonnesletting
+      `68fed55` (`backup_enabled`) som egen omgang: den er databaseendringen. Forutsetter at
+      prod kjører `4813cee` eller nyere, og det gjør den.
+- [ ] **Fastfrysing noen uker før vakta:** ingen skjemaendringer, flyttinger eller nye
+      moduler — bare feilrettinger. Det som kjører på vakta skal være det generalprøven
+      prøvde. Det som skal være med på vakta — `/park/`, puss av `/ko/` og `/vaktliste/`,
+      en eventuell beholdning/depot-modul — må derfor være ferdig før frysingen, ikke under.
+- [ ] **Generalprøve på staging, 3–4 uker før vakta** —
+      [`docs/GENERALPROVE.md`](./docs/GENERALPROVE.md). Ekte folk og telefoner, hovedvekt
+      på flere biler per oppdrag. Testsjekklistene for KO og vaktlista kjøres i forkant.
+      Funn går i `/backlog/`.
+- [ ] **Etter vakta:** arkivering, deretter G6b, og G6c i en *senere* `main`-push (se under).
+- [ ] **G2 (store filer) før frysingen, men ikke `oppdrag/services.py` før G6b** — ellers
+      skrives samme fil om to ganger med vakta imellom. `accounts/views.py`
+      (`user_detail_view` som dispatch-tabell) og `ko/views.py` er uavhengige.
 
 ### Kodegjennomgangen 25. sep. 2026 — se [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md)
 

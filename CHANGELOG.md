@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Veien til neste vakt, og en generalprøve  `#docs #drift`
+
+**Hvorfor:** neste vakt er om rundt 240 dager, og den blir **første gang flere biler per
+oppdrag brukes i virkeligheten** — det har ikke vært en vakt siden modellen kom 11. sep.
+Betingelsen for G6b («la prod gå noen vakter med broene først») kan derfor ikke oppfylles før
+vakta, og å fjerne den gamle kolonnen før første ekte bruk ville tatt bort nødutgangen akkurat
+når modellen er minst prøvd. **G6b og G6c tas etter vakta.**
+
+**`TODO.md`, ny seksjon «Veien til neste vakt»:** `staging` til `main` i to omganger i god tid
+(kolonneslettingen for seg), fastfrysing noen uker før vakta — det som skal med på vakta, som
+`/park/` og puss av `/ko/` og `/vaktliste/`, må være ferdig før — generalprøve 3–4 uker før,
+G6b/G6c etter, og G2 ikke i `oppdrag/services.py` før G6b.
+
+**`docs/GENERALPROVE.md`:** én sammenhengende øvelse med ekte folk og telefoner — to
+sentralbord, KO-leder, tre biler (iPhone med ringebryteren på lydløs, Android, og en
+spesialressurs med passiv vakt og avvente), vaktleder og pasientregistrering. Hovedvekt på
+flere biler per oppdrag (legg til, se hverandres stempler, ferdig først når alle er ledige,
+historikksøket, ta av, flytt, oppdrag uten bil), avvik (avbryt, behandlet på sted, rykk ut på
+nytt, føre og rette status, avvente), nettet borte, KO-koblingen, og avslutningen (arkiv,
+statistikk med «oppdrag» mot «enhetsinnsatser», avslutt vakt, backup og offsite). Den peker på
+`TESTSJEKKLISTE_KO.md` og `TESTSJEKKLISTE_VAKTLISTE.md` for detaljene i stedet for å gjenta
+dem. Funn går i `/backlog/`.
+
 ## 2026-09-26 — Ingen kode leser `Oppdrag.enhet` lenger (G6a, deploy 2 i oppdrag, første steg)  `#oppdrag #ko`
 
 **Hvorfor:** `Oppdrag.enhet` er arven fra én bil per oppdrag. Siden flere enheter kom
