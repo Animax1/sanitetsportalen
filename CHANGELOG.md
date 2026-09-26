@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Ankomster per time: samme svar i begge statistikkene, og i riktig rekkefølge (E1)  `#patients #statistikk`
+
+**Hvorfor:** pasientstatistikken ble regnet to steder, og de ga **ulike tall for samme
+vakt**. Grunnstatistikken grupperte ankomst per døgn og time (`'%d.%m %H:00'`), full
+statistikk per klokketime (`'%H:00'`) — på en vakt over flere døgn slo den siste sammen
+kl. 14 fredag og kl. 14 lørdag. André valgte **døgn og time** («E1 a»): det viser hvordan
+vakta gikk, og døgnrytmen kan regnes ut av det — ikke omvendt.
+
+**Og en feil til, i den som var «riktig»:** den sorterte på etiketten, så `'01.10 08:00'`
+kom foran `'30.09 22:00'` — en vakt over et månedsskifte sto baklengs i grafen.
+
+**`patients.services.ankomster_per_time(pts)`** er nå kjernen begge bruker. Den sorterer på
+tidspunktet og skriver etiketten `dd.mm HH:00` (grafen i `statistikk.js` bruker nøklene som
+akse, så den trengte ingen endring). **Allerede kollapsede arkiver** har aggregatet frosset
+med signatur og viser fortsatt klokketimene — de røres ikke.
+
+**Ingen test brakk av endringen** — verken klokketime-formatet eller rekkefølgen var prøvd.
+`patients/tests_ankomster.py` går gjennom `basic_stats` og `full_stats` (ikke hjelperen) med
+data over et månedsskifte. **Mutanter: 3, alle drept** — tilbake til klokketime, sortering på
+etiketten, og full statistikk med sin egen regel igjen.
+
 ## 2026-09-26 — Tilgangsreglene i docstringene sa det motsatte av koden (F1)  `#vaktliste #accounts #oppdrag`
 
 **Hvorfor først i pulje F:** den som leser en docstring før hun endrer en tilgangsport, leser

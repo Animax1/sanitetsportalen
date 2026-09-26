@@ -321,6 +321,41 @@ def stamp_utskrevet_if_needed(patient, updates):
 
 # ── Basis-statistikk (tilsvarer /api/stats) ──────────────────────────────────
 
+#: Formatene `inntid` kan stå i: skjemaets og ISO fra eldre importer.
+_INNTID_FORMATER = ('%d.%m.%Y %H:%M', '%Y-%m-%dT%H:%M')
+
+
+def ankomster_per_time(pts) -> dict:
+    """Ankomster per **døgn og time**, i kronologisk rekkefølge (26. sep. 2026, E1).
+
+    Én kjerne for begge statistikkene. Til da regnet grunnstatistikken per
+    døgn og time, og full statistikk per klokketime — så på en vakt over flere
+    døgn slo den ene sammen kl. 14 fredag og kl. 14 lørdag, og de to sidene
+    viste ulike tall for samme vakt. André valgte døgn og time: det viser
+    hvordan vakta faktisk gikk, og døgnrytmen kan regnes ut av det — ikke
+    omvendt.
+
+    **Sortert på tidspunktet, ikke på etiketten.** `sorted()` på
+    «dd.mm HH:00» satte «01.10 08:00» foran «30.09 22:00» — en vakt over et
+    månedsskifte sto baklengs. Etiketten er uendret, fordi grafen i
+    `statistikk.js` bruker nøklene som akse.
+    """
+    telling = {}
+    for p in pts:
+        raa = (p.get('inntid') or '').strip()
+        if not raa:
+            continue
+        for fmt in _INNTID_FORMATER:
+            try:
+                dt = datetime.strptime(raa, fmt)
+            except ValueError:
+                continue
+            time = dt.replace(minute=0)
+            telling[time] = telling.get(time, 0) + 1
+            break
+    return {time.strftime('%d.%m %H:00'): antall for time, antall in sorted(telling.items())}
+
+
 def _compute_stats_from_dicts(pts):
     """Intern hjelpe-funksjon: beregn basis-statistikk fra en list-of-dicts.
 
@@ -359,18 +394,7 @@ def _compute_stats_from_dicts(pts):
     prob_counts.pop('Ukjent', None)
     top_probs = sorted(prob_counts.items(), key=lambda x: x[1], reverse=True)[:12]
 
-    arrivals = {}
-    for p in pts:
-        if p.get('inntid'):
-            for fmt in ('%d.%m.%Y %H:%M', '%Y-%m-%dT%H:%M'):
-                try:
-                    dt = datetime.strptime(p['inntid'].strip(), fmt)
-                    key = dt.strftime('%d.%m %H:00')
-                    arrivals[key] = arrivals.get(key, 0) + 1
-                    break
-                except ValueError:
-                    continue
-    arrivals_sorted = dict(sorted(arrivals.items()))
+    arrivals_sorted = ankomster_per_time(pts)
 
     def avg(lst):
         return round(sum(lst) / len(lst), 0) if lst else 0
@@ -542,18 +566,7 @@ def _compute_full_stats_from_dicts(pts):
     prob_counts = count_field('problemstilling')
 
     # ── Ankomster per time ────────────────────────────────────────────────────
-    arrivals = {}
-    for p in pts:
-        if p['inntid']:
-            for fmt in ('%d.%m.%Y %H:%M', '%Y-%m-%dT%H:%M'):
-                try:
-                    dt = datetime.strptime(p['inntid'].strip(), fmt)
-                    key = dt.strftime('%H:00')
-                    arrivals[key] = arrivals.get(key, 0) + 1
-                    break
-                except ValueError:
-                    continue
-    arrivals = dict(sorted(arrivals.items()))
+    arrivals = ankomster_per_time(pts)
 
     # ── Krysstabeller ────────────────────────────────────────────────────────
     def crosstab(f1, f2, col_order=None):

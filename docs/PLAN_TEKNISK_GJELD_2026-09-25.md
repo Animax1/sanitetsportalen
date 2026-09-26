@@ -301,7 +301,7 @@ hører til:
 
 Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 
-**E1. Statistikkutregningen i pasientmodulen finnes to ganger, og de gir ulike svar.**
+**E1. Statistikkutregningen i pasientmodulen finnes to ganger, og de gir ulike svar.** *Levert 26. sep. 2026 (André: døgn og time), se CHANGELOG.*
 - **Hvor:** `patients/services.py`, `_compute_stats_from_dicts` og
   `_compute_full_stats_from_dicts`.
 - **Feilen:** full statistikk grupperer ankomst på `'%H:00'`, mens den andre bruker
