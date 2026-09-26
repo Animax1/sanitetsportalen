@@ -10,6 +10,7 @@ SQL-en i `_db_aktivitet()` kjører bare på PostgreSQL. Den ble prøvd mot en ek
 PostgreSQL 16 med en transaksjon som holdt en lås, en forespørsel bak den og en
 fremprovosert deadlock (CHANGELOG 25. sep. 2026); her prøves det SQLite gjør.
 """
+import unittest
 from unittest import mock
 
 from django.test import SimpleTestCase, TestCase
@@ -98,14 +99,42 @@ class KallstedetTests(SimpleTestCase):
 
 
 
+def _vendor():
+    from django.db import connection
+    return connection.vendor
+
+
+@unittest.skipUnless(_vendor() == 'sqlite', 'prøver SQLite-grenen; CI kjører PostgreSQL')
 class SqliteTests(TestCase):
-    """Lokalt og i testene: kortet viser «n/a», ikke en feil."""
+    """Lokalt: kortet viser «n/a», ikke en feil.
+
+    **Bare på SQLite** (26. sep. 2026, D1). Testen gikk ut fra at suiten
+    alltid kjørte på SQLite, og ble rød første gang den møtte PostgreSQL —
+    der signalene finnes, som de skal. Søsteren under prøver den grenen.
+    """
 
     def test_sqlite_har_ingen_signaler_og_ingen_feil(self):
         db = admin_status._get_db_health()
         self.assertTrue(db['healthy'])
         self.assertNotIn('signaler', db)
         self.assertNotIn('aktivitet_feil', db)
+
+
+@unittest.skipUnless(_vendor() == 'postgresql', 'krever PostgreSQL — kjøres i CI')
+class EktePostgresTests(TestCase):
+    """Spørringene mot `pg_stat_activity` og `pg_stat_database`, **uten mock**.
+
+    Testene under bytter ut aktiviteten; denne kjører den. Den fantes ikke før
+    suiten kjørte mot PostgreSQL (D1), og en feil i SQL-en ville ellers først
+    vist seg som «aktivitet_feil» på server-status i prod.
+    """
+
+    def test_signalene_regnes_og_ingenting_feiler(self):
+        db = admin_status._get_db_health()
+        self.assertTrue(db['healthy'])
+        self.assertNotIn('aktivitet_feil', db)
+        self.assertIn(db['signaler']['samlet'], ('gronn', 'oransje', 'rod'))
+        self.assertGreaterEqual(db['tilkoblinger'], 1)
 
 
 class PostgresgreinenTests(TestCase):

@@ -4,12 +4,12 @@ Kjør med: python manage.py test patients
 """
 import json
 import re
-import shutil
 import unittest
 from datetime import datetime
 
 from django.db import connection
 from django.test import TestCase, Client, SimpleTestCase, override_settings
+from patients.js_test_utils import node_available
 from patients.test_helpers import sett_aktiv_vakt
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -1097,7 +1097,7 @@ global.document = {
         harness = jsu.build_harness([(jsu.PORTAL_UTILS_JS, ('withSubmitGuard',))])
         return jsu.run_node(harness, snippet, preamble=self.BTN_STUB)
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_guard_blokkerer_andre_kall_mens_forste_paagaar(self):
         """Selve vernet: to raske klikk skal gi én registrering.
 
@@ -1115,7 +1115,7 @@ await Promise.all([forste, andre]);
 assert(kall === 1, 'forventet 1 registrering, fikk ' + kall);
 ''')
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_guard_disabler_knappen_umiddelbart(self):
         """Knappen skal være låst mens kallet pågår, ikke først etterpå."""
         self._run_guard('''
@@ -1129,7 +1129,7 @@ assert(btn.dataset.submitting === undefined, 'låsen ble ikke frigitt etterpaa')
 assert(btn.disabled === false, 'knappen ble ikke aktivert igjen');
 ''')
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_guard_holder_laasen_i_minst_250ms(self):
         """Et raskt svar skal likevel holde knappen låst minimumstiden.
 
@@ -1142,7 +1142,7 @@ const brukt = Date.now() - start;
 assert(brukt >= 245, 'laasen ble holdt i bare ' + brukt + ' ms');
 ''')
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_guard_frigir_laasen_naar_lagring_feiler(self):
         """En mislykket lagring skal ikke låse knappen for godt.
 
@@ -1269,7 +1269,7 @@ let sendtBody = null;
         harness = jsu.build_harness([(jsu.FORMS_JS, ('_saveNewImpl',))])
         return jsu.run_node(harness, snippet, preamble=self.DOM_STUB)
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_429_vises_som_feilmelding_i_skjemaet(self):
         self._kjor('''
 global.apiFetch = async () => ({
@@ -1288,7 +1288,7 @@ assert(skjult === false,
        'modalen ble lukket selv om pasienten ikke ble lagret');
 ''')
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_vellykket_lagring_lukker_modalen(self):
         self._kjor('''
 global.apiFetch = async () => ({ ok: true, status: 201, json: async () => ({ id: 1 }) });
@@ -1300,7 +1300,7 @@ assert(lastet === 1, 'pasientlista ble ikke lastet paa nytt');
 assert(felter['new-form-error'].style.display === 'none',
        'feilfeltet ble staaende synlig etter vellykket lagring');
 ''')
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_idempotensnokkelen_sendes_med(self):
         """F3: uten nøkkelen i kroppen er hele server-vernet dødt."""
         self._kjor('''
@@ -1315,7 +1315,7 @@ assert(sendtBody.idempotency_key === 'test-noekkel-abc123',
        'idempotency_key manglet i kroppen, fikk: ' + sendtBody.idempotency_key);
 ''')
 
-    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
     def test_409_lukker_modalen_uten_feilmelding(self):
         """En dobbeltinnsending er ikke en feil brukeren kan rette.
 

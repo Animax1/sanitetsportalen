@@ -159,10 +159,11 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       byttet — KOs sak, ikke oppdragsmodulens.
 - [ ] **Pulje C — avgjørelser.** C1 og C2 levert 26. sep. Igjen: C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
       predikat for «på vakt», eller fjern feltet.
-- [ ] **Pulje D — verifiseringen.** CI med PostgreSQL og node, og manglende node skal feile,
-      ikke hoppe over ~160 tester (D1, erstatter «Vurder GitHub Actions»); død kode som
+- [ ] **Pulje D — verifiseringen.** D1 (CI) levert 26. sep. Igjen: død kode som
       testene holder i live (D2); XSS-skanner for `backlog.js` og `+`-uttrykk (D3);
-      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
+      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4). Og en innstilling
+      hos André, ikke i koden: «vent på grønne sjekker» i Railway for `main`, så CI blir en
+      sperre og ikke bare et merke.
 - [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og

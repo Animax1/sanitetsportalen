@@ -261,7 +261,7 @@ Punktet finnes **bare på staging**.
 
 ## Pulje D: verifiseringen
 
-**D1. CI med PostgreSQL og node.** Erstatter punktet «Vurder GitHub Actions» i TODO.
+**D1. CI med PostgreSQL og node.** Erstatter punktet «Vurder GitHub Actions» i TODO. *Levert 26. sep. 2026 (bare staging og main), se CHANGELOG.*
 - **Jobbene:**
   - hele suiten mot PostgreSQL
   - migrasjonsprøvene

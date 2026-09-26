@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — CI: testene kjører mot PostgreSQL med node ved push til staging og main (D1)  `#core/drift`
+
+**Hvorfor:** suiten kjørte bare lokalt, på **SQLite**, og rundt **160 JS-tester hoppet over
+seg selv** når node manglet — en grønn suite kunne bety at halvparten av JS-reglene aldri
+kjørte. A3 (runde 1) viste hva det koster: en databasefeil i en signalmottaker veltet
+stemplingen **bare i PostgreSQL**, grønt lokalt og rødt i prod.
+
+**`.github/workflows/tester.yml`** — ved push til **`staging` og `main`**, og PR-er mot dem
+(André: «det holder med staging og main», arbeidet går alltid via staging):
+PostgreSQL 16 som tjeneste, Python 3.13 som `runtime.txt`, node 22, avhengighetene med
+hasher som på Railway, og stegene fra kommandoblokka i `CLAUDE.md`: `check`,
+**`makemigrations --check`** (ny — fanger en modellendring uten migrasjon), `collectstatic`,
+alt utenom `core` med `--parallel 4`, `core` serielt, og **`verifiser_migrasjoner`** —
+«husk å kjøre migrasjonsprøvene» er ikke lenger noe man må huske.
+
+**`KREV_NODE=1`: en JS-test uten node feiler, den hopper ikke over.**
+`patients.js_test_utils.node_available()` kaster når variabelen er satt og node mangler.
+Den er nå **det eneste stedet** node sjekkes: ni tester spurte `shutil.which('node')` selv,
+og ville gått forbi kravet i stillhet. `NodeSjekkesEttStedTests` holder det. Lokalt er alt
+som før. **Bevist med node skjult fra PATH:** uten kravet `OK (skipped=31)` — den grønne,
+hule tilstanden — med kravet `RuntimeError`.
+
+**Én test gikk ut fra SQLite** (`test_sqlite_har_ingen_signaler_og_ingen_feil`) og ble rød
+første gang den møtte PostgreSQL, der databasekortets signaler finnes som de skal. Den
+kjører nå bare på SQLite, og har fått en søster, **`EktePostgresTests`**, som kjører
+spørringene mot `pg_stat_activity` **uten mock** — de var til nå bare prøvd med mock.
+
+**`core/tests_ci.py`:** hver app med tester står i CI-kjøringen (samme feil som da
+`myproject` manglet i `CLAUDE.md` til 14. sep.), og workflowen krever node og PostgreSQL.
+
+**Kjørt ende til ende før push, på CI-ens versjoner:** et nytt venv på **Python 3.13**,
+installert fra `requirements.txt` med hasher, PostgreSQL 16, `KREV_NODE=1`: `check` og
+`makemigrations --check` rene, **3 821 + 834 tester grønne**, **3 av 3 migrasjonsprøver**,
+211 sekunder. **Hele suiten hadde aldri kjørt mot PostgreSQL før**, og den eneste feilen var
+testen over.
+
+**Mutasjonstesting:** 4 mutanter — `myproject` ute av workflowen, `KREV_NODE` fjernet
+(begge fanget av `tests_ci`), og node skjult med og uten kravet (over). `CLAUDE.md` har én
+linje om CI; kommentaren om `myproject` ble kortet inn, siden `tests_ci` nå holder den.
+
+**Ikke gjort, og André sin sak:** CI stopper ikke Railway. «Vent på grønne sjekker» for
+`main` er en innstilling i Railway.
+
 ## 2026-09-26 — Django-admin er skrivebeskyttet for kontoene, og regelen om `role` dekker flere former (B4)  `#core/tilgang`
 
 **André: «skrivebeskyttet».** Django-admin rutes bare under `DEBUG` — aldri i prod eller

@@ -19,7 +19,6 @@ To lag med tester:
 Kjør med: python manage.py test patients.tests_xss_stats
 """
 import re
-import shutil
 import unittest
 
 from django.test import SimpleTestCase
@@ -27,7 +26,7 @@ from django.test import SimpleTestCase
 from patients.js_test_utils import (
     ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_BEMANNING_JS, STATISTIKK_JS, STATISTIKK_KO_JS,
     STATISTIKK_OPPDRAG_JS,
-    build_harness, extract_function, read_js, run_node,
+    build_harness, extract_function, node_available, read_js, run_node,
 )
 
 # Funksjonene som bygger HTML fra pasientdata. Endres denne lista, må
@@ -195,7 +194,7 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
                           f'{felt} settes inn uescapet i {name}()')
 
 
-@unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class StatsEscapingBehaviourTests(SimpleTestCase):
     """Kjører byggerne i node og verifiserer akseptansekriteriet for N6."""
 

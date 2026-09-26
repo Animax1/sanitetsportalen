@@ -1,0 +1,81 @@
+# Testene, mot PostgreSQL og med node — ved hver push til staging og main.
+#
+# Hvorfor dette finnes (26. sep. 2026, D1 i docs/PLAN_TEKNISK_GJELD_2026-09-25.md):
+# suiten kjørte bare lokalt, på SQLite, og rundt 160 JS-tester hoppet over seg
+# selv uten node. En feil som bare finnes i PostgreSQL (A3: en databasefeil i en
+# signalmottaker som veltet stemplingen) var grønn lokalt og rød i prod.
+#
+# Bare staging og main (André, 26. sep. 2026): arbeidet går alltid via staging,
+# så det er der CI svarer — før noe går videre til main. CI stopper ikke Railway
+# av seg selv; «vent på grønne sjekker» for main er en innstilling i Railway.
+#
+# Stegene er de samme som kommandoblokka i CLAUDE.md, og skal holdes like:
+# `core` for seg (tests_backup tåler ikke --parallel), resten delt.
+name: Tester
+
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+
+concurrency:
+  group: tester-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tester:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Migrasjonsprøvene lager og sletter sin egen engangsbase på samme server.
+      MIGRASJONSPROVE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Bare for testene. settings.py krever minst 50 tegn.
+      SECRET_KEY: ci-bare-for-testene-ikke-en-hemmelighet-0123456789abcdef
+      DEBUG: 'True'
+      # En JS-test uten node skal feile, ikke hoppe over (patients/js_test_utils.py).
+      KREV_NODE: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'   # som runtime.txt
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Avhengighetene, låst med hasher som på Railway
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: Django-sjekk og manglende migrasjoner
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+
+      - name: Statiske filer (manifestet noen tester leser)
+        run: python manage.py collectstatic --noinput -v 0
+
+      - name: Testene utenom core
+        run: python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog myproject --noinput -v 1 --parallel 4
+
+      - name: core, serielt
+        run: python manage.py test core --noinput -v 1
+
+      - name: Migrasjonsprøvene mot PostgreSQL
+        run: python manage.py verifiser_migrasjoner

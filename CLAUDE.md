@@ -83,9 +83,9 @@ python manage.py create_admin --username admin --password "bytt-meg"
 # Kjøre lokalt
 python manage.py runserver           # http://127.0.0.1:8000/
 
-# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): den bærer
-# settings-vaktene — PostgreSQL på Railway, `_env_bool` som hadde rate-limitingen
-# av i prod. Lista her utelot den, og da kjørte ingen dem.
+# CI: `.github/workflows/tester.yml` — det samme, PostgreSQL, `KREV_NODE=1`.
+# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): settings-vaktene.
+# `core/tests_ci.py` krever at hver app med tester står i CI-kjøringen.
 python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog myproject -v 2
 
 # Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).

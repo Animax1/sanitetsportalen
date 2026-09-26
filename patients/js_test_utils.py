@@ -14,6 +14,7 @@ node med et minimalt stubbet miljø. Det unngår å måtte laste hele modulen,
 som har toppnivå-avhengigheter til Chart, bootstrap og DOM-en.
 """
 import re
+import os
 import shutil
 import subprocess
 import tempfile
@@ -74,8 +75,25 @@ VAKTLISTE_JS = (
 
 
 def node_available():
-    """True hvis node finnes på PATH. Brukes med unittest.skipUnless."""
-    return shutil.which('node') is not None
+    """True hvis node finnes på PATH. Brukes med unittest.skipUnless.
+
+    **Med `KREV_NODE=1` kaster den i stedet for å si nei** (26. sep. 2026, D1).
+    Rundt 160 JS-tester hopper over seg selv uten node, og suiten er da grønn
+    uten at `avgjor()`, `klikkSkalKjore()` og de andre JS-reglene har kjørt.
+    CI setter variabelen; lokalt er alt som før. Et kast ved import gjør hele
+    testmodulen rød, et kast i `setUp` den ene testen — begge synes.
+
+    **Dette er det eneste stedet node sjekkes.** `NodeSjekkesEttStedTests`
+    holder det: en test som spør `shutil.which('node')` selv, ville gått forbi
+    kravet i stillhet.
+    """
+    if shutil.which('node') is not None:
+        return True
+    if os.environ.get('KREV_NODE', '').strip().lower() in ('1', 'true', 'ja'):
+        raise RuntimeError(
+            'KREV_NODE er satt, men node finnes ikke på PATH — JS-testene ville '
+            'ellers hoppet over seg selv og suiten sett grønn ut.')
+    return False
 
 
 def read_js(path):
