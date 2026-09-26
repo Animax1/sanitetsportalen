@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Sikkerhetssjekken dekket 75 av 186 ruter, og meldte grønt om tre som ikke fantes (B5)  `#core/sikkerhet`
+
+`scripts/sikkerhetssjekk.py` prøver en kjørende portal utenfra: at ingen side eller API
+svarer 200 uten innlogging, og at skriveendepunktene avviser POST uten CSRF. Lista over hva
+den prøvde, var **skrevet for hånd «fra urlpatterns 13. sep. 2026»**, og hadde forfalt:
+
+- **111 av 186 ruter manglet** — hele `/ko/` (42), `/backlog/` (9), `/api/endringer/`, og
+  deler av oppdrag, vaktlista, portal-admin og pasientene.
+- **Tre av stiene fantes ikke lenger** (`/portal-admin/backup/patients/`, `…/last-ned/1/`,
+  `…/run/`). De ga 404 — og 404 telte som «stengt». Scriptet meldte altså grønt om ruter
+  som ikke var der: en skanner som melder dekning den ikke har.
+
+**Rettingen: lista utledes av `urlpatterns`.**
+- `core/sikkerhetsruter.py` + `python manage.py sikkerhetsruter` skriver
+  `scripts/sikkerhetsruter.json`: hver rute som en eksempelsti (`<int:…>` → `1`, andre → `x`).
+- **Alt er stengt med mindre det står i `AAPNE` (8) eller `OMDIRIGERER` (10), med grunn.**
+- Scriptet leser fila og prøver **hver stengt rute med både GET og POST** anonymt. Da trenger
+  ingen å vite hvilke metoder et view tar: en rute som bare tar POST, svarer 405 på GET.
+- De åpne kan svare **400** — en invitasjons- eller passordlenke med ugyldig token sier fra.
+
+**`core/tests_sikkerhetsruter.py` holder det i live**, og gjør scriptets jobb inne i suiten:
+fila er det kommandoen ville skrevet («Kjør: python manage.py sikkerhetsruter»),
+klassifiseringen peker ikke på ruter som er borte, hver åpning er begrunnet, og hver stengt
+rute gir aldri 200 eller 500 anonymt — GET og POST.
+
+**Kjørt ende til ende** mot en lokal server: 168 ruter stengt for GET og POST, de ti gamle
+adressene sender videre. **Mutasjonstesting:** 4 mutanter — en rute fjernet fra fila, en død
+klassifisering, en tom begrunnelse, og `@modul_kreves` fjernet fra et view i backlog. Alle
+drept.
+
+**Og én feil i min egen første versjon:** eksempelstien for de gamle regex-adressene ble
+`/admin/server-status/(?Pxx)` — `(?P<rest>…)` ble lest som en `<parameter>`. Rekkefølgen er
+snudd.
+
 ## 2026-09-26 — Feilen fra e-postutsendingen: rå tekst til alle med `les`, og «kaster aldri» som kastet (B7)  `#vaktliste/offline`
 
 **Tre ting ved samme feil:**

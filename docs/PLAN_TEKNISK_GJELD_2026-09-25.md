@@ -196,7 +196,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
   - Utvid `RollenSettesBareGjennomSkjemaeneTests` til å fange `fields` med
     `role`/`is_superuser` og `.update(role=`.
 
-**B5. `scripts/sikkerhetssjekk.py` mangler `/ko/`, `/backlog/` og `/api/endringer/`.**
+**B5. `scripts/sikkerhetssjekk.py` mangler `/ko/`, `/backlog/` og `/api/endringer/`.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Retting:** utled `STENGT_GET` fra `urlpatterns`, som `tests_modul_dekorator` gjør.
 
 **B6. Datofiltrene gir 500 på en ugyldig dato.** *Levert 26. sep. 2026, se CHANGELOG.*

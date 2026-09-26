@@ -30,47 +30,25 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
-# ── Det som skal være stengt uten innlogging ──────────────────────────────────
-# Fra `urlpatterns` 13. sep. 2026. <pk> er byttet med 1 — 404 er også et
-# godkjent svar, poenget er at svaret aldri er 200 (eller 500).
-STENGT_GET = [
-    '/', '/min-profil/', '/varsler/', '/api/varsler/', '/api/varsler/ulest-antall/',
-    '/accounts/change-password/', '/portal-admin/brukere/', '/portal-admin/brukere/ny/',
-    '/portal-admin/brukere/1/', '/portal-admin/innloggingslogg/', '/portal-admin/innstillinger/',
-    '/portal-admin/moduler/', '/portal-admin/moduler/patients/', '/portal-admin/auditlog/',
-    '/portal-admin/auditlog/eksport.csv', '/portal-admin/backup/', '/portal-admin/backup/patients/',
-    '/portal-admin/backup/patients/last-ned/1/', '/portal-admin/server-status/',
-    '/portal-admin/server-status/json/', '/portal-admin/server-status/sessions/',
-    '/pasienter/', '/pasienter/api/settings/', '/pasienter/api/patients/', '/pasienter/api/patients/1/',
-    '/pasienter/api/forstehjelpere/', '/pasienter/api/helsepersonell/', '/pasienter/api/vakter/',
-    '/pasienter/api/innstillinger/arkiv/', '/pasienter/api/innstillinger/arkiv/1/',
-    '/statistikk/', '/statistikk/api/kilde/patients/full-stats/', '/statistikk/api/kilde/oppdrag/full-stats/',
-    '/statistikk/api/kilde/patients/arkiv/1/full-stats/',
-    '/oppdrag/', '/oppdrag/api/enheter/', '/oppdrag/api/enheter/1/', '/oppdrag/api/lokasjoner/',
-    '/oppdrag/api/enhetstyper/', '/oppdrag/api/problemstillinger/', '/oppdrag/api/bilinnstillinger/',
-    '/oppdrag/api/oppdrag/', '/oppdrag/api/oppdrag/1/', '/oppdrag/api/historikk/', '/oppdrag/api/arkiv/',
-    '/oppdrag/api/arkiv/1/', '/oppdrag/api/oppdrag/1/historikk/',
-    '/vaktliste/', '/vaktliste/api/vaktlister/', '/vaktliste/api/vaktlister/1/',
-    '/vaktliste/api/vaktlister/1/ressurser/', '/vaktliste/api/ressurser/1/', '/vaktliste/api/ressurser/1/vaktposter/',
-    '/vaktliste/api/vaktposter/1/', '/vaktliste/api/enhet/1/besetning/', '/vaktliste/api/vaktlister/1/belastning/',
-    '/vaktliste/api/grenser/', '/vaktliste/api/vaktlister/1/fil/', '/vaktliste/api/mannskap/',
-    '/vaktliste/api/mannskap/1/', '/vaktliste/api/korps/', '/vaktliste/api/kompetanser/',
-    '/vaktliste/api/grupper/', '/vaktliste/api/roller/',
-]
-# Skriveendepunkter: uten innlogging og uten CSRF-token skal svaret være 403
-# (CSRF) eller en omdirigering — aldri 200, aldri 500.
-STENGT_POST = [
-    '/pasienter/api/patients/', '/pasienter/api/avslutt-vakt/', '/pasienter/api/innstillinger/arkiv/lagre/',
-    '/oppdrag/api/oppdrag/', '/oppdrag/api/lokasjoner/', '/oppdrag/api/oppdrag/1/status/rykker_ut/',
-    '/vaktliste/api/vaktlister/', '/vaktliste/api/mannskap/', '/vaktliste/api/vaktposter/1/stempling/mott/',
-    '/vaktliste/api/vaktlister/1/drift/start/', '/vaktliste/api/vaktlister/1/fil/send/',
-    '/portal-admin/backup/patients/run/', '/portal-admin/server-status/sessions/kill-all/',
-    '/accounts/logout/',
-]
-# Skal svare uten innlogging — og bare disse.
-AAPENT = ['/healthz/', '/robots.txt', '/manifest.webmanifest', '/accounts/login/',
-          '/accounts/glemt-passord/', '/vaktliste/sw.js']
+# ── Rutene: utledet av `urlpatterns`, ikke skrevet for hånd ─────────────────
+# `scripts/sikkerhetsruter.json` skrives av `python manage.py sikkerhetsruter`,
+# og `core/tests_sikkerhetsruter.py` krever at den er i takt med rutene. Lista
+# sto her for hånd til 26. sep. 2026 (B5): 111 av 186 ruter manglet, og tre av
+# stiene fantes ikke lenger — de ga 404, som telte som «stengt», så scriptet
+# meldte grønt om ruter som ikke var der. <pk> er 1 og andre parametre «x»;
+# 404 er et godkjent svar for en stengt rute, poenget er at det aldri er 200.
+_RUTEFIL = Path(__file__).with_name('sikkerhetsruter.json')
+_RUTER = json.loads(_RUTEFIL.read_text(encoding='utf-8'))
+#: Alt som skal være stengt — prøves anonymt med GET *og* POST uten CSRF. En
+#: rute som bare tar POST svarer 405 på GET, og det er også «stengt».
+STENGT = _RUTER['stengt']
+#: Skal svare uten innlogging — og bare disse. 400 er lov: en lenke med
+#: ugyldig token sier fra om det.
+AAPENT = _RUTER['aapne']
+#: Gamle adresser som sender videre. Aldri 200.
+OMDIRIGERER = _RUTER['omdirigerer']
 # Skal ikke finnes.
 FINNES_IKKE = ['/django-admin/', '/admin/', '/.env', '/.git/config', '/static/', '/backups/',
                '/manage.py', '/myproject/settings.py', '/wp-login.php']
@@ -265,17 +243,19 @@ def test_cookies(k, r, etter_innlogging=False):
 def test_stengt(base, r):
     r.overskrift('Uten innlogging: alt skal være stengt')
     k = Klient(base)
-    for sti in STENGT_GET:
+    for sti in STENGT:
         st, h, html = k.kall(sti)
         loc = h.get('location', '')
         ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
-        if st == 200 and sti == '/':
-            ok = False
         if ok:
             continue
         r.feil(f'GET {sti} svarte {st} {loc} uten innlogging')
-    r.ok(f'{len(STENGT_GET)} sider og API-er sjekket — de som ikke står som FEIL over, er stengt')
-    for sti in STENGT_POST:
+    r.ok(f'{len(STENGT)} sider og API-er sjekket — de som ikke står som FEIL over, er stengt')
+    for sti in OMDIRIGERER:
+        st, h, html = k.kall(sti)
+        r.sjekk(st in (301, 302, 404), f'GET {sti} → {st} (gammel adresse)',
+                f'GET {sti} → {st} — en gammel adresse skal sende videre, ikke svare')
+    for sti in STENGT:
         st, h, html = k.kall(sti, 'POST', json_data={})
         loc = h.get('location', '')
         ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
@@ -283,11 +263,11 @@ def test_stengt(base, r):
             r.feil(f'POST {sti} uten innlogging og CSRF svarte {st}')
         elif st == 500:
             r.feil(f'POST {sti} ga 500')
-    r.ok(f'{len(STENGT_POST)} skriveendepunkter avviser POST uten innlogging/CSRF')
+    r.ok(f'{len(STENGT)} ruter avviser POST uten innlogging/CSRF')
     r.overskrift('Åpne sider og ting som ikke skal finnes')
     for sti in AAPENT:
         st, h, html = k.kall(sti)
-        r.sjekk(st == 200, f'GET {sti} → {st}', f'GET {sti} → {st} (forventet 200)')
+        r.sjekk(st in (200, 400), f'GET {sti} → {st}', f'GET {sti} → {st} (forventet 200, eller 400 for et ugyldig token)')
         if sti == '/healthz/':
             r.sjekk(len(html) < 300 and 'Traceback' not in html, f'/healthz/ er kort ({len(html)} tegn): {html.strip()[:80]!r}',
                     f'/healthz/ er lang ({len(html)} tegn) — lekker den noe?')
