@@ -2,14 +2,12 @@
 
 Skilt ut fra ``views.py`` i N13.3.
 """
-from core.klientip import klient_ip
-import hashlib
-import json as _jmod
 import logging
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
+from core.arkiv import get_handler, logg_arkivhendelse, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
@@ -17,24 +15,6 @@ from .services import arkiver_aktiv_vakt, compute_arkiv_stats
 from .views_common import _json_body
 
 logger = logging.getLogger(__name__)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# BACKUP / RESTORE
-# ═══════════════════════════════════════════════════════════════════════
-
-def _log_audit(request, action, detail):
-    """Hjelpefunksjon for å logge backup-hendelser til AuditLog."""
-    from audit.models import AuditLog
-    AuditLog.objects.create(
-        table_name='backup',
-        record_id=0,
-        action='CREATE',
-        field_name=action,
-        new_value=detail,
-        user=request.user if request.user.is_authenticated else None,
-        ip=klient_ip(request),
-    )
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -66,7 +46,8 @@ def arkiv_lagre_view(request):
         logger.exception('Feil ved arkivering av vakt')
         return JsonResponse({'error': 'Arkivering feilet. Se server-logg.'}, status=500)
 
-    _log_audit(request, 'arkiv_lagret', f'arkiv_id={arkiv.pk}, tittel={arkiv.tittel}')
+    logg_arkivhendelse(type(arkiv), 'arkiv_lagret', f'arkiv_id={arkiv.pk}, tittel={arkiv.tittel}',
+                       request=request, record_id=arkiv.pk)
     return JsonResponse({
         'ok': True,
         'id': arkiv.pk,
@@ -108,8 +89,6 @@ def arkiv_detalj_view(request, pk):
     DELETE: Krever admin og {confirm: true} i body.
     """
     from .models import VaktArkiv
-    import hashlib
-    import json as _jmod
 
     try:
         arkiv = VaktArkiv.objects.select_related('importert_av').get(pk=pk)
@@ -122,22 +101,12 @@ def arkiv_detalj_view(request, pk):
 
         stats = compute_arkiv_stats(arkiv)
 
-        # SHA-256-verifikasjon. Kilden avhenger av om arkivet er kollapset:
-        # etter kollaps finnes ikke pasientradene lenger, og `sha256` (som er
-        # beregnet over dem) kan aldri verifiseres igjen. Da sjekkes det
-        # frosne aggregatet i stedet.
-        if arkiv.er_kollapset:
-            from .services import _compute_sha256_for_aggregat
-            sha_now = _compute_sha256_for_aggregat(arkiv, arkiv.aggregat or {})
-            tamper_detected = bool(
-                arkiv.aggregat_sha256 and sha_now != arkiv.aggregat_sha256
-            )
-        else:
-            # Samme helper som arkiveringen brukte — verifikasjonen må lese
-            # nøyaktig de feltene signaturen ble beregnet over.
-            from .services import _compute_sha256_for_arkiv, _arkiv_pasienter_dicts
-            sha_now = _compute_sha256_for_arkiv(arkiv, _arkiv_pasienter_dicts(arkiv))
-            tamper_detected = bool(arkiv.sha256 and sha_now != arkiv.sha256)
+        # **`core.arkiv.verifiser`, som oppdrag bruker** (26. sep. 2026, E3).
+        # Til da sto regelen skrevet ut her — radsignaturen, eller aggregatets
+        # etter kollaps — og en endring i den ene ville gitt to svar på
+        # «er arkivet tuklet med». Handleren henter radene med samme funksjon
+        # som arkiveringen brukte.
+        tamper_detected = verifiser(get_handler('patients'), arkiv)
 
         return JsonResponse({
             'id': arkiv.pk,
@@ -173,5 +142,6 @@ def arkiv_detalj_view(request, pk):
 
     tittel = arkiv.tittel
     arkiv.delete()  # CASCADE sletter ArkivertPasient-rader
-    _log_audit(request, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}')
+    logg_arkivhendelse(VaktArkiv, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
+                       request=request, record_id=pk)
     return JsonResponse({'ok': True})

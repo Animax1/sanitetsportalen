@@ -10,6 +10,7 @@ Offentlig API:
 - ``verifiser(handler, arkiv)`` — True hvis signaturen ikke stemmer
 - ``kollaps(handler, arkiv)`` — irreversibel; frys aggregat, slett rader
 - ``har_backup_etter(handler, tidspunkt)`` — sperre før kollaps
+- ``logg_arkivhendelse(modell, handling, detalj)`` — auditrad på arkivets tabell
 
 Se ``core/arkiv/handlers.py`` for arbeidsdelingen mellom core og handler, og
 ``patients/arkiv.py`` for et ferdig eksempel.
@@ -26,6 +27,7 @@ from .service import (  # noqa: F401
     beregn_sha256,
     har_backup_etter,
     kollaps,
+    logg_arkivhendelse,
     verifiser,
 )
 
@@ -39,5 +41,6 @@ __all__ = [
     'beregn_sha256',
     'har_backup_etter',
     'kollaps',
+    'logg_arkivhendelse',
     'verifiser',
 ]

@@ -44,7 +44,7 @@ from core.kommando import lesbar_dbfeil
 from django.utils import timezone
 
 from audit.models import AuditLog
-from core.arkiv import all_handlers, get_handler, har_backup_etter, kollaps
+from core.arkiv import all_handlers, get_handler, har_backup_etter, kollaps, logg_arkivhendelse
 
 
 class Command(BaseCommand):
@@ -168,14 +168,9 @@ class Command(BaseCommand):
 
             slettet = kollaps(handler, arkiv)
 
-            AuditLog.objects.create(
-                table_name=arkiv._meta.db_table,
-                record_id=arkiv.pk,
-                action='UPDATE',
-                field_name='kollapset_at',
-                old_value='',
-                new_value=f'{slettet} rader slettet, erstattet av aggregat',
-            )
+            logg_arkivhendelse(type(arkiv), 'kollapset_at',
+                               f'{slettet} rader slettet, erstattet av aggregat',
+                               record_id=arkiv.pk, action='UPDATE')
 
             self.stdout.write(self.style.SUCCESS(
                 f'  Kollapset «{arkiv.tittel}»: {slettet} rader slettet.'

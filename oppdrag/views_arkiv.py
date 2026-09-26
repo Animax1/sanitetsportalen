@@ -14,14 +14,12 @@ oppdrag, ikke vaktas arkiv.
 """
 from __future__ import annotations
 
-from core.klientip import klient_ip
-
 import logging
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
-from core.arkiv import verifiser
+from core.arkiv import logg_arkivhendelse, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
@@ -32,25 +30,6 @@ from .statistikk import arkiv_stats
 from .views_common import json_body
 
 logger = logging.getLogger(__name__)
-
-
-def _logg_audit(request, handling, detalj):
-    """Arkivhendelser i auditsporet.
-
-    Signalet i `oppdrag/signals.py` logger feltendringer på oppdrag, ikke
-    handlinger på et arkiv — og «hvem arkiverte vakta, og når» er nettopp det
-    man leter etter i ettertid.
-    """
-    from audit.models import AuditLog
-    AuditLog.objects.create(
-        table_name='oppdrag_oppdragarkiv',
-        record_id=0,
-        action='CREATE',
-        field_name=handling,
-        new_value=detalj,
-        user=request.user if request.user.is_authenticated else None,
-        ip=klient_ip(request),
-    )
 
 
 def _antall_oppdrag(arkiv) -> int:
@@ -126,8 +105,11 @@ def arkiv_liste_view(request):
             {'status': 'error', 'message': 'Arkivering feilet. Se server-logg.'},
             status=500)
 
-    _logg_audit(request, 'arkiv_lagret',
-                f'arkiv_id={arkiv.pk}, vakt={vakt.navn}, antall={antall}')
+    # Signalet i `oppdrag/signals.py` logger feltendringer på oppdrag, ikke
+    # handlinger på et arkiv — «hvem arkiverte vakta» logges her.
+    logg_arkivhendelse(OppdragArkiv, 'arkiv_lagret',
+                       f'arkiv_id={arkiv.pk}, vakt={vakt.navn}, antall={antall}',
+                       request=request, record_id=arkiv.pk)
     return JsonResponse(
         {'status': 'ok', 'data': _arkiv_til_dict(arkiv)}, status=201)
 
@@ -164,5 +146,6 @@ def arkiv_detalj_view(request, pk):
 
     tittel = arkiv.tittel
     arkiv.delete()   # CASCADE tar de arkiverte oppdragene
-    _logg_audit(request, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}')
+    logg_arkivhendelse(OppdragArkiv, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
+                       request=request, record_id=pk)
     return JsonResponse({'status': 'ok'})

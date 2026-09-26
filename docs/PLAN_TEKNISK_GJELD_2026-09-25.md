@@ -317,7 +317,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
   `ProtectedError` fanges bare i oppdrag.
 - **Retting:** én fabrikk i `core`.
 
-**E3. Arkivverifiseringen er skrevet på nytt i viewet.**
+**E3. Arkivverifiseringen er skrevet på nytt i viewet.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `patients/views_arkiv.py:124-140`.
 - **Retting:** kall `core.arkiv.verifiser()`, slik oppdrag gjør.
 - **Samtidig:** arkivhendelsene logges med `table_name='backup'`. Lag én felles

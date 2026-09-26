@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Arkivene verifiseres og logges ett sted (E3)  `#core #patients #oppdrag`
+
+**Verifiseringen:** `patients/views_arkiv.py` hadde regelen for «er arkivet tuklet med»
+skrevet ut i viewet — radsignaturen, eller aggregatets etter kollaps — mens oppdrag kalte
+`core.arkiv.verifiser()`. Samme regel to steder; en endring i den ene ville gitt to svar.
+Pasientviewet kaller nå `verifiser(get_handler('patients'), arkiv)`. Handleren henter radene
+med samme funksjon arkiveringen brukte, så signaturene er uendret (`ArkivSignaturLaastTests`
+grønne).
+
+**Loggingen:** tre former for samme slags hendelse. Pasientarkivet logget «lagret» og «slettet»
+som `table_name='backup'` med `record_id=0`; oppdragsarkivet som `oppdrag_oppdragarkiv`, også
+med 0; kollaps-kommandoen med arkivets eget tabellnavn og ID. Et søk på «hvem slettet arkivet»
+fant det ene og ikke det andre. **`core.arkiv.logg_arkivhendelse()`** skriver nå alle tre på
+arkivets tabell og ID, med bruker og IP når det finnes en forespørsel. Gamle rader står som de
+sto — bruddet er datert, og `'backup'` → `patients` i `audit/signals.py` blir stående.
+
+**Test:** lagring og sletting gjennom endepunktene gir to rader på `patients_vaktarkiv` med
+arkivets ID og admin som bruker — det var udekket. **Mutanter: 5, alle drept** — verifiseringen
+alltid «ok», feil tabell i hjelperen, brukeren glemt, slettingen og kollapsen uten logg.
+
 ## 2026-09-26 — «Kan lede» i oppdrag: knappen og døra svarer likt (E4)  `#oppdrag #ko #vaktliste`
 
 **Hvorfor:** «kan sette opp verdimengdene» sto to steder med to ulike regler. Knappen

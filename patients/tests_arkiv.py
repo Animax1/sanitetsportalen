@@ -318,6 +318,20 @@ class ArkivSlettTests(ArkivTestMixin, TestCase):
         self.assertFalse(VaktArkiv.objects.filter(pk=self.arkiv.pk).exists())
         self.assertEqual(ArkivertPasient.objects.filter(arkiv_id=self.arkiv.pk).count(), 0)
 
+    def test_lagring_og_sletting_logges_paa_arkivets_tabell(self):
+        """Pasientarkivet logget som `'backup'` til 26. sep. 2026 (E3), mens
+        oppdragsarkivet og kollapsen brukte arkivets eget tabellnavn — et søk på
+        «hvem slettet arkivet» fant det ene og ikke det andre."""
+        from audit.models import AuditLog
+        resp = self._lagre_arkiv_post(navn='Loggprøve')
+        ny_pk = resp.json()['id']
+        self._slett_arkiv(ny_pk)
+        rader = AuditLog.objects.filter(table_name='patients_vaktarkiv', record_id=ny_pk)
+        self.assertEqual(sorted(rader.values_list('field_name', flat=True)),
+                         ['arkiv_lagret', 'arkiv_slettet'])
+        self.assertEqual({r.user_id for r in rader}, {self.admin.pk})
+        self.assertFalse(AuditLog.objects.filter(table_name='backup').exists())
+
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class StatsMatcher(ArkivTestMixin, TestCase):

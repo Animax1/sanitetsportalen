@@ -112,3 +112,29 @@ def har_backup_etter(handler, tidspunkt) -> bool:
         module_slug=handler.backup_slug,
         created_at__gt=tidspunkt,
     ).exists()
+
+
+def logg_arkivhendelse(arkiv_modell, handling: str, detalj: str, *, request=None,
+                       record_id: int = 0, action: str = 'CREATE') -> None:
+    """Én auditrad for en handling på et arkiv — lagret, slettet, kollapset.
+
+    **Tabellnavnet er arkivets eget** (26. sep. 2026, E3). Pasientarkivet
+    logget som `'backup'`, oppdragsarkivet som `oppdrag_oppdragarkiv`, og
+    kollaps-kommandoen med arkivets ID — tre former for samme slags hendelse,
+    så et søk på «hvem slettet arkivet» fant det ene og ikke det andre.
+    Rader fra før står som de sto; bruddet er datert.
+
+    `request` er valgfri: kommandoen har ingen, og da står bruker og IP tomme.
+    """
+    from audit.models import AuditLog
+    from core.klientip import klient_ip
+    bruker = getattr(request, 'user', None) if request is not None else None
+    AuditLog.objects.create(
+        table_name=arkiv_modell._meta.db_table,
+        record_id=record_id,
+        action=action,
+        field_name=handling,
+        new_value=detalj,
+        user=bruker if getattr(bruker, 'is_authenticated', False) else None,
+        ip=klient_ip(request) if request is not None else None,
+    )
