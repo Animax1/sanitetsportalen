@@ -91,6 +91,18 @@ def status_tidspunkt_for(oppdrag_liste, meldinger=None) -> dict:
     return ut
 
 
+def delte_linjer_for_liste(oppdragene) -> dict:
+    """``{oppdrag_id: delte linjer}`` for en liste, i to spørringer (G4).
+
+    Lest gjennom hendelsesmodellen `Oppdrag.hendelse` peker på — denne modulen
+    importerer ikke `ko` (avhengighetsretningen), og kjenner verken loggen
+    eller delingene.
+    """
+    from .models import Oppdrag
+    hendelse_modell = Oppdrag._meta.get_field('hendelse').related_model
+    return hendelse_modell.delte_linjer_bulk([(o.pk, o.hendelse_id) for o in oppdragene])
+
+
 def enheter_til_liste(oppdrag, meldinger=None) -> list:
     """Enhetene på oppdraget med hver sin status — matrisen sentralbordet
     ser. Leser `oppdrag.enheter`; kalleren prefetcher `enheter__enhet` der
@@ -132,7 +144,7 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
 
 def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
                      status_tidspunkt=None, koblingsrad=None, meldinger=None,
-                     avbrutt_av=None, avventer_av=None) -> dict:
+                     avbrutt_av=None, avventer_av=None, delte_linjer=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
@@ -158,6 +170,9 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     André: «trykker en bil avbryt så må det vises»). Sendes den ikke, slås den
     opp for dette ene oppdraget; lista sender den ferdig, av samme grunn som
     over.
+
+    ``delte_linjer`` sendes ferdig av lista (`delte_linjer_for_liste`), av
+    samme grunn (G4, 26. sep. 2026).
     """
     status = koblingsrad.status if koblingsrad is not None else oppdrag.status
     data = {
@@ -229,6 +244,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     # bærer `delt_at`, så bilen kan vise det som er nytt for henne.
     data['delte_linjer'] = (
         [] if skjul_fritekst or not oppdrag.hendelse_id
+        else delte_linjer if delte_linjer is not None
         else oppdrag.hendelse.delte_linjer_for(oppdrag))
     if for_enhet:
         # «Neste»-knappen vet hvilken overgang den utfører fordi serveren sier

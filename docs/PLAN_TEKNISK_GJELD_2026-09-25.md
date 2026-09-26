@@ -417,7 +417,7 @@ Ingen av disse gjør skade i dag. Hver av dem gjør neste endring dyrere.
 eksempel på hva det koster. Fjern `updateClock` og last `portal-clock.js` nå. På sikt:
 arv `base_portal`.
 
-**G4. N+1 i endepunkter som polles:**
+**G4. N+1 i endepunkter som polles:** *Levert 26. sep. 2026, se CHANGELOG.*
 - `enhetskort()`/`enhet_status()` (2–4 spørringer per enhet), kalt fra `enheter_view` og KO
   sin tavle
 - hendelsesfeltene i oppdragslista

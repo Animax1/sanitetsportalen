@@ -33,7 +33,8 @@ from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
-    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, kan_lede,
+    bytte_til_dict, delte_linjer_for_liste, endring_til_dict, er_enhetskonto, etag_for_svar,
+    hendelse_til_dict, kan_lede,
     melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
@@ -185,7 +186,7 @@ def enheter_view(request):
     # Det aktive oppdraget i ett blikk (prosjektleder, 11. sep. 2026): «det
     # handler om å kjapt skaffe oversikt» — nummer, hastegrad, problemstilling
     # og når statusen ble satt, uten å åpne oppdraget.
-    data = [services.enhetskort(e, vakt, ledig_siden.get(e.pk)) for e in enheter]
+    data = services.enhetskort_liste(enheter, vakt, ledig_siden)
 
     # Enheter som ikke er på vakt sendes med, de filtreres ikke bort.
     # Sentralbordet viser dem i en egen gruppe: en bil som forsvinner fra
@@ -395,15 +396,18 @@ def oppdrag_liste_view(request):
             # de ligger i `historikk_liste_view`, søkbare på nummer.
             qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
                       .select_related('enhet', 'lokasjon', 'hendelse')
-                      .prefetch_related('enheter__enhet').order_by('-created_at'))
+                      .prefetch_related('enheter__enhet', 'hendelse__lag')
+                      .order_by('-created_at'))
             gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
             status_tid = status_tidspunkt_for(qs, gjeldende)
             avbrutt = services.avbrutt_av_bulk([o.pk for o in qs])
             avventer = services.avventer_av_bulk([o.pk for o in qs])
+            delte = delte_linjer_for_liste(qs)
             data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
                                      meldinger=gjeldende[o.pk],
                                      avbrutt_av=avbrutt.get(o.pk, []),
-                                     avventer_av=avventer.get(o.pk, []))
+                                     avventer_av=avventer.get(o.pk, []),
+                                     delte_linjer=delte[o.pk])
                     for o in qs]
             # **Ferdige oppdrag i historikken telles med** (André, 21. sep.
             # 2026: «ferdige oppdrag som vises i historikk vises ikke som
@@ -1241,7 +1245,8 @@ def historikk_liste_view(request):
 
     qs = (Oppdrag.objects
           .filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False)
-          .select_related('enhet', 'lokasjon')
+          .select_related('enhet', 'lokasjon', 'hendelse')
+          .prefetch_related('enheter__enhet', 'hendelse__lag')
           .order_by('-historikk_fra'))
 
     sok = (request.GET.get('sok') or '').strip()
@@ -1257,11 +1262,15 @@ def historikk_liste_view(request):
     # Bulk her også: historikken kan være hele vakta, og `oppdrag_til_dict`
     # slår ellers opp avbrytelsene én gang per rad.
     rader = list(qs)
-    avbrutt = services.avbrutt_av_bulk([o.pk for o in rader])
-    avventer = services.avventer_av_bulk([o.pk for o in rader])
+    ider = [o.pk for o in rader]
+    avbrutt = services.avbrutt_av_bulk(ider)
+    avventer = services.avventer_av_bulk(ider)
+    gjeldende = Statusmelding.objects.gjeldende_bulk(ider)
+    delte = delte_linjer_for_liste(rader)
     return JsonResponse({'status': 'ok', 'data': [
-        oppdrag_til_dict(o, avbrutt_av=avbrutt.get(o.pk, []),
-                         avventer_av=avventer.get(o.pk, [])) for o in rader]})
+        oppdrag_til_dict(o, meldinger=gjeldende[o.pk], avbrutt_av=avbrutt.get(o.pk, []),
+                         avventer_av=avventer.get(o.pk, []), delte_linjer=delte[o.pk])
+        for o in rader]})
 
 
 # ── Korreksjoner ─────────────────────────────────────────────────────────────

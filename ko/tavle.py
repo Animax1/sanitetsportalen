@@ -92,8 +92,8 @@ def opptatt(ressurser, vakt) -> dict:
     kildene, og en kopi her ville gått i utakt første gang noe feilet halvveis
     (samme regel som `oppdrag.services.enhet_status`).
     """
-    from oppdrag.models import Statusmelding
-    from oppdrag.services import enhet_status
+    from oppdrag.models import Statusmelding, siste_med_status
+    from oppdrag.services import enhet_status_bulk
 
     ut: dict = {}
     lag_ider = [r.pk for r in ressurser if r.enhet_id is None]
@@ -112,18 +112,22 @@ def opptatt(ressurser, vakt) -> dict:
         }
     # Bilene er med når de er blant `ressurser` — det er `ressurser_paa_tavla`
     # sin `med_biler` som bestemmer, ett sted.
-    for r in ressurser:
-        if r.enhet_id is None or r.pk in ut:
-            continue
-        info = enhet_status(r.enhet, vakt)
+    # I bulk (G4, 26. sep. 2026): tavla polles, og ett oppslag per bil var
+    # to til fire spørringer hver.
+    biler = [r for r in ressurser if r.enhet_id is not None and r.pk not in ut]
+    status = enhet_status_bulk({r.enhet_id: r.enhet for r in biler}.values(), vakt)
+    opptatte = [(r, status[r.enhet_id]) for r in biler
+                if status[r.enhet_id]['koblingsrad'] is not None
+                and status[r.enhet_id]['status'] in OPPTATT_STATUSER]
+    meldinger = Statusmelding.objects.gjeldende_bulk(
+        {info['aktivt_oppdrag'].pk for _, info in opptatte})
+    for r, info in opptatte:
         kobling = info['koblingsrad']
-        if kobling is None or info['status'] not in OPPTATT_STATUSER:
-            continue
         o = info['aktivt_oppdrag']
         merke = f'O{o.oppdragsnummer} {info["status_navn"]}'
         # Fra da hun rykket ut, ikke fra siste status: det er da hun forlot
         # plassen på tavla.
-        ut_melding = Statusmelding.objects.gjeldende_for_status(o, 'rykker_ut', oppdragsenhet=kobling)
+        ut_melding = siste_med_status(meldinger[o.pk], 'rykker_ut', kobling.pk)
         ut[r.pk] = {
             'merke': merke,
             'tekst': ' · '.join(d for d in (merke, getattr(o.lokasjon, 'navn', '')) if d),

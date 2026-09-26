@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Endepunktene som polles koster like mange spørringer for 3 og 30 enheter (G4)  `#oppdrag #ko #ytelse`
+
+**Hvorfor:** enhetslista, oppdragslista og KO-tavla polles hvert tiende sekund fra hver fane
+med sentralbordet eller KO åpen. Hver av dem slo opp noe *per rad*. Målt med samme scenario
+ved k=1 og k=3 av hvert slag (ledig, tildelt, på oppdrag, på hendelse):
+
+| Endepunkt | Før, k=1 → k=3 | Etter |
+|---|---|---|
+| `enheter_view` | 26 → 42 | **17 → 17** |
+| oppdragslista | 24 → 36 | **21 → 21** |
+| `historikk_liste_view` | 17 → 23 | **17 → 17** |
+| KO-tavla (`ko.tavle.opptatt`) | 10 → 26 | **5 → 5** |
+
+Med 30 biler var enhetslista rundt hundre spørringer per poll. Tallene over inkluderer
+sesjon og innlogging.
+
+**Grepet er det `gjeldende_bulk` alt bruker: bulk-versjonen er implementasjonen, og
+enkeltversjonen er ett oppslag i den.** Regelen står fortsatt ett sted.
+- `oppdrag.services.enhet_status_bulk()` — to spørringer for alle enhetene; `enhet_status()`
+  er et oppslag i den. `enhetskort_liste()` bygger kortene med én `gjeldende_bulk` for de
+  aktive oppdragene. `enheter_view` og `ko.tavle.opptatt` bruker dem.
+- `oppdrag.models.siste_med_status()` er regelen fra `gjeldende_for_status`, på meldinger
+  kalleren alt har.
+- `ko.Hendelse.delte_linjer_bulk()` tar `(oppdrag_id, hendelse_id)`-par; `delte_linjer_for`
+  er et oppslag i den. Oppdragsmodulen når den gjennom
+  `Oppdrag._meta.get_field('hendelse').related_model` (`delte_linjer_for_liste`) og importerer
+  fortsatt ikke `ko`.
+- Lista og historikken prefetcher `hendelse__lag`, og historikken fikk `select_related`,
+  `enheter__enhet` og `gjeldende_bulk` som lista alt hadde.
+
+**Tester:** `oppdrag/tests_ytelse_polling.py` krever samme antall for k=1 og k=3 per
+endepunkt, at hvert kort i lista er kortet alene, og at de delte linjene i lista er linjene
+alene — også med en linje delt fra en *annen* hendelse, som ikke skal telle.
+
+**Mutasjon:** 12 mutanter, 5 røde med én gang. Av de 7 som overlevde var 2 ekvivalente (se
+under) og **5 ekte hull som fantes også i enkeltversjonen**: nyeste påbegynte framfor eldste,
+vakt-avgrensningen på ventende og på påbegynte (fjorårets oppdrag telte), «tildelt siden»
+som første og ikke siste varsling, og tavlas «fra» som *bilens egen* utrykning når to biler
+står på samme oppdrag. `EnhetStatusBulkReglerTests` holder alle fem; alle røde etterpå.
+Ekvivalente: `OPPTATT_STATUSER`-filteret på tavla er nøyaktig de påbegynte statusene (står
+som vern mot en ny status), og hendelsesjekken på delingene ble gjort to ganger — den ene er
+fjernet.
+
 ## 2026-09-26 — `sett_status` sto uten transaksjon i en uke: dekoratøren hadde havnet på en lesefunksjon  `#oppdrag #data`
 
 **Hvorfor:** funnet mens G4 ble lest, ikke i planen. `sett_status` skriver tre rader —

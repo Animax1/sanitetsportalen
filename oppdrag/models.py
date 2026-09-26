@@ -671,13 +671,21 @@ class StatusmeldingManager(models.Manager):
         gjelder, uansett enhet — det som svarer på «når fikk oppdraget denne
         statusen». Med `oppdragsenhet` er det bilens egen.
         """
-        treff = None
-        for melding in self.gjeldende(oppdrag):
-            if oppdragsenhet is not None and melding.oppdragsenhet_id != oppdragsenhet.pk:
-                continue
-            if melding.status == status:
-                treff = melding
-        return treff
+        return siste_med_status(self.gjeldende(oppdrag), status,
+                                oppdragsenhet.pk if oppdragsenhet is not None else None)
+
+
+def siste_med_status(meldinger, status, oppdragsenhet_id=None):
+    """Regelen i `gjeldende_for_status`, på meldinger kalleren alt har
+    (fra `gjeldende_bulk`) — så en liste slipper én spørring per rad (G4).
+    Den siste med statusen; med `oppdragsenhet_id` bare den enhetens."""
+    treff = None
+    for melding in meldinger:
+        if oppdragsenhet_id is not None and melding.oppdragsenhet_id != oppdragsenhet_id:
+            continue
+        if melding.status == status:
+            treff = melding
+    return treff
 
 
 class Statusmelding(BaseTimeStampedModel):

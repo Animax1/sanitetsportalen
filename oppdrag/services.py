@@ -358,30 +358,64 @@ def enhet_status(enhet, vakt=None) -> dict:
     «Tildelt» på et kort som sier «passiv vakt» ville lest som at noen er på
     vei.
     """
-    rad = aktiv_koblingsrad(enhet, vakt)
-    aktivt = rad.oppdrag if rad is not None else None
-    ventende = ventende_oppdrag(enhet, vakt)
-    antall_ventende = ventende.count()
-    status = rad.status if rad else choices.LEDIG
-    status_navn = (choices.status_navn_for(rad.oppdrag.hastegrad, rad.status) if rad
-                   else choices.STATUS_NAVN[choices.LEDIG])
-    tildelt_siden = None
-    if rad is None and antall_ventende and not enhet.passiv_vakt:
-        status, status_navn = TILDELT, 'Tildelt'
-        tildelt_siden = (Oppdragsenhet.objects
-                         .filter(enhet=enhet, status=choices.VENTER, oppdrag__in=ventende)
-                         .order_by('varslet_at').values_list('varslet_at', flat=True).first())
-    return {
-        # Koblingsraden er *enhetens* status på oppdraget — med flere enheter
-        # er ikke oppdragets status hennes.
-        'koblingsrad': rad,
-        'enhet': enhet,
-        'status': status,
-        'status_navn': status_navn,
-        'aktivt_oppdrag': aktivt,
-        'antall_ventende': antall_ventende,
-        'tildelt_siden': tildelt_siden,
-    }
+    return enhet_status_bulk([enhet], vakt)[enhet.pk]
+
+
+def enhet_status_bulk(enheter, vakt=None) -> dict:
+    """``{enhet_id: enhet_status(...)}`` i to spørringer (G4, 26. sep. 2026).
+
+    Enhetslista og KO-tavla polles hvert tiende sekund, og `enhet_status` per
+    enhet kostet to til fire spørringer hver. **Regelen står bare her** —
+    `enhet_status` er ett oppslag i den, samme grep som `gjeldende_bulk`.
+    Påbegynt og ventende betyr det samme som i `aktiv_koblingsrad` og
+    `ventende_oppdrag`, og `SporringerVokserIkkeMedListaTests` holder tallet
+    konstant.
+    """
+    enheter = list(enheter)
+    ider = [e.pk for e in enheter]
+    aktive = (Oppdragsenhet.objects
+              .filter(enhet_id__in=ider)
+              .exclude(status__in=(choices.VENTER, choices.LEDIG))
+              .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon'))
+    ventende = Oppdragsenhet.objects.filter(enhet_id__in=ider, status=choices.VENTER)
+    if vakt is not None:
+        aktive = aktive.filter(oppdrag__vakt=vakt)
+        ventende = ventende.filter(oppdrag__vakt=vakt)
+    # Nyeste påbegynte per enhet, som `aktiv_koblingsrad`.
+    rad_for: dict = {}
+    for rad in aktive.order_by('-oppdrag__created_at'):
+        rad_for.setdefault(rad.enhet_id, rad)
+    venter_paa: dict = {}
+    forste_varsling: dict = {}
+    for enhet_id, oppdrag_id, varslet_at in ventende.values_list(
+            'enhet_id', 'oppdrag_id', 'varslet_at'):
+        venter_paa.setdefault(enhet_id, set()).add(oppdrag_id)
+        if enhet_id not in forste_varsling or varslet_at < forste_varsling[enhet_id]:
+            forste_varsling[enhet_id] = varslet_at
+
+    ut = {}
+    for enhet in enheter:
+        rad = rad_for.get(enhet.pk)
+        antall_ventende = len(venter_paa.get(enhet.pk, ()))
+        status = rad.status if rad else choices.LEDIG
+        status_navn = (choices.status_navn_for(rad.oppdrag.hastegrad, rad.status) if rad
+                       else choices.STATUS_NAVN[choices.LEDIG])
+        tildelt_siden = None
+        if rad is None and antall_ventende and not enhet.passiv_vakt:
+            status, status_navn = TILDELT, 'Tildelt'
+            tildelt_siden = forste_varsling[enhet.pk]
+        ut[enhet.pk] = {
+            # Koblingsraden er *enhetens* status på oppdraget — med flere
+            # enheter er ikke oppdragets status hennes.
+            'koblingsrad': rad,
+            'enhet': enhet,
+            'status': status,
+            'status_navn': status_navn,
+            'aktivt_oppdrag': rad.oppdrag if rad is not None else None,
+            'antall_ventende': antall_ventende,
+            'tildelt_siden': tildelt_siden,
+        }
+    return ut
 
 
 #: Visningsstatusen for en enhet med ventende oppdrag og ingen påbegynt.
@@ -401,21 +435,23 @@ class ProblemstillingUdefinert(UlovligOvergang):
     problemstillingen først»."""
 
 
-def _aktivt_oppdrag_felter(rad) -> dict:
+def _aktivt_oppdrag_felter(rad, meldinger=None) -> dict:
     """Feltene enhetskortet viser om det aktive oppdraget.
 
     Alle `None` når det ikke finnes noe, slik at kortet kan lese dem uten å
     spørre. `rad` er enhetens koblingsrad: statusen og tidspunktet er *hennes*.
+    `meldinger` er oppdragets gjeldende meldinger når lista alt har dem.
     """
-    from .models import Statusmelding
+    from .models import Statusmelding, siste_med_status
 
     if rad is None:
         return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
                 'grovsortering_navn': None, 'problemstilling': None, 'antall': None,
                 'status_tidspunkt': None, 'sted_navn': '', 'lokasjon_navn': ''}
     oppdrag = rad.oppdrag
-    melding = Statusmelding.objects.gjeldende_for_status(
-        oppdrag, rad.status, oppdragsenhet=rad)
+    if meldinger is None:
+        meldinger = Statusmelding.objects.gjeldende(oppdrag)
+    melding = siste_med_status(meldinger, rad.status, rad.pk)
     return {
         'oppdragsnummer': oppdrag.oppdragsnummer,
         'hastegrad': oppdrag.hastegrad,
@@ -431,6 +467,20 @@ def _aktivt_oppdrag_felter(rad) -> dict:
     }
 
 
+def enhetskort_liste(enheter, vakt=None, ledig_siden=None) -> list:
+    """`enhetskort` for hele lista, med et fast antall spørringer (G4).
+
+    `ledig_siden` er `ledig_siden_bulk()`s svar. Rekkefølgen er `enheter`s.
+    """
+    from .models import Statusmelding
+    enheter = list(enheter)
+    status = enhet_status_bulk(enheter, vakt)
+    meldinger = Statusmelding.objects.gjeldende_bulk(
+        {i['koblingsrad'].oppdrag_id for i in status.values() if i['koblingsrad']})
+    ledig_siden = ledig_siden or {}
+    return [_enhetskort(e, status[e.pk], ledig_siden.get(e.pk), meldinger) for e in enheter]
+
+
 def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
     """Alt et enhetskort viser — **den ene kilden, to lesere**.
 
@@ -443,9 +493,14 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
 
     `ledig_siden` sendes inn av den som henter mange kort: `ledig_siden_bulk()`
     svarer for hele lista i én spørring, og et oppslag per enhet ville vært N
-    spørringer på en liste som polles hvert tiende sekund.
+    spørringer på en liste som polles hvert tiende sekund. En liste bruker
+    `enhetskort_liste`.
     """
-    info = enhet_status(enhet, vakt)
+    return _enhetskort(enhet, enhet_status(enhet, vakt), ledig_siden, None)
+
+
+def _enhetskort(enhet, info, ledig_siden, meldinger) -> dict:
+    rad = info['koblingsrad']
     return {
         'id': enhet.pk,
         'navn': enhet.navn,
@@ -474,7 +529,8 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
             if info['status'] == choices.LEDIG and ledig_siden else None),
         # «Tildelt 16:02 · 2 min» (19. sep. 2026): fra den første varslingen.
         'tildelt_siden': info['tildelt_siden'].isoformat() if info['tildelt_siden'] else None,
-        **_aktivt_oppdrag_felter(info['koblingsrad']),
+        **_aktivt_oppdrag_felter(
+            rad, meldinger.get(rad.oppdrag_id) if (rad and meldinger is not None) else None),
     }
 
 

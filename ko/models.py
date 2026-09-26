@@ -464,17 +464,46 @@ class Hendelse(models.Model):
         alle, ellers delingens — det er tidspunktet bilen regner «ny tekst»
         fra.
         """
-        egne = {d.linje_id: d.delt_at
-                for d in Linjedeling.objects.filter(oppdrag=oppdrag, linje__hendelse=self)}
-        rader = (self.linjer
-                 .filter(kilde=KILDE_OPERATOR, fjernet_at__isnull=True,
-                         korrigert_av__isnull=True)
-                 .filter(Q(delt_at__isnull=False) | Q(pk__in=list(egne)))
-                 .order_by(Coalesce('rot_id', 'id'), 'id'))
-        return [{'id': l.pk, 'rot': l.rot_id or l.pk, 'tekst': l.tekst,
-                 'av': l.forfatter_navn, 'tid': l.tidspunkt.isoformat(),
-                 'delt_at': (l.delt_at or egne.get(l.pk)).isoformat()}
-                for l in rader]
+        return Hendelse.delte_linjer_bulk([(oppdrag.pk, self.pk)])[oppdrag.pk]
+
+    @classmethod
+    def delte_linjer_bulk(cls, par) -> dict:
+        """``{oppdrag_id: delte_linjer_for(...)}`` i to spørringer (G4, 26. sep. 2026).
+
+        Oppdragslista polles, og hvert oppdrag på en hendelse kostet to
+        spørringer her. **Regelen står bare i denne**; `delte_linjer_for` er
+        ett oppslag i den, som `gjeldende()` i `gjeldende_bulk()`.
+        `par` er ``(oppdrag_id, hendelse_id)``; en `None`-hendelse gir en tom liste.
+        """
+        par = list(par)
+        ut = {opp: [] for opp, _ in par}
+        hendelse_for = {opp: h for opp, h in par if h}
+        if not hendelse_for:
+            return ut
+        hendelser = set(hendelse_for.values())
+        egne: dict = {opp: {} for opp in hendelse_for}
+        for opp_id, linje_id, delt_at in (
+                Linjedeling.objects.filter(oppdrag_id__in=list(egne),
+                                           linje__hendelse_id__in=hendelser)
+                .values_list('oppdrag_id', 'linje_id', 'delt_at')):
+            egne[opp_id][linje_id] = delt_at
+        alle_egne = {lid for d in egne.values() for lid in d}
+        rader = list(Logglinje.objects
+                     .filter(hendelse_id__in=hendelser, kilde=KILDE_OPERATOR,
+                             fjernet_at__isnull=True, korrigert_av__isnull=True)
+                     .filter(Q(delt_at__isnull=False) | Q(pk__in=alle_egne))
+                     .order_by(Coalesce('rot_id', 'id'), 'id'))
+        for opp, hendelse_id in hendelse_for.items():
+            mine = egne[opp]
+            ut[opp] = [{'id': l.pk, 'rot': l.rot_id or l.pk, 'tekst': l.tekst,
+                         'av': l.forfatter_navn, 'tid': l.tidspunkt.isoformat(),
+                         'delt_at': (l.delt_at or mine.get(l.pk)).isoformat()}
+                        for l in rader
+                        # En deling teller bare når linja hører til
+                        # *oppdragets* hendelse.
+                        if l.hendelse_id == hendelse_id
+                        and (l.delt_at is not None or l.pk in mine)]
+        return ut
 
     def lag_navn(self) -> list[str]:
         """Navnene på lagene som er på hendelsen, i den rekkefølgen de kom.
