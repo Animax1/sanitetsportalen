@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Én verdilistefabrikk for oppdrag og KO, i `core` (E2)  `#core #oppdrag #ko`
+
+**Hvorfor:** lokasjonene, enhetstypene og problemstillingene i oppdrag og ansvarsområdene,
+konserttypene og kjennetegnene i KO administreres likt — liste for `les`, opprett/endre/
+omsortere for den som leder, sletting for global admin med `confirm`. **To fabrikker med rundt
+130 like linjer**, og de hadde glidd:
+
+| | oppdrag | KO | nå |
+|---|---|---|---|
+| Unikt navn | eksakt | uten store/små | **uten store/små** |
+| Maks lengde | ingen sjekk — for langt navn ga 500 på PostgreSQL | sjekket | **sjekket**, lest av modellfeltet |
+| `ProtectedError` ved sletting | 409 | **500** | **409** |
+| Ukjent ID | JSON-404 | HTML-404 | **JSON-404** |
+| ETag på lista | ja | nei | **ja** |
+
+**`core/verdilister.py`:** `Verdiliste` beskriver en tabell (felter, «i bruk», faste rader,
+ekstrafelt), `lag_views()` gir liste-, detalj- og rekkefølgeviewet. Modulene melder inn
+tabellene og sin egen regel for hvem som leder (`oppdrag.views_common.kan_lede`,
+`ko.views.kan_lede_ko`) — tilgangen er modulens, mekanikken felles. Ligger i `core` fordi KO
+ikke skal kjenne oppdrag. **Rate-limit-gruppene er uendret** (`oppdrag:verdier:…`, `ko:…`).
+
+**`core/jsonkropp.py`** er den første `json_body` i `core` (M8-versjonen). Fabrikken trengte
+en, og en sjette kopi ville gjort E5 større; de fem andre samles dit i E5.
+
+**Modulenes egne tester gikk uendret gjennom** (754 i oppdrag, 899 i KO). `core/tests_verdilister.py`
+prøver hver forskjell i modulen der den *før* var feil, gjennom den ekte URL-en.
+**Mutanter: 8, alle drept** — hver av de fem forskjellene satt tilbake, og de tre portene
+(409 ved bruk, `confirm`, admin for sletting).
+
 ## 2026-09-26 — Arkivene verifiseres og logges ett sted (E3)  `#core #patients #oppdrag`
 
 **Verifiseringen:** `patients/views_arkiv.py` hadde regelen for «er arkivet tuklet med»

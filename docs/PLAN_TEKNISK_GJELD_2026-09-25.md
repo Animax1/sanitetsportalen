@@ -310,7 +310,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 - **Retting:** avgjør hvilken nøkkel som er riktig, trekk ut én felles kjerne, og la én
   test holde begge.
 
-**E2. Verdilistefabrikken.**
+**E2. Verdilistefabrikken.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `ko/views.py:718-853` og `oppdrag/views_verdier.py:131-277`. Omtrent 130 like
   linjer.
 - **Glidningen:** navneunikheten er `iexact` i den ene og eksakt i den andre, og

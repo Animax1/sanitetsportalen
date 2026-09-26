@@ -51,6 +51,7 @@ from core.jsdata import js_json
 from core.ratelimit import rate_limit
 from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
+from core.verdilister import Verdiliste, lag_views
 
 from . import services, systemlinjer
 from .models import (MELDER_VALG, PRIORITET_VALG, Ansvarsmerke, Ansvarsomraade, Hendelse,
@@ -252,9 +253,15 @@ def index_view(request):
     return render(request, 'ko/index.html', kontekst)
 
 
+def kan_lede_ko(user) -> bool:
+    """Setter opp KO-innstillingene. Én regel for knappen og for endepunktene
+    i verdilistefabrikken. Global admin trenger ingen egen `or`: `nivaa_for`
+    gir toppen av stigen."""
+    return har_tilgang(user, 'ko', 'skriv_leder')
+
+
 def _kan_lede_ko(request) -> bool:
-    # Global admin trenger ingen egen `or`: `nivaa_for` gir toppen av stigen.
-    return har_tilgang(request.user, 'ko', 'skriv_leder')
+    return kan_lede_ko(request.user)
 
 
 @modul_kreves('ko', 'les', svar='json')
@@ -709,147 +716,36 @@ def oppdrag_hendelse_view(request, pk):
 
 # ── KO-innstillingene: ansvarsområdene (18. sep. 2026) ───────────────────────
 #
-# Samme form som `oppdrag/views_verdier.py`: liste for `les`, opprett/endre/
-# omsortere for leder (KO-leder eller global admin), sletting for global admin
-# med `confirm` og 409 når raden er i bruk. Én fabrikk — skrevet her og ikke
-# som rader i oppdragsmodulens `VERDIMENGDER`, fordi tabellen er KOs og
-# `oppdrag` ikke kjenner `ko`. Fabrikken bar også `Ressursbehov` fra 18. til
+# Samme fabrikk som `oppdrag/views_verdier.py` — `core.verdilister` fra
+# 26. sep. 2026 (E2). Til da sto en egen kopi her, med unikt navn uten
+# store/små, men uten sperre for `ProtectedError` og med HTML-404 — de to
+# hadde glidd. Tabellene er KOs; `oppdrag` kjenner ikke `ko`, og `core` kjenner
+# ingen av dem. Fabrikken bar også `Ressursbehov` fra 18. til
 # 19. sep. 2026; lista ble erstattet av lagene fra vaktlista (`HendelseLag`).
-
-class _Verdiliste:
-    """Én tabell: modellen, slugen og hva som teller som «i bruk»."""
-
-    def __init__(self, model, slug, maks, i_bruk):
-        self.model, self.slug, self.maks, self.i_bruk = model, slug, maks, i_bruk
-
-    def til_dict(self, rad):
-        return {'id': rad.pk, 'navn': rad.navn, 'er_aktiv': rad.er_aktiv,
-                'rekkefolge': rad.rekkefolge, 'i_bruk': self.i_bruk(rad)}
-
-    def valider_navn(self, navn, *, unntatt_pk=None):
-        if not navn:
-            return 'Navn kan ikke være tomt.'
-        if len(navn) > self.maks:
-            return f'Navnet er for langt (maks {self.maks} tegn).'
-        if self.model.objects.filter(navn__iexact=navn).exclude(pk=unntatt_pk).exists():
-            return f'«{navn}» finnes allerede.'
-        return None
-
 
 VERDILISTER = {
     # I bruk = kontoer som bærer merket nå. Linjene teller ikke: de er tekst,
     # og et område som slettes skal ikke skrive om loggen.
-    'ansvarsomraader': _Verdiliste(Ansvarsomraade, 'ansvarsomraader', 40,
-                                   lambda r: Ansvarsmerke.objects.filter(omraade=r.navn).count()),
+    'ansvarsomraader': Verdiliste(
+        Ansvarsomraade, i_bruk=lambda r: Ansvarsmerke.objects.filter(omraade=r.navn).count()),
     # Programmet (tavleplanleggeren, steg 2). I bruk = konserter som peker
     # dit, i alle vakter: en type fjorårets program står med, slettes ikke.
-    'konserttyper': _Verdiliste(Konserttype, 'konserttyper', 60, lambda r: r.poster.count()),
-    'kjennetegn': _Verdiliste(Kjennetegn, 'kjennetegn', 60, lambda r: r.poster.count()),
+    'konserttyper': Verdiliste(Konserttype, i_bruk=lambda r: r.poster.count()),
+    'kjennetegn': Verdiliste(Kjennetegn, i_bruk=lambda r: r.poster.count()),
 }
 
 
-def _liste_view(slug):
-    vl = VERDILISTER[slug]
-
-    @never_cache
-    @modul_kreves('ko', 'les', svar='json')
-    @require_http_methods(['GET', 'POST'])
-    @rate_limit(group=f'ko:{slug}', rate='60/m', method='POST')
-    def view(request):
-        if request.method == 'GET':
-            return JsonResponse({'status': 'ok', 'data': [
-                vl.til_dict(r) for r in vl.model.objects.all()]})
-        if not _kan_lede_ko(request):
-            return _feil('Å sette opp KO-innstillingene er skriv_leder i KO.', 403)
-        navn = (_json_body(request).get('navn') or '').strip()
-        feil = vl.valider_navn(navn)
-        if feil:
-            return _feil(feil)
-        siste = (vl.model.objects.order_by('-rekkefolge')
-                 .values_list('rekkefolge', flat=True).first())
-        rad = vl.model.objects.create(navn=navn, rekkefolge=(siste or 0) + 10)
-        return JsonResponse({'status': 'ok', 'data': vl.til_dict(rad)})
-
-    view.__name__ = f'{slug}_view'
-    return view
+def _views(slug):
+    return lag_views(modul='ko', liste=VERDILISTER[slug], slug=slug,
+                     kan_lede=kan_lede_ko,
+                     nekt='Å sette opp KO-innstillingene er skriv_leder i KO.',
+                     gruppe='ko:', skille='_')
 
 
-def _detalj_view(slug):
-    vl = VERDILISTER[slug]
-
-    @modul_kreves('ko', 'les', svar='json')
-    @require_http_methods(['PUT', 'DELETE'])
-    @rate_limit(group=f'ko:{slug}_detalj', rate='60/m', method=['PUT', 'DELETE'])
-    def view(request, pk):
-        if not _kan_lede_ko(request):
-            return _feil('Å sette opp KO-innstillingene er skriv_leder i KO.', 403)
-        rad = get_object_or_404(vl.model, pk=pk)
-        data = _json_body(request)
-        if request.method == 'DELETE':
-            if not er_global_admin(request.user):
-                return _feil('Sletting er global admin.', 403)
-            if not data.get('confirm'):
-                return _feil('Bekreftelse mangler. Send {"confirm": true}.')
-            brukt = vl.i_bruk(rad)
-            if brukt:
-                return _feil(f'«{rad.navn}» er i bruk ({brukt}) og kan ikke slettes. '
-                             'Deaktiver den i stedet.', 409)
-            rad.delete()
-            return JsonResponse({'status': 'ok'})
-        if 'navn' in data:
-            navn = (data.get('navn') or '').strip()
-            feil = vl.valider_navn(navn, unntatt_pk=rad.pk)
-            if feil:
-                return _feil(feil)
-            rad.navn = navn
-        if 'er_aktiv' in data:
-            rad.er_aktiv = bool(data['er_aktiv'])
-        rad.save()
-        return JsonResponse({'status': 'ok', 'data': vl.til_dict(rad)})
-
-    view.__name__ = f'{slug}_detalj_view'
-    return view
-
-
-def _rekkefolge_view(slug):
-    vl = VERDILISTER[slug]
-
-    @modul_kreves('ko', 'les', svar='json')
-    @require_http_methods(['PUT'])
-    @rate_limit(group=f'ko:{slug}_rekkefolge', rate='30/m', method='PUT')
-    def view(request):
-        """Hele lista, som i oppdragsmodulen: to «opp» som krysser hverandre
-        i nettet gir ellers en rekkefølge ingen ba om."""
-        if not _kan_lede_ko(request):
-            return _feil('Å sette opp KO-innstillingene er skriv_leder i KO.', 403)
-        ider = _json_body(request).get('ider')
-        if not isinstance(ider, list) or not all(isinstance(i, int) for i in ider):
-            return _feil('Send `ider` som en liste med tall.')
-        rader = {r.pk: r for r in vl.model.objects.filter(pk__in=ider)}
-        if len(rader) != len(set(ider)):
-            return _feil('Lista inneholder ukjente rader — hent den på nytt.')
-        for plass, rad_pk in enumerate(ider):
-            rad = rader[rad_pk]
-            ny = (plass + 1) * 10
-            if rad.rekkefolge != ny:
-                rad.rekkefolge = ny
-                rad.save(update_fields=['rekkefolge'])
-        return JsonResponse({'status': 'ok', 'data': [
-            vl.til_dict(r) for r in vl.model.objects.all()]})
-
-    view.__name__ = f'{slug}_rekkefolge_view'
-    return view
-
-
-ansvarsomraader_view = _liste_view('ansvarsomraader')
-ansvarsomraade_detalj_view = _detalj_view('ansvarsomraader')
-ansvarsomraader_rekkefolge_view = _rekkefolge_view('ansvarsomraader')
-konserttyper_view = _liste_view('konserttyper')
-konserttype_detalj_view = _detalj_view('konserttyper')
-konserttyper_rekkefolge_view = _rekkefolge_view('konserttyper')
-kjennetegn_view = _liste_view('kjennetegn')
-kjennetegn_detalj_view = _detalj_view('kjennetegn')
-kjennetegn_rekkefolge_view = _rekkefolge_view('kjennetegn')
+ansvarsomraader_view, ansvarsomraade_detalj_view, ansvarsomraader_rekkefolge_view = \
+    _views('ansvarsomraader')
+konserttyper_view, konserttype_detalj_view, konserttyper_rekkefolge_view = _views('konserttyper')
+kjennetegn_view, kjennetegn_detalj_view, kjennetegn_rekkefolge_view = _views('kjennetegn')
 
 
 # ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────
