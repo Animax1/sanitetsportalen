@@ -681,26 +681,39 @@ def oppdrag_detalj_view(request, pk):
                 gjeldende=oppdrag.problemstilling))
     if feil:
         return JsonResponse({'status': 'error', 'message': feil}, status=400)
+    # **Bare feltene som endres, skrives** (26. sep. 2026, A5). Objektet ble
+    # lest før valideringen; en `save()` uten `update_fields` skrev derfor
+    # tilbake status, `trenger_ressurs`, `historikk_fra` og `enhet` slik de
+    # sto da — og en stempling fra bilen i mellomtiden forsvant.
+    endret = []
     if 'problemstilling' in data:
         oppdrag.problemstilling = data['problemstilling']
+        endret.append('problemstilling')
     if 'hastegrad' in data:
         oppdrag.hastegrad = data['hastegrad']
+        endret.append('hastegrad')
     if 'antall' in data:
         oppdrag.antall = data['antall']
+        endret.append('antall')
     if 'fritekst' in data:
         oppdrag.fritekst = (data.get('fritekst') or '').strip()
+        endret.append('fritekst')
     if 'lokasjon_id' in data:
         try:
             oppdrag.lokasjon = Lokasjon.objects.get(pk=data['lokasjon_id'])
         except (Lokasjon.DoesNotExist, ValueError, TypeError):
             return JsonResponse(
                 {'status': 'error', 'message': 'Ukjent lokasjon.'}, status=400)
+        endret.append('lokasjon')
     # Verdiene før endringen, lest av raden som står i basen — ikke av
     # objektet over, som alt er endret.
     foer = services.felt_i_tidslinjen(Oppdrag.objects.select_related('lokasjon').get(pk=oppdrag.pk))
     with transaction.atomic():
-        oppdrag.save()
+        if endret:
+            oppdrag.save(update_fields=endret + ['updated_at'])
         services.logg_endringer(oppdrag, foer, bruker=request.user, automatisk=automatisk)
+    # Svaret leses på nytt: objektet over bærer status fra før lagringen.
+    oppdrag.refresh_from_db()
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
 

@@ -40,6 +40,36 @@ class EndringeneLoggesTests(OppdragBasis):
         return [(e.felt, e.fra_verdi, e.til_verdi, e.automatisk, e.endret_av_navn)
                 for e in Oppdragsendring.objects.filter(oppdrag=self.o)]
 
+    def test_en_stempling_mens_verdien_endres_overlever(self):
+        """**PUT skriver bare feltene den endrer** (26. sep. 2026, A5).
+
+        Viewet leser oppdraget, validerer, og lagrer. Stempler bilen i mellomtiden,
+        skrev en `save()` uten `update_fields` den gamle statusen tilbake — og
+        `trenger_ressurs`, `historikk_fra` og `enhet` med den. Stemplingen legges
+        her inn nøyaktig der kappløpet står: mellom lesingen og lagringen.
+        """
+        from unittest.mock import patch
+
+        from oppdrag import services
+        from oppdrag.models import Oppdrag
+
+        ekte = services.felt_i_tidslinjen
+        stemplet = []
+
+        def bilen_stempler_naa(oppdrag):
+            # Første kall er lesingen av «før», som står rett før lagringen.
+            if not stemplet:
+                services.sett_status(Oppdrag.objects.get(pk=self.o.pk), choices.RYKKER_UT)
+                stemplet.append(True)
+            return ekte(oppdrag)
+
+        with patch('oppdrag.services.felt_i_tidslinjen', side_effect=bilen_stempler_naa):
+            res = self._put(hastegrad='Haster')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.hastegrad, 'Haster')
+        self.assertEqual(self.o.status, choices.RYKKER_UT, 'Stemplingen ble skrevet over')
+
     def test_hastegrad_som_passer_beholder_problemstillingen(self):
         res = self._put(hastegrad='Haster')
         self.assertEqual(res.status_code, 200, res.content)
@@ -63,12 +93,18 @@ class EndringeneLoggesTests(OppdragBasis):
         ny = Lokasjon.objects.create(navn='Village')
         self.assertEqual(self._put(lokasjon_id=ny.pk).status_code, 200)
         self.assertEqual(self._endringer(), [('lokasjon', 'Hovedscene', 'Village', False, 'sentral_verdi')])
+        # Og at den ble *lagret*: tidslinjen leser objektet i minnet, så den
+        # alene ser ikke et felt som falt ut av `update_fields` (A5).
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.lokasjon, ny)
 
     def test_notatet_logges_uten_verdier(self):
         """Samme regel som audit: at det ble endret, aldri hva det sto."""
         self.assertEqual(self._put(fritekst='Pasienten heter Kari').status_code, 200)
         self.assertEqual(self._endringer(), [('fritekst', '', '', False, 'sentral_verdi')])
         self.assertFalse(Oppdragsendring.objects.filter(til_verdi__icontains='Kari').exists())
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.fritekst, 'Pasienten heter Kari')
 
     def test_uendret_gir_ingen_linje_og_avvist_gir_ingen_linje(self):
         self.assertEqual(self._put(hastegrad='Akutt').status_code, 200)

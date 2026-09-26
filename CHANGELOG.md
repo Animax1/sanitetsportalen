@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Å endre en verdi i oppdraget kunne skrive over en stempling: `update_fields` (A5)  `#oppdrag/sentralbord`
+
+**Kappløpet:** PUT i `oppdrag_detalj_view` (verdiene rett i vinduet, 23. sep.) leser
+oppdraget, validerer, og lagret med `oppdrag.save()` — **alle** felt. Stemplet bilen i
+mellomtiden, ble den gamle statusen skrevet tilbake, sammen med `trenger_ressurs`,
+`historikk_fra` og `enhet`. Stemplingen sto i statusmeldingene, men oppdraget viste
+«Venter».
+
+**Rettingen:** PUT samler feltene den faktisk endrer og lagrer med
+`update_fields=endret + ['updated_at']`. Svaret leses på nytt fra basen, så det viser
+stemplingen og ikke det gamle objektet.
+
+**Test:** `test_en_stempling_mens_verdien_endres_overlever` legger en ekte stempling inn
+akkurat mellom lesingen og lagringen, gjennom endepunktet. Rød uten rettingen
+(`'venter' != 'rykker_ut'`).
+
+**Mutasjonstesting:** 6 mutanter — `update_fields` fjernet, og hvert av de fem feltene
+tatt ut av lista ett om gangen. **To overlevde først**: fritekst og lokasjon.
+Testene deres sjekket bare tidslinjen, og tidslinjen leser objektet i minnet — så et felt
+som aldri ble lagret, så ut som lagret. Begge testene krever nå verdien fra basen. Alle 6
+drept. `oppdrag` (744 tester): grønt.
+
 ## 2026-09-26 — Innloggingen avslørte om et brukernavn fantes: «låst i 15 minutter» fjernet (B1)  `#core/sikkerhet`
 
 **Brukernavn-enumerering.** Femte feilede forsøk på en konto som finnes, ga meldingen

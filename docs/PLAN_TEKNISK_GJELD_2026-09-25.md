@@ -110,7 +110,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
   - `enhet_varslet` i KO fyrer ikke.
 - **Retting:** `ta_av_enhet` pluss `varsle_enhet` med samme `rekkefolge`.
 
-**A5. PUT i `oppdrag_detalj_view` lagrer uten `update_fields`.**
+**A5. PUT i `oppdrag_detalj_view` lagrer uten `update_fields`.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `oppdrag/views.py:702`.
 - **Feilen:** en stempling som kommer mellom lesingen og lagringen, blir overskrevet med
   gamle verdier.
