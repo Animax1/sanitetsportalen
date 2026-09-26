@@ -162,8 +162,7 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
 
 - [ ] **Pulje A — åtte feil i drift, før neste vakt.** Bjella ringer ikke for første bil på
       et oppdrag (A1); ETag-ene mangler felt, så redigering inne i oppdraget gir 304 hos de
-      andre (A2); «Flytt» i Venter beholder gammel bils varsling (A4); arkivert vaktliste i drift styrer fortsatt sentralbord, KO og e-post (A6); 500 på
-      ledig plass i `vaktposter_view` (A7); tilstedeværelsen — bjellas polling sender ikke
+      andre (A2); «Flytt» i Venter beholder gammel bils varsling (A4); arkivert vaktliste i drift styrer fortsatt sentralbord, KO og e-post (A6); tilstedeværelsen — bjellas polling sender ikke
       `X-Portal-Inaktiv`, så synlige faner er alltid «aktiv nå» (A8).
 - [ ] **Pulje B — spor, tilgang og lekkasjer.** Låsemeldingen avslører at brukernavnet
       finnes (B1); `reset_password`, `unlock`, feltendringer og sletting av backup uten

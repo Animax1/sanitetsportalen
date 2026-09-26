@@ -77,6 +77,32 @@ def _feil(melding, status=400):
     return JsonResponse({'status': 'error', 'message': melding}, status=status)
 
 
+#: Navnet brukeren ser når en peker ikke finnes. Nøkkelen er feltnavnet.
+_PEKERNAVN = {'korps': 'korps', 'rolle': 'rolle', 'enhet': 'enhet', 'gruppe': 'gruppe'}
+
+
+def _ukjent_peker(modell, **pekere):
+    """Feilmeldingen for første peker som ikke finnes, ellers ``None``.
+
+    **Slås opp før skrivingen** (26. sep. 2026, A7). Fremmednøklene er utsatt
+    til commit, så en ukjent ID ble først en `IntegrityError` da
+    `transaction.atomic()` lukket seg — og der sto en `except` skrevet for
+    unik-skranken, som svarte «finnes allerede» om noe som ikke fantes, eller
+    500 der meldingen leste `mannskap.navn` på en ledig plass. Et nedtrekk
+    tegnet før noen slettet rollen, sender en slik ID.
+
+    `None` er «ingen peker» og er lov. Målmodellen leses av feltet, så
+    vaktlista trenger ikke importere `oppdrag` for å sjekke en enhet.
+    """
+    for felt, pk in pekere.items():
+        if pk is None:
+            continue
+        mal = modell._meta.get_field(felt).related_model
+        if not mal.objects.filter(pk=pk).exists():
+            return f'Ukjent {_PEKERNAVN.get(felt, felt)}.'
+    return None
+
+
 def _nektet(melding='Ingen tilgang'):
     """403 med samme form som resten av API-et.
 
@@ -760,6 +786,10 @@ def ressurser_view(request, pk):
         return _feil(f'«{gruppe.navn}» finnes i ett eksemplar, og står '
                      f'allerede på denne vaktlista.')
 
+    ukjent = _ukjent_peker(Ressurs, korps=_int(data.get('korps_id')),
+                           enhet=_int(data.get('enhet_id')))
+    if ukjent:
+        return _feil(ukjent)
     try:
         with transaction.atomic():
             ressurs = Ressurs.objects.create(
@@ -1301,6 +1331,9 @@ def ressurs_detalj_view(request, pk):
     if 'rekkefolge' in data:
         ressurs.rekkefolge = _int(data['rekkefolge']) or 100
 
+    ukjent = _ukjent_peker(Ressurs, korps=ressurs.korps_id, enhet=ressurs.enhet_id)
+    if ukjent:
+        return _feil(ukjent)
     try:
         with transaction.atomic():
             ressurs.save()
@@ -1399,10 +1432,17 @@ def vaktposter_view(request, pk):
         probono=bool(data.get('probono')),
         alle_korps=alle_korps,
     )
+    ukjent = _ukjent_peker(Vaktpost, korps=felter['korps_id'], rolle=felter['rolle_id'])
+    if ukjent:
+        return _feil(ukjent)
     try:
         with transaction.atomic():
             lagde = [Vaktpost.objects.create(**felter) for _ in range(antall)]
     except IntegrityError:
+        # Unik-skranken gjelder bare en person — en ledig plass har ingen
+        # `mannskap`, og meldingen under leste `mannskap.navn` (A7).
+        if mannskap is None:
+            return _feil('Plassen kunne ikke lagres.')
         return _feil(
             f'{mannskap.navn} står allerede på «{ressurs.navn}» fra dette '
             f'tidspunktet.')
@@ -1679,6 +1719,9 @@ def vaktpost_detalj_view(request, pk):
     vaktpost.fra_tid = fra_tid
     vaktpost.til_tid = til_tid
 
+    ukjent = _ukjent_peker(Vaktpost, korps=vaktpost.korps_id, rolle=vaktpost.rolle_id)
+    if ukjent:
+        return _feil(ukjent)
     try:
         with transaction.atomic():
             vaktpost.save()

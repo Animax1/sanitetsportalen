@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Vaktlista: en ukjent rolle, korps eller enhet ga 500 eller feil melding (A7)  `#vaktliste/planlegging`
+
+**Tre feil med samme rot.** Fremmednøklene er utsatt til commit, så en `rolle_id`,
+`korps_id` eller `enhet_id` som ikke finnes, ble først en `IntegrityError` da
+`transaction.atomic()` lukket seg — og der sto en `except` skrevet for unik-skranken:
+
+- **Ny ledig plass (`vaktposter_view`) → 500.** Meldingen leste `mannskap.navn`, og på en
+  ledig plass er `mannskap` `None`.
+- **Ny eller endret ressurs → «finnes allerede på denne vaktlista»** om en enhet eller et
+  korps som ikke fantes. Endringen ga i tillegg 500 når svaret skulle tegnes.
+- **Endret plass → «Personen står allerede …»** om en ukjent rolle, og 500 samme vei.
+
+Det skjer uten at noen gjør noe galt: et nedtrekk tegnet før noen slettet rollen, sender en
+ID som var gyldig da.
+
+**Rettingen:** `_ukjent_peker()` i `vaktliste/views.py` slår opp pekerne før skrivingen og
+svarer «Ukjent rolle.» / «Ukjent korps.» / «Ukjent enhet.» med 400. Målmodellen leses av
+feltet, så vaktlista slipper å importere `oppdrag` for å sjekke en enhet. `except`-grenen
+på den ledige plassen tåler `None` som et ekstra nett.
+
+**Tester:** `vaktliste/tests_ukjente_pekere.py`, seks stykker gjennom endepunktene, pluss at
+`''` («Ingen valgt») fortsatt er lov. **Mutasjonstesting:** 4 mutanter — sperra fjernet på
+hvert kallsted. Alle drept. `vaktliste` (1 294 tester): grønt.
+
+**Ikke gjort her:** at rollen hører til ressursens gruppe valideres fortsatt ikke. Det er en
+annen regel, og står i planen.
+
 ## 2026-09-26 — Å endre en verdi i oppdraget kunne skrive over en stempling: `update_fields` (A5)  `#oppdrag/sentralbord`
 
 **Kappløpet:** PUT i `oppdrag_detalj_view` (verdiene rett i vinduet, 23. sep.) leser

@@ -133,7 +133,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
   (`-satt_i_drift_at`, `services.py:1483`). Ellers kan de to vise hver sin liste for samme
   bil når to lister står i drift.
 
-**A7. `vaktposter_view` gir 500 på en ledig plass.**
+**A7. `vaktposter_view` gir 500 på en ledig plass.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `vaktliste/views.py:1402-1408`.
 - **Feilen:** `except IntegrityError` leser `mannskap.navn` når `mannskap` er `None`.
 - **Samme mønster, feil melding:** `ressurser_view`, `ressurs_detalj_view` og
