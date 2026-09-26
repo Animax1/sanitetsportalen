@@ -493,10 +493,15 @@ def oppdrag_liste_view(request):
     # — lyd går bare til enhetene, og ingen er varslet.
     naa = timezone.now()
     with transaction.atomic():
+        # **Alle enhetene varsles gjennom `varsle_enhet`, også den første**
+        # (26. sep. 2026, A1). Oppdraget ble opprettet med `enhet=enheter[0]`,
+        # og da laget broen i `Oppdrag.save()` den første koblingsraden — uten
+        # bjella. Det vanligste tilfellet, én bil, fikk ingen rad. `varsle_enhet`
+        # gjør den første til primær og fryser modusen, som broen gjorde.
         oppdrag = Oppdrag.objects.create(
             vakt=vakt,
             oppdragsnummer=services.neste_oppdragsnummer(vakt),
-            enhet=enheter[0] if enheter else None,
+            enhet=None,
             problemstilling=data['problemstilling'],
             hastegrad=data['hastegrad'],
             antall=data.get('antall'),
@@ -506,7 +511,7 @@ def oppdrag_liste_view(request):
             trenger_ressurs=not enheter,
             trenger_ressurs_siden=None if enheter else naa,
         )
-        for enhet in enheter[1:]:
+        for enhet in enheter:
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 

@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Bjella ringte ikke for den første bilen på et oppdrag (A1)  `#oppdrag/enhetsskjerm`
+
+**Kravet fra 15. sep.** — «en bruker som er koblet til en enhet … som får et oppdrag skal få
+varsel på varselbjella» — **holdt ikke i det vanligste tilfellet: ett oppdrag, én bil.**
+POST `/oppdrag/api/oppdrag/` opprettet oppdraget med `enhet=enheter[0]` og kalte
+`varsle_enhet` bare for `enheter[1:]`. Den første enhetens koblingsrad ble laget av **broen
+i `Oppdrag.save()`**, som går utenom `varsle_bjelle`. Enhet nummer to og tre fikk bjella;
+den første, som oftest er den eneste, fikk ingenting.
+
+**Hvorfor ingen test så det:** alle i `VarselbjellaTests` kalte `varsle_enhet` direkte —
+løgn nr. 3 i mutasjonsavsnittet, i praksis. Regelen var prøvd; inngangen var det ikke.
+
+**Rettingen:** oppdraget opprettes med `enhet=None`, og **alle** enhetene varsles gjennom
+`varsle_enhet`. Den gjør allerede den første til primær, fryser `varslet_modus` og
+nullstiller «trenger ressurs» — det broen gjorde, pluss bjella. `rekkefolge` blir 1, 2, …
+i stedet for 0, 1, …; `primaer` leser bare rekkefølgen innbyrdes. **Ingen produksjonskode når
+broen lenger**, bare testene — første steg mot deploy 2. Står i `oppdrag/CLAUDE.md`.
+
+**Tester:** to nye gjennom POST — bjella for én bil, og at den første fortsatt er primær med
+modusen frosset (passiv vakt) og bare én bjellerad. Røde uten rettingen (`0 != 1`).
+**Mutasjonstesting:** 2 mutanter — den gamle formen (`enheter[1:]` med `enhet=enheter[0]`),
+og `enheter[1:]` med `enhet=None` (den første bilen mistes helt). Begge drept.
+`oppdrag`+`ko`+`statistikk` (1 683) grønt på SQLite, `oppdrag`+`ko` (1 648) grønt på
+PostgreSQL.
+
 ## 2026-09-26 — «Aktiv nå» var feil for hver synlig fane: bjella og pasientsiden sendte ikke `X-Portal-Inaktiv` (A8)  `#core/drift`
 
 Tilstedeværelsen fra 16. sep. hviler på at **pollingen har headeren** og at en forespørsel

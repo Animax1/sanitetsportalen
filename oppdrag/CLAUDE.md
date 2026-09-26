@@ -168,6 +168,9 @@ ble regnet ut, ville et oppdrag hun kjørte i passiv vakt hoppet over til «akti
 gikk aktiv neste morgen — og hele poenget med å dokumentere passiv tid ville vært borte.
 **Broen i `Oppdrag.save()` stempler den også** — den lager den *første* koblingsraden, og
 uten stempelet talte `oppdrag_i_passiv` bare enheter lagt til etterpå (funnet av en mutant).
+**Siden 26. sep. 2026 (A1) når bare testene broen:** POST oppretter med `enhet=None` og
+varsler *alle* enhetene gjennom `varsle_enhet` — broen gikk utenom bjella, så den første
+bilen fikk ingen rad. Første steg mot deploy 2.
 
 **`Vaktmodusperiode` er den andre halvparten av svaret.** Stempelet sier hva som gjaldt for
 *ett oppdrag*; perioden sier hvor mange *timer* hun sto passiv, også de timene ingenting

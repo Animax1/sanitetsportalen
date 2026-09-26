@@ -1940,6 +1940,40 @@ class VarselbjellaTests(FlereEnheterBasis):
         self.assertEqual(len(uleste), 1)
         self.assertIn(str(o2.oppdragsnummer), uleste[0].title)
 
+    def _opprett(self, *enheter):
+        sentral = _klient(_bruker('sentral_bjelle', 'skriv_full'))
+        res = sentral.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data={'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+                                 'lokasjon_id': self.lokasjon.pk,
+                                 'enhet_ider': [e.pk for e in enheter]})
+        self.assertEqual(res.status_code, 200, res.content)
+        return Oppdrag.objects.get(pk=res.json()['data']['id'])
+
+    def test_den_forste_bilen_faar_bjella_naar_oppdraget_opprettes(self):
+        """**Gjennom endepunktet, ikke `varsle_enhet`** (26. sep. 2026, A1).
+
+        Testene over kaller `varsle_enhet` selv, og det var nettopp derfor
+        feilen sto: POST varslet bare `enheter[1:]`, og den første fikk
+        koblingsraden sin fra broen i `Oppdrag.save()`, som går utenom bjella.
+        Det vanligste tilfellet — ett oppdrag, én bil — ga ingen rad.
+        """
+        o = self._opprett(self.a)
+        varsler = self._varsler()
+        self.assertEqual(len(varsler), 1)
+        self.assertIn(str(o.oppdragsnummer), varsler[0].title)
+
+    def test_den_forste_er_fortsatt_primaer_og_modusen_frosset(self):
+        """Det broen gjorde, gjør `varsle_enhet` nå — også modusen, som en
+        mutant fant manglet på den første raden 16. sep."""
+        self.a.passiv_vakt = True
+        self.a.save(update_fields=['passiv_vakt'])
+        o = self._opprett(self.a, self.b)
+        self.assertEqual(o.enhet, self.a)
+        self.assertEqual(o.primaer.enhet, self.a)
+        self.assertEqual(services.koblingsrad(o, self.a).varslet_modus,
+                         services.gjeldende_modus(self.a))
+        self.assertEqual(len(self._varsler()), 1)
+
     def test_en_bjelle_som_feiler_stopper_ikke_varslingen(self):
         """En bil uten bjellerad er et savn; en varsling som velter
         utrykningen er en feil."""

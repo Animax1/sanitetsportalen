@@ -69,7 +69,7 @@ Puljene er sortert etter **hva en feil koster**, samme regel som puljene fra 16.
 Hver retting skal ha en test **gjennom endepunktet** som er rød før rettingen. Laget er
 tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels** for A7–A8.
 
-**A1. Bjella ringer ikke for den første bilen på et oppdrag.**
+**A1. Bjella ringer ikke for den første bilen på et oppdrag.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `oppdrag/views.py:496-506`.
 - **Feilen:**
   - POST oppretter oppdraget med `enhet=enheter[0]` og varsler bare `enheter[1:]`.
