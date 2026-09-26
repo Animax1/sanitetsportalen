@@ -206,11 +206,11 @@ tilganger da, en for eget korps og en for alle korps.»
 - **`les` ble det smale trinnet, `les_alle` det vide.** Eksisterende `les`-rader ble
   smalere ved oppgraderingen, ikke videre — den trygge retningen. Samordneren får
   `les_alle` i matrisen.
-- **Synligheten følger ikke stigen.** `skriv_handling` ligger over `les_alle` i
-  `NIVAA_HIERARKI` og ser likevel bare sitt eget korps. Stigen ordner hva man får
-  *gjøre*; hvilket korps man ser er modulens egen regel, `services.ser_alle_korps()`.
-  Det er en pris, og den er betalt med vilje: alternativet var å legge `les_alle` over
-  `skriv_handling`, og da hadde en leser rangert over en som skriver.
+- **Synligheten følger stigen fra `les_alle` og opp — snudd 12. sep. 2026.** Til da
+  så `skriv_handling` bare sitt eget korps, selv om det ligger over `les_alle` i
+  `NIVAA_HIERARKI`. André: «Endre skrive: eget korps til å inkludere lese: alle korps.»
+  Korps-føreren ser nå alle, men fører fortsatt bare sitt eget. Hvilket korps man ser er
+  modulens egen regel, `services.ser_alle_korps()` — den er fasit, ikke denne teksten.
 - **Filteret ligger i svaret sida bygges av** — `vaktliste_detalj_view`,
   `belastning_view` og `mannskap_view` — ikke i byggerne i nettleseren. Da følger alle
   fanene med på én gang. Ressursene sendes alle: en bil reservert et annet korps står

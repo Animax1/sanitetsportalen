@@ -24,14 +24,16 @@ skade en feil gjør.** `skriv_full` bemanner alle korps og skriver ut — retter
 den noe galt, retter man det tilbake. `skriv_leder` setter opp vakta:
 oppretter og fjerner ressurser og vaktlister, endrer vaktas lengde, lager
 roller og grupper. En fjernet ressurs tar bemanningen med seg, og det er ikke
-en feil man angrer. Vaktlista er den eneste modulen som deklarerer nivået.
+en feil man angrer. Oppdrag, KO og backlog deklarerer nivået også, med egne
+etiketter (`Module.nivaa_navn`).
 
 **Fem nivåer fra 11. sep. 2026: `les` ble «eget korps», og `les_alle` kom
 til.** Andrés bestilling: den som leser eller fører sitt eget korps skal bare
 se sitt eget korps på `/vaktliste/`. Notatets §4.4 sa det motsatte — «`les`
 ser hele lista, poenget er samordning» — og den som samordner får nå
-`les_alle`. Synligheten følger ikke stigen: `skriv_handling` ligger over
-`les_alle` og ser likevel bare sitt eget korps. Se `services.ser_alle_korps`.
+`les_alle`. **Snudd for `skriv_handling` 12. sep.:** korps-føreren ser alle
+korps, men fører bare sitt eget. Fasit er `services.ser_alle_korps` — ikke denne
+teksten, som sa det motsatte til 26. sep. 2026.
 """
 from core.modules import Module
 

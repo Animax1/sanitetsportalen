@@ -1161,7 +1161,7 @@ class KorpsfilterTests(TilgangsBasis):
     | `leser` | `les` | Haugesund | eget korps |
     | `leser_uten` | `les` | — | ingenting |
     | `samordner` | `les_alle` | — | alle |
-    | `kb` | `skriv_handling` | Haugesund | eget korps — over `les_alle` i stigen, ser likevel bare sitt eget |
+    | `kb` | `skriv_handling` | Haugesund | alle — fører bare sitt eget (snudd 12. sep.) |
     | `vaktleder` | `skriv_full` | — | alle |
     """
 

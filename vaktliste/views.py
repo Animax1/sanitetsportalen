@@ -8,7 +8,7 @@ To terskler, og skillet mellom dem er *hva slags utsagn* nivået får avgi:
 
 | Handling | Krav |
 |---|---|
-| Lese lista | `les` — hele lista, alle korps (§4.4) |
+| Lese lista | `les` — sitt eget korps; `les_alle` og oppover — alle. Fasit: `services.ser_alle_korps()` |
 | Bemanne en ressurs | `services.kan_sette_vaktpost()` — badge **og** reservasjon |
 | Dele ut en ressurs, sette opp ledige plasser | `services.kan_skrive_alt()` |
 | Opprette/fjerne ressurser og vaktlister, vaktas lengde, roller, grupper | `services.kan_lede()` |

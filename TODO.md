@@ -177,9 +177,10 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og
       helseprober (E6).
-- [ ] **Pulje F — dokumentasjon som motsier koden.** Tilgangsdocstrings i vaktlista og
-      `accounts` (F1); audit-avsnittet i rot-`CLAUDE.md` er feil (F2); TODO-punkter som er
-      gjort eller dobbelt (F3); ~40 utdaterte kommentarer, tas i forbifarten (F4).
+- [ ] **Pulje F — dokumentasjon som motsier koden.** F1 levert 26. sep. Igjen:
+      audit-avsnittet i rot-`CLAUDE.md` er feil (F2 — rota har ~25 tegn igjen under taket,
+      så rettingen må korte); TODO-punkter som er gjort eller dobbelt (F3); ~40 utdaterte
+      kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);
       store filer (G2); pasientsidens eget skall (G3); N+1 i pollede endepunkter (G4);
       `requirements.txt` kompilert for 3.11, SW-cachen, polling i skjulte faner (G5).

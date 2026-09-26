@@ -344,7 +344,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 
 ## Pulje F: dokumentasjon som motsier koden
 
-**F1. Tilgangsregler i docstrings som sier det motsatte av koden.** Disse skal først,
+**F1. Tilgangsregler i docstrings som sier det motsatte av koden.** *Levert 26. sep. 2026, se CHANGELOG.* Disse skal først,
 fordi den som leser dem før hun endrer en port, leser feil regel:
 - `vaktliste/views.py:11`
 - `vaktliste/services.py:645`

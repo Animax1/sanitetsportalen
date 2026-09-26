@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Tilgangsreglene i docstringene sa det motsatte av koden (F1)  `#vaktliste #accounts #oppdrag`
+
+**Hvorfor først i pulje F:** den som leser en docstring før hun endrer en tilgangsport, leser
+feil regel. Fasit er `vaktliste.services.ser_alle_korps()`: **`les` ser sitt eget korps,
+`les_alle` og oppover ser alle** — også `skriv_handling`, snudd 12. sep. 2026 («Endre skrive:
+eget korps til å inkludere lese: alle korps»), men som fortsatt bare *fører* sitt eget.
+
+| Hvor | Sa | Nå |
+|---|---|---|
+| `vaktliste/views.py` | «`les` — hele lista, alle korps (§4.4)» | eget korps; `les_alle`+ alle; peker på `ser_alle_korps()` |
+| `vaktliste/services.py` | «`les` gjelder hele lista med vilje» | peker på `ser_alle_korps()` |
+| `vaktliste/module.py` | `skriv_handling` «ser likevel bare sitt eget korps»; vaktlista «den eneste modulen» med `skriv_leder` | snudd 12. sep.; oppdrag, KO og backlog har det også |
+| `accounts/models.py` | «`SKRIV_HANDLING` er tomt i dag … tas i bruk når oppdragsmodulen skrives», pluss de to over | brukes av oppdrag (bilen) og vaktlista |
+| `vaktliste/tests_tilgang.py` | tabellen: `kb` «ser likevel bare sitt eget» — mens testen rett under krevde `{'Kari', 'Ola'}` | «alle — fører bare sitt eget» |
+| `docs/BESLUTNING_VAKTLISTE.md` | «Synligheten følger ikke stigen» | datert: snudd 12. sep. |
+
+**De to siste fantes ikke i planen** — de dukket opp da jeg søkte etter flere kopier av de
+samme setningene. En regel skrevet ut seks steder glir fra hverandre; derfor peker tekstene nå
+på funksjonen i stedet for å gjenta regelen.
+
+**`lokasjon`-kommandoen** sa at oppdragsmodulen «har ingen URL ennå» — den har hatt det siden
+fase 3, og lokasjonene redigeres i «Valglister». Kommandoen står igjen som verktøy (grei for å
+fylle staging), med ny tekst. **Testen hadde en død `skipTest`-gren** (`if modul.url is None`)
+som ville hoppet stille over seg selv den dagen URL-en faktisk forsvant; nå `assertIsNotNone`.
+
+**Mutant: 1 gyldig, drept.** Den første kjøringen traff `url=None` i *docstringen* til
+`oppdrag/module.py` og gikk grønn — løgn nr. 1 i mutasjonsavsnittet. Mot kodelinjen: rød.
+
 ## 2026-09-26 — Brytere og ruter uten virkning: `/api/` gir 410, `backup_enabled` ut, `createcachetable` ut (D4)  `#core`
 
 **`/api/…` svarer 410 i stedet for 301.** Adressene flyttet til `/pasienter/api/` i fase 2.

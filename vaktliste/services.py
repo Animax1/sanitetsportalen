@@ -644,9 +644,10 @@ def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
 #   kan_*_korps/…       — `skriv_handling` avgrenset av badgen.
 #   (ingenting)         — `les` skriver ikke.
 #
-# **`les` gjelder hele lista med vilje.** Poenget med en vaktliste er
-# samordning på tvers av korps; den som ikke skal se andre korps, skal ikke ha
-# modulen (§4.4).
+# **Hvem som *ser* hvilke korps står i `ser_alle_korps()`, ikke her.** `les`
+# ser sitt eget korps, `les_alle` og oppover ser alle (11.–12. sep. 2026). Å se
+# er ikke å skrive: stigen over gjelder skriving. Her sto «`les` gjelder hele
+# lista med vilje» (§4.4) til 26. sep. 2026 — regelen som ble snudd 11. sep.
 
 def kan_skrive_alt(user) -> bool:
     """`skriv_full` eller høyere — står utenfor badge og reservasjon.

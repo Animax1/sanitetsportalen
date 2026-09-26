@@ -1,17 +1,10 @@
-"""Vedlikehold lokasjonslista fra kommandolinjen.
+"""Vedlikehold lokasjonslista fra kommandolinjen — et verktøy, ikke flaten.
 
-Lokasjonene er stedene på *dette* arrangementet, og skal kunne endres uten
-deploy. Den permanente flaten er en admin-side i oppdragsmodulen, og den
-kommer i fase 3 sammen med sentralbordet.
+Lokasjonene redigeres i sentralbordet, under «Valglister» (`views_verdier`,
+`skriv_leder`, 12. sep. 2026). Kommandoen var flaten fram til da, og står igjen
+fordi den er grei for å fylle staging med mange steder på én gang.
 
-**Hvorfor ikke en side allerede nå:** modulen har ingen URL ennå, med vilje —
-et modulkort som fører til 404 er en knapp som fører til en vegg. En
-admin-side uten vei inn er den samme feilen med et ekstra steg; portalen har
-allerede hatt én slik, og den ble oppdaget ved at noen måtte skrive URL-en for
-hånd.
-
-Kommandoen følger `appsetting`-presedensen: den dekker behovet fram til flaten
-finnes, og gjør staging mulig å fylle med testdata før fase 3 skrives.
+Den skrev at modulen «har ingen URL ennå» til 26. sep. 2026 (F1).
 
 Bruk::
 

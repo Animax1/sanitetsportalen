@@ -150,12 +150,13 @@ class TilgangsNivaa(models.TextChoices):
     ``ingen`` finnes ikke som verdi — fravær av rad *er* ingen tilgang. To
     måter å uttrykke det samme på ville før eller siden kommet i utakt.
 
-    ``SKRIV_HANDLING`` er tomt i dag. Det finnes fordi en bil-/ambulansekonto
-    skal kunne utløse en navngitt overgang (et tidsstempel) uten å kunne
-    redigere fritekst, og fordi det ikke lar seg løse med en feltwhitelist
-    inne i den generelle PUT-en — der er stemplingen en bivirkning av en
-    redigering. Regelen er at en innskrenket aktør får et *smalt endepunkt*
-    som ikke leser request-kroppen. Tas i bruk når oppdragsmodulen skrives.
+    ``SKRIV_HANDLING`` finnes fordi en bil-/ambulansekonto skal kunne utløse
+    en navngitt overgang (et tidsstempel) uten å kunne redigere fritekst, og
+    fordi det ikke lar seg løse med en feltwhitelist inne i den generelle
+    PUT-en — der er stemplingen en bivirkning av en redigering. Regelen er at
+    en innskrenket aktør får et *smalt endepunkt* som ikke leser
+    request-kroppen. Brukes av oppdragsmodulen (bilens stemplinger) og av
+    vaktlista, der det betyr «fører sitt eget korps».
     ``SKRIV_LEDER`` kom 30. aug. 2026, og er det fjerde trinnet. Det finnes
     fordi vaktlista har to skrivende roller som ikke er samme rolle: den som
     *bemanner* (setter folk på plassene, på tvers av korps) og den som *setter
@@ -164,15 +165,16 @@ class TilgangsNivaa(models.TextChoices):
     bort andres arbeid — en fjernet ressurs tar bemanningen med seg. Uten et
     trinn til måtte de to enten deles ut samlet, eller så måtte oppsettet bli
     global admin, og da ville en vaktleder uten adminrettigheter ikke kunne
-    lage sin egen vaktliste. Ingen annen modul deklarerer nivået i dag.
+    lage sin egen vaktliste. Oppdrag, KO og backlog deklarerer det også, hver
+    med sin etikett (``Module.nivaa_navn``).
     Se §3.2 i docs/BESLUTNING_ROLLEMODELLEN.md.
     ``LES_ALLE`` kom 11. sep. 2026, for vaktlista: André ville at den som
     leser eller fører sitt eget korps bare skal se sitt eget korps på
     ``/vaktliste/`` — og da trengs et eget trinn for den som skal lese alle.
     ``les`` er det smale trinnet med vilje: eksisterende rader ble smalere
-    ved oppgraderingen, ikke videre. Synligheten følger ikke stigen —
-    ``skriv_handling`` ligger over ``les_alle`` og ser likevel bare sitt
-    eget korps; se ``vaktliste.services.ser_alle_korps``.
+    ved oppgraderingen, ikke videre. Hvem som ser hvilke korps står i
+    ``vaktliste.services.ser_alle_korps`` — fra 12. sep. ser ``skriv_handling``
+    alle korps igjen, men fører bare sitt eget.
     """
 
     LES = 'les', 'Lese'

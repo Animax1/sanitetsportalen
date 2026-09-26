@@ -484,13 +484,8 @@ class ChoicesTests(TestCase):
 
 
 class LokasjonKommandoTests(TestCase):
-    """`python manage.py lokasjon` — flaten fram til fase 3.
-
-    Modulen har ingen URL ennå, med vilje. En admin-side uten vei inn er den
-    samme feilen som et modulkort som fører til 404, med et ekstra steg — og
-    portalen har allerede hatt én slik. Kommandoen følger
-    `appsetting`-presedensen.
-    """
+    """`python manage.py lokasjon` — verktøyet for å fylle lokasjonslista fra
+    kommandolinjen. Flaten er «Valglister» i sentralbordet (fra 12. sep. 2026)."""
 
     def _kjor(self, *args):
         from io import StringIO
@@ -588,8 +583,11 @@ class ModulRegistreringTests(TestCase):
         ModulTilgang.objects.create(
             bruker=bruker, modul_slug='oppdrag', nivaa='les')
         modul = get_module('oppdrag')
-        if modul.url is None:
-            self.skipTest('Modulen har ingen URL ennå')
+        # Grenen `if modul.url is None: skipTest(...)` sto her til 26. sep. 2026.
+        # Modulen har hatt URL siden fase 3, så grenen var død — og en test som
+        # hopper over seg selv i stillhet, beviser ingenting den dagen URL-en
+        # faktisk forsvinner.
+        self.assertIsNotNone(modul.url)
         c = Client()
         c.force_login(bruker)
         self.assertEqual(c.get(modul.url).status_code, 200)
