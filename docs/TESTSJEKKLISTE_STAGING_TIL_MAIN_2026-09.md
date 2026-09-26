@@ -2,7 +2,7 @@
 
 **Hva denne er.** Det som bør prøves for hånd på staging før det som ligger der går til
 prod. Den dekker **bare det som er endret** mellom `main` (`4813cee`) og `staging`
-(`b5243c3`): de tekniske rundene 6–8, G6a og feilrettingene underveis. Alt står i
+(`729fe04`; commitene etter `6a6a8a6` er bare dokumenter): de tekniske rundene 6–8, G6a og feilrettingene underveis. Alt står i
 `CHANGELOG.md` under 26. sep. 2026.
 
 **Hva den ikke er.** En gjennomgang av hele portalen. Den finnes i
@@ -98,7 +98,7 @@ så ingenting trenger å stokkes om:
 |---|---|---|
 | 1 | `git push origin 0660da0:main` | Tekniske runder 6 og 7, vaktfabrikken og historikksøket |
 | 2 | `git push origin 68fed55:main` | **Bare kolonneslettingen** (`backup_enabled`). Ta backup av prod rett før — det er den ene endringen som ikke kan angres uten tilbakerulling |
-| 3 | `git push origin b5243c3:main` | Resten: felles klokke, kommandoene til `core`, bil-kontoen, G6a og dokumentene |
+| 3 | `git push origin <siste commit på staging>:main` (i dag `729fe04`) | Resten: felles klokke, kommandoene til `core`, bil-kontoen, G6a og dokumentene |
 
 Den er trygg fordi prod allerede kjører `4813cee`, og den koden bruker ikke kolonnen.
 
