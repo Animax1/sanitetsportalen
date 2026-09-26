@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — ETag-en er hele svaret: en endring i oppdragsvinduet druknet i en 304 (A2)  `#oppdrag/sentralbord`
+
+**Symptomet:** en operatør endret hastegrad, problemstilling, lokasjon eller notatet rett i
+oppdragsvinduet (levert 23. sep.), og **de andre operatørene så det ikke** — lista svarte
+**304**, fordi ETag-en var uendret. **Bilen** sto med gammel lokasjon og gammelt notat til
+neste stempling, og en **bil nummer to** på et oppdrag som var i gang, synes heller ikke.
+
+**Roten:** de tre listene som polles — sentralbordets oppdrag, bilens oppdrag og
+enhetslista — hadde hver sin **håndskrevne liste over felt** som skulle inn i ETag-en.
+CHANGELOG har rettet dem felt for felt i to uker («skal ikke drukne i en 304»):
+meldings-ID-ene, «Rett tid», avbrytelsene, avventingen, hendelsen, lagene, de delte linjene,
+lokasjonen i enhetslista. Neste felt noen la til i svaret, manglet igjen.
+
+**Rettingen lukker feilklassen:** `views_common.etag_for_svar()` hasher **hele den
+serialiserte payloaden** (`json.dumps(sort_keys=True)`), med historikktallet ved siden av.
+Tre feltlister og deres kommentarer er borte. Prefikset er `v2:`, så ingen gammel ETag kan
+treffe. `etag_for()` står igjen for verdimengdene, der den alt tar hele radene.
+
+**Prisen, og vakta:** svaret får ikke bære noe regnet ut fra klokka — da ville hver polling
+gitt ny ETag og aldri 304, og trafikken økt i stedet for å synke. Payloaden er lest felt for
+felt: bare lagrede verdier. `test_uendret_gir_304` holder det for alle tre listene, også mot
+PostgreSQL (rekkefølgen i usorterte spørringer kan variere der).
+
+**Tester:** `oppdrag/tests_etag.py` — hastegrad, lokasjon og problemstilling i alle tre
+listene, notatet hos sentralbordet og bilen, en bil til på et oppdrag i gang, og 304 når
+ingenting er endret. **Mutasjonstesting:** 4 mutanter — bare id og status i hashen,
+enhetslista uten data, historikktallet ute, og et klokkefelt i hashen (vakta over). Alle
+drept. `oppdrag`+`ko`+`statistikk` (1 688): grønt; ETag-testene grønne på PostgreSQL.
+
+**Én testfeil underveis, min:** «antall» på «Pustevansker» ga samme ETag — riktig, fordi
+bare «Transport» bærer antall og ingenting ble endret. Byttet til problemstillingen.
+
 ## 2026-09-26 — «Flytt» i Venter tok med seg den gamle bilens varsling (A4)  `#oppdrag/enhetsskjerm`
 
 `flytt_til_enhet()` pekte koblingsraden om når bilen sto i **Venter**, og lot alt annet

@@ -35,6 +35,24 @@ def etag_for(rader, ekstra=None) -> str:
     return '"v1:' + hashlib.sha256(raa.encode('utf-8')).hexdigest()[:16] + '"'
 
 
+def etag_for_svar(data, ekstra=None) -> str:
+    """ETag over **hele** den serialiserte payloaden (26. sep. 2026, A2).
+
+    `etag_for` tar en håndskrevet liste med felt, og de tre listene som polles
+    manglet felt for felt i to uker — sist hastegrad, lokasjon, antall,
+    fritekst og enhetslista, så en endring i oppdragsvinduet druknet i en 304.
+    Hashes hele svaret, er et nytt felt med uten at noen husker det.
+
+    **Prisen:** svaret får ikke bære noe regnet ut fra klokka, ellers blir
+    hver polling en ny ETag og aldri 304. `tests_etag.test_uendret_gir_304`
+    holder det. `default=str` tar tidspunkt og desimaler som måtte dukke opp.
+    """
+    raa = json.dumps(data, sort_keys=True, default=str, ensure_ascii=False)
+    if ekstra is not None:
+        raa += '|' + str(ekstra)
+    return '"v2:' + hashlib.sha256(raa.encode('utf-8')).hexdigest()[:16] + '"'
+
+
 def er_enhetskonto(user) -> bool:
     """True hvis kontoen er knyttet til en `Enhet`.
 

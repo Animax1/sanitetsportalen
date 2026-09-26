@@ -80,7 +80,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
   setter selv `oppdrag.enhet`.
 - **Test:** POST med én enhet skal gi én rad i bjella.
 
-**A2. ETag-ene er satt sammen av feltlister skrevet for hånd.**
+**A2. ETag-ene er satt sammen av feltlister skrevet for hånd.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `oppdrag/views.py:191-199`, `:403-409` og `:436-441`.
 - **Feilen:**
   - Hastegrad, problemstilling, lokasjon, antall, grovsortering, fritekst,

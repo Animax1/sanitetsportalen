@@ -153,9 +153,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 `636e1f2`). Funnene, begrunnelsene og «ferdig når» står i notatet; her står bare puljene,
 i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
 
-- [ ] **Pulje A — feil i drift, før neste vakt.** A1 og A3–A8 levert 26. sep. Igjen:
-      ETag-ene mangler felt, så redigering inne i oppdraget gir 304 hos de andre (A2).
-      KO-loggen får heller ingen «varslet»-linje for den nye bilen ved flytt i Venter.
+- [ ] **KO-loggen får ingen «varslet»-linje for den nye bilen ved flytt i Venter.** Raden
+      pekes om (A4, 26. sep. 2026), og `enhet_varslet` i `ko/signals.py` fyrer bare på en ny
+      rad. Var slik før også. Enten et eget signal på `Enhetsbytte`, eller at KO leser
+      byttet — KOs sak, ikke oppdragsmodulens.
 - [ ] **Pulje B — spor, tilgang og lekkasjer.** `reset_password`, `unlock`,
       feltendringer og sletting av backup uten audit (B2); vaktlistas audithull (B3);
       `accounts/admin.py` (B4); `sikkerhetssjekk.py` mangler KO og backlog (B5); rå

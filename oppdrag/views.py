@@ -32,7 +32,7 @@ from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
-    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for, hendelse_til_dict, json_body, melding_til_dict,
+    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, json_body, melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
 
@@ -188,14 +188,8 @@ def enheter_view(request):
     # Enheter som ikke er på vakt sendes med, de filtreres ikke bort.
     # Sentralbordet viser dem i en egen gruppe: en bil som forsvinner fra
     # tavla er en bil ingen husker å sette inn igjen.
-    etag = etag_for([
-        (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
-         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'],
-         r['ledig_siden'], r['passiv_vakt'],
-         # «Rediger oppdrag» kan flytte det uten å røre status eller id.
-         r['lokasjon_navn'])
-        for r in data
-    ])
+    # Hele svaret, ikke en feltliste (A2) — se `etag_for_svar`.
+    etag = etag_for_svar(data)
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
         svar = HttpResponseNotModified()
         svar['ETag'] = etag
@@ -394,20 +388,6 @@ def oppdrag_liste_view(request):
                 rad['andre_meldinger'] = [melding_til_dict(m) for m in gjeldende
                                           if m.oppdragsenhet_id != kobling.pk]
                 data.append(rad)
-            # Meldings-ID-ene må inn i ETag-en: en korreksjon endrer tidslinjen
-            # uten å røre oppdragets status, og skal ikke drukne i en 304.
-            # Lagene og beskrivelsen på hendelsen er med (KO, 18.–19. sep.
-            # 2026): KO skriver dem på hendelsen, ikke på oppdraget, og bilen
-            # ville ellers stått med gammel tekst til neste stempling. Både
-            # id og `delt_at` — en angret og delt igjen linje har samme id.
-            etag_rader = [
-                (r['id'], r['status'], r['enhet_id'],
-                 tuple(m['id'] for m in r['statusmeldinger']),
-                 tuple(m['id'] for m in r['andre_meldinger']),
-                 tuple(r['hendelse_lag']),
-                 tuple((t['id'], t['delt_at']) for t in r['delte_linjer']))
-                for r in data
-            ]
         else:
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
@@ -423,22 +403,6 @@ def oppdrag_liste_view(request):
                                      avbrutt_av=avbrutt.get(o.pk, []),
                                      avventer_av=avventer.get(o.pk, []))
                     for o in qs]
-            # Tidspunktet er med i ETag-en: «Rett tid» endrer det uten å røre
-            # statusen, og «12 min i Fremme» skal ikke drukne i en 304.
-            # Avbrytelsene er med i ETag-en: en bil som avbryter på et oppdrag
-            # noen alt har løst endrer verken status eller tidspunkt, og merket
-            # ville da drukne i en 304.
-            # Avventingen er med av samme grunn: operatøren setter «avventer»
-            # uten at status eller tidspunkt endrer seg.
-            # Hendelsen er med (KO pulje 5): å knytte et oppdrag til en
-            # hendelse rører verken status eller tidspunkt, og grupperingen på
-            # tavla ville ellers stått gammel til neste stempling.
-            etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'],
-                           tuple(r['avbrutt_av']), tuple(r['avventer_av']),
-                           r['hendelse_id'], r['hendelse_prioritet'],
-                           tuple(r['hendelse_lag']),
-                           tuple((t['id'], t['delt_at']) for t in r['delte_linjer']))
-                          for r in data]
             # **Ferdige oppdrag i historikken telles med** (André, 21. sep.
             # 2026: «ferdige oppdrag som vises i historikk vises ikke som
             # ferdig i tallstatistikken»). Et ferdig oppdrag går til
@@ -448,7 +412,12 @@ def oppdrag_liste_view(request):
             # radene som står igjen.
             i_historikk = Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=False).count()
 
-        etag = etag_for(etag_rader, ekstra=None if er_enhetskonto(request.user) else i_historikk)
+        # **Hele svaret, ikke en feltliste** (26. sep. 2026, A2). Lista over
+        # felt ble rettet felt for felt i to uker — meldings-ID-ene, «Rett tid»,
+        # avbrytelsene, avventingen, hendelsen, lagene, de delte linjene — og
+        # manglet fortsatt hastegrad, lokasjon, antall og notatet. Se
+        # `etag_for_svar`. Antallet i historikken står ved siden av.
+        etag = etag_for_svar(data, ekstra=None if er_enhetskonto(request.user) else i_historikk)
         if request.META.get('HTTP_IF_NONE_MATCH') == etag:
             svar = HttpResponseNotModified()
             svar['ETag'] = etag
