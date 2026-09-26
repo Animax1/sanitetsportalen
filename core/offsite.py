@@ -38,6 +38,8 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 
+from core.vask import vask
+
 logger = logging.getLogger(__name__)
 
 MAGI = b'SPBK1'
@@ -151,7 +153,7 @@ def last_opp(backup, sti) -> 'OffsiteKopi':
         rad.sendt_at = timezone.now()
         logger.info('core.offsite: lastet opp %s (%d bytes)', rad.objektnavn, rad.bytes)
     except Exception as exc:   # noqa: BLE001 — sporet skal ha årsaken
-        rad.feil = f'{exc.__class__.__name__}: {exc}'[:500]
+        rad.feil = _vask(f'{exc.__class__.__name__}: {exc}', 500)
         logger.exception('core.offsite: opplasting av %s feilet', backup.filename)
     rad.save()
     return rad
@@ -312,10 +314,10 @@ def _les_livssyklus() -> dict:
                     'feil': f'Scaleway svarte «{kode}» på lesing av '
                             f'livssyklusreglene. Har nøkkelen '
                             f'ObjectStorageBucketsRead? '
-                            f'({_vask(str(exc))})'}
+                            f'({_vask(str(exc), 160)})'}
         logger.warning('core.offsite: kunne ikke lese livssyklusreglene: %s', exc)
         return {'kjent': False, 'regler': [], 'avvik': [],
-                'feil': f'{navn}: {exc}'[:200]}
+                'feil': _vask(f'{navn}: {exc}', 200)}
 
     regler = []
     for rad in raa:
@@ -331,13 +333,11 @@ def _les_livssyklus() -> dict:
             'avvik': _avvik(regler)}
 
 
-def _vask(melding: str) -> str:
-    """Feilteksten uten nøkler, kortet ned. Den vises i nettleseren."""
+def _vask(melding: str, maks: int) -> str:
+    """Feilteksten uten nøkler og URL-legitimasjon. Den vises i nettleseren."""
     k = konfig()
-    for hemmelig in (k.get('access_key'), k.get('secret_key')):
-        if hemmelig:
-            melding = melding.replace(hemmelig, '***')
-    return melding[:160]
+    return vask(melding, hemmeligheter=(k.get('access_key'), k.get('secret_key'),
+                                        k.get('nokkel')), maks=maks)
 
 
 def _prefiks(rad: dict) -> str:

@@ -336,7 +336,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 - intervallsammenslåingen i vaktlista (tre kopier)
 - hjelperne mellom `oppdrag-kort.js` og `oppdrag-enhet.js`
 
-**E6. Vaskingen og helseprobene.**
+**E6. Vaskingen og helseprobene.** *Levert 26. sep. 2026, se CHANGELOG.*
 - `_scrub_secrets` og `offsite._vask` gjør nesten det samme. Samle dem i én `core/vask.py`.
 - `core/health.py` og `core/admin_status.py` har hver sin DB- og cache-probe.
 

@@ -356,7 +356,7 @@ if REDIS_URL:
             #     ConnectionError, og RATELIMIT_FAIL_OPEN er False som default.
             #     Begge er håndtert: flagget settes True nedenfor, og
             #     core.ratelimit.er_rate_limited fanger exceptions
-            #   - patients/admin_status.py _get_cache_health: try/except rundt probe
+            #   - core/health.py maal_cache: try/except rundt proben (delt med server-status)
         }
     }
     # Sentinel for diagnostikk (vises i admin/server-status)

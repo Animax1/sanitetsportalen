@@ -141,6 +141,19 @@ class OpplastingTests(_MedBackupDir):
         self.assertEqual(st['antall'], 0)
         self.assertEqual(st['siste_feil'].pk, rad.pk)
 
+    @override_settings(OFFSITE_S3_SECRET_KEY='SCWxxxxHEMMELIGxxxx9999')
+    def test_feilen_som_lagres_bærer_ingen_nøkler(self):
+        """`OffsiteKopi.feil` vises på /portal-admin/backup/, og ble lagret
+        uvasket til 26. sep. 2026 (E6) — bare livssykluskortet vasket sin."""
+        self.s3.feil = ConnectionError(
+            'https://ak:SCWxxxxHEMMELIGxxxx9999@s3.fr-par.scw.cloud nede, '
+            'nøkkel SCWxxxxHEMMELIGxxxx9999')
+        create_backup('patients', KIND_MANUAL)
+        feil = OffsiteKopi.objects.get().feil
+        self.assertNotIn('SCWxxxxHEMMELIGxxxx9999', feil)
+        self.assertIn('[scrubbed]@s3.fr-par', feil)
+        self.assertIn('nøkkel ***', feil)
+
     def test_status_og_oversikten(self):
         create_backup('patients', KIND_MANUAL)
         st = offsite.status()
@@ -369,6 +382,19 @@ class LivssyklusTests(SimpleTestCase):
             svar = offsite.livssyklus(bruk_cache=False)
         self.assertNotIn(hemmelig, svar['feil'])
         self.assertIn('***', svar['feil'], 'den skal faktisk ha vasket noe')
+
+    @override_settings(OFFSITE_S3_SECRET_KEY='SCWxxxxHEMMELIGxxxx9999',
+                       OFFSITE_S3_ACCESS_KEY='SCWTILGANGxxxx1111')
+    def test_ogsaa_den_generelle_feilen_vaskes(self) -> None:
+        """En feil uten S3-kode gikk rett i kortet, uvasket, til 26. sep. 2026."""
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                raise RuntimeError('tidsavbrudd mot https://x:SCWxxxxHEMMELIGxxxx9999@s3')
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertNotIn('SCWxxxxHEMMELIGxxxx9999', svar['feil'])
+        self.assertIn('tidsavbrudd', svar['feil'])
 
     def test_kaster_aldri(self) -> None:
         """Et kort som selv gir feil er borte akkurat når man trenger det."""

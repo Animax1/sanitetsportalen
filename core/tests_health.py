@@ -130,3 +130,46 @@ class HealthzMiddlewareIsolationTests(TestCase):
         snapshot = metrics_store.snapshot(window_seconds=300)
         self.assertEqual(snapshot.get('count', 0), 0,
                          'Health-checks skal ikke føre opp i metrics-vinduet')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class ProbeneGjennomDenEkteVeienTests(TestCase):
+    """Målingen er delt med server-status (26. sep. 2026, E6). Testene over
+    patcher `_check_cache` og ser derfor aldri hva som skjer med et ekte
+    unntak — disse går gjennom proben."""
+
+    def test_healthz_viser_bare_unntakstypen(self):
+        lekk = RuntimeError('redis://default:hemmelig123@redis.host:6379/0 nede')
+        with patch.object(cache, 'set', side_effect=lekk):
+            body = self.client.get('/healthz/').json()
+        self.assertEqual(body['cache']['error'], 'RuntimeError')
+        self.assertNotIn('hemmelig123', str(body))
+
+    def test_server_status_viser_den_vaskede_meldingen(self):
+        from core.admin_status import _get_cache_health
+        lekk = RuntimeError('redis://default:hemmelig123@redis.host:6379/0 nede')
+        with patch.object(cache, 'set', side_effect=lekk):
+            ut = _get_cache_health()
+        self.assertIn('[scrubbed]@redis.host', ut['error'])
+        self.assertNotIn('hemmelig123', ut['error'])
+
+    def test_select_1_som_ikke_gir_1_er_en_feil(self):
+        """Server-status sjekket ikke svaret før E6 — bare at spørringen gikk."""
+        from core import health
+        from core.admin_status import _get_db_health
+
+        class Markor:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def execute(self, sql): pass
+            def fetchone(self): return (0,)
+
+        class Tilkobling:
+            def cursor(self): return Markor()
+
+        with patch.object(health, 'connections', {'default': Tilkobling()}):
+            self.assertFalse(health.maal_db().ok)
+            self.assertEqual(self.client.get('/healthz/').status_code, 503)
+            db = _get_db_health()
+        self.assertFalse(db['healthy'])
+        self.assertEqual(db['error'], 'Uventet svar fra DB')

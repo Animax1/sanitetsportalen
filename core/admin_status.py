@@ -19,21 +19,19 @@ Kun for admin-rollen.
 """
 import json
 import os
-import time
-import uuid
 from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 
-from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
+from core.health import maal_cache, maal_db
 from core.klientip import klient_ip
 from core.sesjoner import aktive_sesjoner, bruker_id_i, dekod
 # `_scrub_secrets` står igjen som navn for de mange kallstedene her; den
@@ -163,16 +161,13 @@ def _get_db_health():
     from django.db import connection
     ut = {'vendor': connection.vendor, 'healthy': False, 'latency_ms': None,
           'tilkoblinger': None, 'maks_tilkoblinger': None}
-    try:
-        start = time.perf_counter()
-        with connection.cursor() as cur:
-            cur.execute('SELECT 1')
-            cur.fetchone()
-        ut['latency_ms'] = round((time.perf_counter() - start) * 1000, 2)
-        ut['healthy'] = True
-    except Exception as exc:
-        ut['error'] = _scrub_secrets(str(exc))[:200]
+    m = maal_db()
+    if m.ms is not None:
+        ut['latency_ms'] = round(m.ms, 2)
+    if not m.ok:
+        ut['error'] = m.feiltekst(detaljert=True)
         return ut
+    ut['healthy'] = True
     try:
         ut['sortering'] = _db_sortering(connection)
     except Exception as exc:
@@ -519,26 +514,13 @@ def _get_cache_health():
     Skal aldri kaste — alle feil fanges og rapporteres som unhealthy.
     Eventuelle credentials i feilmeldinger scrubbes før retur.
     """
-    backend_name = getattr(settings, 'CACHE_BACKEND_NAME', 'unknown')
-    probe_key = f'_health_probe_{uuid.uuid4().hex[:8]}'
-    probe_value = f'ok_{int(time.time())}'
-    try:
-        start = time.perf_counter()
-        cache.set(probe_key, probe_value, 30)
-        got = cache.get(probe_key)
-        cache.delete(probe_key)
-        latency_ms = round((time.perf_counter() - start) * 1000, 2)
-        return {
-            'backend': backend_name,
-            'healthy': got == probe_value,
-            'latency_ms': latency_ms,
-        }
-    except Exception as exc:
-        return {
-            'backend': backend_name,
-            'healthy': False,
-            'error': _scrub_secrets(str(exc))[:200],
-        }
+    m = maal_cache()
+    ut = {'backend': getattr(settings, 'CACHE_BACKEND_NAME', 'unknown'), 'healthy': m.ok}
+    if m.ms is not None:
+        ut['latency_ms'] = round(m.ms, 2)
+    if not m.ok:
+        ut['error'] = m.feiltekst(detaljert=True)
+    return ut
 
 
 # ── Beredskapstrinnene (24. sep. 2026) ────────────────────────────────────

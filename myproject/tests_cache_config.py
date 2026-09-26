@@ -185,7 +185,7 @@ class CacheHealthHelperTests(TestCase):
         """Hvis cache.set kaster, skal helperen returnere healthy=False uten å re-raise."""
         from core import admin_status as admin_status_module
         with mock.patch.object(
-            admin_status_module.cache, 'set', side_effect=RuntimeError('redis nede')
+            cache, 'set', side_effect=RuntimeError('redis nede')
         ):
             result = admin_status_module._get_cache_health()
             self.assertFalse(result['healthy'])
@@ -197,7 +197,7 @@ class CacheHealthHelperTests(TestCase):
         from core import admin_status as admin_status_module
         leaky = 'Failed: redis://default:hemmelig123@redis.host:6379/0 unreachable'
         with mock.patch.object(
-            admin_status_module.cache, 'set', side_effect=RuntimeError(leaky)
+            cache, 'set', side_effect=RuntimeError(leaky)
         ):
             result = admin_status_module._get_cache_health()
             self.assertFalse(result['healthy'])

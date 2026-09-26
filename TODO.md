@@ -173,8 +173,6 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       mellom `migrate` og containerbyttet kjører den gamle koden, og den velger kolonnen i
       hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
       PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
-- [ ] **Pulje E — duplisering som alt har glidd.** E1–E5 levert 26. sep. Igjen: vasking og
-      helseprober (E6).
 - [ ] **`enhetstimer` i bemanningsstatistikken teller en bil to ganger** når to ressurser
       er koblet til samme enhet og skiftene overlapper (`Ressurs.enhet` er en FK — dagbil og
       nattbil kan være samme bil). `vaktliste/statistikk.py` summerer unionen *per ressurs*;

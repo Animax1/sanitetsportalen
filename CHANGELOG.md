@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Offsite-feilen ble vist uvasket to av tre steder; vaskingen og helseprobene ett sted (E6)  `#core #sikkerhet #drift`
+
+**Vaskingen.** `core/offsite.py` hadde sin egen `_vask`, som byttet ut S3-nøklene men ikke
+URL-legitimasjon — `core.vask.vask` gjorde det motsatte. Å slå dem sammen avdekket det
+viktigste: **`_vask` ble brukt på ett av tre steder der en offsite-feil når nettleseren.**
+`OffsiteKopi.feil` (vises på `/portal-admin/backup/`) og den generelle feilen fra
+livssykluskortet ble lagret og vist rå. boto3 legger gjerne hele forespørselen i teksten.
+
+- `vask(tekst, *, hemmeligheter=(), maks=None)` tar begge nå: URL-legitimasjon alltid, kjente
+  hemmeligheter når kallstedet oppgir dem. **`maks` kapper etter vaskingen** — kappet først,
+  kunne en halv nøkkel stått igjen.
+- `offsite._vask(melding, maks)` er en tynn innpakning som oppgir tilgangsnøkkel,
+  hemmelig nøkkel **og krypteringsnøkkelen**, og brukes på alle tre stedene.
+
+**Helseprobene.** `SELECT 1` og skriv/les/slett-proben sto i både `core/health.py`
+(`/healthz/`) og `core/admin_status.py` (server-status), og hadde glidd: server-status sjekket
+ikke at `SELECT 1` ga 1, og `/healthz/` skrev «OperationalError: OperationalError». Nå
+`maal_db()` og `maal_cache()` i `core/health.py`, som returnerer en `Maaling`. **Målingen er
+felles, framstillingen er leserens:** `/healthz/` er offentlig og viser bare unntakstypen;
+server-status er admin og viser den vaskede meldingen (`Maaling.feiltekst(detaljert=…)`).
+Svaret fra `/healthz/` har samme form som før — Better Stack ser bare på statuskoden.
+
+**Nye prøver som går gjennom den ekte proben.** De gamle `/healthz/`-testene patchet
+`_check_cache` og så derfor aldri et ekte unntak; `ProbeneGjennomDenEkteVeienTests` gjør det,
+og prøver `SELECT 1` som svarer 0. `core/tests_vask.py` er nye enhetstester for `vask`.
+En testfelle underveis: klassefiksturen i `core/tests_offsite.py` har tilgangsnøkkel `'a'`,
+og vaskingen byttet ut hver «a» i feilteksten — samme felle testen over allerede advarer mot.
+Den nye testen setter realistiske nøkler.
+
+**Mutasjon:** 10 mutanter, alle røde — hemmelighetene ignorert (4), kapp før vask, URL-regexen
+av (8), opplastingsfeilen uvasket, den generelle livssyklusfeilen uvasket, `secret_key` ikke
+oppgitt, `/healthz/` med detaljert tekst, radsjekken fjernet, server-status' cache alltid
+frisk, databasefeil uten `return`.
+
 ## 2026-09-26 — Intervallene i vaktlista ett sted, og bilskjermens kopier kan ikke gli (E5, fjerde del)  `#vaktliste #oppdrag`
 
 **Intervallene.** «Slå sammen `(fra, til)` som overlapper eller møtes» sto tre ganger:
