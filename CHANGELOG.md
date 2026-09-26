@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Pasientregistreringen: en ukjent førstehjelper forsvant stille (B8)  `#core/drift`
+
+POST og PUT på `/pasienter/api/patients/` slo opp førstehjelper og helsepersonell og svelget
+`DoesNotExist` med `pass`. Svaret var **201/200**, pasienten sto **uten behandler**, og
+**tildelingsvarselet ble aldri sendt**. Operatøren så «lagret» og hadde ingen grunn til å
+sjekke. Det skjer uten at noen gjør noe galt: et nedtrekk tegnet før noen fjernet personen
+fra registeret, sender en ID som var gyldig da.
+
+**Rettingen:** `_hent_person()` i `patients/views_patients.py` gir personen, `None` for tom
+verdi, eller «Ukjent førstehjelper. Last siden på nytt og velg igjen.» med 400. Oppslaget
+sto skrevet fire ganger; nå står det én gang. I PUT slås personene opp **før** noe settes
+på objektet, så en avvist endring ikke etterlater et halvt endret objekt.
+
+**Tester:** `patients/tests_ukjent_behandler.py` — POST og PUT for begge felt, at en avvist
+PUT ikke endrer plasseringen, at `''` fortsatt fjerner personen, og at en avvist innsending
+**ikke brenner idempotensnøkkelen** (valideringen står fortsatt foran `reserver()`).
+**Mutasjonstesting:** 3 mutanter — feilen svelget igjen, sjekken fjernet i POST, og i PUT.
+Alle drept. `patients` (371 tester): grønt.
+
 ## 2026-09-26 — Datofiltrene i auditlogg og innloggingslogg ga 500 på en ugyldig dato (B6)  `#core/drift`
 
 `?date_from=2026-13-45` — eller «i går», eller 30. februar — gikk rett inn i

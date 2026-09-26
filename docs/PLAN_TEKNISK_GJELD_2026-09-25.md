@@ -209,7 +209,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
 - **Samtidig:** `send_fil` lover «kaster aldri», men `rader_for` og `brannliste` kjøres
   utenfor `try`.
 
-**B8. Pasient-POST og -PUT forkaster en ugyldig ID stille.**
+**B8. Pasient-POST og -PUT forkaster en ugyldig ID stille.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `patients/views_patients.py:219-233` og `:391-409`.
 - **Feilen:** svaret er 201/200 med tildelingen satt til `None`, og uten varsel.
 - **Retting:** 400, og ett felles oppslag i stedet for fire kopier.

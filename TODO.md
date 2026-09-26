@@ -168,7 +168,7 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       finnes (B1); `reset_password`, `unlock`, feltendringer og sletting av backup uten
       audit (B2); vaktlistas audithull (B3); `accounts/admin.py` (B4);
       `sikkerhetssjekk.py` mangler KO og backlog (B5); rå
-      unntakstekst i `Utsending.feil` (B7); ugyldig førstehjelper-ID forkastes stille (B8).
+      unntakstekst i `Utsending.feil` (B7).
 - [ ] **Pulje C — avgjørelser.** C1 står øverst. C2: planleggerens kladd er synlig for
       `les_alle`/`skriv_handling`, stikk i strid med tre kommentarer — rett koden eller
       løftet. C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett

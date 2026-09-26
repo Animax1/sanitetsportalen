@@ -41,6 +41,26 @@ from .views_common import (
 
 # ── Hoved-side ────────────────────────────────────────────────────────────────
 
+
+#: Navnet brukeren ser i feilmeldingen.
+_PERSONNAVN = {'Forstehjelper': 'førstehjelper', 'Helsepersonell': 'helsepersonell'}
+
+
+def _hent_person(modell, raa):
+    """ID fra klienten → `(person, None)`, `(None, None)` for tom, eller `(None, melding)`.
+
+    **En ukjent ID er en feil, ikke en tom verdi** (26. sep. 2026, B8). Oppslaget
+    svelget `DoesNotExist` med `pass`, så POST ga 201 og PUT 200 med personen
+    stille satt til `None` — og tildelingsvarselet ble aldri sendt. Et nedtrekk
+    tegnet før noen fjernet personen fra registeret, sender en slik ID.
+    """
+    if raa in (None, ''):
+        return None, None
+    try:
+        return modell.objects.get(pk=int(raa)), None
+    except (modell.DoesNotExist, ValueError, TypeError):
+        return None, f'Ukjent {_PERSONNAVN[modell.__name__]}. Last siden på nytt og velg igjen.'
+
 @modul_kreves('patients', 'les')
 def index_view(request):
     """Render hoved-siden.
@@ -214,23 +234,12 @@ def patients_list_view(request):
     now_str = now_local_str()
     data['_now_str'] = now_str  # leses av stamp_*_if_needed
 
-    # Konverter forstehjelper-ID til Forstehjelper-objekt
-    forstehjelper_obj = None
-    forstehjelper_id = data.get('forstehjelper')
-    if forstehjelper_id:
-        try:
-            forstehjelper_obj = Forstehjelper.objects.get(pk=int(forstehjelper_id))
-        except (Forstehjelper.DoesNotExist, ValueError, TypeError):
-            pass
-
-    # Konverter helsepersonell_ref-ID til Helsepersonell-objekt
-    helsepersonell_obj = None
-    helsepersonell_id = data.get('helsepersonell_ref')
-    if helsepersonell_id:
-        try:
-            helsepersonell_obj = Helsepersonell.objects.get(pk=int(helsepersonell_id))
-        except (Helsepersonell.DoesNotExist, ValueError, TypeError):
-            pass
+    forstehjelper_obj, feil = _hent_person(Forstehjelper, data.get('forstehjelper'))
+    if feil:
+        return JsonResponse({'error': feil}, status=400)
+    helsepersonell_obj, feil = _hent_person(Helsepersonell, data.get('helsepersonell_ref'))
+    if feil:
+        return JsonResponse({'error': feil}, status=400)
 
     # Bruk server-tid hvis frontend sendte blank/manglende inntid.
     # Tidligere: data.get('inntid', now) – returnerte '' hvis nøkkelen fantes med tom verdi.
@@ -380,34 +389,24 @@ def patient_detail_view(request, pk):
             'utskrevet_til', 'journal',
         }
 
+        # Personene slås opp før noe settes på objektet: en avvist endring
+        # skal ikke etterlate et halvt endret objekt (B8).
+        personer = {}
+        for felt, modell in (('forstehjelper', Forstehjelper),
+                             ('helsepersonell_ref', Helsepersonell)):
+            if felt in data:
+                personer[felt], feil = _hent_person(modell, data[felt])
+                if feil:
+                    return JsonResponse({'error': feil}, status=400)
+
         # Lagre gammel plassering FØR mutasjon for obs-stempling
         old_plassering = patient.plassering or ''
 
         for field, value in data.items():
             if field in allowed_text_fields:
                 setattr(patient, field, value)
-
-        # Forstehjelper: konverter ID til objekt
-        if 'forstehjelper' in data:
-            forstehjelper_id = data['forstehjelper']
-            if forstehjelper_id:
-                try:
-                    patient.forstehjelper = Forstehjelper.objects.get(pk=int(forstehjelper_id))
-                except (Forstehjelper.DoesNotExist, ValueError, TypeError):
-                    pass
-            else:
-                patient.forstehjelper = None
-
-        # Helsepersonell_ref: konverter ID til objekt
-        if 'helsepersonell_ref' in data:
-            hp_id = data['helsepersonell_ref']
-            if hp_id:
-                try:
-                    patient.helsepersonell_ref = Helsepersonell.objects.get(pk=int(hp_id))
-                except (Helsepersonell.DoesNotExist, ValueError, TypeError):
-                    pass
-            else:
-                patient.helsepersonell_ref = None
+        for felt, person in personer.items():
+            setattr(patient, felt, person)
 
         # Én felles tidsstempel for hele requesten (Europe/Oslo, uavh. av container-TZ).
         data['_now_str'] = now_local_str()
