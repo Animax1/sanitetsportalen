@@ -4,6 +4,14 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — To utdaterte punkter øverst i TODO: rollemodellens deploy 2 og 3  `#docs`
+
+**Hvorfor:** øverst i `TODO.md`, under «Krever Andre», sto «Deploy 2 til prod — krever din
+avgjørelse» (`role` krympet til `admin`/`bruker`) og «Deploy 3 til prod» (de fem
+`kan_redigere_*`-flaggene fjernet). Begge har vært i prod lenge — André: «det er ikke andre
+roller enn admin og bruker» — og `accounts/0014_fjern_modulflagg` ligger på `main`. Punktene
+var rester som aldri ble slettet, i den ene seksjonen som skal si hva som venter på ham. Slettet.
+
 ## 2026-09-26 — `appsetting`, `kollaps_arkiv` og `AppSetting`-adminen ut av `patients` (G1, andre del)  `#core`
 
 **Hvorfor:** tre ting i `patients` var rammeverk. `AppSettingAdmin` (i `patients/admin.py`),
