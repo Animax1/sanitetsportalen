@@ -1099,6 +1099,76 @@ class ArkiveringAvVaktlisteTests(ApiTests):
         self.assertEqual(res.status_code, 200)
         self.assertEqual([v['id'] for v in self.c.get('/vaktliste/api/vaktlister/').json()['data']], [vl.pk])
 
+    # ── En arkivert liste styrer ingenting (26. sep. 2026, A6) ───────────
+    #
+    # Arkiveringen satte bare `arkivert_at`. Sto lista i drift, var den borte
+    # fra velgeren men vant fortsatt «lista i bruk» for sentralbordet og KO, og
+    # ble sendt på e-post med telefonnumre på intervall — uten at noen på
+    # skjermen kunne se den eller stoppe den.
+
+    def _i_drift(self, vl, arkivert=False):
+        Vaktliste.objects.filter(pk=vl.pk).update(
+            status=choices.DRIFT, satt_i_drift_at=timezone.now(),
+            arkivert_at=timezone.now() if arkivert else None)
+        vl.refresh_from_db()
+        return vl
+
+    def test_en_liste_i_drift_arkiveres_ikke(self):
+        vl = self._i_drift(self._liste('Testvakten'))
+        res = self.c.post(f'/vaktliste/api/vaktlister/{vl.pk}/arkiver/')
+        self.assertEqual(res.status_code, 409, res.content)
+        self.assertIn('drift', res.json()['message'])
+        vl.refresh_from_db()
+        self.assertIsNone(vl.arkivert_at)
+
+    def test_en_arkivert_liste_settes_ikke_i_drift(self):
+        vl = self._liste('Testvakten')
+        Vaktliste.objects.filter(pk=vl.pk).update(arkivert_at=timezone.now())
+        res = self.c.post(f'/vaktliste/api/vaktlister/{vl.pk}/drift/start/')
+        self.assertEqual(res.status_code, 409, res.content)
+        vl.refresh_from_db()
+        self.assertNotEqual(vl.status, choices.DRIFT)
+
+    def test_en_arkivert_liste_i_drift_styrer_ingenting(self):
+        """Lister som ble arkivert i drift før sperra kom, finnes. Ingen av de
+        fire leserne skal velge dem."""
+        from unittest.mock import patch
+
+        from . import fil
+        from .driftstatus import VaktlisteDriftstatus
+        arkivert = self._i_drift(self._liste('Gammel'), arkivert=True)
+        levende = self._liste('Levende')
+        enhet = Enhet.objects.create(navn='Sola 56')
+        self._ressurs(arkivert, 'Bil gammel', enhet=enhet)
+        self._ressurs(levende, 'Bil levende', enhet=enhet)
+        Vakt.objects.filter(pk=levende.vakt_id).update(er_aktiv=True)
+        AppSetting.set('aktiv_vakt_id', str(levende.vakt_id))
+
+        self.assertNotEqual(services.vaktliste_i_bruk(), arkivert)
+        besetning = services.besetning(enhet.pk)
+        self.assertEqual(besetning['ressurs_navn'] if besetning else None, 'Bil levende')
+        AppSetting.set(fil.MOTTAKERE_NOKKEL, 'a@example.com')
+        AppSetting.set(fil.INTERVALL_NOKKEL, '30')
+        with patch('vaktliste.fil.send_fil') as send:
+            fil.send_planlagte()
+        self.assertNotIn(arkivert, [kall.args[0] for kall in send.call_args_list])
+        drift = VaktlisteDriftstatus().vaktbilde(None)['vaktlister_i_drift']
+        self.assertEqual([d['id'] for d in drift], [])
+
+    def test_to_lister_i_drift_gir_samme_liste_til_sentralbordet_og_ko(self):
+        """`besetning()` sorterte ikke, og falt da på `Ressurs.Meta.ordering`
+        (navnet) — mens `vaktliste_i_bruk()` tar den sist satt i drift. Navnene
+        er valgt så basens rekkefølge peker på den gamle."""
+        gammel = self._i_drift(self._liste('Gammel'))
+        ny = self._liste('Ny')
+        Vaktliste.objects.filter(pk=ny.pk).update(
+            status=choices.DRIFT, satt_i_drift_at=gammel.satt_i_drift_at + timedelta(hours=1))
+        enhet = Enhet.objects.create(navn='Sola 56')
+        self._ressurs(gammel, 'A-bil', enhet=enhet)
+        self._ressurs(ny, 'B-bil', enhet=enhet)
+        self.assertEqual(services.vaktliste_i_bruk().pk, ny.pk)
+        self.assertEqual(services.besetning(enhet.pk)['ressurs_navn'], 'B-bil')
+
     def test_bare_global_admin(self):
         vl = self._liste('Testvakten')
         leder = _klient(_bruker('leder', 'skriv_leder'))

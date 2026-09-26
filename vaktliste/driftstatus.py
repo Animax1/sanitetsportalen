@@ -15,14 +15,13 @@ class VaktlisteDriftstatus(BaseDriftstatusHandler):
     order = 10
 
     def vaktbilde(self, vakt) -> dict:
-        from vaktliste import choices
-        from vaktliste.models import Utsending, Vaktliste
+        from vaktliste import services
+        from vaktliste.models import Utsending
 
         drift = [
             {'id': v.pk, 'vakt': v.vakt.navn,
              'siden': v.satt_i_drift_at.isoformat() if v.satt_i_drift_at else None}
-            for v in (Vaktliste.objects.filter(status=choices.DRIFT)
-                      .select_related('vakt'))
+            for v in (services.lister_i_drift().select_related('vakt'))
         ]
         u = Utsending.objects.order_by('-created_at').first()
         return {

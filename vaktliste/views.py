@@ -369,6 +369,13 @@ def vaktliste_arkiver_view(request, pk, retning):
     except Vaktliste.DoesNotExist:
         return _feil('Vaktliste ikke funnet', status=404)
     if retning == 'arkiver':
+        # **En liste i drift arkiveres ikke** (26. sep. 2026, A6). Den ville
+        # forsvunnet fra velgeren og fortsatt styrt sentralbordet, KO og
+        # e-postutsendingen. Ta den ut av drift først — det er en dør, ikke en
+        # sletting, og rører ingen stempler.
+        if vl.i_drift:
+            return _feil('Lista står i drift. Ta den ut av drift før den arkiveres.',
+                         status=409)
         if vl.arkivert_at is None:
             vl.arkivert_at = timezone.now()
             vl.save(update_fields=['arkivert_at', 'updated_at'])
@@ -1100,6 +1107,10 @@ def drift_view(request, pk, tilstand):
         return _feil('Vaktliste ikke funnet', status=404)
 
     utsending = None
+    if tilstand == 'start' and vl.arkivert_at is not None:
+        # Samme sperre motsatt vei (A6): en arkivert liste er ute av velgeren.
+        return _feil('Lista er arkivert. Hent den tilbake før den settes i drift.',
+                     status=409)
     if tilstand == 'start':
         vl.status = choices.DRIFT
         # Tidspunktet settes kun ved åpning, og beholdes ved en senere

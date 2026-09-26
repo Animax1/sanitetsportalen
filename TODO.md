@@ -153,10 +153,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 `636e1f2`). Funnene, begrunnelsene og «ferdig når» står i notatet; her står bare puljene,
 i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
 
-- [ ] **Pulje A — feil i drift, før neste vakt.** A1, A3, A5, A7 og A8 levert 26. sep.
+- [ ] **Pulje A — feil i drift, før neste vakt.** A1, A3, A5, A6, A7 og A8 levert 26. sep.
       Igjen: ETag-ene mangler felt, så redigering inne i oppdraget gir 304 hos de andre
-      (A2); «Flytt» i Venter beholder gammel bils varsling (A4); arkivert vaktliste i drift
-      styrer fortsatt sentralbord, KO og e-post (A6).
+      (A2); «Flytt» i Venter beholder gammel bils varsling (A4).
 - [ ] **Pulje B — spor, tilgang og lekkasjer.** `reset_password`, `unlock`,
       feltendringer og sletting av backup uten audit (B2); vaktlistas audithull (B3);
       `accounts/admin.py` (B4); `sikkerhetssjekk.py` mangler KO og backlog (B5); rå

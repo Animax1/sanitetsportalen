@@ -116,7 +116,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
   gamle verdier.
 - **Retting:** `update_fields` med feltene som faktisk endres.
 
-**A6. En arkivert vaktliste i drift styrer fortsatt.**
+**A6. En arkivert vaktliste i drift styrer fortsatt.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `vaktliste/views.py:345-348`.
 - **Feilen:** lista er borte fra velgeren, men fire steder ser fortsatt den arkiverte:
   - besetningen på sentralbordet

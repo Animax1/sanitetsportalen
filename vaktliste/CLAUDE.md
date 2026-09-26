@@ -89,7 +89,7 @@ og de må ikke slås sammen.
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
   (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
   fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som ingen under `skriv_full`
-  ser eller kan fylle (`services.KLADD`, `er_planlagt`; C2, 26. sep.). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
+  ser eller kan fylle (`services.KLADD`, C2). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
   og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
   viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
@@ -338,7 +338,7 @@ ressursene **uten** enhet og **på vakt nå** fra `api/ressurser/uten-enhet/` �
   (`0015`) er nødnettsterminalens nummer, tekst med ledende nuller.
 - **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
   og ukoblet er ulike svar på ulike problemer.
-- **Lista i drift vinner; ellers portalens aktive vakt** (12. sep. 2026 — «koblingen
+- **Lista i drift vinner — ikke arkivert, sist satt i drift (`lister_i_drift()`); ellers portalens aktive vakt** (12. sep. 2026 — «koblingen
   fungerer ikke»: vaktlista som kjørte lå på en annen vakt enn den aktive). Dekker
   ingen skift nå, sendes **neste skift** med (`neste`, `neste_fra`), så svaret er «ingen
   nå, Kari fra 16:00». 404-meldingen skiller «koblet i en annen vakt» fra «ikke koblet
@@ -570,7 +570,7 @@ før man rører *annen* kode:
 - **Én person, ett sted, per natt — også på tvers av vaktlistene** (`(mannskap, natt)` er
   unik). En seng på en annen vakt flyttes aldri herfra.
 - **Alle med `les` ser hele lista, men telefonen og skiftdetaljene følger korpsfilteret**
-  (`vis_telefon`). Alle får `er_paa_vakt`, så tellingen stemmer (C1, 26. sep. 2026).
+  (`vis_telefon`). Alle får `er_paa_vakt` (C1).
 - **Dataene står i vaktlistas hovedsvar** (`data_for`), så de følger offline-kopien.
 - **Brannlista står i fila på e-post**, og `fil.signatur()` tar den med bare når den finnes.
 

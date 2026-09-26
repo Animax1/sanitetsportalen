@@ -1413,6 +1413,19 @@ def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):
     }
 
 
+def lister_i_drift():
+    """Vaktlistene som står i drift — **og ikke er arkivert**.
+
+    **Én spørring, fire lesere** (26. sep. 2026, A6): `vaktliste_i_bruk()`,
+    `besetning()`, intervallsendingen i `fil` og driftstatus. Arkiveringen satte
+    bare `arkivert_at`, så en liste arkivert i drift var borte fra velgeren men
+    styrte fortsatt sentralbordet og KO, og ble sendt på e-post med
+    telefonnumre. Sperra i viewet hindrer nye; dette tar dem som finnes.
+    """
+    from .models import Vaktliste
+    return Vaktliste.objects.filter(status=choices.DRIFT, arkivert_at__isnull=True)
+
+
 def vaktliste_i_bruk():
     """Vaktlista som gjelder **nå** — den i drift, ellers den aktive vaktas.
 
@@ -1447,7 +1460,7 @@ def vaktliste_i_bruk():
     from core.vakt import hent_aktiv_vakt
     from .models import Vaktliste
 
-    i_drift = (Vaktliste.objects.filter(status=choices.DRIFT)
+    i_drift = (lister_i_drift()
                .select_related('vakt')
                .order_by('-satt_i_drift_at', '-pk').first())
     if i_drift is not None:
@@ -1494,7 +1507,10 @@ def besetning(enhet_id, naa=None):
     kandidater = (Ressurs.objects
                   .filter(enhet_id=enhet_id)
                   .select_related('vaktliste__vakt'))
-    ressurs = (kandidater.filter(vaktliste__status=choices.DRIFT).first()
+    # Samme utvalg og samme rekkefølge som `vaktliste_i_bruk()` (A6): står to
+    # lister i drift, skal sentralbordet og KO vise samme liste for samme bil.
+    ressurs = (kandidater.filter(vaktliste__in=lister_i_drift())
+               .order_by('-vaktliste__satt_i_drift_at', '-vaktliste__pk').first()
                or (kandidater.filter(vaktliste__vakt=vakt).first() if vakt else None))
     if ressurs is None:
         return None

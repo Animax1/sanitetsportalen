@@ -261,15 +261,14 @@ def send_planlagte(naa=None) -> list:
 
     Returnerer radene som ble skrevet. Kaster ikke.
     """
-    from . import choices
-    from .models import Vaktliste
+    from . import services
 
     minutter = intervall_minutter()
     if not minutter or not mottakere():
         return []
     naa = naa or timezone.now()
     ut = []
-    for vl in Vaktliste.objects.filter(status=choices.DRIFT).select_related('vakt'):
+    for vl in services.lister_i_drift().select_related('vakt'):
         siste = vl.utsendinger.first()
         if siste is not None and (naa - siste.created_at) < timedelta(minutes=minutter):
             continue

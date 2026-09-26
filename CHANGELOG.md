@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — En arkivert vaktliste i drift styrte fortsatt sentralbordet, KO og e-posten (A6)  `#vaktliste/offline`
+
+**Arkiveringen satte bare `arkivert_at` og rørte ikke `status`.** En liste som ble
+arkivert mens den **sto i drift**, var borte fra velgeren, men:
+
+- vant fortsatt «lista i bruk» for **KO-tavla** (`vaktliste_i_bruk()`),
+- vant fortsatt **besetningen** på sentralbordet (`besetning()`),
+- ble **sendt på e-post med telefonnumre** på intervall (`fil.send_planlagte()`),
+- og sto på server-status som «i drift».
+
+Ingen på skjermen kunne se den, og derfor ingen stoppe den.
+
+**Rettingen, to lag:**
+1. **Sperre i hver retning, 409:** en liste i drift arkiveres ikke («Ta den ut av drift
+   før den arkiveres»), og en arkivert liste settes ikke i drift. Ut av drift er en dør,
+   ikke en sletting, og rører ingen stempler.
+2. **`services.lister_i_drift()`** — `status=drift` **og** ikke arkivert — er én spørring
+   for alle fire leserne. Den tar listene som alt er arkivert i drift i prod.
+
+**Og en søsterfeil:** `besetning()` sorterte ikke, og falt på `Ressurs.Meta.ordering`
+(navnet), mens `vaktliste_i_bruk()` tar den **sist satt i drift**. Med to lister i drift
+kunne sentralbordet og KO vise hver sin liste for samme bil. Nå samme rekkefølge.
+
+**Tester** (`ArkiveringAvVaktlisteTests`): begge sperrene, en arkivert liste i drift mot
+alle fire leserne, og to lister i drift med navn valgt så basens rekkefølge peker på den
+gamle. **Mutasjonstesting:** 8 mutanter — hver sperre fjernet, arkivfilteret fjernet fra
+hjelperen, hver av de fire leserne tilbake til den gamle spørringen, og sorteringen i
+`besetning()` fjernet. Alle drept. `vaktliste`+`ko`+`oppdrag` (2 954 tester): grønt.
+
+`vaktliste/CLAUDE.md` traff taket med dagens tillegg (C1, C2, A6) og ble kortet inn på
+stedet, ikke hevet.
+
 ## 2026-09-26 — Planleggerens kladd var synlig for `les_alle` og korps-føreren (C2)  `#vaktliste/tilgang`
 
 **André: «skjul, bare de som har skriverett kan se den».** En ledig plass som ikke er delt
