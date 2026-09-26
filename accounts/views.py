@@ -1142,6 +1142,9 @@ def user_detail_view(request, pk):
         if action == 'edit':
             mfa_for = user.mfa_required
             rolle_for = user.role
+            # Verdiene før, for auditraden per endret felt (B2) — `form.save()`
+            # skriver dem over på samme objekt.
+            foer = {f: getattr(user, f) for f in AdminUserEditForm.Meta.fields}
             form = AdminUserEditForm(request.POST, instance=user)
             tilgang_form = ModulTilgangForm(request.POST, bruker=user)
             if form.is_valid() and tilgang_form.is_valid():
@@ -1157,11 +1160,17 @@ def user_detail_view(request, pk):
                 # Rolleendring ble ikke loggført i det hele tatt: frysing og
                 # sletting skrev auditrad, men det å gi noen admin gjorde det
                 # ikke. Modultilgang loggføres per modul som endres.
-                if user.role != rolle_for:
-                    _log_user_admin_action(
-                        request, user, 'UPDATE', field_name='role',
-                        old_value=rolle_for, new_value=user.role,
-                    )
+                # **Hvert felt som faktisk endret seg** (26. sep. 2026, B2). Bare
+                # rollen ble logget; `email`, `fullt_navn`, `mfa_required` og
+                # `er_delt_konto` kunne endres sporløst — og en endret e-post er
+                # veien til en passordlenke.
+                for felt, gammel in foer.items():
+                    ny = getattr(user, felt)
+                    if ny != gammel:
+                        _log_user_admin_action(
+                            request, user, 'UPDATE', field_name=felt,
+                            old_value=str(gammel), new_value=str(ny),
+                        )
                 for slug, fra, til in tilgang_form.save(user):
                     _log_user_admin_action(
                         request, user, 'UPDATE', field_name=slug,
@@ -1209,6 +1218,9 @@ def user_detail_view(request, pk):
                     'den er en delt konto.',
                 )
             elif send_invitasjon(user, request):
+                # En invitasjon er en lenke som setter passord (B2).
+                _log_user_admin_action(request, user, 'UPDATE', field_name='invitasjon',
+                                       new_value=user.email)
                 messages.success(
                     request, f'Ny invitasjon er sendt til {user.email}.',
                 )
@@ -1285,9 +1297,12 @@ def user_detail_view(request, pk):
             return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'unlock':
+            laast_til = user.locked_until
             user.failed_login_attempts = 0
             user.locked_until = None
             user.save(update_fields=['failed_login_attempts', 'locked_until'])
+            _log_user_admin_action(request, user, 'UPDATE', field_name='locked_until',
+                                   old_value=str(laast_til), new_value='None')
             messages.success(request, f'Kontoen til «{user.username}» er låst opp.')
             return redirect('portaladmin:user_detail', pk=pk)
 
@@ -1298,6 +1313,10 @@ def user_detail_view(request, pk):
             user.save(update_fields=['password', 'must_change_password'])
 
             _invalidate_all_sessions(user)
+            # **Aldri passordet**, bare at det ble byttet (B2). Dette var den
+            # mest inngripende handlingen på en konto, og den eneste uten spor.
+            _log_user_admin_action(request, user, 'UPDATE', field_name='password',
+                                   new_value='midlertidig passord satt av admin')
 
             messages.success(request, 'Nytt midlertidig passord generert (vises nedenfor).')
 
@@ -1314,6 +1333,10 @@ def user_detail_view(request, pk):
             # Logg hendelsen
             _log_event(user, user.username, True, request,
                        LoginEvent.EVENT_MFA_RESET_BY_ADMIN)
+            # Innloggingsloggen sier at det skjedde, men ikke *hvem* som gjorde
+            # det: raden står på brukeren. Auditloggen bærer admin (B2).
+            _log_user_admin_action(request, user, 'UPDATE', field_name='mfa',
+                                   new_value='nullstilt av admin')
             messages.success(
                 request,
                 f'MFA nullstilt for «{user.username}» — de må sette opp på nytt ved neste pålogging.',

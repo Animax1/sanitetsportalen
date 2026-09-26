@@ -199,6 +199,7 @@ med. Derfor eget kort, ikke en rad blant modulene.
                     action="{% url 'portaladmin:backup_admin_delete' slug=hel.slug pk=b.pk %}"
                     data-confirm="Slette {{ b.filename }}?">
                 {% csrf_token %}
+                <input type="hidden" name="bekreft" value="ja">
                 <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>
               </form>
             </td>
@@ -481,6 +482,7 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
                       action="{% url 'portaladmin:backup_admin_delete' slug=rad.slug pk=b.pk %}"
                       data-confirm="Slette {{ b.filename }}?">
                   {% csrf_token %}
+                  <input type="hidden" name="bekreft" value="ja">
                   <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>
                 </form>
               </td>

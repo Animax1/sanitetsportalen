@@ -167,7 +167,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
   påstår det motsatte.
 - **Retting:** alltid «Feil brukernavn eller passord.». Låsingen virker uansett.
 
-**B2. Hull i auditloggen i brukeradministrasjonen.**
+**B2. Hull i auditloggen i brukeradministrasjonen.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:**
   - `reset_password` og `unlock` (`accounts/views.py:1278-1290`) logger ingenting.
   - `edit` logger bare `role` og modultilgang. Endringer av `mfa_required`,

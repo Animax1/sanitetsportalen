@@ -157,8 +157,8 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       pekes om (A4, 26. sep. 2026), og `enhet_varslet` i `ko/signals.py` fyrer bare på en ny
       rad. Var slik før også. Enten et eget signal på `Enhetsbytte`, eller at KO leser
       byttet — KOs sak, ikke oppdragsmodulens.
-- [ ] **Pulje B — spor, tilgang og lekkasjer.** `reset_password`, `unlock`,
-      feltendringer og sletting av backup uten audit (B2); vaktlistas audithull (B3);
+- [ ] **Pulje B — spor, tilgang og lekkasjer.** B1, B2, B6 og B8 levert 26. sep. Igjen:
+      vaktlistas audithull (B3);
       `accounts/admin.py` (B4); `sikkerhetssjekk.py` mangler KO og backlog (B5); rå
       unntakstekst i `Utsending.feil` (B7).
 - [ ] **Pulje C — avgjørelser.** C1 og C2 levert 26. sep. Igjen: C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett

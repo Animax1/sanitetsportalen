@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Brukeradministrasjonen: nytt passord, «Lås opp» og feltendringer satte ingen spor (B2)  `#core/audit`
+
+**Jo mer inngripende, jo mindre spor** — mønsteret rot-`CLAUDE.md` kaller feil vei rundt,
+funnet i `/portal-admin/brukere/<pk>/`. Frysing, tining, utlogging, rolle og modultilgang
+skrev auditrad. Disse gjorde det ikke:
+
+| Handling | Før | Nå |
+|---|---|---|
+| **«Nytt midlertidig passord»** — gir admin et passord som virker | ingenting | `password`, **aldri passordet** |
+| **«Lås opp»** | ingenting | `locked_until`, fra → `None` |
+| **Redigering** | bare `role` | **hvert felt som endret seg**: `email`, `fullt_navn`, `mfa_required`, `er_delt_konto`, `role` |
+| **«Nullstill MFA»** | bare innloggingsloggen, der raden står på *brukeren*, ikke admin | også `mfa` i auditloggen, med admin |
+| **«Send invitasjon»** — en lenke som setter passord | ingenting | `invitasjon`, med adressen |
+| **Sletting av en backupfil** (`/portal-admin/backup/`) | ingenting, og ingen bekreftelse på serveren | auditrad (`DELETE`, filnavnet), `bekreft=ja` kreves, `backup:slett` 30/m |
+
+**En endret e-post er veien til en passordlenke**, og det var nettopp den som kunne endres
+sporløst. Redigeringen leser nå verdiene før `form.save()` og logger hvert felt i
+`AdminUserEditForm.Meta.fields` som faktisk endret seg — et uendret felt gir ingen rad.
+Backupslettingen var irreversibel og uten spor, mens gjenopprettingen, som er reversibel,
+skriver en rad.
+
+**Merk:** dette er manuell audit, gjennom den eksisterende `_log_user_admin_action`. Rot-
+`CLAUDE.md` sier «legg aldri til manuell audit-kode — signalet tar seg av det», og det
+stemmer ikke: `audit/signals.py` fyller bare ut `app_label`. Det rettes i F2.
+
+**Tester:** `accounts/tests_brukeradmin_audit.py` (seks, også at passordet ikke står i
+loggen og at en uendret redigering ikke gir rader) og to i `BackupAdminViewTests`.
+**Mutasjonstesting (tungt, audit):** 8 mutanter — hver av de fire nye loggelinjene fjernet,
+feltvilkåret snudd, redigeringsloggen fjernet, bekreftelsen fjernet og backupraden fjernet.
+Alle drept. `accounts`+`audit` (338) og `core.tests_backup` (125): grønt.
+
 ## 2026-09-26 — ETag-en er hele svaret: en endring i oppdragsvinduet druknet i en 304 (A2)  `#oppdrag/sentralbord`
 
 **Symptomet:** en operatør endret hastegrad, problemstilling, lokasjon eller notatet rett i

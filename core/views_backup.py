@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core.auth_decorators import admin_required
+from core.klientip import klient_ip
 from core.ratelimit import rate_limit
 
 
@@ -188,12 +189,24 @@ def _berorte_rader(handler) -> list[dict]:
 
 @admin_required
 @require_http_methods(['POST'])
+@rate_limit(group='backup:slett', rate='30/m', method='POST', on_limit='html')
 def backup_admin_delete_view(request, slug: str, pk: int):
-    """Slett én enkelt backup-fil + DB-rad."""
+    """Slett én enkelt backup-fil + DB-rad.
+
+    **Med bekreftelse og spor** (26. sep. 2026, B2). Slettingen var irreversibel
+    og etterlot ingenting — mens gjenopprettingen, som er reversibel, skriver en
+    auditrad. `bekreft=ja` i skjemaet stopper en POST som treffer URL-en uten å
+    mene det; dialogen (`data-confirm`) stopper feilklikket. De to er ikke samme
+    sperre, som for sletting av en konto.
+    """
+    from audit.models import AuditLog
     from core.backup import get_backup_dir
     from core.models import Backup
 
     backup = get_object_or_404(Backup, pk=pk, module_slug=slug)
+    if request.POST.get('bekreft') != 'ja':
+        messages.error(request, 'Slettingen må bekreftes.')
+        return redirect('portaladmin:backup_admin')
     path = get_backup_dir() / backup.filename
     filename = backup.filename
     if path.exists():
@@ -204,6 +217,10 @@ def backup_admin_delete_view(request, slug: str, pk: int):
                 request,
                 f'Kunne ikke slette filen på disk ({exc}). DB-rad fjernes likevel.',
             )
+    AuditLog.objects.create(
+        table_name='patients_backup', record_id=backup.pk, action='DELETE',
+        app_label='core', field_name='fil', old_value=filename,
+        user=request.user, ip=klient_ip(request))
     backup.delete()
     messages.success(request, f'Slettet backup «{filename}».')
     return redirect('portaladmin:backup_admin')

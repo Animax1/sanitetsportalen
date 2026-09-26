@@ -828,11 +828,27 @@ class BackupAdminViewTests(TestCase):
             path = self.backup_dir / backup.filename
             self.assertTrue(path.exists())
 
-            resp = client.post(f'/portal-admin/backup/patients/slett/{backup.pk}/')
+            resp = client.post(f'/portal-admin/backup/patients/slett/{backup.pk}/',
+                               {'bekreft': 'ja'})
 
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(Backup.objects.filter(pk=backup.pk).exists())
         self.assertFalse(path.exists())
+        # **Og den setter spor** (B2, 26. sep. 2026): irreversibel, og uten rad.
+        from audit.models import AuditLog
+        rad = AuditLog.objects.get(field_name='fil', action='DELETE')
+        self.assertEqual((rad.user, rad.old_value, rad.app_label),
+                         (self.admin, backup.filename, 'core'))
+
+    def test_delete_uten_bekreftelse_sletter_ingenting(self) -> None:
+        client = Client()
+        client.force_login(self.admin)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='patients', kind=KIND_MANUAL)
+            resp = client.post(f'/portal-admin/backup/patients/slett/{backup.pk}/')
+            self.assertTrue((self.backup_dir / backup.filename).exists())
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Backup.objects.filter(pk=backup.pk).exists())
 
     def test_ukjent_modul_omdirigerer_med_feil(self) -> None:
         client = Client()
