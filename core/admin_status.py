@@ -693,7 +693,7 @@ def _build_status_payload():
 def admin_status_view(request):
     """HTML-dashbord for admin."""
     payload = _build_status_payload()
-    return render(request, 'patients/admin_status.html', {
+    return render(request, 'core/server_status.html', {
         'payload': payload,
         'trinn': BEREDSKAPSTRINN,
         'kritisk': KRITISK,

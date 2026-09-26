@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Server-status ut av `patients`, og 531 linjer JS som ingen test så (G1, første del)  `#core #frontend`
+
+**Hvorfor:** `/portal-admin/server-status/` er rammeverk, men malen lå i
+`templates/patients/admin_status.html`, med **531 linjer inline-JS** — der ingen XSS-skanner,
+polling-regel, escaper-likhet eller node-test kunne se dem.
+
+- **Malen** er `core/templates/core/server_status.html` (`git mv`, historikken følger).
+- **Skriptet** er `static/js/portal-status.js`: IIFE-en er løst opp i toppnivåfunksjoner,
+  `statusStart()` kjører på `DOMContentLoaded`, og URL-ene kommer fra `data-url-*` på
+  `#server-status` i stedet for en inline `<script>`. `portal-utils.js` lastes foran.
+- **Tre ting endret seg i flyttingen:** den lokale `escapeHtml` er borte — den slapp 0
+  gjennom, som er `escHtmlValue`s regel, så det er den som brukes; `klokke` heter `datoKlokke`
+  (portal-utils har en `klokke` som bare gir klokkeslett — det samme navnet i to filer på
+  én side er den sist lastede som vinner i stillhet); de lokale CSRF-hjelperne er erstattet
+  av `apiFetch`. **Og dashbordet måler nå tilstedeværelse:** det sendte
+  `X-Portal-Inaktiv: ukjent` fordi `portal-utils.js` ikke var lastet (A8). Pollingen går
+  gjennom `naarSynlig`.
+
+**Skannerne så den med én gang:** `core/tests_js_konkatenering.py` fant `+ r.count` limt
+rett inn i «Tregeste stier» (et tall — escapet likevel) og `res.status` i en feilmelding (ikke
+markup, ført i `GJENNOMGATT`). `core/tests_oppdateringsintervaller.py` krevde at løkka sto i
+runbooken §3d, som nå også sier at en bakgrunnsfane ikke spør.
+
+**Tester:** `core/tests_portal_status_js.py` — aktivitetsgrensene (300 s, 3 600 s) i node,
+escaping i «Tregeste stier» og konfigkortet, og at siden bærer de fire URL-ene, laster de
+to filene i rekkefølge og ikke har fått inline-JS tilbake.
+
+**Rota:** ny rad for `portal-status.js`, «34 filer … på åtte sider». For å holde taket er
+avsnittet om den slettede `accounts/decorators.py` kortet — lærdommen står, anekdoten er
+kortere (65 962 av 66 000).
+
+**Igjen av G1** (ført i `TODO.md`): `AppSetting`-adminen og kommandoen, vaktas livssyklus og
+testinfrastrukturen.
+
+**Mutasjon:** 6 mutanter, alle røde — stien og konfignøkkelen rå, grensen 300 → 301,
+pollingen uten `naarSynlig`, en egen `escapeHtml` uten `'` lagt tilbake i fila, og en
+`data-url-*` fjernet fra malen.
+
 ## 2026-09-26 — Endepunktene som polles koster like mange spørringer for 3 og 30 enheter (G4)  `#oppdrag #ko #ytelse`
 
 **Hvorfor:** enhetslista, oppdragslista og KO-tavla polles hvert tiende sekund fra hver fane

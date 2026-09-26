@@ -209,11 +209,10 @@ Importér alltid fra `core.auth_decorators`. **`accounts/decorators.py` er slett
 (14. sep. 2026, gjeldspunkt 3.3): den var en ren re-eksport av `admin_required`, og den
 eneste leseren var testen som verifiserte at den virket.
 
-*Og slettingen avdekket at regelen sto brutt.* Testen som håndhevet N11 lette bare etter
-den absolutte formen `from accounts.decorators import`. `accounts/views.py` brukte den
-relative, `from .decorators import`, og slapp unna i et år med testen grønn — en regel som
-bare dekker halve syntaksen måler noe annet enn den later som. Testen i `core/tests.py`
-dekker nå begge.
+*Og slettingen avdekket at regelen sto brutt:* testen lette bare etter
+`from accounts.decorators import`, mens `accounts/views.py` brukte `from .decorators
+import` — et år grønt. En regel som dekker halve syntaksen måler noe annet enn den later
+som; `core/tests.py` dekker nå begge.
 
 **Tre kategorier, ikke én.** Se `docs/BESLUTNING_ROLLEMODELLEN.md`:
 
@@ -736,8 +735,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-33 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
-`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
+34 filer i `static/js/` (ingen bundler), på åtte sider — pasientsiden,
+`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status og de to under
 `/oppdrag/`.
 
 **Tre av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
@@ -778,6 +777,7 @@ håndhever det på cellebredden.
 | `vaktliste-*.js` (sju) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
+| `portal-status.js` | **kun** server-status | dashbordet, `core/admin_status.py` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
 i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse

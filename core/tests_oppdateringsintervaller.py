@@ -78,7 +78,7 @@ class OversiktenDekkerHverLoekkeTests(SimpleTestCase):
     def test_letingen_finner_noe(self):
         """En leting som finner null, melder grønt om en dekning den ikke har."""
         navn = {f.name for f in filer_med_loekke()}
-        self.assertTrue({'ko.js', 'portal-utils.js', 'admin_status.html'} <= navn, navn)
+        self.assertTrue({'ko.js', 'portal-utils.js', 'portal-status.js'} <= navn, navn)
 
 
 class TalleneStemmerTests(SimpleTestCase):

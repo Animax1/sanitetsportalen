@@ -309,8 +309,9 @@ lastes på nytt.
 henter bare når siden lastes eller noen trykker.
 
 **Admin: `/portal-admin/server-status/`** — hele dashbordet hvert **10 s**
-(`templates/patients/admin_status.html` · `refresh`). Lukk den når den ikke trengs: ingen
-annen side spør oftere med full henting.
+(`static/js/portal-status.js` · `refresh`). Lukk den når den ikke trengs: ingen
+annen side spør oftere med full henting. Står fana i bakgrunnen, spør den ikke
+(`naarSynlig`, 26. sep. 2026) — det gjelder sikkerhetsnettene i KO og sentralbordet også.
 
 **Hva en fane koster, i forespørsler per sekund når ingenting skjer** (anslag, 24. sep. 2026):
 

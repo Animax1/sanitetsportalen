@@ -182,8 +182,11 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       `test_to_ressurser_paa_samme_bil_telles_en_gang`.
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
-- [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep. Igjen: rammeverket i
-      `patients` til `core` (G1); store filer (G2); pasientsidens eget skall (G3).
+- [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep., og G1s server-status.
+      Igjen av G1: `AppSetting`-adminen og `appsetting`-kommandoen, vaktas livssyklus
+      (`avslutt_vakt_view`, `vakter_view`, `gjenaapne_vakt_view`) og testinfrastrukturen
+      (`js_test_utils`, `tests_modul_dekorator`) ut av `patients`. Store filer (G2);
+      pasientsidens eget skall (G3).
 - [ ] **scipy og numpy (~160 MB) — valgfrie?** Vurdert under G5, ikke endret. Koden tåler
       alt at de mangler (`HAS_SCIPY` i `patients/services.py`): da står χ²- og
       Kruskal-Wallis-merkene som «Ingen data», og resten av statistikken virker. Å ta dem ut
@@ -472,7 +475,7 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
       som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
 
-- [ ] **Rota har ~35 tegn igjen av taket på 66 000** (65 966 etter F2, 26. sep. 2026; taket
+- [ ] **Rota har ~40 tegn igjen av taket på 66 000** (65 962 etter G1, 26. sep. 2026; taket
       ble hevet fra 65 500 samme dag for norsk sortering). Neste avsnitt i rota sprenger den,
       og da står man med valget midt i en annen oppgave. Det som skal
       flyttes er avsnitt som beskriver **én** modul — regelen fila selv setter — og den

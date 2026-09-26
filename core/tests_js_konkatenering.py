@@ -33,6 +33,8 @@ GJENNOMGATT = {
         'del av en nøkkel (`type:…`) til gruppeErSkjult(), ikke markup',
     ('vaktliste-overnatting.js', 'apnePlasser', 'rom.navn'):
         'går til textContent, ikke innerHTML',
+    ('portal-status.js', 'refreshSessionsList', 'res.status'):
+        'i en Error-melding, ikke i markup — og et HTTP-statustall',
     ('vaktliste-overnatting.js', 'apnePlasser', 'der.navn'):
         'del av en tekst som escapes samlet i <option> rett under',
 }
