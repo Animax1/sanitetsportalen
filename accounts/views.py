@@ -465,9 +465,14 @@ def login_view(request):
                     # Ingen MFA – logg inn direkte
                     return _do_complete_login(request, user, next_url)
             else:
+                # **Samme melding også når dette forsøket låste kontoen**
+                # (26. sep. 2026, B1). Bare en konto som finnes kan låses, så
+                # «låst i 15 minutter» på femte forsøk fortalte hvem som helst
+                # at brukernavnet fantes. Eieren får vite det ved neste forsøk
+                # med riktig passord, som over.
                 error = 'Feil brukernavn eller passord.'
-                if user_obj and _registrer_mislykket_forsok(user_obj):
-                    error = 'For mange feil forsøk. Kontoen er låst i 15 minutter.'
+                if user_obj:
+                    _registrer_mislykket_forsok(user_obj)
                 LoginEvent.objects.create(
                     user=user_obj, username_attempt=username, success=False,
                     ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,

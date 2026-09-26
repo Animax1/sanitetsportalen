@@ -100,6 +100,28 @@ class KontolaasRoeperIkkeTests(TestCase):
         self.assertIn(b'Feil brukernavn eller passord', a)
         self.assertIn(b'Feil brukernavn eller passord', b)
 
+    def test_forsoket_som_laaser_kontoen_sier_ikke_fra(self):
+        """**Femte feilede forsøk svarer som de fire første** (26. sep. 2026, B1).
+
+        Meldingen «Kontoen er låst i 15 minutter» kom bare når kontoen fantes —
+        et ukjent brukernavn kan ikke låses. Fem gjett avslørte derfor om et
+        brukernavn fantes, og testen over sammenlignet bare en konto som *alt*
+        var låst. Låsingen virker fortsatt; det er bare meldingen som tier.
+        """
+        CustomUser.objects.create_user(username='finnes', password='TestPassord123!',
+                                       must_change_password=False)
+        svar = {}
+        for navn in ('finnes', 'finnesikke'):
+            for _ in range(5):
+                res = Client().post(self.url, {'username': navn, 'password': 'feil'})
+            svar[navn] = res
+        for navn, res in svar.items():
+            with self.subTest(navn=navn):
+                self.assertContains(res, 'Feil brukernavn eller passord')
+                self.assertNotContains(res, 'låst')
+        self.assertTrue(CustomUser.objects.get(username='finnes').is_locked(),
+                        'Låsingen skal virke selv om meldingen tier')
+
     def test_riktig_passord_paa_laast_konto_sier_laast(self):
         c = Client()
         res = c.post(self.url, {'username': 'laast', 'password': 'TestPassord123!'})

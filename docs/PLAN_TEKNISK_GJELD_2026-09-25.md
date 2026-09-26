@@ -161,7 +161,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
 
 ## Pulje B: spor, tilgang og lekkasjer
 
-**B1. Låsemeldingen avslører at brukernavnet finnes.**
+**B1. Låsemeldingen avslører at brukernavnet finnes.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `accounts/views.py:468-470`.
 - **Feilen:** bare en konto som finnes kan få «Kontoen er låst». Kommentaren M14 rett over
   påstår det motsatte.

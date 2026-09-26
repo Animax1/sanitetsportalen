@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Innloggingen avslørte om et brukernavn fantes: «låst i 15 minutter» fjernet (B1)  `#core/sikkerhet`
+
+**Brukernavn-enumerering.** Femte feilede forsøk på en konto som finnes, ga meldingen
+**«For mange feil forsøk. Kontoen er låst i 15 minutter.»** Et brukernavn som ikke finnes
+kan ikke låses, og fikk alltid «Feil brukernavn eller passord». Fem gjett avslørte dermed om
+et navn fantes — mens kommentaren M14 rett over påsto at «alle andre får samme svar som ved
+feil passord». `KontolaasRoeperIkkeTests` sammenlignet bare en konto som *alt* var låst, og
+så det aldri.
+
+**Rettingen:** samme melding hver gang. Låsingen virker som før; eieren får vite at kontoen
+er låst ved neste forsøk med riktig passord («midlertidig låst»), som er M14-regelen.
+Meldingen i MFA-steget står: der har brukeren alt bevist passordet.
+
+**Test:** `test_forsoket_som_laaser_kontoen_sier_ikke_fra` sender fem feil mot et navn som
+finnes og et som ikke gjør det, og krever lik melding — pluss at kontoen faktisk er låst.
+**Mutasjonstesting:** 2 mutanter — den gamle meldingen tilbake, og kallet som teller og
+låser fjernet. Begge drept. `accounts` (307 tester): grønt.
+
 ## 2026-09-26 — KO-loggen kunne velte en stempling i PostgreSQL: savepoint i `_trygt` (A3)  `#ko/loggen`
 
 **Hva som var galt:** `ko/signals.py` løfter bilens stemplinger inn i KO-loggen, og hver
