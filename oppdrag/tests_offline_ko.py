@@ -33,7 +33,7 @@ globalThis.OPPDRAG_STATUSNAVN = {
 '''
 
 HARNESS = (
-    (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+    (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                        'klokke')),
     (OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
                         'lagNokkel', 'projiser')),

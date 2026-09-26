@@ -38,6 +38,13 @@ HTML_BUILDERS = (
     'mkInterpretation',
     'renderForstehjelperAdmin',
     'renderHelsepersonellAdmin',
+    # Sto utenfor til 26. sep. 2026 (E5): en mutant som tok escapingen ut av
+    # arkivtittelen overlevde. `test_ingen_bygger_staar_utenfor_skanningen`
+    # sammenligner nå lista med kilden.
+    'fmtChi2Inline',
+    'visVakter',
+    'loadArkivListe',
+    'visArkivDetalj',
     # Oppdragsfanen (fase 6). Byggerne setter ingen verdier inn selv i dag —
     # de sender rader til mkStatsTable(), som escaper via cellHtml() — men de
     # står her fordi neste kolonne noen legger til skal måtte gjennom samme
@@ -68,7 +75,7 @@ HTML_BUILDERS = (
 )
 
 # Funksjoner som escaper – en interpolasjon som starter med én av disse er OK.
-ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
+ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', 'escapeHtml(')
 
 # Interpolasjoner som er gjennomgått manuelt og ikke trenger escaping, med
 # begrunnelse. Alt utenfor denne lista og ESCAPING_CALLS gjør testen rød.
@@ -103,6 +110,14 @@ REVIEWED_INTERPOLATIONS = {
     "b.is_active ? 'toggle-on' : 'toggle-off'": 'hardkodet ikonnavn',
     "h.is_active ? 'toggle-on' : 'toggle-off'": 'hardkodet ikonnavn',
 
+    # Lagt til 26. sep. 2026 med byggerne som sto utenfor skanningen.
+    'knapp': 'visVakter(): markup bygget linja over, med escHtmlValue(v.id)',
+    'rows': 'loadArkivListe(): radene bygget over, hver verdi escapet',
+    'id': 'visArkivDetalj(): i URL-en til apiFetch, ikke i markup',
+    'pStr': 'fmtChi2Inline(): hardkodet tekst eller toFixed() av et tall',
+    'chi2.chi2.toFixed(1)': 'tall — toFixed() kaster på alt annet',
+    "chi2.p.toFixed(3).replace('.',',')": 'tall — toFixed() kaster på alt annet',
+
     # Testnavnene escapes der listene bygges, ikke der de settes inn.
     # test_testnavn_escapes_ved_konstruksjon under vokter det.
     "sigTests.join(', ')": 'elementene escapes med escHtmlValue() i map()',
@@ -127,6 +142,19 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
                          + '\n' + read_js(STATISTIKK_KO_JS)
                          + '\n' + read_js(STATISTIKK_BEMANNING_JS))
         cls.utils_src = read_js(PORTAL_UTILS_JS)
+
+    def test_ingen_bygger_staar_utenfor_skanningen(self):
+        """Lista sammenlignes med kilden (26. sep. 2026, E5), som i
+        `oppdrag/tests_xss.py`. Fire byggere sto utenfor — arkivlista og
+        -detaljen, vaktlista og χ²-merket — og en mutant som tok escapingen ut
+        av arkivtittelen overlevde begge skannerne."""
+        mangler = []
+        for navn in re.findall(r'^(?:async )?function (\w+)\(', self.stats_src, re.M):
+            kropp = extract_function(self.stats_src, navn)
+            if re.search(r'`[^`]*<\w+[^`]*\$\{', kropp, re.S) and navn not in HTML_BUILDERS:
+                mangler.append(navn)
+        self.assertEqual(mangler, [], (
+            'Disse bygger markup uten å bli skannet — legg dem i HTML_BUILDERS.'))
 
     def test_escape_hjelperne_finnes_i_utils(self):
         """Byggerne er avhengige av hjelperne i portal-utils.js.
@@ -229,7 +257,7 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
     def test_escHtmlValue_beholder_tallet_null(self):
         """0 er en gyldig celleverdi og skal vises, ikke bli tom streng.
 
-        escapeHtml()/_escHtml() returnerer '' for alt falsy. I tabellceller
+        escapeHtml() returnerer '' for alt falsy. I tabellceller
         er det feil, og grunnen til at escHtmlValue() finnes.
         """
         self._run_js(

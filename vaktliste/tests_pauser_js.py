@@ -52,7 +52,7 @@ class PauseneIVaktlistaJsTests(SimpleTestCase):
 
     def setUp(self):
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
             (VAKTLISTE_JS, RESSURS + OVERSIKT + PLANLEGGER),
         ))
 

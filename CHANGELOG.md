@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Fem HTML-escapere, to som ikke escapet `'` — og fire byggere utenfor skanningen (E5, tredje del)  `#frontend #sikkerhet #patients`
+
+**Hvorfor:** `static/js/` hadde fem escapere. `_escHtml` (i `portal-utils.js`) og `esc` (i
+`notifications.js`) escapet ikke `'` — trygge i tekst og i `"`-attributter, ikke i
+`'`-attributter, og navnene sa ingenting om det. Ingen av dem sto i en `'`-attributt i dag.
+
+- **`_escHtml` er slettet.** De seks kallene i `patients-admin.js` bruker `escapeHtml()`,
+  som har samme «falsy → tom»-regel og escaper `'`. Ti testharnesser i `oppdrag` og
+  `vaktliste` hentet den inn som hjelper uten at koden de prøvde brukte den, og to
+  `ESCAPING_CALLS` godtok den; alle er ryddet.
+- **`esc` i `notifications.js` escaper `'`.** Den blir stående som egen kopi fordi fila
+  lastes av `base_portal`, og sidene under `/portal-admin/` (brukeradministrasjonen) laster
+  ikke `portal-utils.js`.
+- **`core/tests_js_escaping.py` utleder escaperne** — hver funksjon, også en nøstet, som gjør
+  `<` til `&lt;` — og kjører dem i node mot samme fiendtlige streng. Alle skal gi samme
+  svar. En ny kopi er med den dagen den skrives. Den ene lovlige forskjellen er falsy:
+  `escapeHtml(0)` er `''` og `escHtmlValue(0)` er `'0'`, begge med vilje. (Den femte
+  varianten står inline i `admin_status.html` og flytter med G1 — da fanges den.)
+
+**Og en overlevende mutant avdekket et eldre hull:** `${a.tittel}` uten escaping i
+arkivlista gikk grønt gjennom både `patients/tests_xss_stats.py` og `core/tests_js_regler.py`.
+`HTML_BUILDERS` der er ført for hånd, og **fire byggere sto utenfor**: `loadArkivListe`,
+`visArkivDetalj`, `visVakter` (alle `patients-admin.js`) og `fmtChi2Inline`
+(`statistikk.js`). Ingen hadde uescapet brukerdata — tallfeltene fra API-et er pakket i
+`escHtmlValue()` likevel, så de trenger ingen unntaksliste. Seks lokalt bygde uttrykk står i
+`REVIEWED_INTERPOLATIONS` med begrunnelse. **`test_ingen_bygger_staar_utenfor_skanningen`**
+sammenligner nå lista med kilden, som `oppdrag/tests_xss.py` har gjort siden 16. sep. —
+den samme feilen, i en fil der vernet ikke var kopiert.
+
+**Mutasjon:** 6 mutanter. `'` fjernet i `esc` og i `escapeHtml` — røde; en ny escaper uten
+`'` lagt i `backlog.js` — rød (første forsøk traff ikke, ankeret fantes ikke, og ble kjørt
+på nytt); `${a.tittel}` rå — **overlevde**, rød etter rettingen; `${d.notat}` rå — rød;
+`visArkivDetalj` tatt ut av lista — rød.
+
 ## 2026-09-26 — Sesjonsdekodingen ett sted, og passordbyttet tåler en rar sesjon (E5, andre del)  `#core #accounts #sikkerhet`
 
 **Hvorfor:** Djangos sesjonstabell ble dekodet fire steder med tre ulike feilhåndteringer:

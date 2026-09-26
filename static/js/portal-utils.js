@@ -215,16 +215,12 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function _escHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+// `_escHtml` sto her til 26. sep. 2026 (E5): samme som escapeHtml(), men uten
+// `'` — trygg i tekst og i "-attributter, ikke i '-attributter. En escaper
+// som er trygg bare noen steder, er en felle for den som tar feil av navnet.
+// core/tests_js_escaping.py krever at alle escaperne gir samme svar.
 
-// escapeHtml() og _escHtml() returnerer tom streng for alt falsy, slik at
+// escapeHtml() returnerer tom streng for alt falsy, slik at
 // tomme felt blir borte i stedet for å vises som "null". I tabellceller er
 // det feil: tallet 0 er en helt gyldig verdi som skal vises. escHtmlValue()
 // skiller derfor på «ikke satt» (null/undefined) og «falsy, men en verdi».

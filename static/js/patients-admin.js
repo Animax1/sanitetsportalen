@@ -249,14 +249,14 @@ async function loadArkivListe() {
 
   const rows = data.map(a => `
     <tr>
-      <td class="small">${_escHtml(a.tittel)}</td>
-      <td class="small text-nowrap">${_escHtml(a.importert_at ? a.importert_at.slice(0,16).replace('T',' ') : '')}</td>
-      <td class="small text-center">${a.antall_pasienter}</td>
+      <td class="small">${escapeHtml(a.tittel)}</td>
+      <td class="small text-nowrap">${escapeHtml(a.importert_at ? a.importert_at.slice(0,16).replace('T',' ') : '')}</td>
+      <td class="small text-center">${escHtmlValue(a.antall_pasienter)}</td>
       <td class="small">
-        <button class="btn btn-outline-primary btn-sm py-0 px-1" data-action="visArkivDetalj" data-id="${a.id}">
+        <button class="btn btn-outline-primary btn-sm py-0 px-1" data-action="visArkivDetalj" data-id="${escHtmlValue(a.id)}">
           <i class="bi bi-bar-chart me-1"></i>Statistikk
         </button>
-        <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" data-action="slettArkiv" data-id="${a.id}">
+        <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" data-action="slettArkiv" data-id="${escHtmlValue(a.id)}">
           <i class="bi bi-trash"></i>
         </button>
       </td>
@@ -296,14 +296,14 @@ async function visArkivDetalj(id) {
   const d = await res.json();
 
   document.getElementById('arkiv-detalj-tittel').innerHTML =
-    `<i class="bi bi-archive me-2"></i>${_escHtml(d.tittel)}`;
+    `<i class="bi bi-archive me-2"></i>${escapeHtml(d.tittel)}`;
 
   const datoStr = d.importert_at ? d.importert_at.slice(0,16).replace('T',' ') : '';
   document.getElementById('arkiv-detalj-meta').innerHTML =
-    `Arrangement: <strong>${_escHtml(d.arrangement_navn)}</strong> &nbsp;|&nbsp; ` +
-    `Arkivert: ${datoStr} av ${_escHtml(d.importert_av)} &nbsp;|&nbsp; ` +
-    `Pasienter: ${d.antall_pasienter} &nbsp;|&nbsp; År: ${d.year_snapshot}` +
-    (d.notat ? ` &nbsp;|&nbsp; <em>${_escHtml(d.notat)}</em>` : '');
+    `Arrangement: <strong>${escapeHtml(d.arrangement_navn)}</strong> &nbsp;|&nbsp; ` +
+    `Arkivert: ${escapeHtml(datoStr)} av ${escapeHtml(d.importert_av)} &nbsp;|&nbsp; ` +
+    `Pasienter: ${escHtmlValue(d.antall_pasienter)} &nbsp;|&nbsp; År: ${escHtmlValue(d.year_snapshot)}` +
+    (d.notat ? ` &nbsp;|&nbsp; <em>${escapeHtml(d.notat)}</em>` : '');
 
   if (d.tamper_detected) {
     document.getElementById('arkiv-detalj-tamper')?.classList.remove('d-none');
@@ -313,38 +313,38 @@ async function visArkivDetalj(id) {
   document.getElementById('arkiv-detalj-stats').innerHTML = `
     <div class="row g-2 mb-3">
       <div class="col-6 col-md-3"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold fs-5">${s.total ?? 0}</div><div class="text-muted">Totalt</div>
+        <div class="fw-bold fs-5">${escHtmlValue(s.total ?? 0)}</div><div class="text-muted">Totalt</div>
       </div></div>
       <div class="col-6 col-md-3"><div class="border rounded p-2 text-center small" style="border-color:#16a34a!important">
-        <div class="fw-bold fs-5 text-success">${s.gronn ?? 0}</div><div class="text-muted">Grønn</div>
+        <div class="fw-bold fs-5 text-success">${escHtmlValue(s.gronn ?? 0)}</div><div class="text-muted">Grønn</div>
       </div></div>
       <div class="col-6 col-md-3"><div class="border rounded p-2 text-center small" style="border-color:#ca8a04!important">
-        <div class="fw-bold fs-5" style="color:#ca8a04">${s.gul ?? 0}</div><div class="text-muted">Gul</div>
+        <div class="fw-bold fs-5" style="color:#ca8a04">${escHtmlValue(s.gul ?? 0)}</div><div class="text-muted">Gul</div>
       </div></div>
       <div class="col-6 col-md-3"><div class="border rounded p-2 text-center small" style="border-color:#dc2626!important">
-        <div class="fw-bold fs-5 text-danger">${s.rod ?? 0}</div><div class="text-muted">Rød</div>
+        <div class="fw-bold fs-5 text-danger">${escHtmlValue(s.rod ?? 0)}</div><div class="text-muted">Rød</div>
       </div></div>
     </div>
     <div class="row g-2 mb-3">
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.tilstede ?? 0}</div><div class="text-muted">Tilstede</div>
+        <div class="fw-bold">${escHtmlValue(s.tilstede ?? 0)}</div><div class="text-muted">Tilstede</div>
       </div></div>
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.utskrevet ?? 0}</div><div class="text-muted">Utskrevet</div>
+        <div class="fw-bold">${escHtmlValue(s.utskrevet ?? 0)}</div><div class="text-muted">Utskrevet</div>
       </div></div>
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.i_obs ?? 0}</div><div class="text-muted">I obs</div>
+        <div class="fw-bold">${escHtmlValue(s.i_obs ?? 0)}</div><div class="text-muted">I obs</div>
       </div></div>
     </div>
     <div class="row g-2">
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.avg_wait_min ?? 0} min</div><div class="text-muted">Snitt ventetid</div>
+        <div class="fw-bold">${escHtmlValue(s.avg_wait_min ?? 0)} min</div><div class="text-muted">Snitt ventetid</div>
       </div></div>
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.avg_obs_min ?? 0} min</div><div class="text-muted">Snitt obs-tid</div>
+        <div class="fw-bold">${escHtmlValue(s.avg_obs_min ?? 0)} min</div><div class="text-muted">Snitt obs-tid</div>
       </div></div>
       <div class="col-4"><div class="border rounded p-2 text-center small">
-        <div class="fw-bold">${s.avg_total_min ?? 0} min</div><div class="text-muted">Snitt total tid</div>
+        <div class="fw-bold">${escHtmlValue(s.avg_total_min ?? 0)} min</div><div class="text-muted">Snitt total tid</div>
       </div></div>
     </div>
   `;

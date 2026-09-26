@@ -92,7 +92,7 @@ HTML_BUILDERS_PER_FIL = {
     ),
 }
 
-ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
+ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
     # Verdiene rett i oppdragsvinduet (23. sep. 2026).
@@ -444,7 +444,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
 
     # `klokke` bor i portal-utils.js nå — begge oppdragssidene bruker den.
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
                               'hastegradKlasse', 'mkBesetning',
@@ -537,7 +537,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
@@ -770,7 +770,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',

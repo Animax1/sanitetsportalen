@@ -58,7 +58,7 @@ HTML_BUILDERS = (
     '_utenSengBolk', 'mkBrannliste', 'apnePlasser',
 )
 
-ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
+ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
     # Overnatting (25. sep. 2026). Hver av disse er markup bygget i
@@ -344,7 +344,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml',
-                           '_escHtml', 'klokke')),
+                           'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
@@ -678,7 +678,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml')),
         (VAKTLISTE_JS, ('mkMannskap', 'mkVerdiliste', '_personKolonne',
                         '_passerPersonsok', '_sorterMannskap', '_nivaa',
                         '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanSkriveNoe',
