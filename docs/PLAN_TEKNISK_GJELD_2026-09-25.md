@@ -189,7 +189,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
 - **Bør vurderes:** å utlede feltlista fra modellen minus en unntaksliste, slik `AppSetting`
   gjør med `NOKLER_UTEN_AUDIT`. En ny kolonne bør logges som standard.
 
-**B4. `accounts/admin.py` går utenom sperrene rundt superbruker og rolle.**
+**B4. `accounts/admin.py` går utenom sperrene rundt superbruker og rolle.** *Levert 26. sep. 2026 (André: skrivebeskyttet), se CHANGELOG.*
 - **Når:** bare når `DEBUG=True`, så risikoen er lav i prod.
 - **Retting:**
   - Gjør ModelAdmin for `CustomUser` skrivebeskyttet, eller fjern den.

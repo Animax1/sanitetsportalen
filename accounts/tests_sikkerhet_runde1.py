@@ -341,6 +341,14 @@ class RollenSettesBareGjennomSkjemaeneTests(SimpleTestCase):
     #: noen har tenkt på superbrukeren.
     UNNTATT: dict[str, str] = {}
 
+    #: Feltene regelen gjelder. `is_superuser` kom med 26. sep. 2026 (B4): å
+    #: lage en superbruker nummer to er den andre veien rundt sperrene.
+    FELT = frozenset({'role', 'is_superuser'})
+
+    #: Filene der skjemaene med sperrene bor — der *skal* `role` stå i
+    #: `Meta.fields`. `is_superuser` står ikke i noen av dem.
+    SKJEMAENE = frozenset({'accounts/forms.py'})
+
     def test_ingen_skriver_role_utenfor_skjemaene(self):
         import ast
         from pathlib import Path
@@ -359,11 +367,32 @@ class RollenSettesBareGjennomSkjemaeneTests(SimpleTestCase):
             except (SyntaxError, UnicodeDecodeError):
                 continue
             for node in ast.walk(tre):
-                if not isinstance(node, ast.Assign):
-                    continue
-                for mal in node.targets:
-                    if isinstance(mal, ast.Attribute) and mal.attr == 'role':
+                if isinstance(node, ast.Assign):
+                    for mal in node.targets:
+                        if isinstance(mal, ast.Attribute) and mal.attr in self.FELT:
+                            funn.append(f'{rel}:{node.lineno}')
+                elif isinstance(node, ast.Call):
+                    # `.update(role=…)` og `setattr(x, 'role', …)` — samme skriving,
+                    # en annen form. Regelen dekket bare `x.role = …` til 26. sep.
+                    # 2026 (B4), og slapp dem gjennom.
+                    navn = getattr(node.func, 'attr', getattr(node.func, 'id', ''))
+                    if navn == 'update' and any(k.arg in self.FELT for k in node.keywords):
                         funn.append(f'{rel}:{node.lineno}')
+                    if (navn == 'setattr' and len(node.args) > 1
+                            and isinstance(node.args[1], ast.Constant)
+                            and node.args[1].value in self.FELT):
+                        funn.append(f'{rel}:{node.lineno}')
+                elif (isinstance(node, ast.ClassDef) and node.name == 'Meta'
+                      and rel not in self.SKJEMAENE):
+                    # Et `ModelForm` med feltet i `Meta.fields` skriver det ved
+                    # `save()` — som Django-admins egne skjemaer gjorde (B4).
+                    for setning in node.body:
+                        if (isinstance(setning, ast.Assign)
+                                and any(getattr(t, 'id', '') == 'fields' for t in setning.targets)
+                                and isinstance(setning.value, (ast.Tuple, ast.List))
+                                and any(isinstance(e, ast.Constant) and e.value in self.FELT
+                                        for e in setning.value.elts)):
+                            funn.append(f'{rel}:{setning.lineno}')
         self.assertEqual(
             funn, [],
             'Disse stedene skriver `.role` direkte, utenom skjemaene:\n  '
@@ -382,3 +411,25 @@ class RollenSettesBareGjennomSkjemaeneTests(SimpleTestCase):
         antall = len([s for s in rot.glob('*/**/*.py')
                       if '/migrations/' not in s.as_posix()])
         self.assertGreater(antall, 50, f'fant bare {antall} filer')
+
+
+class DjangoAdminErSkrivebeskyttetTests(SimpleTestCase):
+    """Kontoene og innloggingsloggen kan ses i Django-admin, ikke endres
+    (26. sep. 2026, B4 — André: «skrivebeskyttet»). Prøvd med en superbruker,
+    som er den ene som ellers slipper gjennom alt."""
+
+    def test_ingen_kan_legge_til_endre_eller_slette(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+
+        from accounts.models import CustomUser, LoginEvent
+
+        request = RequestFactory().get('/django-admin/')
+        request.user = CustomUser(username='su', is_superuser=True, is_staff=True, is_active=True)
+        for modell in (CustomUser, LoginEvent):
+            modeladmin = admin.site._registry[modell]
+            with self.subTest(modell=modell.__name__):
+                self.assertFalse(modeladmin.has_add_permission(request))
+                self.assertFalse(modeladmin.has_change_permission(request))
+                self.assertFalse(modeladmin.has_delete_permission(request))
+                self.assertTrue(modeladmin.has_view_permission(request), 'å se skal gå')

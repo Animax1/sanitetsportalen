@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Django-admin er skrivebeskyttet for kontoene, og regelen om `role` dekker flere former (B4)  `#core/tilgang`
+
+**André: «skrivebeskyttet».** Django-admin rutes bare under `DEBUG` — aldri i prod eller
+på staging — men der kunne `accounts/admin.py` opprette og endre kontoer med egne skjemaer
+som skrev **`role` og `is_superuser` rett inn**: en superbruker nummer to, og
+degradering uten sperra «siste admin». Frysehandlingen der skrev ingen auditrad, og
+innloggingsloggen kunne slettes rad for rad. En vei rundt sperrene er en vei rundt dem,
+også lokalt.
+
+**Nå:** `CustomUserAdmin` og `LoginEventAdmin` kan **se, ikke legge til, endre eller
+slette** — heller ikke som superbruker. Passordhashen vises ikke. De to skjemaene,
+frysehandlingene og sesjonshjelperen er slettet; endringer skjer i
+`/portal-admin/brukere/`, der sperrene og auditen er. **`LoginEventAdmin` ble tatt med
+uten at det sto i funnet** — sletting av rader i innloggingsloggen er samme sort vei rundt.
+
+**Og regelen som skulle holde dette, dekket bare én form.**
+`RollenSettesBareGjennomSkjemaeneTests` fant `x.role = …`, og slapp gjennom:
+- et `ModelForm` med `role` eller `is_superuser` i `Meta.fields` — nøyaktig det
+  Django-admin-skjemaene var; nå lov bare i `accounts/forms.py`, der sperrene sitter,
+- `.update(role=…)`,
+- `setattr(x, 'role', …)`,
+- og `is_superuser` i det hele tatt.
+
+Samme lærdom som N11: en regel som bare dekker halve syntaksen måler noe annet enn den
+later som. Den utvidede regelen fant de to skjemaene med én gang.
+
+**Tester:** `DjangoAdminErSkrivebeskyttetTests` (se ja, alt annet nei, med en superbruker).
+`FreezeThawAdminActionTests` (seks tester av handlingen som er borte) er fjernet —
+portalens frysing har sine egne, for sesjonene, auditraden og sperra mot å fryse seg selv.
+**Mutasjonstesting:** 6 mutanter — hver av de tre tillatelsene slått på, og hver av de tre
+nye formene lagt inn i en fil. Alle drept. `accounts` (308): grønt.
+
 ## 2026-09-26 — Vaktlista: nye og slettede lister, timetaket, registrene og grensene satte ingen spor (B3)  `#core/audit` `#vaktliste/roller`
 
 Mannskapet, skiftene, ressursene, pausene og overnattingen ble auditlogget. Dette ble det
