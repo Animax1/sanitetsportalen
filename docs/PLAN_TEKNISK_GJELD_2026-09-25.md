@@ -226,7 +226,7 @@ som overlever her blir ikke sett av noen.
 Hvert punkt er et valg mellom å rette koden og å rette løftet. Anbefalingen står, men valget
 er Andrés.
 
-**C1. Overnattingsfanen viser skiftdetaljer fra andre korps til en ren `les`-bruker.**
+**C1. Overnattingsfanen viser skiftdetaljer fra andre korps til en ren `les`-bruker.** *Levert 26. sep. 2026 (André: «a»), se CHANGELOG.*
 Punktet finnes **bare på staging**.
 - **Hvor:** `vaktliste/overnatting.py:307-331` og `:363`.
 - **Hva brukeren ser:** «Ola, Karmøy: Ambulanse 2, 22:00–06:00». Hovedkallet filtrerer de

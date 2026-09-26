@@ -5,6 +5,7 @@ André: «Dens funksjon er for brannsikkerhet.» Svarene: per natt, bare
 mannskap fra registeret, lederen setter opp rommene, `skriv_full` plasserer
 alle og korps-føreren sitt eget korps, og alle med `les` ser hele lista.
 """
+import json
 from datetime import date
 
 from audit.models import AuditLog
@@ -370,6 +371,36 @@ class LesingenTests(_Overnatting):
         data = self._data(self.c_kb)
         self.assertEqual({p['telefon'] for p in data['plasseringer']},
                          {'900 00 000', '911 11 111'})
+
+    def _nattskift(self):
+        Vaktpost.objects.create(ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+                                fra_tid=kl(2, 22), til_tid=kl(3, 6))
+        Vaktpost.objects.create(ressurs=self.res_karmoy, mannskap=self.p_karmoy,
+                                fra_tid=kl(2, 22), til_tid=kl(3, 6))
+
+    def test_leseren_ser_at_andre_korps_er_paa_vakt_men_ikke_hvor(self):
+        """**C1, André 26. sep. 2026: «a».** Opptellingen trenger å vite *at*
+        Ola er på vakt — «4 i rommet, 1 på vakt» — men ikke på hvilken bil og
+        når. De skiftene filtrerer hovedsvaret bort for en ren `les`, og
+        overnattingsfanen ga dem tilbake. Detaljene følger telefonen."""
+        self._nattskift()
+        leser = _bruker('leser_hgsd_c1', 'les')
+        Mannskap.objects.create(navn='Leser', korps=self.hgsd, user=leser)
+        rader = {p['navn']: p for p in self._data(_klient(leser))['plasseringer']}
+        self.assertTrue(rader['Ola']['er_paa_vakt'])
+        self.assertEqual(rader['Ola']['paa_vakt'], [])
+        self.assertTrue(rader['Kari']['er_paa_vakt'])
+        self.assertEqual([s['ressurs'] for s in rader['Kari']['paa_vakt']], ['Lag HGSD'])
+        self.assertNotIn('Lag Karmøy', json.dumps(rader), 'ingen detalj om andre korps')
+
+    def test_den_som_ser_alle_ser_alle_skiftene(self):
+        self._nattskift()
+        rader = {p['navn']: p for p in self._data(self.c_kb)['plasseringer']}
+        self.assertEqual([s['ressurs'] for s in rader['Ola']['paa_vakt']], ['Lag Karmøy'])
+
+    def test_uten_skift_er_ingen_paa_vakt(self):
+        rader = self._data(self.c_leser)['plasseringer']
+        self.assertEqual({p['er_paa_vakt'] for p in rader}, {False})
 
     def test_svaret_baerer_nettene_rommene_og_rutinen(self):
         self.vl.brannrutine = 'Ring 110'

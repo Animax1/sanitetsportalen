@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Overnattingsfanen viste andre korps' skift til en ren `les` (C1)  `#vaktliste/tilgang`
+
+**Funnet i kodegjennomgangen 25. sep., gikk til prod med `7c21318` samme kveld.** En ren
+`les`-bruker fikk skiftdetaljene til alle som overnattet — «Ola, Karmøy: Ambulanse 2,
+22:00–06:00» — mens hovedsvaret i vaktlista filtrerer de samme skiftene bort for henne.
+`paa_vakt()` gikk utenom `synlige_vaktposter`.
+
+**André valgte «a»:** alle ser *at* en person er på vakt om natta — opptellingen trenger
+det, «4 i rommet, 1 på vakt» — men **hvilken ressurs og når følger telefonen** (`vis_telefon`:
+eget korps, eller den som ser alle). Én regel for hvem som ser et annet korps, ikke to.
+
+- Serveren sender `er_paa_vakt` til alle, og `paa_vakt` (skiftene) bare der telefonen vises.
+- Klienten teller og merker på `er_paa_vakt`, ikke på lengden av `paa_vakt` — ellers ville
+  brannlista sagt at Ola skal være inne mens han kjører ambulansen.
+- Fila på e-post er uendret: den går til de faste mottakerne admin har satt.
+- **Personvernprotokollen v1.13**, A.6: tilgangsavsnittet for overnatting nevner nå
+  skiftdetaljene. `vaktliste/CLAUDE.md` likeså.
+
+**Tester:** tre i `LesingenTests` gjennom hovedsvaret (ingen detalj om et annet korps i
+svaret, detaljene for eget korps, den som ser alle ser alt) og én i JS (tellingen og merket
+uten detaljer). **Mutasjonstesting:** 4 mutanter — detaljene til alle, `er_paa_vakt` alltid
+falsk, tellingen på detaljene og merket på detaljene. Alle drept.
+
 ## 2026-09-26 — Bjella ringte ikke for den første bilen på et oppdrag (A1)  `#oppdrag/enhetsskjerm`
 
 **Kravet fra 15. sep.** — «en bruker som er koblet til en enhet … som får et oppdrag skal få

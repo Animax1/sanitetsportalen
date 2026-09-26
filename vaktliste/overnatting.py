@@ -350,6 +350,11 @@ def _skift_til_dict(vp) -> dict:
 
 
 def plassering_til_dict(o, skift=(), telefon=False) -> dict:
+    """**`er_paa_vakt` til alle, skiftene bare der telefonen vises** (26. sep.
+    2026, C1 — André: «a»). Opptellingen trenger å vite *at* noen er på vakt;
+    hvilken bil og når er skift fra et annet korps, og dem filtrerer
+    hovedsvaret bort for en ren `les`. Samme predikat som telefonen, så det
+    ikke finnes to regler for hvem som ser et annet korps."""
     m = o.mannskap
     return {
         'id': o.pk,
@@ -360,7 +365,8 @@ def plassering_til_dict(o, skift=(), telefon=False) -> dict:
         'korps_id': m.korps_id,
         'korps_kort': m.korps.kortnavn or m.korps.navn,
         'telefon': m.telefon if telefon else '',
-        'paa_vakt': [_skift_til_dict(vp) for vp in skift],
+        'er_paa_vakt': bool(skift),
+        'paa_vakt': [_skift_til_dict(vp) for vp in skift] if telefon else [],
     }
 
 

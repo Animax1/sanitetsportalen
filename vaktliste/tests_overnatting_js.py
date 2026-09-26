@@ -28,7 +28,7 @@ globalThis.MITT_KORPS = 'mitt-korps';
 const L = (d, t, m = 0) => new Date(2026, 9, d, t, m).toISOString();
 const P = (id, rom_id, mannskap_id, natt, navn, korps_id, paa_vakt = []) => ({
   id, rom_id, mannskap_id, natt, navn, korps_id, korps_kort: korps_id === 1 ? 'HGSD' : 'KAR',
-  telefon: '900', paa_vakt});
+  telefon: '900', paa_vakt, er_paa_vakt: paa_vakt.length > 0});
 globalThis.aktivListe = {
   vaktliste: {id: 1, vakt_navn: 'Vakta'},
   mannskap: [], vaktposter: [],
@@ -157,6 +157,17 @@ class OvernattingJsTests(SimpleTestCase):
         self.assertRegex(m, r'<strong>2</strong> overnatter')
         self.assertRegex(m, r'<strong>1</strong> skal være inne')
         self.assertIn('Samleplass nord', m)
+
+    def test_paa_vakt_uten_detaljer_telles_og_merkes(self):
+        """**C1:** en ren `les` får `er_paa_vakt` for et annet korps, men ikke
+        skiftene. Tellingen og merket skal stå likevel — uten dem sier
+        brannlista at Ola skal være inne mens han kjører ambulansen."""
+        m = self._markup("""
+            const ola = aktivListe.overnatting.plasseringer[1];
+            ola.er_paa_vakt = true; ola.paa_vakt = [];""", nivaa='les', korps='1')
+        self.assertRegex(m, r'<strong>0</strong> skal være inne')
+        rad_ola = m.split('Ola')[1].split('</tr>')[0]
+        self.assertIn('På vakt', rad_ola)
 
     def test_en_annen_natt_viser_sine_egne(self):
         m = self._markup("overnattingNatt = '2026-10-03';").split('vl-brannliste')[0]

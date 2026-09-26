@@ -145,13 +145,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       avlesning 25. sep. 2026 var fra **staging** og viste ingen manglende indekser;
       bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
-- [ ] **Avgjør C1 før neste `staging → main`: skal en `les`-bruker se andre korps' skift i
-      overnattingsfanen?** I dag viser den «Ola, Karmøy: Ambulanse 2, 22:00–06:00» for
-      korps hovedkallet filtrerer bort (`vaktliste/overnatting.py:307-363`). Anbefalingen
-      er at bare «på vakt i natt: ja/nei» vises for den som ikke ser alle korps. Finnes bare
-      på staging, og går til prod med neste merge. Se
-      [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md) C1.
-
 ## Pågående / neste
 
 ### Kodegjennomgangen 25. sep. 2026 — se [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md)
@@ -168,9 +161,9 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       feltendringer og sletting av backup uten audit (B2); vaktlistas audithull (B3);
       `accounts/admin.py` (B4); `sikkerhetssjekk.py` mangler KO og backlog (B5); rå
       unntakstekst i `Utsending.feil` (B7).
-- [ ] **Pulje C — avgjørelser.** C1 står øverst. C2: planleggerens kladd er synlig for
-      `les_alle`/`skriv_handling`, stikk i strid med tre kommentarer — rett koden eller
-      løftet. C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
+- [ ] **Pulje C — avgjørelser.** C1 levert 26. sep. C2 besluttet 26. sep. — skjul
+      planleggerens kladd for alle under `skriv_full`; i dag ser `les_alle` og
+      `skriv_handling` den, stikk i strid med tre kommentarer. C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
       predikat for «på vakt», eller fjern feltet.
 - [ ] **Pulje D — verifiseringen.** CI med PostgreSQL og node, og manglende node skal feile,
       ikke hoppe over ~160 tester (D1, erstatter «Vurder GitHub Actions»); død kode som

@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 25. september 2026  
-**Versjon:** 1.12  
+**Siste oppdatering:** 26. september 2026  
+**Versjon:** 1.13  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -358,8 +358,9 @@ formålet er også i mannskapets egen interesse.
 | `Vaktliste.brannrutine` | Stedets rutine ved alarm, skrevet av vaktleder | Ikke personopplysning |
 
 **Tilgang:** alle med lesetilgang til vaktlista ser alle rom og navn — den som teller opp
-trenger hele lista. **Telefonnummer vises bare** for egne korps eller for dem som ser alle
-korps, som ellers i modulen.
+trenger hele lista. **Telefonnummer og skiftdetaljer vises bare** for egne korps eller for
+dem som ser alle korps, som ellers i modulen. Alle ser *at* en person er på vakt om natta
+(opptellingen trenger det), men bare de samme ser på hvilken ressurs og når (26.09.2026).
 
 **Lagringstid:** plasseringene slettes **30 dager etter natta**, automatisk (se A.9).
 Rommene blir stående. **To steder lever opplysningen lenger, og det er bevisst:**
@@ -1147,9 +1148,14 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.12 – sist oppdatert 25. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.13 – sist oppdatert 26. september 2026*
 
 **Endringslogg:**
+
+- **v1.13 (26.09.2026):** **A.6, overnatting:** skiftdetaljene («Ambulanse 2, 22:00–06:00»)
+  følger nå telefonen og vises bare for eget korps eller for dem som ser alle korps. En ren
+  lesetilgang fikk dem for alle korps via overnattingsfanen, selv om vaktlista ellers
+  filtrerer de samme skiftene bort. Alle ser fortsatt *at* en person er på vakt.
 
 - **v1.12 (25.09.2026):** **A.6:** ny underseksjon for overnatting i vaktlista — hvem
   som sover i hvilket rom per natt, for brannsikkerheten. **A.9:** plasseringene slettes

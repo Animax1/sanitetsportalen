@@ -119,7 +119,9 @@ function _paaVaktTekst(p) {
 
 
 function _overnattingTelling(folk) {
-  const paaVakt = folk.filter((p) => (p.paa_vakt || []).length).length;
+  // `er_paa_vakt`, ikke lengden på `paa_vakt`: skiftene fra et annet korps
+  // sendes ikke til en ren `les` (C1), men tellingen skal stemme likevel.
+  const paaVakt = folk.filter((p) => p.er_paa_vakt).length;
   return { antall: folk.length, paaVakt, inne: folk.length - paaVakt };
 }
 
@@ -185,7 +187,7 @@ function _sengerad(p) {
          <i class="bi bi-x-lg"></i></button>`
     : '';
   const vakt = _paaVaktTekst(p);
-  const merke = vakt
+  const merke = p.er_paa_vakt
     ? `<span class="vl-paavakt"><i class="bi bi-lightning-charge-fill me-1"></i>På vakt ${escapeHtml(vakt)}</span>`
     : '';
   return `
@@ -277,7 +279,7 @@ function mkBrannliste(netter) {
             <td>${escapeHtml(p.navn)}</td>
             <td>${escapeHtml(p.korps_kort)}</td>
             <td>${escapeHtml(p.telefon || '')}</td>
-            <td>${escapeHtml(_paaVaktTekst(p) ? 'PÅ VAKT ' + _paaVaktTekst(p) : '')}</td>
+            <td>${escapeHtml(p.er_paa_vakt ? ('PÅ VAKT ' + _paaVaktTekst(p)).trim() : '')}</td>
           </tr>`).join('');
       return `
         <h3>${escapeHtml(r.navn)}<small>${sted} · ${escHtmlValue(folk.length)}${tak}</small></h3>
