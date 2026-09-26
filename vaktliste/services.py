@@ -32,10 +32,8 @@ def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
     og oppdrag plutselig scopes til den. Aktiv vakt byttes der den alltid
     byttes, i vaktadministrasjonen.
 
-    Dette er det andre stedet i portalen som lager `Vakt`-rader (det første
-    er «Avslutt vakt» i pasientmodulen). Det er notert som en ryddejobb i
-    TODO sammen med `hent_aktiv_vakt` — vaktas livssyklus bør samles i
-    `core` når noen er i den koden uansett.
+    Vakta lages av `core.vakt.opprett_vakt` (26. sep. 2026), som alle andre
+    steder som lager vakter: navnekappløpet gir 400, ikke 500.
 
     **Slutten tas imot her, ikke bare i «Innstillinger».** Fram til
     11. sep. 2026 spurte «Ny vaktliste» bare om start, og slutten lå bak
@@ -45,26 +43,14 @@ def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
 
     Returnerer den nye vaktlista.
     """
-    from core.models import Vakt
-
-    navn = (navn or '').strip()
-    if not navn:
-        raise ValueError('Vakta må ha et navn.')
-    if Vakt.objects.filter(navn=navn).exists():
-        raise ValueError(
-            f'En vakt med navnet «{navn}» finnes allerede. '
-            f'Legg på en dato eller velg et annet navn.')
+    from core.vakt import opprett_vakt
 
     startet = startet or timezone.now()
     if planlagt_slutt is not None and planlagt_slutt <= startet:
         raise ValueError('Vakta må slutte etter at den begynner.')
     with transaction.atomic():
-        vakt = Vakt.objects.create(
-            navn=navn,
-            year=timezone.localtime(startet).year,
-            startet=startet,
-            er_aktiv=False,
-        )
+        vakt = opprett_vakt(navn, year=timezone.localtime(startet).year,
+                            startet=startet, er_aktiv=False)
         return Vaktliste.objects.create(vakt=vakt, planlagt_slutt=planlagt_slutt)
 
 

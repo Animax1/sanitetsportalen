@@ -1018,15 +1018,6 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
-- [ ] **`core.vakt.opprett_vakt()` som eneste fabrikk for `Vakt`-rader.** Tre steder lager
-      dem i dag: `core/vakt.py`, `patients/views_patients.py` og
-      `vaktliste.services.opprett_planlagt_vakt`. Hvert har sin egen navnesjekk, og
-      vaktlistas er `exists()` før `create()` — et kappløp, ikke en skranke. **To samtidige
-      innsendinger av samme navn gir 500**: `Vakt.navn` er unik, `IntegrityError` fanges
-      ikke, og `kopier_oppsett` kjører *etter* transaksjonen, så en feil der etterlater en
-      tom vaktliste. Fabrikken fanger `IntegrityError` og gir samme `ValueError` som
-      navnesjekken; kopieringen går inn i samme `atomic()`.
-
 - [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
       se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
       for frysing, verifisering og kollaps, men **opprettelsen** (`arkiver_aktiv_vakt()` i

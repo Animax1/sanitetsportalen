@@ -25,7 +25,7 @@ from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
 from core.validators import now_local_str, validate_patient_time_fields
 from core.jsonkropp import json_body
-from core.vakt import hent_aktiv_vakt
+from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, opprett_vakt, vaktnavn_opptatt_melding
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
@@ -486,12 +486,10 @@ def avslutt_vakt_view(request):
             {'error': 'Den nye vakta må ha et navn — det settes ved vaktstart.'},
             status=400,
         )
+    # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
+    # `opprett_vakt` under — denne sjekken er et kappløp.
     if Vakt.objects.filter(navn=nytt_navn).exists():
-        return JsonResponse(
-            {'error': f'En vakt med navnet «{nytt_navn}» finnes allerede. '
-                      f'Legg på en dato eller velg et annet navn.'},
-            status=400,
-        )
+        return JsonResponse({'error': vaktnavn_opptatt_melding(nytt_navn)}, status=400)
 
     vakt = hent_aktiv_vakt()
     # Lag pre-reset backup før sletting
@@ -499,19 +497,23 @@ def avslutt_vakt_view(request):
     create_backup(slug='patients', kind='pre_reset', user=request.user,
                   note=f'Før avslutning av vakta «{vakt.navn}»')
 
-    with transaction.atomic():
-        deleted, _ = Patient.objects.filter(vakt=vakt).delete()
-        vakt.er_aktiv = False
-        vakt.avsluttet = timezone.now()
-        vakt.save(update_fields=['er_aktiv', 'avsluttet'])
+    try:
+        with transaction.atomic():
+            deleted, _ = Patient.objects.filter(vakt=vakt).delete()
+            vakt.er_aktiv = False
+            vakt.avsluttet = timezone.now()
+            vakt.save(update_fields=['er_aktiv', 'avsluttet'])
 
-        from core.validators import current_local_year
-        ny = Vakt.objects.create(
-            navn=nytt_navn, year=current_local_year(), startet=timezone.now())
-        AppSetting.set('aktiv_vakt_id', ny.pk)
-        # Ny vakt har ingen tellernøkkel — next_patient_nr starter på 1 av
-        # seg selv. Den gamle vaktas nøkkel blir liggende: gjenåpnes vakta,
-        # fortsetter serien der den slapp.
+            from core.validators import current_local_year
+            ny = opprett_vakt(nytt_navn, year=current_local_year(), startet=timezone.now())
+            AppSetting.set('aktiv_vakt_id', ny.pk)
+            # Ny vakt har ingen tellernøkkel — next_patient_nr starter på 1 av
+            # seg selv. Den gamle vaktas nøkkel blir liggende: gjenåpnes vakta,
+            # fortsetter serien der den slapp.
+    except VaktnavnOpptatt as feil:
+        # Tatt mellom sjekken over og nå. Transaksjonen er rullet tilbake:
+        # ingen pasienter slettet, gammel vakt fortsatt aktiv.
+        return JsonResponse({'error': str(feil)}, status=400)
 
     return JsonResponse({
         'ok': True,

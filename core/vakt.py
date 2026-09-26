@@ -11,10 +11,42 @@ hører derfor hjemme her.
 """
 from __future__ import annotations
 
+from django.db import IntegrityError, transaction
 from django.utils import timezone as djtz
 
 from core.models import AppSetting, Vakt
 from core.validators import current_local_year
+
+
+class VaktnavnOpptatt(ValueError):
+    """Navnet er tatt. En `ValueError`, så kallerne som alt svarer 400 på
+    en ugyldig verdi gjør det her også."""
+
+
+def vaktnavn_opptatt_melding(navn: str) -> str:
+    return (f'En vakt med navnet «{navn}» finnes allerede. '
+            f'Legg på en dato eller velg et annet navn.')
+
+
+def opprett_vakt(navn, *, year, startet, er_aktiv=True):
+    """Den ene fabrikken for `Vakt`-rader (26. sep. 2026).
+
+    **Databasen avgjør om navnet er ledig, ikke et `exists()` foran.** Tre
+    steder laget vakter, hvert med sin egen sjekk, og en sjekk før `create()`
+    er et kappløp: to samtidige innsendinger av samme navn består begge, og
+    den andre fikk 500 fra unikhetskravet. Her fanges `IntegrityError` i et
+    eget savepoint, så en kaller inne i en større transaksjon kan fortsette,
+    og svaret blir det samme som om sjekken hadde sagt nei.
+    """
+    navn = (navn or '').strip()
+    if not navn:
+        raise ValueError('Vakta må ha et navn.')
+    try:
+        with transaction.atomic():
+            return Vakt.objects.create(navn=navn, year=year, startet=startet,
+                                       er_aktiv=er_aktiv)
+    except IntegrityError:
+        raise VaktnavnOpptatt(vaktnavn_opptatt_melding(navn)) from None
 
 
 def vakt_for_year(year):
@@ -29,10 +61,17 @@ def vakt_for_year(year):
     men før deploy 2 finnes maks én per år.
     """
     vakt = Vakt.objects.filter(year=year).order_by('-startet').first()
-    if vakt is None:
-        vakt = Vakt.objects.create(
-            navn=str(year), year=year, startet=djtz.now())
-    return vakt
+    if vakt is not None:
+        return vakt
+    try:
+        return opprett_vakt(str(year), year=year, startet=djtz.now())
+    except VaktnavnOpptatt:
+        # En samtidig forespørsel rakk å lage den. Finnes den fortsatt ikke,
+        # er navnet tatt av en vakt for et annet år — det skal synes.
+        vakt = Vakt.objects.filter(year=year).order_by('-startet').first()
+        if vakt is None:
+            raise
+        return vakt
 
 
 def hent_aktiv_vakt():

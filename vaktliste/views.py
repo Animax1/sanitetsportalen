@@ -319,20 +319,23 @@ def vaktlister_view(request):
             _vaktliste_til_dict(vl, request.user) for vl in qs]})
 
     data = json_body(request)
+    # **Vakta og kopien i én transaksjon** (26. sep. 2026). Kopieringen sto
+    # etter, og feilet den, ble en tom vaktliste stående — med navnet tatt,
+    # så et nytt forsøk fikk «finnes allerede».
     try:
-        ny = services.opprett_planlagt_vakt(
-            data.get('navn'),
-            startet=_tid(data.get('startet')),
-            planlagt_slutt=_tid(data.get('planlagt_slutt')))
+        with transaction.atomic():
+            ny = services.opprett_planlagt_vakt(
+                data.get('navn'),
+                startet=_tid(data.get('startet')),
+                planlagt_slutt=_tid(data.get('planlagt_slutt')))
+            kopiert = 0
+            kopier_fra = _int(data.get('kopier_fra'))
+            if kopier_fra:
+                kilde = Vaktliste.objects.filter(pk=kopier_fra).first()
+                if kilde is not None:
+                    kopiert = services.kopier_oppsett(kilde, ny)
     except ValueError as feil:
         return json_feil(str(feil))
-
-    kopiert = 0
-    kopier_fra = _int(data.get('kopier_fra'))
-    if kopier_fra:
-        kilde = Vaktliste.objects.filter(pk=kopier_fra).first()
-        if kilde is not None:
-            kopiert = services.kopier_oppsett(kilde, ny)
 
     svar = _vaktliste_til_dict(ny, request.user)
     svar['kopierte_ressurser'] = kopiert

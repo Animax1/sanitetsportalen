@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Én fabrikk for vakter: to like vaktnavn samtidig gir 400, ikke 500  `#core #vaktliste #patients`
+
+**Hvorfor:** tre steder laget `Vakt`-rader, hvert med sin egen sjekk av navnet, og `Vakt.navn`
+er unik. En `exists()` foran `create()` er et kappløp — **to samtidige innsendinger av samme
+vaktnavn** besto begge sjekken, og den andre fikk **500** fra unikhetskravet.
+
+| Sted | Før | Nå |
+|---|---|---|
+| «Ny vaktliste» (`vaktliste`) | 500 i kappløpet; `kopier_oppsett` kjørte *etter* transaksjonen, så en feil der etterlot en tom vaktliste med navnet tatt | 400; vakta og kopien i én transaksjon |
+| «Avslutt vakt» (`patients`) | 500 i kappløpet (transaksjonen rullet tilbake, så ingen pasienter gikk tapt) | 400, samme tilbakerulling — og den tidlige sjekken står igjen så et åpenbart tatt navn ikke koster en backup |
+| `vakt_for_year` (fersk installasjon) | 500 på den ene av to samtidige første forespørsler | henter den den andre rakk å lage |
+
+**`core.vakt.opprett_vakt(navn, *, year, startet, er_aktiv=True)`** fanger `IntegrityError` i
+et **eget savepoint** og kaster `VaktnavnOpptatt` (en `ValueError`, så kallerne som alt svarte
+400 på ugyldige verdier gjør det her også). Savepointet er poenget: uten det er transaksjonen
+rundt ubrukelig etter feilen, og neste spørring kaster.
+
+**Tester:** `core/tests_vakt_fabrikk.py` tvinger fram kappløpet ved å la `exists()` svare
+«ledig» og krever 400 — og at ingen pasienter er slettet, gammel vakt fortsatt er aktiv og
+pekeren står. `IngenAndreLagerVakterTests` leser koden med AST og avviser
+`Vakt.objects.create` utenfor `core/vakt.py`.
+
+**Mutasjon:** 6 mutanter, alle røde — savepointet fjernet, `IntegrityError` ikke fanget,
+`vakt_for_year` uten fangst og uten sin `raise`, kopien utenfor transaksjonen, «avslutt vakt»
+uten fangst.
+
 ## 2026-09-26 — Server-status ut av `patients`, og 531 linjer JS som ingen test så (G1, første del)  `#core #frontend`
 
 **Hvorfor:** `/portal-admin/server-status/` er rammeverk, men malen lå i
