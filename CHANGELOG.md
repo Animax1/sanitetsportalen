@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Pasientsiden bruker den felles klokka (G3, kort del)  `#patients #frontend`
+
+**Hvorfor:** pasientsiden er et eget skall og hadde sin egen `updateClock` i
+`patients-utils.js` — samme navn og samme markup som `portal-clock.js`, som alle andre sider
+laster fra `base_portal`. To kopier av samme ting glir; A8 var et eksempel på hva skallet
+koster. Kopien er slettet, og siden laster `portal-clock.js` etter `portal-utils.js`.
+Runbooken §3d peker på den felles fila.
+
+**Ny regel:** `core/tests_js_samme_side.py` rendrer pasientsiden og server-status, leser
+skriptene de *faktisk* laster, og krever at ingen toppnivåfunksjon er definert i to av dem —
+uten bundler vinner den sist lastede i stillhet.
+
+**Ikke gjort, med vilje:** å la pasientsiden arve `base_portal` (den lange delen av G3). Det er
+en ombygging av hovedflaten, og hører hjemme når siden likevel redesignes.
+
+**Mutasjon:** 2 mutanter, begge røde — en `updateClock` lagt tilbake i `patients-utils.js`, og
+`portal-clock.js` fjernet fra malen.
+
 ## 2026-09-26 — Kolonnen `backup_enabled` slettes (D4, deploy 2)  `#core #migrasjon`
 
 **Hvorfor:** steg 2 av to. `core/0012` (på `main` fra `6b59293`) lot Django glemme feltet og ga

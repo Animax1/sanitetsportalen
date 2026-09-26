@@ -179,7 +179,8 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       Igjen av G1: `AppSetting`-adminen og `appsetting`-kommandoen, vaktas livssyklus
       (`avslutt_vakt_view`, `vakter_view`, `gjenaapne_vakt_view`) og testinfrastrukturen
       (`js_test_utils`, `tests_modul_dekorator`) ut av `patients`. Store filer (G2);
-      pasientsidens eget skall (G3).
+      pasientsidens eget skall (G3 — klokka er felles fra 26. sep.; å arve `base_portal` venter
+      til pasientsiden redesignes uansett).
 - [ ] **scipy og numpy (~160 MB) — valgfrie?** Vurdert under G5, ikke endret. Koden tåler
       alt at de mangler (`HAS_SCIPY` i `patients/services.py`): da står χ²- og
       Kruskal-Wallis-merkene som «Ingen data», og resten av statistikken virker. Å ta dem ut

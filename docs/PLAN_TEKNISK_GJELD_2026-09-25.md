@@ -414,7 +414,7 @@ Ingen av disse gjør skade i dag. Hver av dem gjør neste endring dyrere.
 | `ko/views.py` | 1 394 | Deles etter flate, som `views_verdier` i oppdrag |
 
 **G3. Pasientsiden er et eget skall.** Den har egen header, klokke og bjelle. Funn A8 er ett
-eksempel på hva det koster. Fjern `updateClock` og last `portal-clock.js` nå. På sikt:
+eksempel på hva det koster. Fjern `updateClock` og last `portal-clock.js` nå. *(Levert 26. sep. 2026.)* På sikt:
 arv `base_portal`.
 
 **G4. N+1 i endepunkter som polles:** *Levert 26. sep. 2026, se CHANGELOG.*

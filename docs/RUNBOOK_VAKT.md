@@ -294,7 +294,7 @@ Et nytt oppdrag når bilen på 0–15 s, og beskjeden går uansett over nødnett
 | Hva | Hvor ofte | Nett | Stille når | Hvor |
 |---|---|---|---|---|
 | Pasientlista, førstehjelpere, helsepersonell (+ tavla når den fanen er åpen), alle med ETag | 30 s | ja | fanen er skjult — og henter straks når den kommer tilbake | `patients-app.js` · `doAutoRefresh` |
-| Klokka | 1 s | nei | — | `patients-utils.js` |
+| Klokka | 1 s | nei | — | `portal-clock.js` (felles fra 26. sep. 2026) |
 
 **`/vaktliste/`**
 
