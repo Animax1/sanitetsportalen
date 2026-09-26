@@ -173,10 +173,9 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       mellom `migrate` og containerbyttet kjører den gamle koden, og den velger kolonnen i
       hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
       PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
-- [ ] **Pulje E — duplisering som alt har glidd.** E1 levert 26. sep. Igjen:
+- [ ] **Pulje E — duplisering som alt har glidd.** E1 og E4 levert 26. sep. Igjen:
       verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
-      `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og
-      helseprober (E6).
+      `patients/views_arkiv.py` (E3); småhjelperne (E5); vasking og helseprober (E6).
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1 levert 26. sep. Igjen:
       audit-avsnittet i rot-`CLAUDE.md` er feil (F2 — rota har ~25 tegn igjen under taket,
       så rettingen må korte); TODO-punkter som er gjort eller dobbelt (F3); ~40 utdaterte

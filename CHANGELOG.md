@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — «Kan lede» i oppdrag: knappen og døra svarer likt (E4)  `#oppdrag #ko #vaktliste`
+
+**Hvorfor:** «kan sette opp verdimengdene» sto to steder med to ulike regler. Knappen
+«Valglister» i sentralbordet (`sentralbordkontekst`) sa `er_global_admin or skriv_leder`;
+endepunktene bak den (`views_verdier._kan_lede`) sa det samme **pluss** «ikke en
+enhetskonto» (M6). En bilkonto med `skriv_leder` fikk knappen og så 403 — en knapp som fører
+til en vegg. Nås gjennom `/ko/`, som bygger sentralbordet for alle med KO-tilgang.
+
+**`oppdrag.views_common.kan_lede(user)`** er nå den ene regelen, og begge leser den.
+
+**`er_global_admin(...) or` er borte fra alle tre** (`oppdrag`, `ko`, `vaktliste.kan_lede`):
+`nivaa_for` har gitt admin toppen av stigen siden 13. sep. (M10), så `or`-en var overflødig —
+og kommentaren ved den i oppdrag påsto fortsatt at admin fikk `skriv_full`.
+
+**Test gjennom inngangene:** `oppdrag/tests_kan_lede.py` spør `sentralbordkontekst` (knappen)
+og `POST /oppdrag/api/lokasjoner/` (døra) for leder, bilkonto og `skriv_full`. **Mutanter: 5,
+alle drept** — knappen med den gamle regelen; enhetskontoen sluppet inn; nivået ett trinn ned
+i oppdrag, KO og vaktlista. Den tredje overlevde først i et for smalt testutvalg; hele
+oppdrag-suiten ga 7 røde, og den nye testen dekker den nå selv.
+
 ## 2026-09-26 — Ankomster per time: samme svar i begge statistikkene, og i riktig rekkefølge (E1)  `#patients #statistikk`
 
 **Hvorfor:** pasientstatistikken ble regnet to steder, og de ga **ulike tall for samme

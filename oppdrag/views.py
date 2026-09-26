@@ -32,7 +32,8 @@ from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
-    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, json_body, melding_til_dict,
+    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, json_body, kan_lede,
+    melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
 
@@ -105,8 +106,8 @@ def sentralbordkontekst(request) -> dict:
         'kan_skrive': har_tilgang(request.user, 'oppdrag', 'skriv_full'),
         # Verdimengdene — lokasjoner, enhetstyper, problemstillinger — settes
         # opp av `skriv_leder` (André, 12. sep. 2026). Knappen vises bare da.
-        'kan_lede': (er_global_admin(request.user)
-                     or har_tilgang(request.user, 'oppdrag', 'skriv_leder')),
+        # `views_common.kan_lede` — samme regel som endepunktene bak knappen.
+        'kan_lede': kan_lede(request.user),
         # **Besetningspanelet er vaktlistas data, lånt inn** (§6 i
         # vaktlistenotatet). Flagget er en *slug* gjennom `core`, ikke en
         # import: oppdragsmodulen skal ikke kjenne vaktlista i Python, og

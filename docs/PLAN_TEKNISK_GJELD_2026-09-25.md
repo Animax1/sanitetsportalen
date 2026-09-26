@@ -323,7 +323,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 - **Samtidig:** arkivhendelsene logges med `table_name='backup'`. Lag én felles
   loggehjelper i `core.arkiv`.
 
-**E4. Tilgangsgatene.**
+**E4. Tilgangsgatene.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** tre steder skriver fortsatt `er_global_admin(...) or har_tilgang(...,
   'skriv_leder')`, som er overflødig siden `nivaa_for` ga admin toppen av stigen.
 - **Hvorfor det er mer enn pynt:** «kan lede oppdrag» er skrevet to ulike steder, og bare

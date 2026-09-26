@@ -253,8 +253,8 @@ def index_view(request):
 
 
 def _kan_lede_ko(request) -> bool:
-    return (er_global_admin(request.user)
-            or har_tilgang(request.user, 'ko', 'skriv_leder'))
+    # Global admin trenger ingen egen `or`: `nivaa_for` gir toppen av stigen.
+    return har_tilgang(request.user, 'ko', 'skriv_leder')
 
 
 @modul_kreves('ko', 'les', svar='json')

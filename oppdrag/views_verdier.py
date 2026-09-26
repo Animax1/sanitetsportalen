@@ -23,12 +23,12 @@ from django.http import HttpResponseNotModified, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
+from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, verdier
 from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
-from .views_common import er_enhetskonto, etag_for, json_body
+from .views_common import etag_for, json_body, kan_lede
 
 
 def _feil(melding, status=400):
@@ -129,13 +129,8 @@ VERDIMENGDER = {
 
 
 def _kan_lede(request):
-    # Global admin står utenfor modulaksen og får `skriv_full` av
-    # `nivaa_for` — leder-trinnet må nevnes eksplisitt, som `kan_lede` i
-    # vaktlista gjør.
-    # En enhetskonto setter ikke opp verdimengdene, uansett nivå (M6).
-    if er_enhetskonto(request.user):
-        return False
-    return er_global_admin(request.user) or har_tilgang(request.user, 'oppdrag', 'skriv_leder')
+    # Regelen står i `views_common.kan_lede`, delt med knappen i sentralbordet.
+    return kan_lede(request.user)
 
 
 def _sett_felter(vm, rad, data, *, ny=False):

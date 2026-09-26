@@ -6,6 +6,8 @@ import json
 
 from django.utils import timezone
 
+from core.auth_decorators import har_tilgang
+
 from . import choices, services
 
 
@@ -66,6 +68,19 @@ def er_enhetskonto(user) -> bool:
     å vise.
     """
     return getattr(user, 'enhet', None) is not None
+
+
+def kan_lede(user) -> bool:
+    """Setter opp verdimengdene — lokasjoner, enhetstyper, problemstillinger.
+
+    `skriv_leder`, men **aldri en enhetskonto** (M6), uansett nivå. Én regel for
+    knappen i sentralbordet og for endepunktene i `views_verdier` (26. sep.
+    2026, E4): knappen sjekket ikke enhetskontoen, så en bilkonto med
+    `skriv_leder` fikk «Valglister» og så 403 — en knapp som fører til en vegg.
+    Global admin trenger ingen egen `or`: `nivaa_for` gir admin toppen av stigen.
+    """
+    return not er_enhetskonto(user) and har_tilgang(user, 'oppdrag', 'skriv_leder')
+
 
 
 def status_tidspunkt_for(oppdrag_liste, meldinger=None) -> dict:

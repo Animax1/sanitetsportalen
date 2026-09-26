@@ -675,7 +675,8 @@ def kan_lede(user) -> bool:
     hele tatt: en vaktleder skal kunne sette opp sin egen vaktliste uten å få
     brukeradministrasjon, backup og arkiv på kjøpet.
     """
-    return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_leder')
+    # Global admin trenger ingen egen `or`: `nivaa_for` gir toppen av stigen.
+    return har_tilgang(user, 'vaktliste', 'skriv_leder')
 
 
 def kan_stemple(user) -> bool:
