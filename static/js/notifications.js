@@ -1,6 +1,6 @@
 /* notifications.js — portal-wide varsel-bjelle
  *
- * Lastes av base_portal.html, base.html og patients/index.html.
+ * Lastes av base_portal.html og patients/index.html.
  * Håndterer: badge-polling, dropdown-innlasting, klikk-navigasjon.
  *
  * Klikk-logikk:
@@ -46,12 +46,25 @@
     badgeEl.style.display = n > 0 ? 'inline-flex' : 'none';
   }
 
+  /* ── Er det et menneske i fana? ─────────────────────────────────────── */
+  // Bjella poller hvert 30. sekund på alle sider, og en forespørsel uten
+  // `X-Portal-Inaktiv` teller som en handling (`BrukerAktivitetMiddleware`).
+  // Uten hodet sto hver glemt, synlig fane som «aktiv nå» (26. sep. 2026, A8).
+  // Målingen eies av `portal-utils.js`; der den ikke er lastet — admin-sidene —
+  // vet fana ikke, og sier det, så serveren lar tidspunktet stå.
+  function inaktivHode() {
+    return typeof sekunderSidenInteraksjon === 'function'
+      ? String(sekunderSidenInteraksjon())
+      : 'ukjent';
+  }
+
   /* ── Generisk fetch ──────────────────────────────────────────────────── */
   async function apiFetch(url, method) {
-    const opts = { credentials: 'same-origin' };
+    const opts = { credentials: 'same-origin',
+                   headers: { 'X-Portal-Inaktiv': inaktivHode() } };
     if (method === 'POST') {
       opts.method  = 'POST';
-      opts.headers = { 'X-CSRFToken': getCsrf() };
+      opts.headers['X-CSRFToken'] = getCsrf();
     }
     const res = await fetch(url, opts);
     if (!res.ok) throw new Error(`${method ?? 'GET'} ${url} → ${res.status}`);

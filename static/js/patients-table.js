@@ -76,7 +76,7 @@ async function loadPatients() {
   const headers = {};
   if (lastPatientsEtag) headers['If-None-Match'] = lastPatientsEtag;
 
-  const res = await fetch(url, { headers });
+  const res = await apiFetch(url, { headers });
 
   // 304: ingenting er endret, og svaret har ingen kropp. Behold dataene vi
   // allerede har — å kalle res.json() her ville kastet.
@@ -261,7 +261,7 @@ async function renderBoard() {
   const headers = {};
   if (lastBoardEtag) headers['If-None-Match'] = lastBoardEtag;
 
-  const res = await fetch(url, { headers });
+  const res = await apiFetch(url, { headers });
 
   let pts;
   if (res.status === 304) {

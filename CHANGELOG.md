@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — «Aktiv nå» var feil for hver synlig fane: bjella og pasientsiden sendte ikke `X-Portal-Inaktiv` (A8)  `#core/drift`
+
+Tilstedeværelsen fra 16. sep. hviler på at **pollingen har headeren** og at en forespørsel
+uten den er en handling. Premisset holdt ikke:
+
+- **Bjella** (`notifications.js`, lastet av `base_portal` på alle sider) pollet hvert 30.
+  sekund med sin egen `fetch`.
+- **Pasientsidens auto-refresh** — fem rå `fetch` i `patients-app.js` og
+  `patients-table.js`.
+- **Server-status** pollet hvert 10. sekund, også med rå `fetch`.
+
+En glemt, synlig fane sto derfor som **«aktiv nå»** — nøyaktig fana funksjonen skulle finne,
+og «N aktive nå» på `/portal-admin/server-status/` ble for høyt. Testen viste det rett ut:
+en poll uten header flyttet «siste interaksjon» en time fram, til nå.
+
+**Rettingen:**
+- Pasientsiden bruker `apiFetch` (den laster `portal-utils.js` fra før).
+- Bjella sender `sekunderSidenInteraksjon()` der `portal-utils.js` finnes, og **`ukjent`**
+  der den ikke gjør det — admin-sidene laster den ikke. Server-status sender `ukjent`.
+- `les_inaktiv()` gir `None` for `ukjent`, og middlewaren **skriver ingenting**: en poll som
+  ikke vet, skal verken si «aktiv» eller «inaktiv». Ingen ny makt til klienten — et stort
+  tall kunne alt si «inaktiv». Raden står i tabellen i rot-`CLAUDE.md`.
+
+**Tester** (`core/tests_brukeraktivitet.py`): `ukjent` skriver ingenting; hele
+`notifications.js` kjøres i node med stubbet DOM og `fetch`, med og uten målingen;
+og **`IngenRaaFetchTests`** — ingen rå `fetch(` i `static/js/` utenom tre navngitte unntak
+med begrunnelse, kommentarer strippet først.
+**Mutasjonstesting:** 4 mutanter drept — bjella uten hode, alltid `ukjent`, `ukjent` lest
+som 0, og én rå `fetch` tilbake i pasientsiden. **Ett ekvivalent:** å fjerne
+`if sekunder is None: return` i middlewaren gir `TypeError`, som `__call__` svelger — samme
+utfall. Linja står for lesbarheten. `core` (819) og `patients` (371): grønt.
+
+**Kjent hull:** skriptet i `admin_status.html` er inline, og `IngenRaaFetchTests` leser bare
+`static/js/`. Det lukkes når skriptet flyttes ut (G1 i planen).
+
 ## 2026-09-26 — Pasientregistreringen: en ukjent førstehjelper forsvant stille (B8)  `#core/drift`
 
 POST og PUT på `/pasienter/api/patients/` slo opp førstehjelper og helsepersonell og svelget

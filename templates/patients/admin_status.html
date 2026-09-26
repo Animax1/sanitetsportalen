@@ -347,8 +347,11 @@ const ADMIN_URLS = {
 
   async function refresh() {
     try {
+      // `portal-utils.js` er ikke lastet her, så fana kan ikke måle om noen
+      // er til stede: `ukjent` lar serveren la tidspunktet stå (A8). Uten
+      // hodet teller en poll som en handling, og en glemt fane sto «aktiv nå».
       const res = await fetch(ADMIN_URLS.json, {
-        headers: {'Accept': 'application/json'},
+        headers: {'Accept': 'application/json', 'X-Portal-Inaktiv': 'ukjent'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
@@ -712,7 +715,7 @@ const ADMIN_URLS = {
     const status = document.getElementById('sessions-status');
     try {
       const res = await fetch(ADMIN_URLS.sessions, {
-        headers: {'Accept': 'application/json'},
+        headers: {'Accept': 'application/json', 'X-Portal-Inaktiv': 'ukjent'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();

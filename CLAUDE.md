@@ -993,13 +993,13 @@ tilstedeværelse; det er ikke et mål på det i det hele tatt.
 
 **Fana bærer svaret selv.** `apiFetch` sender `X-Portal-Inaktiv` med sekunder siden siste
 `pointerdown`/`keydown`/`wheel`/`touchstart`, og middlewaren regner det om til et tidspunkt
-i sesjonen (`SISTE_INTERAKSJON`). Ingen ny trafikk og ingen ny tabell — feltet henger på en
-forespørsel som alt går, og `_list_active_sessions` dekoder alt sesjonen.
+i sesjonen (`SISTE_INTERAKSJON`). Ingen ny trafikk og ingen ny tabell.
 
 | Valg | Hvorfor |
 |---|---|
 | **Sekunder, ikke et tidspunkt** | Da slipper serveren å stole på klientens klokke, som kan stå hvor som helst på en delt drifts-PC |
 | **Manglende header = 0** | Sidelastinger og skjemainnsendinger går ikke gjennom `apiFetch`, og *de* er handlinger. Pollingen har headeren, og det er den som skal kunne se gammel ut |
+| **`ukjent` skriver ingenting** | Bjella poller også uten målingen |
 | **`None` og ikke 0 for «vet ikke»** | En sesjon fra før middlewaren fantes må kunne skilles fra «aktiv nå» — ellers ser hver gammel sesjon ut som om noen sitter der |
 | **`scroll` teller ikke** | Treghetsrulling på mobil fyrer lenge etter at fingeren er borte |
 | **Aktiviteten er en kolonne, ikke et filter** | «Jeg må fortsatt se alle som er innlogget» (André). En fane som har stått i to timer er nettopp den man leter etter |

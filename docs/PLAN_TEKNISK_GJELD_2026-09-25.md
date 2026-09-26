@@ -140,7 +140,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
   `vaktpost_detalj_view` svarer «finnes allerede» når feilen er en ugyldig FK.
 - **Retting:** slå opp FK-ene før skrivingen, og la grenen tåle `None`.
 
-**A8. Tilstedeværelsen fra 16. sep. virker ikke for synlige faner.**
+**A8. Tilstedeværelsen fra 16. sep. virker ikke for synlige faner.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:**
   - `static/js/notifications.js:50` har sin egen `fetch` uten `X-Portal-Inaktiv`, og
     kjører på alle portalsider.

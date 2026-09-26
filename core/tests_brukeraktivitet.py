@@ -185,3 +185,105 @@ class KlientensMalingTests(SimpleTestCase):
             console.log(String(sekunderSidenInteraksjon(1_000_000)));
         """)
         self.assertEqual(ut.strip().splitlines()[0], '0')
+
+
+# ── Pollingen som gikk utenom `apiFetch` (26. sep. 2026, A8) ─────────────────
+#
+# Premisset over — «pollingen *har* headeren» — holdt ikke. Bjella
+# (`notifications.js`, alle portalsider, hvert 30. s), pasientsidens
+# auto-refresh og server-status brukte rå `fetch`, og manglende header er en
+# handling. En glemt, synlig fane sto derfor som «aktiv nå» hvert 30. sekund.
+#
+# **`ukjent` er det tredje svaret.** Bjella lastes også på admin-sidene, der
+# `portal-utils.js` — og dermed målingen — ikke finnes. Der vet fana ikke, og
+# sier det: serveren skriver ingenting, verken «aktiv» eller «inaktiv».
+
+
+class UkjentSkriverIngentingTests(TestCase):
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='ukjent_a8', password='x', must_change_password=False)
+        self.c = Client()
+        self.c.force_login(self.bruker)
+
+    def test_les_inaktiv_gir_none_for_ukjent(self):
+        self.assertIsNone(les_inaktiv(LesInaktivTests._Req('ukjent')))
+
+    @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+    def test_en_poll_som_ikke_vet_rorer_ikke_tidspunktet(self):
+        self.c.get('/min-profil/', HTTP_X_PORTAL_INAKTIV='3600')
+        foer = self.c.session.get(SISTE_INTERAKSJON)
+        self.c.get('/api/varsler/ulest-antall/', HTTP_X_PORTAL_INAKTIV='ukjent')
+        self.assertEqual(self.c.session.get(SISTE_INTERAKSJON), foer)
+
+
+class BjellaSenderHodetTests(SimpleTestCase):
+    """Hele `notifications.js` kjøres i node med stubbet DOM og `fetch`.
+
+    Fila er én IIFE uten navngitte toppnivåfunksjoner, så `build_harness`
+    kan ikke hente én funksjon ut av den — derfor hele fila, og pollingen
+    fanges der den meldes inn i `setInterval`.
+    """
+
+    STUBBER = '''
+    const kall = [];
+    globalThis.fetch = async (url, opts) => {
+      kall.push({ url, hode: (opts && opts.headers) || {} });
+      return { ok: true, json: async () => ({ unread: 0 }) };
+    };
+    const el = () => ({ style: {}, textContent: '', addEventListener() {},
+                        querySelectorAll() { return []; } });
+    globalThis.document = { getElementById: () => el(), visibilityState: 'visible',
+                            addEventListener() {}, querySelector() { return null; } };
+    globalThis.window = { location: { pathname: '/ko/' } };
+    globalThis.setInterval = (fn) => { globalThis.__poll = fn; };
+    '''
+
+    def setUp(self):
+        from patients.js_test_utils import JS_DIR, node_available
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.kilde = (JS_DIR / 'notifications.js').read_text(encoding='utf-8')
+
+    def _hodet(self, forspill=''):
+        from patients.js_test_utils import run_node
+        ut = run_node(self.kilde, '''
+            await globalThis.__poll();
+            console.log(JSON.stringify(kall.map((k) => k.hode['X-Portal-Inaktiv'] ?? null)));
+        ''', preamble=self.STUBBER + forspill)
+        return json.loads(ut.strip().splitlines()[0])
+
+    def test_med_maalingen_sender_den_sekundene(self):
+        self.assertEqual(self._hodet('globalThis.sekunderSidenInteraksjon = () => 42;'), ['42'])
+
+    def test_uten_maalingen_sier_den_ukjent(self):
+        self.assertEqual(self._hodet(), ['ukjent'])
+
+
+class IngenRaaFetchTests(SimpleTestCase):
+    """**En forespørsel utenom `apiFetch` teller som et menneske.** Pasientsiden
+    hadde fem slike, og alle ble polling. Unntakene er de som ikke kan bruke
+    den, og hver har sin grunn."""
+
+    UNNTAK = {
+        'portal-utils.js': 'eier `apiFetch`',
+        'notifications.js': 'lastes også der `portal-utils.js` ikke finnes; prøvd over',
+        'vaktliste-sw.js': 'service workeren videresender sidens egne forespørsler, med hodene',
+    }
+
+    def test_ingen_raa_fetch(self):
+        import re
+
+        from patients.js_test_utils import JS_DIR
+        funn = []
+        for sti in sorted(JS_DIR.glob('*.js')):
+            if sti.name in self.UNNTAK:
+                continue
+            kilde = re.sub(r'/\*.*?\*/', '', sti.read_text(encoding='utf-8'), flags=re.S)
+            for nr, linje in enumerate(kilde.splitlines(), 1):
+                if linje.lstrip().startswith('//'):
+                    continue
+                if re.search(r'(?<![\w.])fetch\(', linje):
+                    funn.append(f'{sti.name}:{nr}: {linje.strip()}')
+        self.assertEqual(funn, [], 'Bruk apiFetch() — den sender X-Portal-Inaktiv')

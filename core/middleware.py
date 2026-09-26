@@ -600,8 +600,11 @@ class BrukerAktivitetMiddleware:
         if not getattr(request, 'user', None) or not request.user.is_authenticated:
             return
 
+        sekunder = les_inaktiv(request)
+        if sekunder is None:
+            return
         naa = timezone.now()
-        tidspunkt = naa - timedelta(seconds=les_inaktiv(request))
+        tidspunkt = naa - timedelta(seconds=sekunder)
         forrige = request.session.get(SISTE_INTERAKSJON)
         if forrige:
             try:
@@ -613,18 +616,29 @@ class BrukerAktivitetMiddleware:
         request.session[SISTE_INTERAKSJON] = tidspunkt.isoformat()
 
 
-def les_inaktiv(request) -> int:
+#: Verdien en fane uten målingen sender. Se `les_inaktiv()`.
+UKJENT = 'ukjent'
+
+
+def les_inaktiv(request) -> int | None:
     """Sekunder siden siste interaksjon, slik klienten oppgir dem.
 
-    Egen funksjon fordi den bærer tre beslutninger som hver for seg er en
+    Egen funksjon fordi den bærer fire beslutninger som hver for seg er en
     mulig feil: manglende header betyr **null** (en forespørsel vi ikke kan
     klassifisere er en handling), ugyldig tekst betyr null (en klient som
     sender søppel skal ikke kunne skjule seg), og et negativt eller absurd
     tall klippes (ellers kan en fane skrive seg selv inn i framtida).
+
+    **`ukjent` gir `None`: skriv ingenting** (26. sep. 2026, A8). Bjella
+    poller på alle sider, også der `portal-utils.js` — og dermed målingen —
+    ikke er lastet. En poll som ikke vet, skal verken si «aktiv» eller
+    «inaktiv». Det gir ingen ny makt: et stort tall kunne alt si «inaktiv».
     """
     raa = request.META.get('HTTP_X_PORTAL_INAKTIV')
     if raa is None:
         return 0
+    if raa == UKJENT:
+        return None
     try:
         return max(0, min(int(raa), MAKS_INAKTIV_S))
     except (TypeError, ValueError):

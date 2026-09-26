@@ -33,7 +33,7 @@ document.addEventListener('input', (e) => {
 // Leser kun. Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1),
 // og redigeringsfeltet som lå i innstillingsfanen fulgte med.
 async function loadSettings() {
-  const s = await (await fetch('/pasienter/api/settings/')).json();
+  const s = await (await apiFetch('/pasienter/api/settings/')).json();
   if (s.event_name) {
     const disp = document.getElementById('event-name-display');
     if (disp) disp.textContent = s.event_name;
@@ -49,7 +49,7 @@ async function loadForstehjelpere() {
   if (lastForstehjelperEtag) {
     headers['If-None-Match'] = lastForstehjelperEtag;
   }
-  const res = await fetch('/pasienter/api/forstehjelpere/', {
+  const res = await apiFetch('/pasienter/api/forstehjelpere/', {
     cache: 'no-store',
     headers,
   });
@@ -76,7 +76,7 @@ async function loadHelsepersonell() {
   if (lastHelsepersonellEtag) {
     headers['If-None-Match'] = lastHelsepersonellEtag;
   }
-  const res = await fetch('/pasienter/api/helsepersonell/', {
+  const res = await apiFetch('/pasienter/api/helsepersonell/', {
     cache: 'no-store',
     headers,
   });
