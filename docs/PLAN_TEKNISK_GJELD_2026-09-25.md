@@ -368,7 +368,7 @@ Samme pulje:
 - **Taket:** rettingen må ikke gjøre fila lengre. Ta den sammen med TODO-punktet om at rota
   har ~170 tegn igjen.
 
-**F3. TODO som ikke stemmer:**
+**F3. TODO som ikke stemmer:** *Levert 26. sep. 2026, se CHANGELOG.*
 - Punktet om å flytte `hent_aktiv_vakt` ut av pasientmodulen er **gjort**. Funksjonen bor i
   `core/vakt.py`. Slett punktet, og rydd restene:
   - re-eksporten i `patients/services.py`

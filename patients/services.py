@@ -28,7 +28,7 @@ from core.validators import (
 )
 from .models import Patient, Forstehjelper, VaktArkiv, ArkivertPasient
 from core.models import AppSetting
-from core.vakt import hent_aktiv_vakt, vakt_for_year  # noqa: F401 — brukes under
+from core.vakt import hent_aktiv_vakt
 
 
 # ── Hjelpefunksjoner ─────────────────────────────────────────────────────────

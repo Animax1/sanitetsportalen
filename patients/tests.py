@@ -20,8 +20,8 @@ from core.models import AppSetting
 from patients.services import (
     apply_list_filter, stamp_pabegynt_if_needed,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
-    hent_aktiv_vakt, vakt_for_year,
 )
+from core.vakt import hent_aktiv_vakt, vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 

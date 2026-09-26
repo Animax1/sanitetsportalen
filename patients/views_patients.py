@@ -24,11 +24,11 @@ from .choices import validate_patient_choice_fields
 from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
 from core.validators import now_local_str, validate_patient_time_fields
+from core.vakt import hent_aktiv_vakt, vakt_for_year
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
-    hent_aktiv_vakt, vakt_for_year,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
     validate_plassering_unique,
     SHARED_PLASSERINGER,

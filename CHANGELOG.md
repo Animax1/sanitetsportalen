@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — TODO som ikke stemte, og resten av `hent_aktiv_vakt`-flyttingen (F3)  `#docs #core`
+
+**Hvorfor:** tre punkter i `TODO.md` sa noe annet enn koden.
+
+- **«Flytt `hent_aktiv_vakt` ut av pasientmodulen» var gjort** — funksjonen bor i
+  `core/vakt.py`. Men restene sto: re-eksporten i `patients/services.py`, unntaket i
+  `TILLATT` (`StatistikkappenNavngirIngenKilde`) og en kommentar på fem linjer i
+  `statistikk/views.py` om at flyttingen «hører til den ryddejobben». Punktet er slettet og
+  restene ryddet. **Re-eksporten var i bruk:** `views_patients.py`, `tests.py`,
+  `tests_arkiv.py` og `tests_arkiv_kollaps.py` importerte `vakt_for_year` fra
+  `patients.services` i en *flerlinjes* `import (…)` — et søk på én linje så ingen av dem,
+  og det var suiten som sa fra. De importerer nå fra `core.vakt`. `TILLATT` er tom.
+- **To punkter om `style-src 'unsafe-inline'`** med hvert sitt tall (271 og «~50»). Slått
+  sammen, med tallet talt på nytt: **313** — 209 `style="` i maler, 104 `style=` i JS.
+- **Nytt punkt: `core.vakt.opprett_vakt()`.** Tre steder lager `Vakt`-rader, og vaktlistas
+  `exists()` før `create()` er et kappløp: to samtidige innsendinger av samme navn gir 500
+  (`Vakt.navn` er unik, `IntegrityError` fanges ikke), og `kopier_oppsett` kjører utenfor
+  transaksjonen. Kontrollert mot koden før punktet ble skrevet.
+- Punktet om rotas tak sa «~170 tegn igjen av 65 500» og hadde en avkappet setning. Nå: ~35
+  igjen av 66 000.
+
+**Mutasjon:** 1 mutant — `statistikk/views.py` importerer `hent_aktiv_vakt` fra
+`patients.services` igjen — rød nå som `TILLATT` er tom.
+
 ## 2026-09-26 — Rot-`CLAUDE.md`: audit-avsnittet sa det motsatte av koden (F2)  `#docs`
 
 **Hvorfor:** avsnittet «Audit-logging» sa at feltendringer logges automatisk av

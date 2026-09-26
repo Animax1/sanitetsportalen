@@ -97,11 +97,9 @@ class StatistikkappenNavngirIngenKilde(SimpleTestCase):
     falske treff.
     """
 
-    #: `hent_aktiv_vakt` er portalens scope, ikke en kildes tall. `Vakt` bor i
-    #: `core`, men funksjonen ble liggende i pasientmodulen fordi
-    #: `AppSetting`-pekeren gjør det. Oppdragsmodulen importerer den fra samme
-    #: sted. Å flytte den hører til den ryddejobben, ikke til registeret.
-    TILLATT = {('patients.services', 'hent_aktiv_vakt')}
+    #: Tom siden `hent_aktiv_vakt` flyttet til `core.vakt`. En rad her er et
+    #: bevisst unntak med begrunnelse, ikke en vei rundt registeret.
+    TILLATT: set = set()
 
     def test_ingen_import_av_kildemodulenes_tall(self):
         kilde = Path(settings.BASE_DIR, 'statistikk', 'views.py')

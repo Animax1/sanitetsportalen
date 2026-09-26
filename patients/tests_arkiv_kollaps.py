@@ -23,8 +23,8 @@ from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_full_stats,
     compute_arkiv_stats,
-    vakt_for_year,
 )
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 from patients.test_helpers import sett_aktiv_vakt
 

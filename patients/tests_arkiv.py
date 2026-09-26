@@ -28,8 +28,9 @@ from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_stats,
     basic_stats,
-    _compute_stats_from_dicts, vakt_for_year,
+    _compute_stats_from_dicts,
 )
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 from patients.test_helpers import sett_aktiv_vakt
 

@@ -28,11 +28,6 @@ from core.ratelimit import rate_limit
 from core.stats import all_handlers, get_handler
 from core.stats_cache import cached_stats_response
 
-# Den ene importen fra en modul som står igjen — og den handler ikke om tall.
-# `hent_aktiv_vakt` er portalens scope, delt av alle moduler: `Vakt` bor i
-# `core`, men funksjonen ble liggende i pasientmodulen fordi `AppSetting`
-# (pekeren `aktiv_vakt_id`) gjør det. Oppdragsmodulen importerer den fra samme
-# sted. Å flytte den hører til den ryddejobben, ikke til statistikkregisteret.
 from core.vakt import hent_aktiv_vakt
 
 

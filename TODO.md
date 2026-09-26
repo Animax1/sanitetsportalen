@@ -176,9 +176,8 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
 - [ ] **Pulje E — duplisering som alt har glidd.** E1–E4 levert 26. sep. Igjen:
       småhjelperne (E5) — `core/jsonkropp.py` finnes nå, og de fem `_json_body`-kopiene
       samles dit; vasking og helseprober (E6).
-- [ ] **Pulje F — dokumentasjon som motsier koden.** F1 og F2 levert 26. sep. Igjen:
-      TODO-punkter som er gjort eller dobbelt (F3); ~40 utdaterte kommentarer, tas i
-      forbifarten (F4).
+- [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
+      utdaterte kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);
       store filer (G2); pasientsidens eget skall (G3); N+1 i pollede endepunkter (G4);
       `requirements.txt` kompilert for 3.11, SW-cachen, polling i skjulte faner (G5).
@@ -385,13 +384,16 @@ og 15.6. Det tredje er delvis løst.*
       avgjørende argumentet er et annet: **du kan ikke tegne et godt grensesnitt fra ett
       eksempel.** Ta den den dagen en modul nummer to trenger en kontotype — da er det to
       tilfeller å abstrahere fra, og jobben gjøres én gang riktig.
-- [ ] **`style-src 'unsafe-inline'`.** 271 inline stiler (176 i maler, 95 i JS-bygget
-      markup). **Nonce hjelper ikke** — et CSP-nonce dekker `<style>`-elementer, men ikke
+- [ ] **`style-src 'unsafe-inline'`.** 313 inline stiler talt 26. sep. 2026 (209 `style="`
+      i maler, 104 `style=` i JS-bygget markup; `el.style.x = …` er CSSOM og rammes ikke av
+      CSP). Tallet sto som 271 her og «~50» i et annet punkt — de to er slått sammen.
+      **Nonce hjelper ikke** — et CSP-nonce dekker `<style>`-elementer, men ikke
       `style=`-attributter; det er derfor CSP 3 måtte innføre `style-src-attr`.
       Restrisikoen er lavere enn den ser ut: CSS-eksfiltrasjon går gjennom
       `background-image`, fonter eller `@import`, og **alle tre er allerede låst til
       `'self'`** av `img-src`, `font-src` og `style-src`. Det som står igjen er
       defacement. Ryddes gradvis: fjern inline-stilene i en mal når den likevel skrives om.
+      Står som kjent avvik i personverndokumentasjonen (§ sikkerhetstiltak).
 
 *Samlet her med vilje: begge lå opprinnelig som uavkryssede barn under avkryssede
 foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*
@@ -460,11 +462,9 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
       som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
 
-- [ ] **Rota har ~170 tegn igjen av taket på 65 500.** Den traff taket 17. sep. under
-      konsollayouten og ble komprimert på stedet — det holdt denne gangen, men neste
-      avsnitt gjør det ikke. `CLAUDE.md` er 64 843 tegn etter
-      Neste modul som trenger et avsnitt i rota sprenger den, og da står man med valget
-      midt i en annen oppgave. Det som skal
+- [ ] **Rota har ~35 tegn igjen av taket på 66 000** (65 966 etter F2, 26. sep. 2026; taket
+      ble hevet fra 65 500 samme dag for norsk sortering). Neste avsnitt i rota sprenger den,
+      og da står man med valget midt i en annen oppgave. Det som skal
       flyttes er avsnitt som beskriver **én** modul — regelen fila selv setter — og den
       eneste kandidaten som er igjen er backup-tabellen med ni rader, der hver rad
       forklarer sin egen modul. Vurderes før neste pulje, ikke under den.
@@ -568,11 +568,6 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
       **Ta MFA-rate-limit med i testplanen** — den delte bøtta (N4) var nettopp den
       feiltypen en lasttest fanger, og som ellers først merkes ved en reell vaktstart.
       *Akseptanse:* rapport som viser at konfigurasjonen tåler 25 samtidige uten degradering.
-
-- [ ] **`style-src`-delen av CSP-strammingen.** Utenfor F5s akseptansekriterium, men
-      `unsafe-inline` står fortsatt for stiler. ~50 inline `style=` i markup pluss
-      JS-genererte stiler i statistikk-tabellene må flyttes til CSS-klasser først.
-      Ikke påbegynt. Nevnt som kjent avvik i personverndokumentasjonen (§ sikkerhetstiltak).
 
 - [ ] **Statistikk-utvidelse (tidligere F6).** ~25–35 t, faseinndelt. Flyttet ut som eget
       beslutningsnotat: [`docs/BESLUTNING_STATISTIKK.md`](./docs/BESLUTNING_STATISTIKK.md).
@@ -1010,12 +1005,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
-- [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
-      `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
-      `patients.services`. Den ble liggende fordi `AppSetting` (pekeren `aktiv_vakt_id`)
-      gjør det, så flyttingen henger sammen med hvor `AppSetting` hører hjemme. Ikke
-      hastverk: én import fra én modul, og `StatistikkappenNavngirIngenKilde` har den
-      oppført som det ene tillatte unntaket, så den kan ikke gli i glemmeboka.
+- [ ] **`core.vakt.opprett_vakt()` som eneste fabrikk for `Vakt`-rader.** Tre steder lager
+      dem i dag: `core/vakt.py`, `patients/views_patients.py` og
+      `vaktliste.services.opprett_planlagt_vakt`. Hvert har sin egen navnesjekk, og
+      vaktlistas er `exists()` før `create()` — et kappløp, ikke en skranke. **To samtidige
+      innsendinger av samme navn gir 500**: `Vakt.navn` er unik, `IntegrityError` fanges
+      ikke, og `kopier_oppsett` kjører *etter* transaksjonen, så en feil der etterlater en
+      tom vaktliste. Fabrikken fanger `IntegrityError` og gir samme `ValueError` som
+      navnesjekken; kopieringen går inn i samme `atomic()`.
 
 - [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
       se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
