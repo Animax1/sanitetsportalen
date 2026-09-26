@@ -178,7 +178,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
   - Diff hele `changed_data`.
   - Krev `confirm` og skriv audit ved sletting av backup.
 
-**B3. Hull i auditloggen i vaktlista.**
+**B3. Hull i auditloggen i vaktlista.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `vaktliste/signals.py`.
 - **Feilen:** disse logges ikke:
   - opprettelse og sletting av en vaktliste

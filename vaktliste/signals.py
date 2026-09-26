@@ -13,9 +13,14 @@ Regelen er bygget inn fra første lagring, ikke ettermontert — samme
 rekkefølgekrav som fase 2 i oppdragsmodulen, og av samme grunn: rader som er
 skrevet feil kan ikke fjernes i ettertid uten å røre auditsporet.
 
-Registrene (`Korps`, `Kompetanse`, `Ressursrolle`) auditlogges ikke på feltnivå:
-de er organisasjonsoppsett uten personopplysninger, og endres fra
-Django-admin, som har sin egen historikk.
+**Registrene og grensene logges også** (26. sep. 2026, B3). Her sto det at
+`Korps`, `Kompetanse` og `Ressursrolle` ikke ble logget fordi de «endres fra
+Django-admin, som har sin egen historikk». Det har ikke vært sant siden
+registrene flyttet inn på `/vaktliste/` (30. aug. 2026), og Django-admin er
+ikke rutet i prod. Å slette en `Ressursgruppe` tar rollene med seg, og
+`Belastningsgrenser` endrer varslene for alle lister — det er oppsett, men
+inngripende oppsett. `tests_audit_registre.HverModellHarSporTests` krever nå
+mottakere for hver modell i appen, eller et begrunnet unntak.
 """
 from __future__ import annotations
 
@@ -30,7 +35,8 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import (Mannskap, Overnatting, Overnattingsrom, Pause, Ressurs, Utsending,
+from .models import (Belastningsgrenser, Kompetanse, Korps, Mannskap, Overnatting,
+                     Overnattingsrom, Pause, Ressurs, Ressursgruppe, Ressursrolle, Utsending,
                      Vaktliste, Vaktpost)
 
 TABELLNAVN = 'vaktliste_mannskap'
@@ -172,37 +178,39 @@ def mannskap_post_delete(sender, instance, **kwargs):
 # navnet på vakta (det bor på `core.Vakt`).
 
 VAKTLISTE_TABELLNAVN = 'vaktliste_vaktliste'
-# `brannrutine` (25. sep. 2026) er stedets rutine, ikke noe om en person, og
-# logges med verdi: «hvem flyttet samleplassen» er et spørsmål man stiller.
-VAKTLISTE_FELTER = ('status', 'satt_i_drift_at', 'satt_i_drift_av', 'planlagt_slutt', 'arkivert_at',
-                    'brannrutine')
+# **Alle kolonnene, ikke en liste** (26. sep. 2026, B3). Lista sto skrevet for
+# hånd og manglet `timetak` — vaktas budsjett. `brannrutine` (25. sep. 2026) er
+# stedets rutine og logges med verdi: «hvem flyttet samleplassen» er et
+# spørsmål man stiller. `notat` er fritekst og logges uten verdi, som
+# `Mannskap.notat`.
+VAKTLISTE_FELT_UTEN_VERDILOGGING = frozenset({'notat'})
+
+
+def _beskriv_vaktliste(vl) -> str:
+    return f'Vaktliste for {vl.vakt.navn}' if vl.vakt_id else f'Vaktliste {vl.pk}'
 
 
 @receiver(pre_save, sender=Vaktliste)
 @ikke_under_loaddata
 def vaktliste_pre_save(sender, instance, **kwargs):
-    if not instance.pk:
-        return
+    _logg_endringer(Vaktliste, instance, VAKTLISTE_TABELLNAVN, VAKTLISTE_FELT_UTEN_VERDILOGGING)
+
+
+@receiver(post_save, sender=Vaktliste)
+@ikke_under_loaddata
+def vaktliste_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, VAKTLISTE_TABELLNAVN, _beskriv_vaktliste(instance))
+
+
+@receiver(post_delete, sender=Vaktliste)
+def vaktliste_post_delete(sender, instance, **kwargs):
+    # `vakt` kan være borte når CASCADE går fra vakta — da står bare pk igjen.
     try:
-        gammel = Vaktliste.objects.get(pk=instance.pk)
-    except Vaktliste.DoesNotExist:
-        return
-    bruker, ip = _bruker_og_ip()
-    for felt in VAKTLISTE_FELTER:
-        gammel_verdi = _verdi(gammel, felt)
-        ny_verdi = _verdi(instance, felt)
-        if gammel_verdi == ny_verdi:
-            continue
-        AuditLog.objects.create(
-            table_name=VAKTLISTE_TABELLNAVN,
-            record_id=instance.pk,
-            action='UPDATE',
-            field_name=felt,
-            old_value=gammel_verdi,
-            new_value=ny_verdi,
-            user=bruker,
-            ip=ip,
-        )
+        beskrivelse = _beskriv_vaktliste(instance)
+    except Exception:   # noqa: BLE001 — sletteraden skal skrives uansett
+        beskrivelse = f'Vaktliste {instance.pk}'
+    _logg_slettet(instance, VAKTLISTE_TABELLNAVN, beskrivelse)
 
 
 # ── Skift og ressurser ────────────────────────────────────────────────────────
@@ -427,3 +435,51 @@ def utsending_post_save(sender, instance, created, **kwargs):
             f'Vaktlista «{instance.vaktliste.vakt.navn}» {status} — '
             f'{instance.get_utloest_display().lower()}, {instance.antall_rader} skift, '
             f'til: {instance.mottakere or "(ingen)"}')
+
+
+# ── Registrene og grensene (26. sep. 2026, B3) ───────────────────────────────
+#
+# Organisasjonsoppsett uten personopplysninger, så verdiene logges. **Stablet og
+# eksplisitt**, som tavla i `ko/signals.py`, ikke en løkke med `.connect()`:
+# `SignalerFyrerIkkeUnderLoaddataTests` leser `@receiver(...)` med en regex, og
+# en løkke ville gått rett forbi den. Tabellnavnet slås opp på `sender`, så en
+# modell som legges til står to steder — her og i `REGISTRE` — og
+# `HverModellHarSporTests` sier fra om den ene mangler.
+
+REGISTRE = {
+    Korps: 'vaktliste_korps',
+    Kompetanse: 'vaktliste_kompetanse',
+    Ressursgruppe: 'vaktliste_ressursgruppe',
+    Ressursrolle: 'vaktliste_ressursrolle',
+    Belastningsgrenser: 'vaktliste_belastningsgrenser',
+}
+
+
+@receiver(pre_save, sender=Korps)
+@receiver(pre_save, sender=Kompetanse)
+@receiver(pre_save, sender=Ressursgruppe)
+@receiver(pre_save, sender=Ressursrolle)
+@receiver(pre_save, sender=Belastningsgrenser)
+@ikke_under_loaddata
+def register_pre_save(sender, instance, **kwargs):
+    _logg_endringer(sender, instance, REGISTRE[sender])
+
+
+@receiver(post_save, sender=Korps)
+@receiver(post_save, sender=Kompetanse)
+@receiver(post_save, sender=Ressursgruppe)
+@receiver(post_save, sender=Ressursrolle)
+@receiver(post_save, sender=Belastningsgrenser)
+@ikke_under_loaddata
+def register_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, REGISTRE[sender], str(instance))
+
+
+@receiver(post_delete, sender=Korps)
+@receiver(post_delete, sender=Kompetanse)
+@receiver(post_delete, sender=Ressursgruppe)
+@receiver(post_delete, sender=Ressursrolle)
+@receiver(post_delete, sender=Belastningsgrenser)
+def register_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, REGISTRE[sender], str(instance))

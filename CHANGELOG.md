@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Vaktlista: nye og slettede lister, timetaket, registrene og grensene satte ingen spor (B3)  `#core/audit` `#vaktliste/roller`
+
+Mannskapet, skiftene, ressursene, pausene og overnattingen ble auditlogget. Dette ble det
+ikke:
+
+| Hva | Hvorfor det betyr noe |
+|---|---|
+| **En vaktliste opprettet eller slettet** — bare `pre_save` var koblet | Å slette en liste river hele oppsettet |
+| **`timetak`** — sto ikke i den håndskrevne feltlista | Vaktas budsjett |
+| **`Korps`, `Kompetanse`, `Ressursgruppe`, `Ressursrolle`** | Å slette en gruppe tar rollene med seg (CASCADE) |
+| **`Belastningsgrenser`** | Flytter varslene for *alle* lister |
+
+**Begrunnelsen for hullet var foreldet.** Modulens docstring sa at registrene «endres fra
+Django-admin, som har sin egen historikk». Registrene flyttet inn på `/vaktliste/`
+30. aug. 2026, og Django-admin er ikke rutet i prod.
+
+**Rettingen:**
+- `Vaktliste` logger **alle kolonnene**, ikke en liste (`notat` uten verdi, som
+  `Mannskap.notat`), pluss opprettelse og sletting. Ny kolonne logges som standard.
+- De fem registrene får opprett/endre/slett gjennom hjelperne som fantes, med verdi — de er
+  organisasjonsoppsett uten personopplysninger.
+- **Stablede `@receiver`, ikke en løkke med `.connect()`**: `SignalerFyrerIkkeUnderLoaddataTests`
+  leser dekoratørene med regex, og min første versjon med en løkke ville gått rett forbi
+  den — samme grunn som tavla i `ko/signals.py` står stablet.
+
+**`HverModellHarSporTests` går gjennom *alle* modellene i appen** og krever mottakere for
+opprett, endre og slett — eller en plass i `UNNTATT` med grunn (`Utsending`, som logger seg
+selv i `send_fil`). Neste modell kan ikke komme uten at noen tar stilling. Samme form som
+`BrukerpekereStrippesEllerBegrunnesTests`.
+
+**Tester** (`vaktliste/tests_audit_registre.py`): strukturtesten, og fem gjennom
+endepunktene — korps opprettet/endret/slettet, grensene med verdi, timetaket, en vaktliste
+opprettet og slettet, og notatet uten verdi. **Mutasjonstesting (tungt, audit):**
+7 mutanter — vaktlistas opprett- og slettemottaker fjernet, notatet med verdi, korps uten
+endringsmottaker, grensene uten sletting og uten endring, og opprett-vilkåret snudd. Alle
+drept. `vaktliste` (1 316): grønt.
+
 ## 2026-09-26 — Sikkerhetssjekken dekket 75 av 186 ruter, og meldte grønt om tre som ikke fantes (B5)  `#core/sikkerhet`
 
 `scripts/sikkerhetssjekk.py` prøver en kjørende portal utenfra: at ingen side eller API
