@@ -401,8 +401,6 @@ class ProblemstillingUdefinert(UlovligOvergang):
     problemstillingen først»."""
 
 
-
-@transaction.atomic
 def _aktivt_oppdrag_felter(rad) -> dict:
     """Feltene enhetskortet viser om det aktive oppdraget.
 
@@ -480,6 +478,7 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
     }
 
 
+@transaction.atomic
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
                 sted: str = '', enhet=None, manuell: bool = False,
@@ -497,12 +496,24 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     funksjonen, og et oppdrag lukket av at enheten startet neste er like
     ferdig som ett noen trykket `Ledig` på. Lå regelen i viewet, ville tavla
     beholdt nettopp de oppdragene ingen trykket på.
+
+    **Én transaksjon, og koblingsraden låst** (26. sep. 2026). Tre rader
+    skrives — meldingen, koblingsraden og oppdraget — og stemplingsviewet
+    kaller funksjonen direkte, uten egen transaksjon. Dekoratøren sto fra
+    19. sep. over `_aktivt_oppdrag_felter`, en lesefunksjon: enhetskortet ble
+    limt inn mellom den og funksjonen den hørte til. Låsen gjør at bilen og
+    sentralbordet som fører samme overgang samtidig ikke begge består
+    sjekken under (PostgreSQL; SQLite låser hele basen uansett).
     """
     # **Per enhet fra 11. sep. 2026.** Uten `enhet` er det den primære —
     # slik all eldre kode og alle eldre tester mener det.
     rad = koblingsrad(oppdrag, enhet)
     if rad is None:
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    # Statusen leses på nytt *under låsen*: sjekken under skal gjelde den
+    # verdien, ikke den som ble lest før en annen stempling rakk å skrive.
+    rad.status = (Oppdragsenhet.objects.select_for_update()
+                  .filter(pk=rad.pk).values_list('status', flat=True).get())
     # `hopp` er sentralbordets føring (`foer_status`): KO kan hoppe over ledd
     # framover, men aldri bakover eller over i den andre grenen. Bilen og
     # alt annet går gjennom tabellen.
@@ -1231,7 +1242,6 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
     )
 
 
-@transaction.atomic
 @transaction.atomic
 def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte | None:
     """Flytt oppdraget til en annen enhet, og skriv det i oppdragets logg.

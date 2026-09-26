@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — `sett_status` sto uten transaksjon i en uke: dekoratøren hadde havnet på en lesefunksjon  `#oppdrag #data`
+
+**Hvorfor:** funnet mens G4 ble lest, ikke i planen. `sett_status` skriver tre rader —
+statusmeldingen, koblingsraden og oppdraget — og **bilens stempling kaller den direkte**,
+uten egen transaksjon; `ATOMIC_REQUESTS` er av. Feilet noe etter at meldingen var skrevet
+(databasen, en utledning), ble meldingen stående mens koblingsraden og oppdraget ikke visste
+om den: tidslinjen sa «Fremme», tavla sa «Rykker ut».
+
+**Årsaken:** `@transaction.atomic` sto over `_aktivt_oppdrag_felter` — en ren lesefunksjon
+fra enhetskortet — og `sett_status` rett under sto uten. Enhetskort-blokken ble limt inn
+**mellom dekoratøren og funksjonen den hørte til** 19. sep. (`bd76f66`). Ingenting smalt,
+fordi det bare betyr noe når noe feiler halvveis. `flytt_til_enhet` hadde dessuten
+dekoratøren to ganger (ufarlig, men samme slags spor).
+
+**Rettet:** dekoratøren er tilbake på `sett_status`, og koblingsraden **låses**
+(`select_for_update`) og statusen leses på nytt under låsen før overgangen sjekkes — så bilen
+og sentralbordet som fører samme overgang samtidig ikke begge består sjekken (PostgreSQL;
+SQLite låser hele basen). Ingen andre `@transaction.atomic` i `services`/`views`/`core` står
+på en funksjon uten skriving — sjekket med et skript over alle.
+
+**Test:** `oppdrag/tests_sett_status_atomisk.py` feiler midt i en ekte stempling og krever at
+meldingen rulles tilbake.
+
+**Mutasjon:** 2 mutanter. Dekoratøren fjernet — rød. Raden hentet som nytt objekt i stedet
+for statusen lest inn i det gamle — **overlevde, og er ekvivalent**: `Oppdrag.primaer` er en
+property som spør hver gang, så ingen kaller holder et objekt som kunne blitt foreldet. En
+test jeg skrev for det motsatte ble fjernet — den prøvde ingenting.
+
 ## 2026-09-26 — `requirements.txt` under 3.13, skallcachen som vokste, polling i skjulte faner, død CSS (G5)  `#drift #frontend #vaktliste #ko`
 
 **`requirements.txt`** var kompilert med Python 3.11 mens `runtime.txt` sier 3.13. Kompilert
