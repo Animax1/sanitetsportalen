@@ -412,6 +412,7 @@ class SlettedeSymbolerTests(SimpleTestCase):
     #: (symbol, hvor det ble av)
     SLETTET = [
         ('BACKUP_APPS', 'aldri erstattet — backup styres av registeret'),
+        ('_REGISTERED_MODULES', 'fantes aldri — registeret bygges av _build_registry()'),
         ('RETENTION_HOURS', 'erstattet av core.Backupplan.behold'),
         ('BackupConfig', 'erstattet av core.Backupplan'),
         ('ModuleBackupConfig', 'erstattet av core.Backupplan'),

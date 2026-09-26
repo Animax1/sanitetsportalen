@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Rot-`CLAUDE.md`: audit-avsnittet sa det motsatte av koden (F2)  `#docs`
+
+**Hvorfor:** avsnittet «Audit-logging» sa at feltendringer logges automatisk av
+`audit/signals.py`, og «legg aldri til manuell audit-kode». Begge deler var feil:
+`audit/signals.py` fyller bare `app_label`, loggingen skjer i hver moduls egen `signals.py`,
+og en handling som **ikke** er en feltendring (frysing, rollebytte, sletting av en vaktliste)
+må logges der den skjer. Den som fulgte regelen ordrett, laget nettopp hullene B2 og B3 —
+«aldri manuell audit» er en regel som produserer manglende audit.
+
+**Rettet, uten å gjøre rota lengre** (65 975 → 65 966 tegn av 66 000):
+- Audit-avsnittet sier nå hvem som logger hva, og peker på `core.arkiv.logg_arkivhendelse`.
+- «Importer den i `_REGISTERED_MODULES`» — navnet har aldri eksistert; registeret bygges av
+  `_build_registry()`. Rettet i rota og i docstringen i `core/modules.py`, og navnet står i
+  `SLETTET` i `core/tests_dokumentråte.py`, så det ikke kommer tilbake.
+- Steg 3 sa «legg til permission-flagg på `CustomUser` via migrasjon» — flaggene er borte
+  siden deploy 3. Nå: ingen migrasjon, tilgang er `ModulTilgang`-rader.
+- `skriv_leder` ble sagt å deklareres av vaktlista og oppdrag; KO og backlog gjør det også.
+
+**Mutasjon:** 1 mutant — `_REGISTERED_MODULES` tilbake i rota — rød.
+
 ## 2026-09-26 — Én verdilistefabrikk for oppdrag og KO, i `core` (E2)  `#core #oppdrag #ko`
 
 **Hvorfor:** lokasjonene, enhetstypene og problemstillingene i oppdrag og ansvarsområdene,

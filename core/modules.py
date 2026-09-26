@@ -11,7 +11,7 @@ Designvalg (Fase 3a, Beslutning 1B):
 
 Hvordan legge til en ny modul:
 1. Lag ``<app>/module.py`` med en klasse som arver fra ``Module``.
-2. Importer klassen i ``_REGISTERED_MODULES`` nederst i denne fila.
+2. Importer klassen i ``_build_registry()`` i denne fila.
 3. Ingen migrasjon trengs. Tilgang styres av ``accounts.ModulTilgang``, som
    er rader og ikke kolonner — det var nettopp derfor de fem
    ``kan_redigere_*``-flaggene ble erstattet.

@@ -356,7 +356,7 @@ Samme pulje:
   ennå». Enten fjernes kommandoen, eller så skrives den om som et verktøy, og da skal den
   døde `skipTest`-grenen ut.
 
-**F2. Rot-`CLAUDE.md`.**
+**F2. Rot-`CLAUDE.md`.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Audit-avsnittet er galt.** Det sier at feltendringer logges automatisk av
   `audit/signals.py`, og at man aldri skal skrive manuell audit. I virkeligheten fyller
   `audit/signals.py` bare ut `app_label`, og loggingen skjer i hver modul. Den som følger

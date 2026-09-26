@@ -193,8 +193,8 @@ Portalens rammeverk. Hver app deklarerer sin modul i `<app>/module.py`, og regis
 
 Å legge til en ny modul:
 1. Lag `<app>/module.py` med klasse som arver fra `Module`
-2. Importer den i `_REGISTERED_MODULES` i `core/modules.py`
-3. Legg til permission-flagg på `CustomUser` (via migrasjon) om nødvendig
+2. Importer den i `_build_registry()` i `core/modules.py`
+3. Ingen migrasjon — tilgang er `ModulTilgang`-rader
 
 En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
 `ModulTilgang`-rad på modulen. Global admin ser alt.
@@ -239,9 +239,8 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | `skriv_full` | Kan redigere felter |
 | `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
 
-**`skriv_leder` (30. aug. 2026) deklareres av vaktlista og, fra 12. sep. 2026, av
-oppdragsmodulen** (der betyr det «setter opp verdimengdene» — lokasjoner, enhetstyper,
-problemstillinger). Skillet mot `skriv_full`
+**`skriv_leder` (30. aug. 2026) deklareres av vaktlista, oppdrag, KO og backlog**, med egne
+etiketter (i oppdrag: «setter opp verdimengdene»). Skillet mot `skriv_full`
 er *hva slags skade en feil gjør*: den som bemanner setter folk på plasser og kan rette
 tilbake; den som setter opp fjerner en ressurs, og bemanningen forsvinner med den. Uten
 trinnet måtte de to deles ut samlet, eller oppsettet bli global admin — og da kunne ikke en
@@ -394,7 +393,10 @@ uansett»; se modulens docstring.
 
 ### Audit-logging
 
-Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `RequestAuditMiddleware` lagrer request i thread-local slik at signaler kan hente bruker og IP uten å ta imot `request`-objektet direkte. Legg aldri til manuell audit-kode — signalet tar seg av det.
+**Hver modul logger sine feltendringer i egen `<app>/signals.py`**; `audit/signals.py` fyller
+bare `app_label`. `RequestAuditMiddleware` gir signalene bruker og IP. **En handling som ikke
+er en feltendring logges der den skjer** — «aldri manuell audit-kode» sto her, og ga hullene
+B2 og B3. Arkiv: `core.arkiv.logg_arkivhendelse`.
 
 **Portalens egne tabeller logges av `core/signals.py`** (14. sep. 2026):
 `AppSetting`, `ModuleSettings` og `Vakt`. De sto uten audit i det hele tatt fram til da —
