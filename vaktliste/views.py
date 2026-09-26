@@ -174,7 +174,10 @@ def _tid(raa):
     return verdi
 
 
-def _vaktliste_til_dict(vl):
+def _vaktliste_til_dict(vl, user):
+    """`user` avgjør om feilteksten fra siste utsending sendes (B7). Påkrevd,
+    ikke valgfri: et nytt endepunkt skal ikke kunne glemme den."""
+    vis_feil = services.kan_skrive_alt(user)
     return {
         'id': vl.pk,
         'vakt_navn': vl.vakt.navn,
@@ -194,7 +197,7 @@ def _vaktliste_til_dict(vl):
         # Reserven (12. sep. 2026): siste utsending av vaktlista som fil, og
         # om det finnes mottakere å sende til — knappen skal si det før man
         # trykker, ikke etter.
-        'siste_utsending': fil.utsending_til_dict(vl.utsendinger.first()),
+        'siste_utsending': fil.utsending_til_dict(vl.utsendinger.first(), vis_feil=vis_feil),
         'fil_mottakere': len(fil.mottakere()),
         'fil_ved_drift': fil.sendes_ved_drift(),
         'fil_intervall_min': fil.intervall_minutter(),
@@ -326,7 +329,7 @@ def vaktlister_view(request):
         else:
             qs = Vaktliste.objects.select_related('vakt').filter(arkivert_at__isnull=True)
         return JsonResponse({'status': 'ok', 'data': [
-            _vaktliste_til_dict(vl) for vl in qs]})
+            _vaktliste_til_dict(vl, request.user) for vl in qs]})
 
     data = _json_body(request)
     try:
@@ -344,7 +347,7 @@ def vaktlister_view(request):
         if kilde is not None:
             kopiert = services.kopier_oppsett(kilde, ny)
 
-    svar = _vaktliste_til_dict(ny)
+    svar = _vaktliste_til_dict(ny, request.user)
     svar['kopierte_ressurser'] = kopiert
     return JsonResponse({'status': 'ok', 'data': svar}, status=201)
 
@@ -382,7 +385,7 @@ def vaktliste_arkiver_view(request, pk, retning):
     else:
         vl.arkivert_at = None
         vl.save(update_fields=['arkivert_at', 'updated_at'])
-    return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
+    return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl, request.user)})
 
 
 @never_cache
@@ -490,7 +493,7 @@ def vaktliste_detalj_view(request, pk):
                 vl.save(update_fields=felter)
 
         vl.refresh_from_db()
-        return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
+        return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl, request.user)})
 
     ressurser = list(vl.ressurser.select_related('korps', 'enhet', 'gruppe'))
     # **Skiftene filtreres her, i svaret sida bygges av.** Da gjelder
@@ -507,7 +510,7 @@ def vaktliste_detalj_view(request, pk):
     ))
     foreldre = services.foreldrekart()
     return JsonResponse({'status': 'ok', 'data': {
-        'vaktliste': _vaktliste_til_dict(vl),
+        'vaktliste': _vaktliste_til_dict(vl, request.user),
         'ressurser': [_ressurs_til_dict(r) for r in ressurser],
         'vaktposter': [_vaktpost_til_dict(vp, foreldre) for vp in poster],
         # **Pausene sendes alle, uten korpsfilter** — de hører til ressursen,
@@ -1129,7 +1132,7 @@ def drift_view(request, pk, tilstand):
         vl.status = choices.PLANLEGGING
         vl.save(update_fields=['status', 'updated_at'])
 
-    data = _vaktliste_til_dict(vl)
+    data = _vaktliste_til_dict(vl, request.user)
     data['utsending'] = fil.utsending_til_dict(utsending)
     return JsonResponse({'status': 'ok', 'data': data})
 

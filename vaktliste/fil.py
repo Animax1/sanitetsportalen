@@ -200,12 +200,22 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
     """
     adresser = list(adresser) if adresser is not None else mottakere()
     naa = timezone.now()
-    grupper = rader_for(vaktliste)
     rad = Utsending(
         vaktliste=vaktliste, sendt_av=bruker if getattr(bruker, 'pk', None) else None,
         sendt_av_navn=getattr(bruker, 'username', '') or '',
-        utloest=utloest, mottakere=', '.join(adresser), antall_rader=antall_skift(grupper),
-        innhold_sha256=signatur(grupper, overnatting.brannliste(vaktliste)))
+        utloest=utloest, mottakere=', '.join(adresser))
+    # **Byggingen står også innenfor løftet** (26. sep. 2026, B7): «kaster
+    # aldri» holdt ikke når `rader_for` eller brannlista feilet — da falt
+    # «Sett i drift» med 500 i stedet for å melde at fila ikke gikk.
+    try:
+        grupper = rader_for(vaktliste)
+        rad.antall_rader = antall_skift(grupper)
+        rad.innhold_sha256 = signatur(grupper, overnatting.brannliste(vaktliste))
+    except Exception as exc:   # noqa: BLE001 — sporet skal ha årsaken
+        logger.exception('Vaktlista kunne ikke bygges for vaktliste %s', vaktliste.pk)
+        rad.feil = _feiltekst(exc)
+        rad.save()
+        return rad
     if not adresser:
         rad.feil = 'Ingen mottakere er satt under portalinnstillingene.'
         rad.save()
@@ -227,9 +237,16 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
             rad.feil = 'E-posttjenesten tok ikke imot meldingen.'
     except Exception as exc:   # noqa: BLE001 — sporet skal ha årsaken
         logger.exception('Vaktlista kunne ikke sendes for vaktliste %s', vaktliste.pk)
-        rad.feil = str(exc)[:500] or exc.__class__.__name__
+        rad.feil = _feiltekst(exc)
     rad.save()
     return rad
+
+
+def _feiltekst(exc) -> str:
+    """Unntaket som tekst for `Utsending.feil`, **vasket** (B7): en feil fra
+    en transport kan bære en URL med brukernavn og passord."""
+    from core.vask import vask
+    return vask(str(exc))[:500] or exc.__class__.__name__
 
 
 def signatur(grupper, brannliste=None) -> str:
@@ -281,7 +298,14 @@ def send_planlagte(naa=None) -> list:
     return ut
 
 
-def utsending_til_dict(rad):
+#: Det den som ikke kan sende ser når utsendingen feilet (B7).
+FEIL_FOR_LESER = 'Utsendingen feilet.'
+
+
+def utsending_til_dict(rad, vis_feil=True):
+    """`vis_feil=False` for den som ikke kan sende: at det feilet, ikke hva
+    transporten svarte (26. sep. 2026, B7). Feilteksten er driftsinformasjon
+    for den som setter opp e-posten."""
     if rad is None:
         return None
     return {
@@ -291,5 +315,5 @@ def utsending_til_dict(rad):
         'utloest': rad.utloest,
         'antall_mottakere': rad.antall_mottakere,
         'antall_rader': rad.antall_rader,
-        'feil': rad.feil,
+        'feil': rad.feil if (vis_feil or not rad.feil) else FEIL_FOR_LESER,
     }

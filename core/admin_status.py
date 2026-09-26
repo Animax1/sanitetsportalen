@@ -19,7 +19,6 @@ Kun for admin-rollen.
 """
 import json
 import os
-import re
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -37,6 +36,9 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import admin_required
 from core.klientip import klient_ip
 from core.sesjoner import aktive_sesjoner
+# `_scrub_secrets` står igjen som navn for de mange kallstedene her; den
+# offentlige er `core.vask.vask` (B7). Å døpe om kallstedene er E6.
+from core.vask import vask as _scrub_secrets
 from audit.models import AuditLog
 
 from .middleware import metrics_store
@@ -442,23 +444,6 @@ def _get_worker_config():
         'max_requests': os.environ.get('WEB_MAX_REQUESTS', '1000 (default)'),
         'pid': os.getpid(),
     }
-
-
-# Regex for å fjerne credentials fra URL-er som kan forekomme i error-strenger.
-# Treffer mønster som 'redis://default:hemmelig123@host:6379/0' → 'redis://[scrubbed]@host:6379/0'
-_URL_CREDS_RE = re.compile(r'([a-zA-Z][a-zA-Z0-9+.\-]*://)([^/@\s]*@)')
-
-
-def _scrub_secrets(text: str) -> str:
-    """Fjern credentials fra error-meldinger før de vises i admin-UI.
-
-    Forsvarslag mot fremtidige redis-py-versjoner som kunne lekket passord.
-    Dagens versjon gjør ikke det, men admin-UI-data ender ofte i logger,
-    skjermbilder, support-mailer etc. — best å scrubbe defensivt.
-    """
-    if not text:
-        return text
-    return _URL_CREDS_RE.sub(r'\1[scrubbed]@', text)
 
 
 def _get_cache_health():

@@ -129,6 +129,48 @@ class UtsendingTests(FilBasis):
         self.assertFalse(fil.sendes_ved_drift())
 
 
+class FeilteksteTests(FilBasis):
+    """Feilteksten fra utsendingen (26. sep. 2026, B7).
+
+    `str(exc)` ble lagret rått i `Utsending.feil` og sendt i hovedsvaret til
+    alle med `les`. En feil fra en transport kan bære en URL med brukernavn og
+    passord i — server-status vasker slik tekst, vaktlista gjorde det ikke. Og
+    `send_fil` lovet «kaster aldri», men byggingen av radene sto utenfor `try`.
+    """
+
+    def test_legitimasjon_i_en_url_vaskes_foer_den_lagres(self):
+        with override_settings(EMAIL_BACKEND='vaktliste.tests_fil.LekkendeBackend'):
+            rad = fil.send_fil(self.vl, bruker=self.vaktleder)
+        self.assertNotIn('hemmelig', rad.feil)
+        self.assertIn('smtp://', rad.feil, 'resten av meldingen står')
+
+    def test_bare_den_som_kan_sende_ser_feilteksten(self):
+        with override_settings(EMAIL_BACKEND='vaktliste.tests_fil.SviktendeBackend'):
+            fil.send_fil(self.vl, bruker=self.vaktleder)
+        url = f'/vaktliste/api/vaktlister/{self.vl.pk}/'
+        leser = self.c_leser.get(url).json()['data']['vaktliste']['siste_utsending']
+        leder = self.c_vl.get(url).json()['data']['vaktliste']['siste_utsending']
+        self.assertEqual(leser['feil'], 'Utsendingen feilet.')
+        self.assertIn('nede', leder['feil'])
+
+    def test_send_fil_kaster_ikke_naar_fila_ikke_lar_seg_bygge(self):
+        from unittest.mock import patch
+        with patch('vaktliste.fil.rader_for', side_effect=RuntimeError('knekt')):
+            rad = fil.send_fil(self.vl, bruker=self.vaktleder)
+        self.assertTrue(rad.pk)
+        self.assertIn('knekt', rad.feil)
+
+
+class LekkendeBackend:
+    """En transport som legger legitimasjonen i feilmeldingen."""
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def send_messages(self, meldinger):
+        raise ConnectionError('kan ikke nå smtp://bruker:hemmelig@mail.example.org:587')
+
+
 class SviktendeBackend:
     """E-posttjeneste som er nede — for testen over."""
 

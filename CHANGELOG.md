@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Feilen fra e-postutsendingen: rå tekst til alle med `les`, og «kaster aldri» som kastet (B7)  `#vaktliste/offline`
+
+**Tre ting ved samme feil:**
+
+1. **Uvasket.** `send_fil` lagret `str(exc)` rått i `Utsending.feil`. En transport kan
+   legge en URL med brukernavn og passord i feilmeldingen (`smtp://bruker:hemmelig@…`) —
+   server-status vasker slik tekst, vaktlista gjorde det ikke.
+2. **Til alle.** Feilteksten sto i `siste_utsending` i vaktlistas hovedsvar, som alle med
+   `les` får. Nå ser den som ikke kan sende (under `skriv_full`) bare **«Utsendingen
+   feilet.»** — at det gikk galt, ikke hva transporten svarte. `_vaktliste_til_dict(vl,
+   user)` tar brukeren **påkrevd**, så et nytt endepunkt ikke kan glemme det.
+3. **«Kaster aldri» kastet.** Docstringen lovet det, men `rader_for()` og brannlista ble
+   bygget **utenfor `try`**. Feilet de, falt «Sett i drift» med 500 i stedet for å melde at
+   fila ikke gikk. Byggingen står nå innenfor løftet, og raden får feilen.
+
+**`core/vask.py` er ny og offentlig.** Vaskingen lå som den private `_scrub_secrets` i
+`core/admin_status.py`, og `core/driftstatus.py` importerte det private navnet derfra. En
+tredje leser skulle enten gjort det samme eller kopiert en sikkerhetsregex. Navnet
+`_scrub_secrets` står igjen i `admin_status` som import, for de elleve kallstedene der;
+omdøping og sammenslåing med `offsite._vask` er E6.
+
+**Tester** (`FeilteksteTests`): legitimasjonen vaskes før lagring, leseren får den generelle
+teksten og lederen den faktiske, og `send_fil` lager en rad i stedet for å kaste når fila ikke
+lar seg bygge. **Mutasjonstesting:** 4 mutanter — uvasket tekst, feilen til alle, `vis_feil`
+ignorert i serialiseringen, og byggingen utenfor løftet. Alle drept. `vaktliste` (1 309) og
+`core` (820): grønt.
+
 ## 2026-09-26 — Brukeradministrasjonen: nytt passord, «Lås opp» og feltendringer satte ingen spor (B2)  `#core/audit`
 
 **Jo mer inngripende, jo mindre spor** — mønsteret rot-`CLAUDE.md` kaller feil vei rundt,

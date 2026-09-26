@@ -104,7 +104,7 @@ def samle(metode: str, *args) -> tuple[dict, str]:
     dashbordet har ett `error`-felt, og et kort som viser fire feilmeldinger
     samtidig er ikke mer lesbart enn ett som viser den siste.
     """
-    from core.admin_status import _scrub_secrets
+    from core.vask import vask as _scrub_secrets
 
     ut: dict = {}
     feil = ''

@@ -203,7 +203,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
 - **Hvor:** `core/views_admin.py:220-223` og `accounts/views.py:808-811`.
 - **Retting:** én felles parser som ignorerer ugyldige verdier.
 
-**B7. Rå unntakstekst fra e-postutsendingen vises for alle med `les`.**
+**B7. Rå unntakstekst fra e-postutsendingen vises for alle med `les`.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `Utsending.feil` (`vaktliste/fil.py:228-230`).
 - **Retting:** vask teksten med samme funksjon som server-status bruker (se E6).
 - **Samtidig:** `send_fil` lover «kaster aldri», men `rader_for` og `brannliste` kjøres
