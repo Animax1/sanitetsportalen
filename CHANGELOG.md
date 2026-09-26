@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — CI rød ved første kjøring: «ålesund» sorterte først, og tblib manglet  `#core/drift`
+
+**Første kjøring av D1 (`668acff` på staging) var rød: 1 ekte feil, 31 følgefeil.**
+
+**Den ekte:** `test_enhetslista_er_alfabetisk_uten_hensyn_til_store_bokstaver` ventet
+`['bergen 2', 'Haugesund 56', 'Karmøy 12']` og fikk `['ålesund 1', 'bergen 2', …]`.
+PostgreSQL i CI er initialisert med **en_US.utf8**, der å sorteres som a; den lokale
+basen er **C.UTF-8**, der å kommer etter z. Testen prøvde altså maskinens kollasjon, ikke
+regelen den heter etter (store og små bokstaver). Den bruker nå «voss 1» og krever hele
+lista — bytealfabetet ville satt begge de små sist. Mutant: `Lower('navn')` → `'navn'` i
+`oppdrag/views.py`, **drept**.
+
+**Men funnet er ekte:** kjører Railway-basen også en_US, sorteres «Ålesund» som «Alesund»
+i prod i dag — i enhetslista og i vaktlisteregistrene. Punktet om norsk sortering i
+`TODO.md` er skrevet om med dette; ikke rettet her, fordi det er en atferdsendring og
+kollasjonen på Railway bør sjekkes først.
+
+**Følgefeilene:** 31 × `InterfaceError('connection already closed')` i ko, sammen med
+«cannot pickle 'traceback' object … install tblib». Uten `tblib` kan ikke `--parallel`
+sende en traceback til foreldreprosessen, så Django **kaster inne i arbeideren** ved første
+feil (`RemoteTestResult.check_picklable`). Klassen avbrytes midt i transaksjonen,
+`tearDownClass` kjøres aldri, og hver testklasse som kommer etter i samme arbeider arver en
+død tilkobling. Én feil ble til 32 — og det så ut som en tilkoblingsfeil i ko.
+`tblib==3.2.2` ligger nå i **`requirements-ci.txt`**, med hash, og *ikke* i
+`requirements.txt` — den er det Railway installerer, og prod trenger ikke pakken.
+`core/tests_ci.py` krever at workflowen installerer den.
+
+**Railway venter nå på CI** på både staging og main (André satte det 26. sep.) — punktet i
+`TODO.md` er slettet. Det betyr også at `668acff` ikke ble deployet til staging; denne
+commiten er den første som kan.
+
 ## 2026-09-26 — CI: testene kjører mot PostgreSQL med node ved push til staging og main (D1)  `#core/drift`
 
 **Hvorfor:** suiten kjørte bare lokalt, på **SQLite**, og rundt **160 JS-tester hoppet over

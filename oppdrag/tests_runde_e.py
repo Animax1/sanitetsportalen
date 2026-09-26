@@ -132,10 +132,16 @@ class VerdimengdeApiTests(OppdragBasis):
                                {**data, 'problemstilling': 'Finnes ikke'}).status_code, 400)
 
     def test_enhetslista_er_alfabetisk_uten_hensyn_til_store_bokstaver(self):
-        Enhet.objects.create(navn='ålesund 1')
+        """**Ingen Æ/Ø/Å først i navnet, med vilje** (26. sep. 2026). Der er
+        rekkefølgen databasens kollasjon: C.UTF-8 legger «ålesund» sist,
+        en_US legger den først (å leses som a). Testen sto med «ålesund 1» og
+        var grønn lokalt og rød i CI — den prøvde maskinen, ikke regelen.
+        Norsk sortering er et eget punkt i TODO."""
+        Enhet.objects.create(navn='voss 1')
         Enhet.objects.create(navn='bergen 2')
         navn = [e['navn'] for e in self.leser.get('/oppdrag/api/enheter/').json()['data']]
-        self.assertEqual(navn[:3], ['bergen 2', 'Haugesund 56', 'Karmøy 12'])
+        # Bytealfabetet ville satt begge de små bokstavene sist.
+        self.assertEqual(navn, ['bergen 2', 'Haugesund 56', 'Karmøy 12', 'voss 1'])
 
 
 class AntallFraBilenTests(StemplingBasis):

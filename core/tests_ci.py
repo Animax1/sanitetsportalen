@@ -42,3 +42,10 @@ class WorkflowenTests(SimpleTestCase):
         self.assertRegex(self.tekst, r"KREV_NODE: '1'")
         self.assertRegex(self.tekst, r'image: postgres:\d+')
         self.assertIn('verifiser_migrasjoner', self.tekst)
+
+    def test_tblib_installeres(self):
+        """Uten `tblib` blir én feil under `--parallel` til en kaskade av
+        «connection already closed» — se `requirements-ci.txt`."""
+        self.assertIn('-r requirements-ci.txt', self.tekst)
+        ci = (Path(settings.BASE_DIR) / 'requirements-ci.txt').read_text(encoding='utf-8')
+        self.assertRegex(_uten_kommentarer(ci), r'(?m)^tblib==')

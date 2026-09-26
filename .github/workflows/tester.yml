@@ -61,7 +61,7 @@ jobs:
           node-version: '22'
 
       - name: Avhengighetene, låst med hasher som på Railway
-        run: pip install --require-hashes -r requirements.txt
+        run: pip install --require-hashes -r requirements.txt -r requirements-ci.txt
 
       - name: Django-sjekk og manglende migrasjoner
         run: |

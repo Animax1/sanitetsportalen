@@ -161,9 +161,7 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       predikat for «på vakt», eller fjern feltet.
 - [ ] **Pulje D — verifiseringen.** D1 (CI) levert 26. sep. Igjen: død kode som
       testene holder i live (D2); XSS-skanner for `backlog.js` og `+`-uttrykk (D3);
-      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4). Og en innstilling
-      hos André, ikke i koden: «vent på grønne sjekker» i Railway for `main`, så CI blir en
-      sperre og ikke bare et merke.
+      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
 - [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og
@@ -1003,13 +1001,16 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
-- [ ] **Norsk sortering av æ/ø/å i vaktlisteregistrene.** Ikke hastverk, og
-      kanskje aldri. Sorteringen bruker `Lower(...)`, så store/små bokstaver er
-      deterministiske — men Æ/Ø/Å følger databasens kollasjon, og den er ulik i
-      SQLite (dev) og PostgreSQL (prod). Merkes først den dagen noen legger inn
-      et korps som begynner på Æ, Ø eller Å. Fikses med `db_collation` på
-      kolonnen eller en egen sorteringsnøkkel; begge er større enn problemet er
-      i dag, med en håndfull korps.
+- [ ] **Norsk sortering av æ/ø/å — i vaktlisteregistrene og i oppdragets enhetsliste.**
+      Sorteringen bruker `Lower(...)`, så store/små bokstaver er deterministiske — men
+      Æ/Ø/Å følger databasens kollasjon. **CI viste 26. sep. 2026 at den ikke bare er
+      ulik mellom SQLite og PostgreSQL, men mellom to PostgreSQL-er:** C.UTF-8 legger
+      «Ålesund» sist, en_US (standarden i `postgres`-imaget, trolig også Railways)
+      legger den *først*, som om Å var A. Prod er altså sannsynligvis feil på norsk i
+      dag — sjekk `datcollate` på Railway-basen før noe bygges. Fikses med
+      `Collate(Lower(...), 'nb-NO-x-icu')` i spørringen (krever ICU, SQLite har det
+      ikke) eller en egen sorteringsnøkkel. Merkes den dagen noen legger inn et korps
+      eller en bil som begynner på Æ, Ø eller Å.
 
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra

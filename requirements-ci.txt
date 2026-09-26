@@ -1,0 +1,12 @@
+# Bare for CI, og derfor ikke i requirements.txt — den er det Railway installerer.
+#
+# tblib: uten den kan ikke `--parallel` sende en traceback fra arbeideren til
+# foreldreprosessen. Django kaster da *inne i arbeideren* ved første feil, klassen
+# avbrytes midt i transaksjonen, og hver test som kommer etter i samme arbeider
+# arver en død tilkobling. Første CI-kjøring (26. sep. 2026): én ekte feil ble til
+# 32, og 31 av dem var «InterfaceError: connection already closed» i ko.
+#
+# Hashen er for hjulet (py3-none-any). Oppdateres med `pip download tblib==X
+# --no-deps` + `pip hash`.
+tblib==3.2.2 \
+    --hash=sha256:26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76
