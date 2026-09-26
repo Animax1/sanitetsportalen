@@ -35,7 +35,7 @@ from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
 from core.klientip import klient_ip
-from core.sesjoner import aktive_sesjoner
+from core.sesjoner import aktive_sesjoner, bruker_id_i, dekod
 # `_scrub_secrets` står igjen som navn for de mange kallstedene her; den
 # offentlige er `core.vask.vask` (B7). Å døpe om kallstedene er E6.
 from core.vask import vask as _scrub_secrets
@@ -809,17 +809,12 @@ def admin_session_kill(request):
 
     username = ''
     user_id = 0
-    try:
-        data = sess.get_decoded()
-        uid = data.get('_auth_user_id')
-        if uid:
-            User = get_user_model()
-            user = User.objects.filter(id=int(uid)).first()
-            if user:
-                username = user.username
-                user_id = user.id
-    except Exception:
-        pass
+    uid = bruker_id_i(dekod(sess))
+    if uid is not None:
+        user = get_user_model().objects.filter(id=uid).first()
+        if user:
+            username = user.username
+            user_id = user.id
 
     sess.delete()
     _audit_session_kill(

@@ -22,11 +22,53 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model
 from django.contrib.sessions.models import Session
 from django.utils import timezone
 
 from core.middleware import SISTE_INTERAKSJON
+
+
+def dekod(sesjon) -> dict:
+    """Sesjonsdataene som dict — kaster aldri (26. sep. 2026, E5).
+
+    Dekodingen sto fire steder med tre ulike feilhåndteringer: to fanget
+    alt, to fanget ingenting. Djangos `decode()` gir selv `{}` for en
+    ødelagt signatur, men ikke for gyldig JSON som ikke er et objekt — og
+    da kastet `.get()` midt i et passordbytte, altså i den ene operasjonen
+    der en overlevende sesjon er hele feilmodusen.
+    """
+    try:
+        data = sesjon.get_decoded()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def bruker_id_i(data) -> int | None:
+    """Hvem sesjonen tilhører, eller `None` for anonym eller uleselig."""
+    try:
+        return int(data[SESSION_KEY])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def slett_brukerens_sesjoner(bruker, *, unntatt=None) -> int:
+    """Slett alle ikke-utløpte sesjoner for `bruker`, unntatt `unntatt`-nøkkelen.
+
+    Grundig med vilje: dekoder hver sesjon i stedet for å stole på
+    `current_session_key`. Brukes ved passordbytte, frys, sletting og
+    admin-reset — der en sesjon som overlever er selve feilen man vil unngå,
+    og kostnaden ikke betyr noe fordi operasjonen er sjelden.
+    """
+    slettet = 0
+    for sesjon in Session.objects.filter(expire_date__gt=timezone.now()):
+        if sesjon.session_key == unntatt:
+            continue
+        if bruker_id_i(dekod(sesjon)) == bruker.pk:
+            sesjon.delete()
+            slettet += 1
+    return slettet
 
 
 def inaktiv_sekunder(data, naa):
@@ -66,18 +108,11 @@ def aktive_sesjoner():
     dekodet = []
     bruker_ider = []
     for sesjon in Session.objects.filter(expire_date__gt=naa):
-        try:
-            data = sesjon.get_decoded()
-        except Exception:
-            # En sesjon vi ikke får dekodet er ikke en sesjon vi kan si noe om.
-            # Den skal ikke ta ned lista for de andre.
-            continue
-        raa_id = data.get('_auth_user_id')
-        if not raa_id:
-            continue
-        try:
-            bruker_id = int(raa_id)
-        except (TypeError, ValueError):
+        # En sesjon vi ikke får dekodet er ikke en sesjon vi kan si noe om.
+        # Den skal ikke ta ned lista for de andre.
+        data = dekod(sesjon)
+        bruker_id = bruker_id_i(data)
+        if bruker_id is None:
             continue
         bruker_ider.append(bruker_id)
         dekodet.append((sesjon, bruker_id, data))

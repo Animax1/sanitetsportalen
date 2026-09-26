@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Sesjonsdekodingen ett sted, og passordbyttet tåler en rar sesjon (E5, andre del)  `#core #accounts #sikkerhet`
+
+**Hvorfor:** Djangos sesjonstabell ble dekodet fire steder med tre ulike feilhåndteringer:
+`_invalidate_other_sessions` og `_invalidate_all_sessions` i `accounts/views.py` fanget
+ingenting, `core/sesjoner.aktive_sesjoner` og `admin_session_kill` fanget alt. Djangos
+`decode()` gir selv `{}` for en ødelagt signatur — men gyldig JSON som ikke er et objekt
+kom rett gjennom, og da kastet `.get()` **midt i passordbyttet**, før resten av brukerens
+sesjoner var slettet. Det er den ene operasjonen der en sesjon som overlever er hele
+feilmodusen.
+
+**`core/sesjoner.py`** har nå `dekod(sesjon)` (kaster aldri, alltid dict),
+`bruker_id_i(data)` (`int` eller `None`, leser `django.contrib.auth.SESSION_KEY` i stedet
+for strengen `'_auth_user_id'`) og `slett_brukerens_sesjoner(bruker, unntatt=None)`. De
+fire stedene bruker dem. Sammenligningen er `int` mot `int`, ikke `str(...)` mot `str(...)`.
+
+**Tester:** `core/tests_sesjoner.py` — ikke-objekter gir `{}`, slettingen sparer unntaket,
+andre brukere og anonyme, og en uleselig sesjon stopper den ikke.
+
+**Mutasjon:** 8 mutanter, 7 røde. `unntatt` fjernet (4 røde), brukersjekken fjernet (9),
+hvert av de to kallstedene i `accounts` fjernet (2 og 4), `unntatt` ikke sendt (3),
+`isinstance` fjernet (1), `uid` i `admin_session_kill` nullet (2). **Overlevde:** `if
+bruker_id is None: continue` i `aktive_sesjoner` fjernet — ekvivalent, `brukere.get(None)`
+tre linjer lenger ned hopper over den samme raden. Sjekken står for lesbarhetens skyld.
+
 ## 2026-09-26 — Én `json_body` og én `json_feil`, i `core` (E5, første del)  `#core`
 
 **Hvorfor:** `_json_body` sto i fem moduler (`patients`, `vaktliste`, `backlog`, `ko`,

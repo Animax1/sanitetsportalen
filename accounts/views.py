@@ -27,6 +27,7 @@ from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from core.ratelimit import er_rate_limited as core_er_rate_limited
 
 from audit.models import AuditLog
+from core.sesjoner import slett_brukerens_sesjoner
 from core.url_safety import safe_redirect_url
 
 from core.auth_decorators import admin_required
@@ -97,10 +98,7 @@ def _invalidate_other_sessions(user, current_session_key):
     poenget — og hvor kostnaden er irrelevant fordi operasjonen er sjelden.
     Innloggingsstien bruker ``_registrer_aktiv_sesjon()`` i stedet.
     """
-    for sess in Session.objects.filter(expire_date__gte=timezone.now()):
-        data = sess.get_decoded()
-        if str(data.get('_auth_user_id')) == str(user.pk) and sess.session_key != current_session_key:
-            sess.delete()
+    slett_brukerens_sesjoner(user, unntatt=current_session_key)
 
     if user.current_session_key != current_session_key:
         user.current_session_key = current_session_key
@@ -113,10 +111,7 @@ def _invalidate_all_sessions(user):
     Grundig av samme grunn som over: brukes kun i sikkerhetsoperasjoner der en
     overlevende sesjon er hele feilmodusen man vil unngå.
     """
-    for sess in Session.objects.filter(expire_date__gte=timezone.now()):
-        data = sess.get_decoded()
-        if str(data.get('_auth_user_id')) == str(user.pk):
-            sess.delete()
+    slett_brukerens_sesjoner(user)
 
     if user.current_session_key:
         user.current_session_key = None
