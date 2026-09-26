@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import ProtectedError, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -884,19 +884,31 @@ def _rydd_enhet_ved_sletting(user):
     bli kvitt for den som nettopp trodde han hadde slettet den. André regnet
     med at sletting av kontoen holdt. Nå gjør den det.
 
-    Raden slettes bare når ingen oppdrag peker på den. `Oppdrag.enhet` er
-    `PROTECT`, så en bil som har kjørt kan ikke forsvinne uten å ta historikken
-    med seg — den pensjoneres i stedet. Det er samme skille som ellers i
-    portalen: data uten spor kan slettes, data med spor fryses.
+    Raden slettes bare når ingenting peker på den. En bil som har kjørt kan
+    ikke forsvinne uten å ta historikken med seg — den pensjoneres i stedet.
+    Det er samme skille som ellers i portalen: data uten spor kan slettes,
+    data med spor fryses.
+
+    **Databasen avgjør, ikke en liste over relasjoner** (26. sep. 2026). Her
+    sto `enhet.oppdrag.exists()` — `Oppdrag.enhet`, den *første* bilen. Fem
+    tabeller peker på `Enhet` med `PROTECT` (koblingsradene, hendelsene,
+    byttene, vaktmodusen og det gamle feltet), og bil nummer to på et oppdrag
+    besto sjekken og ga 500 idet `delete()` traff koblingsraden. Nå prøves
+    slettingen, og `ProtectedError` betyr pensjonering — en
+    relasjon som kommer til senere er dekket uten at noen husker den her.
 
     Returnerer `'slettet'`, `'pensjonert'` eller `None`.
     """
     enhet = getattr(user, 'enhet', None)
     if enhet is None:
         return None
-    if not enhet.oppdrag.exists():
+    try:
         enhet.delete()
         return 'slettet'
+    except ProtectedError:
+        # Kastes av Djangos collector *før* noe SQL sendes, så transaksjonen
+        # er urørt og trenger ikke et savepoint (prøvd på PostgreSQL).
+        pass
     enhet.er_aktiv = False
     enhet.pa_vakt = False
     enhet.save(update_fields=['er_aktiv', 'pa_vakt', 'updated_at'])

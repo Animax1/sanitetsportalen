@@ -538,6 +538,35 @@ class EnhetFolgerKontoenTests(TestCase):
         self.assertFalse(self.enhet.pa_vakt)
         self.assertIsNone(self.enhet.user)
 
+    def test_bil_nummer_to_pensjoneres_ikke_500(self):
+        """Bilen står på et oppdrag bare som koblingsrad — ikke i
+        `Oppdrag.enhet`. Sjekken så bare det feltet, og `delete()` smalt."""
+        from oppdrag.models import Enhet, Lokasjon, Oppdrag, Oppdragsenhet
+        from oppdrag.services import neste_oppdragsnummer
+        annen = Enhet.objects.create(navn='Karmøy 12')
+        vakt = vakt_for_year(2098)
+        oppdrag = Oppdrag.objects.create(
+            vakt=vakt, oppdragsnummer=neste_oppdragsnummer(vakt), enhet=annen,
+            problemstilling='Pustevansker', hastegrad='Akutt',
+            lokasjon=Lokasjon.objects.create(navn='Hovedscene'))
+        Oppdragsenhet.objects.create(oppdrag=oppdrag, enhet=self.enhet, rekkefolge=2)
+
+        res = self._slett(self.bil)
+
+        self.assertEqual(res.status_code, 302)
+        self.enhet.refresh_from_db()
+        self.assertFalse(self.enhet.er_aktiv)
+
+    def test_enhet_med_bare_vaktmodus_pensjoneres(self):
+        from core.vakt import vakt_for_year as _vfy
+        from oppdrag.models import Vaktmodusperiode
+        Vaktmodusperiode.objects.create(enhet=self.enhet, vakt=_vfy(2098), modus='aktiv')
+
+        self._slett(self.bil)
+
+        self.enhet.refresh_from_db()
+        self.assertFalse(self.enhet.er_aktiv)
+
     def test_sletting_av_vanlig_konto_rorer_ingen_enhet(self):
         from oppdrag.models import Enhet
 

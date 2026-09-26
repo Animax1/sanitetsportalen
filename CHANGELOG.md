@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Å slette kontoen til bil nummer to ga 500  `#accounts #oppdrag`
+
+**Hvorfor:** funnet under kartleggingen til G6. Når en bil-konto slettes, sletter
+`_rydd_enhet_ved_sletting` enheten hvis ingen oppdrag peker på den — og pensjonerer den
+ellers. Sjekken var `enhet.oppdrag.exists()`: det gamle feltet `Oppdrag.enhet`, som bare
+peker på **den første bilen** på et oppdrag. Fem tabeller peker på `Enhet` med `PROTECT`
+(koblingsradene, enhetshendelsene, byttene, vaktmodusperiodene og det gamle feltet). En bil
+som bare hadde vært **bil nummer to**, eller som hadde en vaktmodusperiode, besto sjekken —
+og `delete()` smalt med `ProtectedError`: **500** i stedet for «Enheten er pensjonert».
+
+**Nå avgjør databasen:** slettingen prøves, og `ProtectedError` betyr pensjonering. En
+relasjon som kommer til senere er dermed dekket uten at noen husker å føre den opp her.
+
+**Tester:** `test_bil_nummer_to_pensjoneres_ikke_500` og
+`test_enhet_med_bare_vaktmodus_pensjoneres` i `accounts/tests_user_admin.py`.
+
+**Mutasjon:** 2 mutanter. Den gamle sjekken tilbake — rød i begge testene. Et savepoint rundt
+`delete()` fjernet — **overlevde, også på PostgreSQL, og er ekvivalent**: Djangos collector
+kaster `ProtectedError` før noe SQL sendes, så transaksjonen er aldri ødelagt. Savepointet er
+derfor fjernet fra koden i stedet for å stå som et vern det ikke er.
+
 ## 2026-09-26 — To utdaterte punkter øverst i TODO: rollemodellens deploy 2 og 3  `#docs`
 
 **Hvorfor:** øverst i `TODO.md`, under «Krever Andre», sto «Deploy 2 til prod — krever din
