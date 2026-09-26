@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Én skanner for markup bygget med `+`, for alle JS-filene (D3)  `#core #backlog #ko`
+
+**Hvorfor:** `backlog.js` bygger markup med `'<…' + x` og hadde ingen statisk skanner. KO
+hadde sin egen, i `ko/tests_js.py`. Prøvd på alle filene: **elleve** bygger markup slik.
+
+**`core/tests_js_konkatenering.py`:** byggerne **utledes** av kilden (en funksjon som limer
+noe inn i en streng med en tagg), så en ny fil er dekket uten at noen fører den opp. Hvert
+datafelt (`rad.navn`) skal escapes eller stå i `GJENNOMGATT` med grunn — tre rader.
+`test_unntakene_finnes_fortsatt` sier fra når en rad blir død.
+
+**Funn:** 14 treff utenfor KO, **ingen ekte hull** — ID-er (tall), `textContent`, og
+verdier escapet lenger ned. Regexen fikk `.` i lookaheaden, så `s.grupper.map(` ikke lenger
+gir falske treff. `backlog.js` fikk `escHtmlValue()` på ni ID-er i stedet for unntak.
+
+**KO sin kopi er fjernet, og med den en død liste.** `KO_GJENNOMGATT` hadde 32 «gjennomgåtte»
+lokale variabelnavn — men regexen krevde et punktum, så **ingen av dem kunne noen gang
+treffe**. En unntaksliste som ikke påvirker noe, ser ut som en dekning den ikke er.
+
+**Grensen, skrevet ned:** lokale variabler (`+ merke`) skannes ikke — 131 av dem. For dem er
+oppførselsprøvene motmiddelet. TODO-punktet om vaktlistas `+`-hull er skrevet om til dette.
+
+**Mutanter: 7 gyldige, alle drept til slutt.** Én overlevde først: at kommentarene strippes før
+skanning. Ingen kommentar i dag slo ut, så ingenting merket det. Prøvd nå gjennom `byggere()`
+med en midlertidig fil — ikke ved å kalle hjelperen, så også et fjernet kallsted blir rødt.
+
 ## 2026-09-26 — Død kode som testene holdt i live (D2)  `#vaktliste #patients #statistikk`
 
 **Hvorfor:** «løgn nr. 3» fra mutasjonsavsnittet i `CLAUDE.md`, i praksis — tester som kaller

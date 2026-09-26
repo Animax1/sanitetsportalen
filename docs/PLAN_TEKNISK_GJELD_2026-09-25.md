@@ -281,7 +281,7 @@ hører til:
 - `har_arkiv_backup_etter`
 - re-eksporten av `core.validators` med `BakoverkompatibilitetTests`
 
-**D3. XSS-skannerne.**
+**D3. XSS-skannerne.** *Levert 26. sep. 2026, se CHANGELOG.*
 - `backlog.js` bygger markup med `+` og har ingen statisk skanner.
 - KO har sin egen skanner for `+`. Utvid den til `backlog.js`, og løs vaktlistas kjente
   `+`-gap (eget punkt i TODO) med samme mekanisme.

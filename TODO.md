@@ -166,9 +166,8 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
         Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
         med. Avgjøres **før** noen bygger en avmeldingsknapp.
-- [ ] **Pulje D — verifiseringen.** D1 (CI) og D2 (død kode) levert 26. sep. Igjen:
-      XSS-skanner for `backlog.js` og `+`-uttrykk (D3); `backup_enabled`,
-      `/api/`-fanger-alt og `createcachetable` (D4).
+- [ ] **Pulje D — verifiseringen.** D1 (CI), D2 (død kode) og D3 (skanneren for `+`)
+      levert 26. sep. Igjen: `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
 - [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og
@@ -317,16 +316,15 @@ Se beslutning 15–17 i notatet.
       **Verdt å vurdere på nytt:** kurvene finnes alt per gruppefane, og verdien var «se
       hull og topper mens du legger inn» — det er først nå, med generatoren på plass, man
       vet hva man vil se etter.
-- [ ] **XSS-skanneren ser bare `${…}` inne i template-literaler, ikke `+`-konkatenering.**
-      Funnet 15. sep. 2026 mens planleggerbyggerne ble registrert: `mkPlanlegger()` og
-      `mkBelastning()` avslutter begge med `hode + \`…\` + linjer + tomt`, og de
-      konkatenerte leddene går forbi `REVIEWED_INTERPOLATIONS` uten et ord. Verdiene der
-      er lokalt bygget markup i begge tilfeller, så det er ikke et hull i dag — men
-      regelen dekker mindre enn den ser ut til å gjøre, og det er nøyaktig sorten feil
-      `accounts/decorators.py` hadde (en test som bare dekket halve syntaksen, grønn i et
-      år). Utvid skanneren til å følge `+`-uttrykk, eller skriv byggerne om til ett
-      template-literal.
-
+- [ ] **Lokale variabler limt inn med `+` skannes ikke for escaping.** Datafeltene gjør
+      det fra 26. sep. 2026 (`core/tests_js_konkatenering.py`, alle JS-filene), men
+      `+ merke` der `merke` er bygget lenger oppe, fanges ikke — 131 slike, flest i KO.
+      Motmiddelet er oppførselsprøver med fiendtlige data gjennom den ekte inngangen, som
+      KO og backlog har. Vaktlistas `mkPlanlegger()`/`mkBelastning()` (`hode + \`…\` +
+      linjer`, funnet 15. sep.) er av denne sorten; verdiene er lokalt bygget markup, så
+      det er ikke et hull i dag. Skal det lukkes helt: en oppførselsprøve per bygger som
+      mangler en, heller enn en liste over 131 navn — KO hadde en slik liste med 32 navn,
+      og ingen av dem ble noen gang lest.
 - [ ] **Skriv midnattsregelen inn i `docs/FORSLAG_RAPPORTMODUL.md` §2.2 også.** Den står i
       `CLAUDE.md` for `_dagnokkel()` og i planleggernotatets §3.3; rapportmodulen er det
       tredje stedet noen leser den, og den som leser bare der må se at forskjellen er

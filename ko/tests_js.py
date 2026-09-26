@@ -12,14 +12,13 @@ JS-oppførsel testes ved å kjøre funksjonene, ikke ved å grep-e etter kodelin
 from __future__ import annotations
 
 import json
-import re
 import unittest
 
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
 from patients.js_test_utils import (JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
-                                    extract_function, node_available, read_js, run_node)
+                                    node_available, read_js, run_node)
 
 #: Enhetskortets innmat, delt med sentralbordet (17. sep. 2026). `/ko/` laster
 #: den, så testene her må lese den — ellers kjører de mot en side som ikke
@@ -148,210 +147,14 @@ class RadenEscaperBrukernavnTests(SimpleTestCase):
 # LOGGEN (pulje 2)
 # ════════════════════════════════════════════════════════════════════════════
 
-KO_LOGG_BYGGERE = (
-    # ko.js: loggstrømmen og sidebaren.
-    'koLinjeHtml',
-    'koLinjeTekst',
-    'koLinjeKnapper',
-    'koFestetHtml',
-    'koTilstedeRad',
-    # De to setter sammen ferdige fragmenter til en liste. De bygger markup
-    # like fullt, og står her og ikke i en unntaksliste: dagen noen limer et
-    # felt rett inn i overskriften, skal skanneren se det.
-    'koTegnLogg',
-    'koTegnTilstede',
-    # Vaktlistas ressurser (pulje 6): kortet, mannskapslinja og lista.
-    'koRessurskort',
-    'koRessursMannskap',
-    'koTegnRessurser',
-    # ko-hendelser.js (18. sep. 2026): tabellen, hendelsen åpnet i vinduet,
-    # skjemaet, knytt/løsne i detaljmodalen og nedtrekket i «Nytt oppdrag».
-    'koPrioMerke',
-    'koHendelseRadHtml',
-    'koTegnHendelser',
-    'koDetaljLinjeHtml',
-    'koHendelseOppdragHtml',
-    # Enhetsbrikkene i hendelsens oppdragsoversikt (21. sep. 2026), skilt ut
-    # som egen bygger fordi de er én per enhet og ikke én per oppdrag.
-    'koHendelseOppdragEnheterHtml',
-    'koPrioKnapperHtml',
-    'koTegnDetalj',
-    # Sidebaren med de pågående, ved siden av den åpne (24. sep. 2026).
-    'koHSideRadHtml',
-    'koTegnHSide',
-    'koFyllLokasjoner',
-    '_koFyllSkjema',
-    'koHendelseValg',
-    'koFyllHendelsevalg',
-    'koLeggHendelsevalgINyttOppdrag',
-    # «Nullstill»-fanen: ren markup uten data, men den bygger markup like fullt.
-    'koTegnNullstill',
-    # Fargeforklaringen i ressursoversikten (19. sep. 2026), samme sort.
-    'koLegendeHtml',
-    # Stripa over konsollen (21. sep. 2026): kortene for de skjulte vinduene,
-    # og funksjonen som setter dem inn.
-    'koSkjulteHtml',
-    'koTegnSkjulte',
-    # Lagene på hendelsen (19. sep. 2026), og besetningen bak et klikk på
-    # lagkortet.
-    'koLagBrikkeHtml',
-    'koLagVelgerHtml',
-    'koFyllLagvalg',
-    'koRessursBesetningHtml',
-    'koRessursOpptattHtml',
-    # Arven i «Nytt oppdrag» (19. sep. 2026): teksten under nedtrekket.
-    'koHendelsevalgEndret',
-    # Rediger/fjern og deling inne i hendelsen (19. sep. 2026), og «Fra
-    # loggen i H14» i oppdragets detaljmodal.
-    'koRettFjernKnapper',
-    'koDeltMerke',
-    'koDelingKnapper',
-    'koDelteLinjerHtml',
-    # ko-tavle.js (22. sep. 2026): stolpene, radene, timene, «Uten plass»,
-    # filteret og funksjonen som setter dem sammen.
-    'koTavleStolpeHtml',
-    'koTavleSluttHtml',
-    'koTavleKonsertHtml',
-    'koTavleBehovHtml',
-    # ko-plan.js (23. sep. 2026): planleggeren.
-    'koPlanBeredskapHtml',
-    'koPlanPostHtml',
-    'koPlanListeHtml',
-    'koPlanSkjemaHtml',
-    'koPlanTidslinjeHtml',
-    'koPlanDekningHtml',
-    'koPlanEtterpaaHtml',
-    'koTavleRadHtml',
-    'koTavleTimerHtml',
-    'koTavleUtenPlassHtml',
-    'koTavleFilterHtml',
-    'koTegnTavle',
-    # Steg 2: pausen på kortet, linja for det valgte laget, skjemaet, besøk,
-    # «ikke vært» og fanen i KO-innstillinger.
-    'koTavlePlanlagtHtml',
-    'koTavleValgtHtml',
-    'koTavleSkjemaHtml',
-    'koTavleBesokHtml',
-    'koTavleIkkeVaertHtml',
-    'koTavleOppsettHtml',
-    # Runde 2 (23. sep. 2026): ◀ Nå ▶ over tavla og tidslinja.
-    'koTidKontrollHtml',
-)
-
-#: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
-#: Samme form som `REVIEWED_INTERPOLATIONS` i `oppdrag/tests_xss.py`.
-KO_GJENNOMGATT = {
-    'rettet': 'fast markup fra en ternær, ingen data i',
-    'hvem': 'markup bygget av en ternær; forfatternavnet escapet i den ene grenen',
-    'av': 'markup bygget to linjer over, navnet escapet der',
-    'merkeHtml': 'markup bygget rett over, merket selv escapet der',
-    'hendelseHtml': 'markup bygget rett over, nummeret og id escapet der',
-    'losne': 'knapp bygget rett over, id escapet der',
-    'festetHtml': 'markup fra koFestetHtml(), som skannes for seg',
-    # Hendelsene:
-    'naa': 'markup bygget rett over, nummer og tittel escapet der',
-    'valg': 'options bygget rett over, id og tekst escapet der',
-    'under': 'markup bygget rett over, beskrivelsen escapet der',
-    'melder': 'markup bygget rett over, melderen escapet der',
-    'behovHtml': 'markup bygget rett over, navnene escapet i map-en',
-    'behov': 'navnene escapet i map-en rett over',
-    'oppdragHtml': 'markup bygget rett over, nummer og tall escapet der',
-    'status': 'markup bygget rett over, klokkeslettet escapet der',
-    'tekst': 'escapeHtml eller fast markup, fra en ternær rett over',
-    'enheter': 'navnene escapet i map-en rett over',
-    'knapper': 'markup bygget i map-en rett over, verdi og navn escapet der',
-    'ikon': 'fast ikonmarkup fra en ternær',
-    'aktiv': 'CSS-klasse med verdien escapet, rett over',
-    'deltar': 'navnene escapet i map-en rett over',
-    'knyttValg': 'markup bygget rett over, id og tekst escapet der',
-    'nyttOppdrag': 'knapp bygget rett over, id escapet der',
-    'hodeKnapper': 'markup bygget rett over, id escapet der',
-    'bliMed': 'knapp bygget rett over, id escapet der',
-    'lagFelt': 'markup bygget rett over, verdi og id escapet der',
-    'skjema': 'markup bygget rett over, koden escapet der',
-    'tall': 'escapeHtml over to tall og et fast ord, eller et fast ord',
-    'hode': 'markup fra gruppehode() i oppdrag-kort.js, alt escapet der',
-    'navn': 'mannskapsnavn escapet i map-en rett over',
-    'kort': 'markup fra koRessurskort(), som skannes for seg',
-    'ansvarHtml': 'markup bygget rett over, området escapet der',
-}
+# **Skanningen av byggerne står i `core/tests_js_konkatenering.py`** (26. sep.
+# 2026, D3), for alle JS-filene og med byggerne utledet av kilden. Her sto en
+# egen kopi med to lister: `KO_LOGG_BYGGERE`, som en ny bygger måtte føres inn
+# i, og `KO_GJENNOMGATT` med 32 lokale variabelnavn — som regexen aldri kunne
+# treffe, fordi den krevde et punktum. Oppførselsprøven under er det som dekker
+# de lokale variablene.
 
 
-class LoggByggerneEscaperTests(SimpleTestCase):
-    """Statisk gjennomgang av byggerne i `ko.js`.
-
-    **Skanneren her leser konkatenering, ikke mal-strenger.** `ko.js` bygger
-    markup med `'...' + x + '...'`, mens `oppdrag/tests_xss.py` leser
-    `` `...${x}...` ``. En kopi av den skanneren ville funnet null byggere her
-    og meldt grønt — og en skanner som melder grønt om en dekning den ikke
-    har, er verre enn ingen skanner (`CLAUDE.md`).
-
-    **Grensen for hva den ser**, skrevet ned så den ikke må gjettes: den finner
-    et **datafelt** (`noe.felt`) limt rett inn i en konkatenering. En lokal
-    variabel bygget lenger oppe fanges *ikke* — derfor står de fem i
-    `KO_GJENNOMGATT`, og derfor finnes oppførselsprøven under, som kjører
-    byggerne med fiendtlige data gjennom den ekte inngangen.
-    """
-
-    def _kropp(self, navn):
-        kilde = read_js(KO_JS)
-        kropp = extract_function(kilde, navn)
-        # **Strip kommentarene først.** En test som leser sin egen prosa måler
-        # at noen har skrevet om begrunnelsen, ikke at koden gjør det den sier
-        # (CLAUDE.md, 16. sep. 2026).
-        return '\n'.join(l for l in kropp.splitlines()
-                         if not l.lstrip().startswith('//'))
-
-    def test_hver_bygger_finnes(self):
-        """Vern mot at testen blir tom fordi en funksjon er omdøpt."""
-        kilde = read_js(KO_JS)
-        for navn in KO_LOGG_BYGGERE:
-            with self.subTest(navn=navn):
-                self.assertIn(f'function {navn}(', kilde)
-
-    def test_ingen_bygger_staar_utenfor_skanningen(self):
-        """En håndholdt liste forfaller i stillhet.
-
-        `_enhetskort` i oppdragsmodulen ble hoistet ut av sin bygger og falt
-        ut av skanningen med det samme — ni byggere sto utenfor uten at noe
-        var rødt. Denne sammenligner lista med kilden, så neste utklipping
-        sier fra selv.
-        """
-        kilde = read_js(KO_JS)
-        funn = set()
-        for navn in re.findall(r'^(?:async )?function (\w+)\(', kilde, re.M):
-            kropp = self._kropp(navn)
-            # En funksjon som limer noe inn i en streng med en tagg i.
-            if re.search(r"'[^']*<\w[^']*'\s*\+", kropp):
-                funn.add(navn)
-        self.assertEqual(sorted(funn - set(KO_LOGG_BYGGERE)), [], (
-            'Disse bygger markup i KO-filene uten å bli skannet. Legg dem i '
-            'KO_LOGG_BYGGERE.'))
-
-    def test_hvert_datafelt_er_escapet_eller_gjennomgaatt(self):
-        uescapet = []
-        for navn in KO_LOGG_BYGGERE:
-            kropp = self._kropp(navn)
-            # `(?![\w(])` holder metodekall utenfor: `rader.map(...)` er en
-            # kjede, ikke et datafelt limt inn i markup. **`\w` må med i
-            # klassen** — uten den backtracker `\w+` til «ma» for å tilfredsstille
-            # lookaheaden, og treffet rapporteres som et halvt feltnavn i
-            # stedet for å forsvinne. En regel som melder «rader.ma» er en
-            # regel ingen forstår.
-            for uttrykk in re.findall(
-                    r'\+\s*([a-z]\w*(?:\.\w+)+)(?![\w(])', kropp):
-                if uttrykk in KO_GJENNOMGATT:
-                    continue
-                uescapet.append(f'{navn}(): + {uttrykk}')
-        self.assertEqual(uescapet, [], (
-            'Datafelt limt rett inn i markup i KO-filene:\n  '
-            + '\n  '.join(uescapet)
-            + '\n\nPakk verdien i escapeHtml(). trustedHtml() er IKKE svaret: '
-              'den returnerer et objekt, og blir «[object Object]» når den '
-              'konkateneres. Se core/tests_js_regler.py.'))
-
-
-@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class LoggEscapingOppforselTests(SimpleTestCase):
     """Kjør byggerne med fiendtlige data og se at markup kommer ut som tekst.
 

@@ -86,20 +86,20 @@ function backlogKort(rad) {
   if (backlogKanLose()) {
     knapper += rad.lost
       ? '<button type="button" class="btn btn-sm btn-outline-secondary"'
-        + ' data-action="backlogGjenapne" data-id="' + rad.id + '">Gjenåpne</button>'
+        + ' data-action="backlogGjenapne" data-id="' + escHtmlValue(rad.id) + '">Gjenåpne</button>'
       : '<button type="button" class="btn btn-sm btn-outline-success"'
-        + ' data-action="backlogSettLost" data-id="' + rad.id + '">Sett løst</button>';
+        + ' data-action="backlogSettLost" data-id="' + escHtmlValue(rad.id) + '">Sett løst</button>';
   }
   if (rad.kan_endres) {
     knapper += ' <button type="button" class="btn btn-sm btn-outline-primary"'
-      + ' data-action="backlogApneRediger" data-id="' + rad.id + '">Rediger</button>';
+      + ' data-action="backlogApneRediger" data-id="' + escHtmlValue(rad.id) + '">Rediger</button>';
   }
   // **Sletting leser `kan_slettes`, ikke `kan_endres`.** Har andre kommentert,
   // kan saken redigeres men ikke slettes — og en knapp som gir 409 er en knapp
   // som fører til en vegg.
   if (rad.kan_slettes) {
     knapper += ' <button type="button" class="btn btn-sm btn-outline-danger"'
-      + ' data-action="backlogSlett" data-id="' + rad.id + '">Slett</button>';
+      + ' data-action="backlogSlett" data-id="' + escHtmlValue(rad.id) + '">Slett</button>';
   }
 
   const beskrivelse = rad.beskrivelse
@@ -115,7 +115,7 @@ function backlogKort(rad) {
   // her?» i det man ser etter en vei inn i tråden.
   const antall = rad.antall_kommentarer || 0;
   const kommentarknapp = '<button type="button" class="btn btn-sm btn-outline-secondary"'
-    + ' data-action="backlogApneKommentarer" data-id="' + rad.id + '">'
+    + ' data-action="backlogApneKommentarer" data-id="' + escHtmlValue(rad.id) + '">'
     + '<i class="bi bi-chat-left-text"></i> ' + antall + '</button> ';
 
   return '<div class="card mb-2"><div class="card-body py-2">'
@@ -268,7 +268,7 @@ function backlogKommentarrad(k) {
   let knapper = '';
   if (k.kan_endres) {
     knapper = '<button type="button" class="btn btn-sm btn-link p-0 ms-2"'
-      + ' data-action="backlogSlettKommentar" data-id="' + k.id + '">Slett</button>';
+      + ' data-action="backlogSlettKommentar" data-id="' + escHtmlValue(k.id) + '">Slett</button>';
   }
   return '<div class="border-bottom pb-2 mb-2">'
     + '<div class="small text-muted">'
@@ -363,14 +363,14 @@ function backlogTyperad(t) {
     ? ' <span class="small text-muted">(' + escapeHtml(status) + ')</span>'
     : '';
   let knapper = '<button type="button" class="btn btn-sm btn-outline-secondary"'
-    + ' data-action="backlogVippType" data-id="' + t.id + '">'
+    + ' data-action="backlogVippType" data-id="' + escHtmlValue(t.id) + '">'
     + (t.er_aktiv ? 'Deaktiver' : 'Aktiver') + '</button>';
   // Sletting er global admin, og bare når ingen bruker typen. Knappen tegnes
   // ikke ellers — serveren svarer 409 uansett, men en knapp som fører til en
   // feilmelding er en knapp som fører til en vegg.
   if ((window.MODUL_TILGANG || {}).admin && !t.i_bruk) {
     knapper += ' <button type="button" class="btn btn-sm btn-outline-danger"'
-      + ' data-action="backlogSlettType" data-id="' + t.id + '">Slett</button>';
+      + ' data-action="backlogSlettType" data-id="' + escHtmlValue(t.id) + '">Slett</button>';
   }
   return '<div class="d-flex justify-content-between align-items-center gap-2 py-1">'
     + '<span>' + escapeHtml(t.navn) + statusHtml + '</span>'
@@ -450,7 +450,7 @@ function backlogFyllNedtrekk() {
   filterType.innerHTML = '<option value="">Alle</option>';
   feltType.innerHTML = '';
   typer.forEach(t => {
-    const o = '<option value="' + t.id + '">' + escapeHtml(t.navn) + '</option>';
+    const o = '<option value="' + escHtmlValue(t.id) + '">' + escapeHtml(t.navn) + '</option>';
     // **Filteret viser alle typene, skjemaet bare de aktive.** En deaktivert
     // type må kunne filtreres fram — innspillene som har den finnes fortsatt —
     // men den skal ikke kunne velges på noe nytt.

@@ -4,7 +4,7 @@ Reglene er egne funksjoner fordi de *avgjør* hva tavla viser og hva den lar
 deg gjøre — hvem som kan dras, hvor et slipp havner, hvilken rad en stolpe
 står i. De kjøres her i node, med data i den formen `/ko/api/tavle/` gir.
 
-Byggerne skannes for escaping i `ko/tests_js.py` (`KO_LOGG_BYGGERE`);
+Byggerne skannes for escaping i `core/tests_js_konkatenering.py`;
 oppførselsprøven med fiendtlige navn står her.
 """
 import json

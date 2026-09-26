@@ -18,7 +18,7 @@ from patients.js_test_utils import (JS_DIR, PORTAL_UTILS_JS, build_harness,
 BACKLOG_JS = JS_DIR / 'backlog.js'
 
 HARNESS = (
-    (PORTAL_UTILS_JS, ('escapeHtml',)),
+    (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
     (BACKLOG_JS, ('backlogNivaaMinst', 'backlogKanMeldeInn', 'backlogKanLose',
                   'backlogTellertekst', 'backlogTidspunkt', 'backlogTypemerke',
                   'backlogModulnavn', 'backlogKort', 'backlogKommentarrad')),
