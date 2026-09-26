@@ -166,13 +166,6 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
         Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
         med. Avgjøres **før** noen bygger en avmeldingsknapp.
-- [ ] **Slett kolonnen `core_modulesettings.backup_enabled` — deploy 2 av D4.** Når
-      `core/0012` har vært i prod (ute fra 26. sep. 2026 eller senere): en migrasjon med
-      `RunSQL('ALTER TABLE core_modulesettings DROP COLUMN backup_enabled')` og ingen
-      `state_operations` (Django kjenner ikke feltet lenger). **Ikke før** — i vinduet
-      mellom `migrate` og containerbyttet kjører den gamle koden, og den velger kolonnen i
-      hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
-      PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
 - [ ] **`enhetstimer` i bemanningsstatistikken teller en bil to ganger** når to ressurser
       er koblet til samme enhet og skiftene overlapper (`Ressurs.enhet` er en FK — dagbil og
       nattbil kan være samme bil). `vaktliste/statistikk.py` summerer unionen *per ressurs*;

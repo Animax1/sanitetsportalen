@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Kolonnen `backup_enabled` slettes (D4, deploy 2)  `#core #migrasjon`
+
+**Hvorfor:** steg 2 av to. `core/0012` (på `main` fra `6b59293`) lot Django glemme feltet og ga
+kolonnen en standardverdi i basen; ingen kode har nevnt den siden. `core/0013` sletter den
+med `RunSQL` — ren skjemaendring, ingen `state_operations`, ingen data.
+
+**Forutsetning før `main`:** prod må kjøre koden fra `0012` (`4813cee` eller nyere). I vinduet
+mellom `migrate` og containerbyttet er det forrige deploys kode som svarer, og den må ikke
+kjenne kolonnen. Står `main` på `4813cee` og prod-footeren viser det, er det oppfylt.
+
+**Prøvd mot ekte PostgreSQL i en engangsbase:** stått på `0012` med 8 rader i moduloppsettet →
+`0013` (kolonnen borte, radene intakte) → **tilbake til `0012`** (kolonnen tilbake som
+`NOT NULL DEFAULT false`, og en rad lagt inn uten å nevne den fikk `false`, slik `0012`-koden
+forutsetter) → fram til `0013` igjen. `verifiser_migrasjoner` grønn. Raden i
+`core.backup.UTGAATTE_FELT` blir stående: backupfilene med feltet lever 730 dager.
+
 ## 2026-09-26 — Historikksøket fant ikke bil nummer to  `#oppdrag`
 
 **Hvorfor:** søket i historikken («Søk på nummer, problemstilling, lokasjon eller enhet»)
