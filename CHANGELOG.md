@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Norsk alfabetisk rekkefølge i hele portalen: Æ Ø Å sist, likt overalt  `#core`
+
+**Hvorfor:** raden på server-status viste staging: **«Blandet inn (Æ=AE, Ø=O, Å=A)» —
+`en_US.utf8`, PostgreSQL 18.6**. Korps-nedtrekket i vaktlista sto som «Ærø · Ålesund ·
+bergen · Ørsta · Oslo», nedtrekket for skift satte «Ærlig Ærdal» over «Anne Berg», og
+førstehjelperne i pasientskjemaet likeså. André valgte den hele løsningen framfor å sortere
+nedtrekkene i nettleseren, etter spørsmålet «Kompliserer denne sorteringen de ulike
+reglene vi har allerede? F.eks vaktliste hvor leder rolle skal stå øverst i skiftene».
+
+**`core/sortering.py` — én regel, tre innganger:**
+
+| Hvor | Bruk |
+|---|---|
+| `Meta.ordering` / `order_by()` | `Norsk('navn')` → PostgreSQL: `LOWER(x) COLLATE "nb-NO-x-icu"`; SQLite: egen kollasjon `norsk` |
+| Python | `sorted(..., key=norsk_nokkel)` |
+| JS | `localeCompare(…, 'nb')` |
+
+Norsk rekkefølge: Andøy · bergen · Bergen · Émile · Haugesund · Oslo · Zeta · Ærø · Ørsta ·
+Ålesund · Aasen. **«Aa» er Å** (CLDR, som ICU og nettleseren). ICU, `norsk_nokkel` og
+nettleserens `'nb'` ga identisk rekkefølge; `BasenSortererNorskTests` holder ICU og nøkkelen
+enige i CI.
+
+**`Norsk` er bare navnenøkkelen.** «Lagleder før hospitant» (`Ressursrolle.rekkefolge`) og
+«tid før rolle» i skiftene står foran den og er urørt — `RollenFoerNavnetTests` prøver det
+med en leder som heter Øyvind.
+
+**Mangler ICU-kollasjonen, faller den tilbake** til `LOWER(x)` — dagens sortering, ikke
+en 500 på hver liste. Raden på server-status viser nå **portalens** rekkefølge, med
+«Basen alene» under; blir den gul, er kollasjonen borte.
+
+**Omfang — og hvorfor stedene utledes:** 18 modeller (`Meta.ordering`), 19 argumenter til
+`order_by(...)`, 6 Python-sorteringer, 9 `localeCompare`. Min første gjennomgang fant 4 av
+`order_by`-argumentene; `HverNavnesorteringErNorskTests` fant **15 til** (KO-tavla, programmet, lokasjonene, pasientregistrene, vaktlista som fil,
+besetningen) — et søk på `order_by('navn')` så ikke `order_by('rekkefolge', 'navn')`. Testen
+leser `Meta.ordering` fra modellene og `order_by(...)` med AST, og `test_regelen_ser_det_den_skal`
+holder at den kjenner igjen `'navn'`, `Lower('navn')` og `F('…__navn')`. Unntatt: arkivets
+`enhet_navn` (signert radform). **Migrasjoner:** fem `AlterModelOptions` (`*_norsk_sortering`),
+uten SQL.
+
+**Bifunn rettet:** `vaktliste/api/mannskap/` teller skift med `annotate(Count)`, og da dropper
+Django `Meta.ordering` — lista kom usortert. Eksplisitt `order_by` nå, med test gjennom
+endepunktet. **CI kjører PostgreSQL 18**, som Railway (var 16). **Rotas tegngrense hevet til
+66 000**, bevisst, med begrunnelse i `core/tests_claude_md.py`; kommentaren om `--parallel`
+rettet samtidig (feilen var `tblib`, ikke `core`).
+
+**Tester som før unngikk Æ/Ø/Å bruker dem nå:** «ålesund 1» er tilbake i enhetslista
+(`oppdrag/tests_runde_e.py`), og verdimengdetesten i `vaktliste/tests.py` har Ærø, Ølen, Åkra.
+
+**Mutanter: 17 gyldige, alle drept til slutt.** To overlevde: besetningens to
+Python-sorteringer (`besetning`, `ressurser_uten_enhet`) kunne byttes tilbake til `.lower()`
+— ingen test hadde Æ/Ø/Å der. Tester lagt til i `tests_besetning` og
+`tests_ressurser_uten_enhet`. **To mutanter var ugyldige og ble kjørt på nytt:** én traff to
+steder, og én ga en syntaksfeil i stedet for å fjerne `connection_created`-koblingen (kallet
+går over to linjer) — «rødt» fra en syntaksfeil beviser ingenting. Riktig kjørt gir den
+`no such collation sequence: norsk`.
+
+**Kjørt:** hele suiten på SQLite og på PostgreSQL 16 lokalt — 3 823 + 862, grønn begge.
+
 ## 2026-09-26 — Server-status viser hvordan basen sorterer Æ, Ø og Å  `#core/drift`
 
 **Hvorfor:** CI viste at «ålesund» sorteres først i en_US og sist i C, og spørsmålet ble

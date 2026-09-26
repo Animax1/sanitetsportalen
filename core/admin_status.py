@@ -203,6 +203,10 @@ def _get_db_health():
 # som Å, Æ, Ø. CI viste forskjellen, og ingen kunne se hva prod gjør uten
 # SQL-tilgang. Kortet viser derfor **svaret, ikke innstillingen** — på en
 # ICU-base sier `datcollate` «C.UTF-8» mens sorteringen er en_US.
+#
+# Fra samme dag sorterer portalen selv norsk (`core/sortering.py`), og raden
+# viser **portalens** svar. Basens eget står under: blir portalens rad gul, er
+# den norske kollasjonen borte og `Norsk` har falt tilbake til basens.
 
 #: «bergen» med liten b: prøven skal også avsløre en sortering uten `lower()`,
 #: som ville satt små bokstaver etter alle store.
@@ -224,19 +228,30 @@ def sortering_vurdering(rekkefolge) -> str:
 
 
 def _db_sortering(connection) -> dict:
-    """Sorterer prøvenavnene i basen, slik appens egne `Lower('navn')` gjør.
-    Kolonnene er laget uten egen kollasjon, så basens standard er den som
-    gjelder — det er den prøven treffer."""
+    """Sorterer prøvenavnene to ganger: slik **portalen** gjør (`Norsk`, se
+    `core/sortering.py`) og slik **basen alene** gjør (`lower()` med basens
+    standardkollasjon, som portalen brukte fram til 26. sep. 2026). Den første
+    er raden; den andre sier hvorfor den trengs."""
+    from core.sortering import norsk_sql, norsk_tilgjengelig
+
     utvalg = ' UNION ALL '.join(['SELECT %s AS n'] * len(SORTERINGSPROVE))
-    with connection.cursor() as cur:
-        cur.execute(f'SELECT n FROM ({utvalg}) AS prove ORDER BY lower(n)', list(SORTERINGSPROVE))
-        rekkefolge = [rad[0] for rad in cur.fetchall()]
-        kollasjon = versjon = None
-        if connection.vendor == 'postgresql':
+
+    def sorter(uttrykk):
+        with connection.cursor() as cur:
+            cur.execute(f'SELECT n FROM ({utvalg}) AS prove ORDER BY {uttrykk}', list(SORTERINGSPROVE))
+            return [rad[0] for rad in cur.fetchall()]
+
+    portalen = sorter(norsk_sql(connection, 'n'))
+    basen = sorter('lower(n)')
+    kollasjon = versjon = None
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cur:
             cur.execute("SELECT datcollate, current_setting('server_version') "
                         "FROM pg_database WHERE datname = current_database()")
             kollasjon, versjon = cur.fetchone()
-    return {'rekkefolge': rekkefolge, 'vurdering': sortering_vurdering(rekkefolge),
+    return {'rekkefolge': portalen, 'vurdering': sortering_vurdering(portalen),
+            'basen': basen, 'basen_vurdering': sortering_vurdering(basen),
+            'norsk_regel': norsk_tilgjengelig(connection),
             'kollasjon': kollasjon, 'versjon': versjon}
 
 

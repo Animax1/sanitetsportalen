@@ -25,6 +25,8 @@ from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.sortering import Norsk
+
 
 #: Hvem som skrev linja. To verdier, og skillet er det §3.1 kaller «bilen sa
 #: det» mot «KO førte det» — det skal være synlig i grensesnittet og i loggen,
@@ -589,7 +591,7 @@ class Ansvarsomraade(models.Model):
     class Meta:
         verbose_name = 'Ansvarsområde'
         verbose_name_plural = 'Ansvarsområder'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self):
         return self.navn
@@ -807,7 +809,7 @@ class Konserttype(models.Model):
     class Meta:
         verbose_name = 'Artist'
         verbose_name_plural = 'Artister'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self):
         return self.navn
@@ -825,7 +827,7 @@ class Kjennetegn(models.Model):
     class Meta:
         verbose_name = 'Kjennetegn'
         verbose_name_plural = 'Kjennetegn'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self):
         return self.navn
@@ -871,7 +873,7 @@ class Programpost(models.Model):
     class Meta:
         verbose_name = 'Programpost'
         verbose_name_plural = 'Programposter'
-        ordering = ['fra', 'lokasjon_navn', 'id']
+        ordering = ['fra', Norsk('lokasjon_navn'), 'id']
 
     def __str__(self):
         return f'{self.navn} · {self.lokasjon_navn}'

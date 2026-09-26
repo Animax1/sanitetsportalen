@@ -77,7 +77,7 @@ operatøren (`POST api/oppdrag/<pk>/antall/<n>/`, `skriv_handling`, som grovsort
 bare der problemstillingen bærer et antall; tomt vises som «1 pasient», ellers «N
 pasienter». Tømmes for problemstillinger uten — ikke i arkivet. `Enhet.enhetstype` (FK,
 null = «Uten type») grupperer tavla og «Nytt oppdrag» i typenes rekkefølge, alfabetisk
-innenfor gruppa (`_grupperEnheter()` i JS; serveren sorterer på `Lower(navn)`), og settes
+innenfor gruppa (`_grupperEnheter()` i JS; serveren sorterer på `Norsk('navn')`), og settes
 i enhetspanelet (`PUT api/enheter/<pk>/` med `type` = ID, `skriv_full`).
 
 **Ressurslista viser «ledig siden»** (16. sep. 2026, André). En ledig enhet har ingen aktiv

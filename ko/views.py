@@ -49,6 +49,7 @@ from core.auth_decorators import (
 )
 from core.jsdata import js_json
 from core.ratelimit import rate_limit
+from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
@@ -1204,7 +1205,7 @@ def tavle_oppsett_view(request):
     return JsonResponse({'status': 'ok', 'data': {
         'lokasjoner': [{
             'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
-        } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')],
+        } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'andel_bak': tavle.andel_bak(),
         'steg_min': tavle.steg_min(),
     }})

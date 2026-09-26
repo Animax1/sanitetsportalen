@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from core.arkiv import AbstractArkiv
 from core.models import BaseTimeStampedModel
+from core.sortering import Norsk
 
 from . import choices
 
@@ -99,7 +100,7 @@ class Enhet(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Enhet'
         verbose_name_plural = 'Enheter'
-        ordering = ['navn']
+        ordering = [Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -140,7 +141,7 @@ class Enhetstype(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Enhetstype'
         verbose_name_plural = 'Enhetstyper'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -231,7 +232,7 @@ class Problemstilling(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Problemstilling'
         verbose_name_plural = 'Problemstillinger'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -304,7 +305,7 @@ class Lokasjon(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Lokasjon'
         verbose_name_plural = 'Lokasjoner'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn

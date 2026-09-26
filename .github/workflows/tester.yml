@@ -30,7 +30,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18   # som Railway (server-status viste 18.6, 26. sep. 2026)
         env:
           POSTGRES_PASSWORD: postgres
         ports: ['5432:5432']

@@ -32,6 +32,8 @@ from datetime import datetime, time, timedelta
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from core.sortering import norsk_nokkel
+
 from . import services
 from .models import Overnatting, Overnattingsrom, Vaktpost
 
@@ -379,7 +381,7 @@ def data_for(vaktliste, user) -> dict:
                         .select_related('mannskap', 'mannskap__korps'))
     vakt = paa_vakt(vaktliste, plasseringer)
     telefon = vis_telefon(user)
-    plasseringer.sort(key=lambda o: (o.natt, o.mannskap.navn.lower()))
+    plasseringer.sort(key=lambda o: (o.natt, norsk_nokkel(o.mannskap.navn)))
     return {
         'netter': [n.isoformat() for n in netter(vaktliste)],
         'netter_i_vakta': [n.isoformat() for n in netter_i_vakta(vaktliste)],

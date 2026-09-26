@@ -542,8 +542,11 @@ const ADMIN_URLS = {
     }
     const [tekst, klasse] = SORTERING_TEKST[s.vurdering] || [s.vurdering, ''];
     setVal('db-sortering', tekst, klasse);
+    const basen = SORTERING_TEKST[s.basen_vurdering] || [s.basen_vurdering];
     rekke.textContent = s.rekkefolge.join(' · ')
-      + (s.kollasjon ? ' — datcollate ' + s.kollasjon + ', PostgreSQL ' + s.versjon : '');
+      + (s.norsk_regel ? '' : ' — norsk regel mangler, faller tilbake til basens')
+      + ' · Basen alene: ' + basen[0]
+      + (s.kollasjon ? ' (datcollate ' + s.kollasjon + ', PostgreSQL ' + s.versjon + ')' : '');
   }
 
   function renderDbAktivitet(db) {

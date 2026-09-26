@@ -18,7 +18,7 @@ from core.models import AppSetting
 from oppdrag.models import Enhet
 
 from . import services
-from .models import Vaktpost
+from .models import Mannskap, Vaktpost
 from .test_helpers import AMBULANSE, gruppe, lag_ressurs
 from .tests_tilgang import TilgangsBasis
 
@@ -50,6 +50,13 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         self.assertIn('Lag HGSD', navn)
         self.assertIn('KO', navn)
         self.assertNotIn('Ambulanse 1', navn, 'bilen står i /oppdrag/ alt')
+
+    def test_navnene_staar_i_norsk_rekkefolge(self):
+        """Samme regel som besetningen i `/oppdrag/` (26. sep. 2026)."""
+        for navn in ('Åse', 'Ærlig', 'Ola'):
+            self._skift(self.res_hgsd, Mannskap.objects.create(navn=navn, korps=self.hgsd))
+        rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
+        self.assertEqual([m['navn'] for m in rader['Lag HGSD']['mannskap']], ['Ola', 'Ærlig', 'Åse'])
 
     def test_bemanningen_er_de_som_har_skift_naa(self):
         self._skift(self.res_hgsd, self.p_hgsd, mott_at=self.na)

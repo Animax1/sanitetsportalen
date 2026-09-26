@@ -10,13 +10,10 @@ leser fila:
    *betyr* rekkefølgen noe (fanerekkefølgen på planleggingssiden), og der
    settes den automatisk.
 
-   **`Lower(...)` er ikke pynt.** Uten den sorterer basen på kodepunkt, og da
-   havner «karmøy» etter «Åsen» i én base og før «Bokn» i en annen — sorteringen
-   ville sett ulik ut i dev (SQLite) og prod (PostgreSQL). Æ/Ø/Å står vi
-   derimot igjen med databasens svar på: en ekte norsk kollasjon krever enten
-   en sorteringsnøkkel-kolonne eller en `db_collation`, og for en håndfull
-   korps er det ikke verdt det. Det er notert i TODO om noen får et korps som
-   begynner på Å.
+   **`Norsk('navn')` er ikke pynt** (`core/sortering.py`, 26. sep. 2026).
+   Uten den er «alfabetisk» databasens alfabet: Railway (en_US) leste Æ som AE,
+   Ø som O og Å som A, og SQLite la dem sist som Å, Æ, Ø. `Lower(...)` sto her
+   før og tok bare store/små bokstaver.
 1. **`Korps`, `Kompetanse` og `Ressursrolle` er tabeller, ikke `choices.py`.**
    Motsatt av oppdragsmodulen, der problemstilling og hastegrad ligger i
    kode. Skillet er det samme som mellom `PROBLEMSTILLING` og `Lokasjon`:
@@ -59,6 +56,7 @@ from django.db.models import F
 from django.db.models.functions import Lower
 
 from core.models import BaseTimeStampedModel
+from core.sortering import Norsk
 
 from . import choices
 
@@ -89,7 +87,7 @@ class Korps(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Korps'
         verbose_name_plural = 'Korps'
-        ordering = [Lower('navn')]
+        ordering = [Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -137,7 +135,7 @@ class Kompetanse(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Kompetanse'
         verbose_name_plural = 'Kompetanser'
-        ordering = [Lower('navn')]
+        ordering = [Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -199,7 +197,7 @@ class Ressursgruppe(BaseTimeStampedModel):
         verbose_name_plural = 'Ressursgrupper'
         # Rekkefølgen betyr noe her, som på `Ressurs` — den styrer fanene og
         # rekkefølgen på bemanningskurvene. Navnet avgjør bare uavgjort.
-        ordering = ['rekkefolge', Lower('navn')]
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -262,7 +260,7 @@ class Ressursrolle(BaseTimeStampedModel):
         verbose_name_plural = 'Ressursroller'
         # Navnet avgjør bare uavgjort — to roller med samme rekkefølge er en
         # vilkårlig rekkefølge, og vilkårlig skal i det minste være stabil.
-        ordering = ['gruppe__rekkefolge', 'rekkefolge', Lower('navn')]
+        ordering = ['gruppe__rekkefolge', 'rekkefolge', Norsk('navn')]
         constraints = [
             models.UniqueConstraint(
                 fields=['gruppe', 'navn'], name='unikt_rollenavn_per_gruppe'),
@@ -383,7 +381,7 @@ class Mannskap(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Mannskap'
         verbose_name_plural = 'Mannskap'
-        ordering = [Lower('korps__navn'), Lower('navn')]
+        ordering = [Norsk('korps__navn'), Norsk('navn')]
         constraints = [
             # Unikt per korps, ikke globalt: to korps kan ha hver sin
             # «Ola Hansen», men to like navn i samme korps er umulige å
@@ -618,7 +616,7 @@ class Ressurs(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Ressurs'
         verbose_name_plural = 'Ressurser'
-        ordering = ['rekkefolge', 'navn']
+        ordering = ['rekkefolge', Norsk('navn')]
         constraints = [
             models.UniqueConstraint(
                 fields=['vaktliste', 'navn'], name='unikt_ressursnavn_per_vaktliste'),
@@ -744,7 +742,7 @@ class Vaktpost(BaseTimeStampedModel):
         ordering = [
             'fra_tid',
             F('rolle__rekkefolge').asc(nulls_last=True),
-            F('mannskap__navn').asc(nulls_first=True),
+            Norsk('mannskap__navn').asc(nulls_first=True),
         ]
         constraints = [
             # Samme person, samme ressurs, samme starttid er en dobbeltføring.

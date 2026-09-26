@@ -31,6 +31,8 @@ from django.utils import timezone
 import json
 from datetime import timedelta
 
+from core.sortering import Norsk
+
 from .models import HENDELSE_APEN, HendelseLag, PlanlagtPause, Tavleplassering
 from .services import Ugyldig, systemlinje
 
@@ -79,7 +81,7 @@ def ressurser_paa_tavla(naa=None, *, med_biler=True):
                     enhet__er_aktiv=True)
     return list(Ressurs.objects.filter(utvalg)
                 .select_related('gruppe', 'enhet')
-                .order_by('gruppe__rekkefolge', 'gruppe__navn', 'rekkefolge', 'navn'))
+                .order_by('gruppe__rekkefolge', Norsk('gruppe__navn'), 'rekkefolge', Norsk('navn')))
 
 
 def opptatt(ressurser, vakt) -> dict:
@@ -725,7 +727,7 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         'vakt_start': _iso(vakt.startet),
         'fulgte': fulgte(),
         'rader': [{'id': l.pk, 'navn': l.navn}
-                  for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')
+                  for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))
                   if l.pk not in ute],
         # KOs egne og vaktlistas, se `effektive_pauser`. `kilde` er «ko»,
         # «vaktliste» eller «endret» (i drift).
@@ -779,5 +781,5 @@ def _planbare(med_biler) -> list[dict]:
     if not med_biler:
         qs = qs.filter(enhet__isnull=True)
     return [{'id': r.pk, 'navn': r.navn, 'gruppe_id': r.gruppe_id, 'bil': r.enhet_id is not None}
-            for r in qs.order_by('gruppe__rekkefolge', 'gruppe__navn', 'rekkefolge', 'navn')]
+            for r in qs.order_by('gruppe__rekkefolge', Norsk('gruppe__navn'), 'rekkefolge', Norsk('navn'))]
 

@@ -21,7 +21,8 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
-from django.db.models.functions import Lower
+
+from core.sortering import Norsk
 
 
 class Innspilltype(models.Model):
@@ -59,7 +60,7 @@ class Innspilltype(models.Model):
     class Meta:
         verbose_name = 'Innspilltype'
         verbose_name_plural = 'Innspilltyper'
-        ordering = ['rekkefolge', Lower('navn')]
+        ordering = ['rekkefolge', Norsk('navn')]
 
     def __str__(self):
         return self.navn

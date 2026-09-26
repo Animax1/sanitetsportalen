@@ -445,7 +445,10 @@ def mannskap_view(request):
             Mannskap.objects
             .select_related('korps', 'user')
             .prefetch_related('kompetanser')
-            .annotate(i_bruk_antall=Count('vaktposter')),
+            .annotate(i_bruk_antall=Count('vaktposter'))
+            # Eksplisitt: med `annotate(Count)` er spørringen en GROUP BY, og
+            # da dropper Django `Meta.ordering` (26. sep. 2026).
+            .order_by(*Mannskap._meta.ordering),
             request.user)
         foreldre = services.foreldrekart()
         kjente = _kjente_eposter()

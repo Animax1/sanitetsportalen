@@ -1206,7 +1206,7 @@ function planleggerLesTilbake() {
 
   return (aktivListe?.ressurser || []).map((r) => {
     const funnet = [...(perRessurs.get(r.id) || new Map()).values()]
-      .sort((a, b) => String(a.fra).localeCompare(String(b.fra)))
+      .sort((a, b) => String(a.fra).localeCompare(String(b.fra), 'nb'))
       .map((v) => ({ id: planleggerNesteId++, ...v }));
     return {
       id: planleggerNesteId++,

@@ -2,6 +2,8 @@
 from django.conf import settings
 from django.db import models, transaction
 
+from core.sortering import Norsk
+
 
 class Forstehjelper(models.Model):
     """Førstehjelper som kan knyttes til pasienter.
@@ -34,7 +36,7 @@ class Forstehjelper(models.Model):
     class Meta:
         verbose_name = 'Førstehjelper'
         verbose_name_plural = 'Forstehjelpere'
-        ordering = ['-is_active', 'name']
+        ordering = ['-is_active', Norsk('name')]
 
     def __str__(self):
         suffix = '' if self.is_active else ' (inaktiv)'
@@ -70,7 +72,7 @@ class Helsepersonell(models.Model):
     class Meta:
         verbose_name = 'Helsepersonell'
         verbose_name_plural = 'Helsepersonell'
-        ordering = ['-is_active', 'name']
+        ordering = ['-is_active', Norsk('name')]
 
     def __str__(self):
         suffix = '' if self.is_active else ' (inaktiv)'

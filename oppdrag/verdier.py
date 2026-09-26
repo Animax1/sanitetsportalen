@@ -18,7 +18,8 @@ Regler som ikke står i tabellen:
 """
 from __future__ import annotations
 
-from django.db.models.functions import Lower
+from core.sortering import Norsk, norsk_nokkel
+
 
 from . import choices
 from .models import Enhetstype, Lydvarsel, Problemstilling
@@ -26,7 +27,7 @@ from .models import Enhetstype, Lydvarsel, Problemstilling
 
 def _sortert(rader):
     """Udefinert først; resten på rekkefølge, så navn."""
-    return sorted(rader, key=lambda r: (0 if r.er_fast else 1, r.rekkefolge, r.navn.lower()))
+    return sorted(rader, key=lambda r: (0 if r.er_fast else 1, r.rekkefolge, norsk_nokkel(r.navn)))
 
 
 def problemstillinger(*, inkluder_inaktive=False):
@@ -90,7 +91,7 @@ def enhetstyper(*, inkluder_inaktive=False):
     qs = Enhetstype.objects.all()
     if not inkluder_inaktive:
         qs = qs.filter(er_aktiv=True)
-    return list(qs.order_by('rekkefolge', Lower('navn')))
+    return list(qs.order_by('rekkefolge', Norsk('navn')))
 
 
 # ── Lydvarselet ──────────────────────────────────────────────────────────────

@@ -4,6 +4,9 @@ CI viste at «ålesund» sorteres først i en_US og sist i C, og ingen kunne se 
 prod gjør uten SQL-tilgang. Kortet viser **svaret, ikke innstillingen**: på en
 ICU-base sier `datcollate` «C.UTF-8» mens sorteringen er en_US (prøvd lokalt mot
 begge). `sortering_vurdering()` er regelen; kortet tegner den.
+
+Samme dag begynte portalen å sortere norsk selv (`core/sortering.py`), og raden
+viser nå **portalens** rekkefølge, med basens egen under som `basen`.
 """
 import unittest
 from unittest import mock
@@ -47,9 +50,18 @@ class ProvenKjorerMotBasenTests(TestCase):
         self.assertEqual(sorted(s['rekkefolge']), sorted(SORTERINGSPROVE))
         self.assertEqual(s['vurdering'], sortering_vurdering(s['rekkefolge']))
 
+    def test_portalen_sorterer_norsk(self):
+        """Raden er portalens svar (`Norsk`), ikke basens — og den er norsk
+        både på SQLite og på PostgreSQL med ICU."""
+        s = admin_status._get_db_health()['sortering']
+        self.assertEqual(s['vurdering'], 'norsk')
+        self.assertTrue(s['norsk_regel'])
+        self.assertEqual(sorted(s['basen']), sorted(SORTERINGSPROVE))
+        self.assertEqual(s['basen_vurdering'], sortering_vurdering(s['basen']))
+
     @unittest.skipUnless(connection.vendor == 'sqlite', 'SQLites lower() er bare ASCII')
-    def test_sqlite_sorterer_paa_kodepunkt(self):
-        self.assertEqual(admin_status._get_db_health()['sortering']['vurdering'], 'kodepunkt')
+    def test_sqlite_alene_sorterer_paa_kodepunkt(self):
+        self.assertEqual(admin_status._get_db_health()['sortering']['basen_vurdering'], 'kodepunkt')
 
     @unittest.skipUnless(connection.vendor == 'postgresql', 'krever PostgreSQL — kjøres i CI')
     def test_postgresql_oppgir_kollasjon_og_versjon(self):

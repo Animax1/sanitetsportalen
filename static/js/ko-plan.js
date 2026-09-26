@@ -168,7 +168,7 @@ function koPlanTidslinje(poster, vindu, steder) {
       r.baner[bane] = x.til;
       r.poster.push({ post: x.p, bane, venstre: koTavleProsent(x.fra, vindu), hoyre: 100 - koTavleProsent(x.til, vindu) });
     });
-  return Array.from(rader.values()).sort((a, b) => a.rekke - b.rekke || a.sted.localeCompare(b.sted))
+  return Array.from(rader.values()).sort((a, b) => a.rekke - b.rekke || a.sted.localeCompare(b.sted, 'nb'))
     .map((r) => ({ sted: r.sted, poster: r.poster, baner: Math.max(1, r.baner.length) }));
 }
 

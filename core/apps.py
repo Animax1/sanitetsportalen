@@ -35,6 +35,15 @@ class CoreConfig(AppConfig):
     def ready(self):
         post_migrate.connect(_ensure_module_settings_defaults, sender=self)
 
+        # Norsk sortering i SQLite (26. sep. 2026): `Norsk('navn')` ber om
+        # kollasjonen `norsk`, og den finnes bare når den legges inn på hver
+        # ny tilkobling. PostgreSQL har sin egen (ICU) — se `core/sortering.py`.
+        from django.db.backends.signals import connection_created
+
+        from .sortering import registrer_sqlite_kollasjon
+        connection_created.connect(registrer_sqlite_kollasjon,
+                                   dispatch_uid='core.sortering.sqlite')
+
         # Audit for portalens egne tabeller (14. sep. 2026). `AppSetting`,
         # `ModuleSettings` og `Vakt` sto uten i det hele tatt: å slå av en
         # modul for alle, eller flytte sesjonstimeouten, etterlot ingen spor.

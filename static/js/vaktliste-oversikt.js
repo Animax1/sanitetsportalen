@@ -235,9 +235,9 @@ function _skiftrekkefolge(a, b) {
   // havner midt blant de lange — det var André som så det: en rad som slutter
   // 22:15 lå mellom rader som slutter 03:00 neste dag. Rekkefølgen skal si
   // noe, ellers er den bare innsettingsrekkefølgen forkledd som sortering.
-  return a.fra_tid.localeCompare(b.fra_tid)
-      || a.til_tid.localeCompare(b.til_tid)
-      || (a.navn || '').localeCompare(b.navn || '');
+  return a.fra_tid.localeCompare(b.fra_tid, 'nb')
+      || a.til_tid.localeCompare(b.til_tid, 'nb')
+      || (a.navn || '').localeCompare(b.navn || '', 'nb');
 }
 
 
@@ -1233,7 +1233,7 @@ function mkTilstede() {
     .filter((r) => perRessurs.has(r.id))
     .map((r) => {
       const linjer = perRessurs.get(r.id)
-        .slice().sort((a, b) => (a.navn || '').localeCompare(b.navn || ''))
+        .slice().sort((a, b) => (a.navn || '').localeCompare(b.navn || '', 'nb'))
         .map((vp) => `
           <tr>
             <td class="vl-navn">${escapeHtml(vp.navn)}</td>

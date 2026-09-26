@@ -380,7 +380,7 @@ function tidslinjeEnhetHtml(o) {
   const egne = (o.statusmeldinger || []).map((m) => ({ m, andres: false }));
   const andre = (o.andre_meldinger || []).map((m) => ({ m, andres: true }));
   const rader = egne.concat(andre)
-    .sort((x, y) => String(x.m.tidspunkt).localeCompare(String(y.m.tidspunkt)));
+    .sort((x, y) => String(x.m.tidspunkt).localeCompare(String(y.m.tidspunkt), 'nb'));
   return rader.map(({ m, andres }) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
     // statusordet — det er tidspunktet som er utledet. Gråtoner, ingen

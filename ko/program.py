@@ -22,6 +22,8 @@ from datetime import timedelta
 
 from django.db import transaction
 
+from core.sortering import Norsk
+
 from .models import (BEREDSKAP_NAVN, Kjennetegn, Konserttype, Programbehov, Programendring,
                      Programpost, Tavleplassering)
 from .services import Ugyldig, systemlinje
@@ -133,7 +135,7 @@ def bilde(post) -> dict:
         'beredskap': BEREDSKAP_NAVN.get(post.beredskap, ''),
         'publikum': str(post.publikum) if post.publikum is not None else '',
         'kjennetegn': ', '.join(sorted(k.navn for k in post.kjennetegn.all())),
-        'behov': ', '.join(f'{b.antall} {b.gruppe_navn}' for b in post.behov.order_by('gruppe_navn')),
+        'behov': ', '.join(f'{b.antall} {b.gruppe_navn}' for b in post.behov.order_by(Norsk('gruppe_navn'))),
     }
 
 
@@ -301,13 +303,13 @@ def program_data(vakt) -> dict:
         # Stedene her og ikke fra sentralbordet: planleggeren skal virke for
         # den som har KO uten oppdragstilgang, og stedsnavnene er ikke oppdrag.
         'steder': [{'id': l.pk, 'navn': l.navn}
-                   for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')],
+                   for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'konserttyper': [{'id': t.pk, 'navn': t.navn, 'er_aktiv': t.er_aktiv}
                          for t in Konserttype.objects.all()],
         'kjennetegn': [{'id': k.pk, 'navn': k.navn, 'er_aktiv': k.er_aktiv}
                        for k in Kjennetegn.objects.all()],
         'grupper': [{'id': g.pk, 'navn': g.navn}
-                    for g in Ressursgruppe.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')],
+                    for g in Ressursgruppe.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'beredskap': [{'verdi': v, 'navn': n} for v, n in BEREDSKAP_NAVN.items()],
         # Tidsvinduet er tavlas (23. sep. 2026), og konsertplanleggeren følger
         # det — også for den som har KO uten vaktlistetilgang, og dermed ingen tavle.
@@ -454,7 +456,7 @@ def plan_mot_faktisk(vakt, naa=None) -> list[dict]:
 
     naa = naa or timezone.now()
     poster = list(Programpost.objects.filter(vakt=vakt)
-                  .prefetch_related('behov', 'endringer').order_by('fra', 'lokasjon_navn', 'id'))
+                  .prefetch_related('behov', 'endringer').order_by('fra', Norsk('lokasjon_navn'), 'id'))
     plasseringer = list(Tavleplassering.objects.filter(vakt=vakt, pause=False)
                         .select_related('ressurs__gruppe'))
     ut = []

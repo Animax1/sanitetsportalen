@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
+from core.sortering import Norsk
 
 from .models import Forstehjelper, Helsepersonell
 from .views_common import _json_body
@@ -50,7 +51,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             server» og ETag sier «hvis samme, send 304».
         """
         if request.method == 'GET':
-            rader = list(model.objects.all().order_by('-is_active', 'name'))
+            rader = list(model.objects.all().order_by('-is_active', Norsk('name')))
             data = [{'id': r.id, 'name': r.name, 'is_active': r.is_active} for r in rader]
 
             # ETag som SHA-256-hash av (id, name, is_active)-tupler. sha256

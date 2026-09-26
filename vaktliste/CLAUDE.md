@@ -258,9 +258,8 @@ og de må ikke slås sammen.
 - **De øvrige verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
   vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
   der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
-  `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og
-  PostgreSQL (prod) svarer ulikt på store/små bokstaver. Æ/Ø/Å er fortsatt
-  databasens svar.
+  `Norsk('navn')` (`core/sortering.py`, 26. sep. 2026): Æ Ø Å sist, likt i SQLite
+  og PostgreSQL. Med `Lower(...)` sto Ærø øverst og Ørsta blant O-ene på Railway.
 - **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
   sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
   der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke

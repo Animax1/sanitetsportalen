@@ -88,11 +88,9 @@ python manage.py runserver           # http://127.0.0.1:8000/
 # `core/tests_ci.py` krever at hver app med tester står i CI-kjøringen.
 python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog myproject -v 2
 
-# Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).
-# `core` må stå for seg: `core/tests_backup.py` skriver ekte backupfiler til én
-# mappe og rører det globale handlerregisteret, så fire arbeidere kolliderer —
-# feilen kommer ut som «cannot pickle 'traceback' object», som ikke ligner det
-# den er. Alt annet tåler `--parallel` fint.
+# Samme suite, delt (~106 s mot 190). `core` står for seg: `core/tests_backup.py`
+# skriver ekte backupfiler til én mappe og rører det globale handlerregisteret.
+# `--parallel` trenger `tblib` (`requirements-ci.txt`), ellers blir én feil til mange.
 python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog myproject -v 1 --parallel 4
 python manage.py test core -v 1
 
@@ -345,6 +343,12 @@ håndhever at ingen mal peker på et CDN.
 **Avhengighetene er låst med hasher** (M16): `requirements.in` er ønskene, `requirements.txt`
 er det `pip-compile --generate-hashes --strip-extras` løste dem til, og det er den Railway
 installerer. Ny pakke: legg den i `.in`, kjør `pip-compile`, commit begge.
+
+### Norsk sortering (core/sortering.py)
+
+**Navn sorteres med `Norsk('navn')`, `norsk_nokkel` eller `localeCompare(…, 'nb')`**, aldri
+`Lower`/`.lower()` — ellers er det databasens alfabet (Railway: Ærø øverst, Ø blant O). Bare
+navnenøkkelen; regler foran den røres ikke. `core/tests_sortering.py` håndhever.
 
 ### Rate-limiting (core/ratelimit.py)
 

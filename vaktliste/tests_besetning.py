@@ -72,6 +72,15 @@ class BesetningTests(TilgangsBasis):
         self.assertEqual('Kari', d['mannskap'][0]['navn'])
         self.assertEqual('Sjåfør', d['mannskap'][0]['rolle'])
 
+    def test_navnene_staar_i_norsk_rekkefolge(self):
+        """Æ Ø Å sist og i den rekkefølgen (26. sep. 2026). `.lower()` la Å før
+        Æ, og i prod (en_US) sto Ærlig foran Ola. Sorteringen er i Python, så
+        basens kollasjon rører den ikke — det gjør bare nøkkelen."""
+        for navn in ('Åse', 'Ærlig', 'Ola'):
+            self._skift(Mannskap.objects.create(navn=navn, korps=self.hgsd))
+        self.assertEqual([m['navn'] for m in self._hent().json()['data']['mannskap']],
+                         ['Ola', 'Ærlig', 'Åse'])
+
     def test_skift_som_ikke_dekker_naa_er_ikke_med(self):
         """113 spør «er bilen bemannet», ikke «hvem har vakt i helga». En
         liste med tretti rader over to døgn svarer ikke på noe."""

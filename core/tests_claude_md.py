@@ -67,7 +67,12 @@ ROT = Path(settings.BASE_DIR)
 #: nytt register i rammeverket, og tabellen over registrene står i rota fordi
 #: den forteller modulene hvordan de melder seg inn. Én rad, kortet ned til det
 #: nødvendige; setningen om pollingen er rettet, ikke utvidet.
-ROT_TEGNGRENSE = 65_800
+#:
+#: **Hevet til 66 000 den 26. sep. 2026, bevisst:** norsk sortering
+#: (`core/sortering.py`) er en regel for alle moduler, og `core/tests_sortering.py`
+#: leser kildekoden i alle appene. Fire linjer, kortet ned fra sju; kommentaren om
+#: `--parallel` ble samtidig kortet og rettet (feilen var `tblib`, ikke `core`).
+ROT_TEGNGRENSE = 66_000
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer

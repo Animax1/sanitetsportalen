@@ -331,7 +331,7 @@ function koTegnLogg() {
   const rader = iStrommen.filter((l) => koLoggfilterTreffer(l, koLoggfilter))
     .sort((a, b) => (b.rot - a.rot) || (b.id - a.id));
   const festede = alle.filter((l) => l.festet_at && !l.fjernet)
-    .sort((a, b) => String(a.festet_at).localeCompare(String(b.festet_at)));
+    .sort((a, b) => String(a.festet_at).localeCompare(String(b.festet_at), 'nb'));
   // Hodet sier hendelsen når en står åpen i vinduet — ko-hendelser.js.
   koTegnLoggHode();
   if (rader.length === 0 && festede.length === 0) {

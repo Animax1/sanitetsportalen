@@ -42,7 +42,7 @@ function _sorterMannskap(rader) {
     if (personSortKol === 'telefon') return m.telefon || '\uffff';  // tomme sist
     return m.korps_navn.toLowerCase() + '\u0000' + m.navn.toLowerCase();
   };
-  const ut = rader.slice().sort((a, b) => nokkel(a).localeCompare(nokkel(b)));
+  const ut = rader.slice().sort((a, b) => nokkel(a).localeCompare(nokkel(b), 'nb'));
   return personSortStigende ? ut : ut.reverse();
 }
 

@@ -17,7 +17,6 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseNotModified, JsonResponse
-from django.db.models.functions import Lower
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
@@ -26,6 +25,7 @@ from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
+from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
 
 from . import choices, services, verdier
@@ -168,7 +168,7 @@ def enheter_view(request):
     # gjenoppretter dem fra, og da må de være synlige et sted.
     # Alfabetisk innenfor gruppa (André, 12. sep. 2026) — `Lower`, ellers er
     # «alfabetisk» databasens alfabet, og SQLite og PostgreSQL svarer ulikt.
-    qs = Enhet.objects.select_related('user', 'enhetstype').order_by(Lower('navn'))
+    qs = Enhet.objects.select_related('user', 'enhetstype').order_by(Norsk('navn'))
     if request.GET.get('alle') != '1':
         qs = qs.filter(er_aktiv=True)
     enheter = list(qs)

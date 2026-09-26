@@ -35,10 +35,10 @@ class RegisterTests(TestCase):
         skjemaet som pris. Sorteringen må derfor testes: uten den er det ingen
         som ser at lista blir tilfeldig hvis `Meta.ordering` ryker.
 
-        **Store/små bokstaver testes, æ/ø/å ikke.** Det første er vårt eget
-        valg (`Lower(...)`) og gjelder i enhver base. Det andre er databasens
-        kollasjon, og den er ulik i SQLite og PostgreSQL — en test på det ville
-        målt hvilken base som kjørte testen, ikke hva koden gjør.
+        **Store/små bokstaver og Æ/Ø/Å testes begge** (fra 26. sep. 2026).
+        Til da var Æ/Ø/Å databasens kollasjon, og en test på dem ville målt
+        hvilken base som kjørte. `Norsk('navn')` (`core/sortering.py`) gjør
+        rekkefølgen lik i SQLite og PostgreSQL.
 
         **`Ressursrolle` er unntatt fra 16. sep. 2026** — se testen under.
         """
@@ -47,10 +47,13 @@ class RegisterTests(TestCase):
                 model.objects.create(navn='Stavanger')
                 model.objects.create(navn='bokn')   # liten forbokstav
                 model.objects.create(navn='Karmøy')
+                model.objects.create(navn='Åkra')
+                model.objects.create(navn='Ølen')
+                model.objects.create(navn='Ærø')
                 self.assertEqual(
                     [r.navn for r in model.objects.all()],
-                    ['bokn', 'Karmøy', 'Stavanger'],
-                    'alfabetisk, og uavhengig av forbokstav')
+                    ['bokn', 'Karmøy', 'Stavanger', 'Ærø', 'Ølen', 'Åkra'],
+                    'norsk alfabetisk, og uavhengig av forbokstav')
                 model.objects.all().delete()
 
     def test_rollene_sorteres_paa_rangering_ikke_alfabet(self):

@@ -26,6 +26,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from core.sortering import norsk_nokkel
 from core.stats import BaseStatistikkHandler, register
 
 from .models import Ressurs, Vaktliste, Vaktpost
@@ -144,7 +145,7 @@ def bemanning_stats(vakt, naa=None):
             bemannet_per_enhet.setdefault(r.enhet_id, []).extend(b)
             navn_per_enhet.setdefault(r.enhet_id, r.navn)
     utnyttelse = {}
-    for enhet_id, navn in sorted(navn_per_enhet.items(), key=lambda p: p[1]):
+    for enhet_id, navn in sorted(navn_per_enhet.items(), key=lambda p: norsk_nokkel(p[1])):
         bemannet = union(bemannet_per_enhet.get(enhet_id, []))
         opptatt = union(opptatt_per_enhet.get(enhet_id, []))
         bem_t = _timer(bemannet) if bemannet else None

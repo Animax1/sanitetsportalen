@@ -29,6 +29,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
 
+from core.sortering import Norsk
+
 from . import overnatting, pauser
 from .models import Pause, Ressursgruppe, Utsending, Vaktpost
 
@@ -145,7 +147,7 @@ def rader_for(vaktliste):
             per_ressurs_pauser.setdefault(p.ressurs_id, []).append(_tidsspenn(p.fra, p.til))
 
     grupper = []
-    for gruppe in Ressursgruppe.objects.order_by('rekkefolge', 'navn'):
+    for gruppe in Ressursgruppe.objects.order_by('rekkefolge', Norsk('navn')):
         egne = sorted((r for r in ressurser.values() if r.gruppe_id == gruppe.pk),
                       key=lambda r: (r.rekkefolge, r.navn.lower()))
         deler = []
