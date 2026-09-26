@@ -463,10 +463,14 @@ class Oppdrag(BaseTimeStampedModel):
     def primaer(self):
         """Koblingsraden med lavest `rekkefolge` — den først varslede.
 
-        Finnes som begrep bare fordi arkivet og statistikken i dag har én
-        `enhet_navn` per rad, og fordi `Oppdrag.enhet` lever til deploy 2.
+        Finnes som begrep fordi arkivet og statistikken har én `enhet_navn`
+        per rad, og fordi lista viser én bil øverst. **Leser prefetchen når
+        den finnes** (G6, 26. sep. 2026): oppdragslista henter `enheter__enhet`
+        på forhånd, og `order_by().first()` ville gått forbi den med én
+        spørring per rad. Sorteringen er den samme i begge grenene.
         """
-        return self.enheter.order_by('rekkefolge', 'created_at').first()
+        rader = sorted(self.enheter.all(), key=lambda r: (r.rekkefolge, r.created_at))
+        return rader[0] if rader else None
 
     @property
     def i_historikk(self) -> bool:

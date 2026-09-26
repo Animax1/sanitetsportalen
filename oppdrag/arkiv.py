@@ -52,7 +52,7 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
         oppdragene = list(
             Oppdrag.objects
             .filter(vakt=vakt)
-            .select_related('enhet', 'lokasjon')
+            .select_related('lokasjon')
             .prefetch_related(
                 Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')),
                 Prefetch('enhetshendelser', Enhetshendelse.objects.select_related('enhet')))
@@ -149,8 +149,9 @@ def _per_enhet(oppdrag, gjeldende):
     """
     rader = list(oppdrag.enheter.all())
     if not rader:
-        return [(oppdrag.enhet.navn if oppdrag.enhet else '',
-                 oppdrag.status, gjeldende, '', None)]
+        # Kan ikke skje etter `0011` (hvert oppdrag har en rad, og
+        # `ta_av_enhet` nekter den siste). Leste `Oppdrag.enhet` til G6.
+        return [('', oppdrag.status, gjeldende, '', None)]
     return [
         (rad.enhet.navn, rad.status,
          [m for m in gjeldende if m.oppdragsenhet_id == rad.pk],

@@ -175,14 +175,17 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     samme grunn (G4, 26. sep. 2026).
     """
     status = koblingsrad.status if koblingsrad is not None else oppdrag.status
+    # Den primære bilen, fra koblingsradene og ikke fra `Oppdrag.enhet` (G6,
+    # 26. sep. 2026). Lista prefetcher `enheter__enhet`, så dette er gratis der.
+    primaer = oppdrag.primaer
     data = {
         'id': oppdrag.pk,
         # Nummeret man sier på samband. `id` er databasenøkkelen og skal ikke
         # vises — den er global og hopper mellom år.
         'nummer': oppdrag.oppdragsnummer,
         # Tomt når oppdraget ble opprettet uten enhet (19. sep. 2026).
-        'enhet_id': oppdrag.enhet_id,
-        'enhet_navn': oppdrag.enhet.navn if oppdrag.enhet_id else '',
+        'enhet_id': primaer.enhet_id if primaer else None,
+        'enhet_navn': primaer.enhet.navn if primaer else '',
         'problemstilling': oppdrag.problemstilling,
         # Antall for problemstillinger som bærer et (transport); ellers null.
         'antall': oppdrag.antall,

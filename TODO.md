@@ -61,10 +61,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   (avgjort 12. sep.). Skal bil 2, som ikke tar med
                   pasienten, få sette/se grovsorteringen? Adminkontoer er aldri
                   mannskap (avgjort 12. sep.: «Den er utenfor.»).
-            - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
-                  NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
-                  foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.
-                  Backup før — og la prod gå noen vakter med broene først.
+            - [ ] Deploy 2 (planens G6), i tre steg. **G6a levert 26. sep.:** ingen kode
+                  leser `Oppdrag.enhet`. **G6b:** skrivingene og broene i
+                  `Oppdrag.save()` bort, Django glemmer feltet (kolonnen står).
+                  Opprinnelig betingelse: «la prod gå noen vakter med broene først» —
+                  gjelder G6b til `main`.
+                  **G6c, i en senere `main`-push enn G6b:** `DROP COLUMN`, og
+                  `Statusmelding.oppdragsenhet` NOT NULL (med `SET CONSTRAINTS ALL
+                  IMMEDIATE` om et dataskritt går foran). Backup før.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

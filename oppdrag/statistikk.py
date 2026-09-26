@@ -182,7 +182,7 @@ def rader_for_vakt(vakt):
     oppdragene = list(
         Oppdrag.objects
         .filter(vakt=vakt)
-        .select_related('enhet', 'lokasjon')
+        .select_related('lokasjon')
         .prefetch_related(
             Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')),
             Prefetch('enhetshendelser', Enhetshendelse.objects.select_related('enhet')))

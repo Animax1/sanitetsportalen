@@ -272,7 +272,7 @@ def avvent_view(request, pk, enhet_pk):
     deler står i loggen. Se `services.avvent_oppdrag`.
     """
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -304,7 +304,7 @@ def kvitter_avbrutt_view(request, pk):
     tatt stilling til.
     """
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -395,7 +395,7 @@ def oppdrag_liste_view(request):
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
             qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
-                      .select_related('enhet', 'lokasjon', 'hendelse')
+                      .select_related('lokasjon', 'hendelse')
                       .prefetch_related('enheter__enhet', 'hendelse__lag')
                       .order_by('-created_at'))
             gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
@@ -573,7 +573,7 @@ def oppdrag_detalj_view(request, pk):
     tidslinjen kan vise rettingen uten at klienten må regne den ut.
     """
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -757,7 +757,7 @@ def _oppdrag_og_enhet(request, pk, enhet_pk):
             {'status': 'error', 'message': 'Enheter fører ikke for hverandre.'},
             status=403)
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return None, None, JsonResponse(
@@ -914,7 +914,7 @@ def grovsortering_view(request, pk, verdi):
             {'status': 'error', 'message': 'Bare enhetskontoer grovsorterer.'},
             status=403)
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -953,7 +953,7 @@ def antall_view(request, pk, antall):
         return JsonResponse(
             {'status': 'error', 'message': 'Antall må være mellom 1 og 999.'}, status=400)
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -1029,7 +1029,7 @@ def stempling_view(request, pk, overgang, sted=None):
             status=403)
 
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -1187,7 +1187,7 @@ def historikk_view(request, pk):
             status=403)
 
     try:
-        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+        oppdrag = (Oppdrag.objects.select_related('lokasjon')
                    .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
@@ -1245,7 +1245,7 @@ def historikk_liste_view(request):
 
     qs = (Oppdrag.objects
           .filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False)
-          .select_related('enhet', 'lokasjon', 'hendelse')
+          .select_related('lokasjon', 'hendelse')
           .prefetch_related('enheter__enhet', 'hendelse__lag')
           .order_by('-historikk_fra'))
 
@@ -1261,7 +1261,6 @@ def historikk_liste_view(request):
             qs = qs.filter(
                 Q(problemstilling__icontains=sok)
                 | Q(lokasjon__navn__icontains=sok)
-                | Q(enhet__navn__icontains=sok)
                 | Q(enheter__enhet__navn__icontains=sok)).distinct()
 
     # Bulk her også: historikken kan være hele vakta, og `oppdrag_til_dict`
@@ -1303,7 +1302,7 @@ def korriger_view(request, pk):
 
     try:
         melding = (Statusmelding.objects
-                   .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon')
+                   .select_related('oppdrag', 'oppdrag__lokasjon')
                    .get(pk=pk, oppdrag__vakt=hent_aktiv_vakt()))
     except Statusmelding.DoesNotExist:
         return JsonResponse(

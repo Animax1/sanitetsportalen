@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Ingen kode leser `Oppdrag.enhet` lenger (G6a, deploy 2 i oppdrag, første steg)  `#oppdrag #ko`
+
+**Hvorfor:** `Oppdrag.enhet` er arven fra én bil per oppdrag. Siden flere enheter kom
+(11. sep.) er koblingsradene (`Oppdragsenhet`) fasit, og kolonnen følger «den primære»
+gjennom broer i `save()`. Planens G6 fjerner den, i tre steg; **dette er det første, og det
+har ingen skjemaendring.** En kartlegging av hele kodebasen fant 26 lesinger i produksjonskoden
+(views, arkiv, statistikk, `select_related`) og 5 skrivinger.
+
+**Lesingene er borte.** `Oppdrag.primaer` er fasit for «den første bilen», og er gjort
+**prefetch-bevisst**: lista henter `enheter__enhet` på forhånd, og `order_by().first()` ville
+gått forbi prefetchen med én spørring per rad. Toppnivåfeltene `enhet_id`/`enhet_navn` i
+oppdrag-JSON står som før (beslutningsnotatet §4), men regnes av koblingsradene.
+
+**Skrivingene står med vilje, til G6b.** Da holdes kolonnen riktig helt til det ikke finnes
+kode som kan lese den — også om prod skulle rulles tilbake til `4813cee` imellom.
+
+**Beviset er atferd, ikke en regel:** `oppdrag/tests_g6_kolonnen.py` bygger et scenario (to
+biler på ett oppdrag, ett ferdig, ett som venter), henter lista, historikken, søket,
+enhetene, hver detalj, statistikken og arkivradene, **setter kolonnen til en feil bil på hvert
+oppdrag**, og krever identiske svar. En statisk regel ville bommet: `enhet` er navnet på fire
+andre felt.
+
+**Mutasjon:** 3 mutanter, alle røde — serializeren, historikksøket og arkivet satt til å lese
+kolonnen igjen (5, 1 og 2 røde).
+
 ## 2026-09-26 — Å slette kontoen til bil nummer to ga 500  `#accounts #oppdrag`
 
 **Hvorfor:** funnet under kartleggingen til G6. Når en bil-konto slettes, sletter

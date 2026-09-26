@@ -320,7 +320,7 @@ def aktiv_koblingsrad(enhet, vakt=None):
     qs = (Oppdragsenhet.objects
           .filter(enhet=enhet)
           .exclude(status__in=(choices.VENTER, choices.LEDIG))
-          .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon'))
+          .select_related('oppdrag', 'oppdrag__lokasjon'))
     if vakt is not None:
         qs = qs.filter(oppdrag__vakt=vakt)
     return qs.order_by('-oppdrag__created_at').first()
@@ -376,7 +376,7 @@ def enhet_status_bulk(enheter, vakt=None) -> dict:
     aktive = (Oppdragsenhet.objects
               .filter(enhet_id__in=ider)
               .exclude(status__in=(choices.VENTER, choices.LEDIG))
-              .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon'))
+              .select_related('oppdrag', 'oppdrag__lokasjon'))
     ventende = Oppdragsenhet.objects.filter(enhet_id__in=ider, status=choices.VENTER)
     if vakt is not None:
         aktive = aktive.filter(oppdrag__vakt=vakt)
@@ -1632,7 +1632,7 @@ def synlige_for_enhet(enhet, vakt=None):
     # Per koblingsrad (11. sep. 2026): det er *bilens* ledig-melding vinduet
     # måles mot, ikke oppdragets — den andre bilen kan fortsatt kjøre.
     rader = (Oppdragsenhet.objects.filter(enhet=enhet)
-             .select_related('oppdrag', 'oppdrag__lokasjon', 'oppdrag__enhet'))
+             .select_related('oppdrag', 'oppdrag__lokasjon'))
     if vakt is not None:
         rader = rader.filter(oppdrag__vakt=vakt)
 
