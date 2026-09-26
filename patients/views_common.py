@@ -4,7 +4,6 @@
 views_arkiv (N13.3). Det som brukes på tvers ligger her, slik at modulene
 ikke trenger å importere fra hverandre.
 """
-import json
 from datetime import datetime
 
 # Roller med skrivetilgang til pasienter
@@ -12,16 +11,6 @@ from datetime import datetime
 # rollelista (§2.6 i beslutningsnotatet), og skrivetilgang avgjøres nå av
 # `har_tilgang(user, 'patients', 'skriv_full')` — ikke av hvilken rolle
 # brukeren har.
-
-
-def _json_body(request):
-    """Parse JSON-body fra request, returner tom dict ved feil."""
-    try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return {}
-    # `[]`, `"x"` og `null` er gyldig JSON og ga 500 på første `.get()` (M8).
-    return data if isinstance(data, dict) else {}
 
 
 def _ensure_pabegynt_not_before_inntid(patient):

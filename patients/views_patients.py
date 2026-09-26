@@ -24,7 +24,8 @@ from .choices import validate_patient_choice_fields
 from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
 from core.validators import now_local_str, validate_patient_time_fields
-from core.vakt import hent_aktiv_vakt, vakt_for_year
+from core.jsonkropp import json_body
+from core.vakt import hent_aktiv_vakt
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
@@ -35,7 +36,7 @@ from .services import (
     recycle_patient_nr_if_last,
 )
 from .views_common import (
-    _json_body, _ensure_pabegynt_not_before_inntid,
+    _ensure_pabegynt_not_before_inntid,
     _patient_to_dict,
 )
 
@@ -205,7 +206,7 @@ def patients_list_view(request):
     if not har_tilgang(request.user, 'patients', 'skriv_full'):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
-    data = _json_body(request)
+    data = json_body(request)
 
     # Valider tidsfelter – kun format dd.mm.åååå tt:mm godtas
     try:
@@ -358,7 +359,7 @@ def patient_detail_view(request, pk):
         if not har_tilgang(request.user, 'patients', 'skriv_full'):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
-        data = _json_body(request)
+        data = json_body(request)
 
         # Valider tidsfelter – kun format dd.mm.åååå tt:mm godtas
         try:
@@ -473,7 +474,7 @@ def avslutt_vakt_view(request):
     """
     from core.models import Vakt
 
-    data = _json_body(request)
+    data = json_body(request)
     if not data.get('confirm'):
         return JsonResponse(
             {'error': 'Bekreftelse mangler. Send {"confirm": true} for å slette.'},
@@ -567,7 +568,7 @@ def gjenaapne_vakt_view(request):
     """
     from core.models import Vakt
 
-    data = _json_body(request)
+    data = json_body(request)
     try:
         vakt = Vakt.objects.get(pk=int(data.get('vakt_id')))
     except (Vakt.DoesNotExist, TypeError, ValueError):

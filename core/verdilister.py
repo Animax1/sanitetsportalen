@@ -29,12 +29,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
-from core.jsonkropp import json_body
+from core.jsonkropp import json_body, json_feil
 from core.ratelimit import rate_limit
-
-
-def _feil(melding, status=400):
-    return JsonResponse({'status': 'error', 'message': melding}, status=status)
 
 
 class Verdiliste:
@@ -148,7 +144,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
             return svar
 
         if not kan_lede(request.user):
-            return _feil(nekt, 403)
+            return json_feil(nekt, 403)
         rad = liste.model()
         # Sist i lista: den som legger til, flytter etterpå om hun vil.
         siste = (liste.model.objects.order_by('-rekkefolge')
@@ -156,7 +152,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
         rad.rekkefolge = (siste or 0) + 10
         feil = liste.sett_felter(rad, json_body(request), ny=True)
         if feil:
-            return _feil(feil)
+            return json_feil(feil)
         rad.save()
         return JsonResponse({'status': 'ok', 'data': liste.til_dict(rad)})
 
@@ -165,31 +161,31 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
     @rate_limit(group=f'{gruppe}{slug}{skille}detalj', rate='60/m', method=['PUT', 'DELETE'])
     def detalj_view(request, pk):
         if not kan_lede(request.user):
-            return _feil(nekt, 403)
+            return json_feil(nekt, 403)
         rad = liste.model.objects.filter(pk=pk).first()
         if rad is None:
-            return _feil('Ikke funnet', 404)
+            return json_feil('Ikke funnet', 404)
         data = json_body(request)
 
         if request.method == 'DELETE':
             if not er_global_admin(request.user):
-                return _feil('Sletting er global admin.', 403)
+                return json_feil('Sletting er global admin.', 403)
             if not data.get('confirm'):
-                return _feil('Bekreftelse mangler. Send {"confirm": true}.')
+                return json_feil('Bekreftelse mangler. Send {"confirm": true}.')
             if liste.er_fast(rad):
-                return _feil(f'«{rad.navn}» er fast og kan ikke slettes.')
+                return json_feil(f'«{rad.navn}» er fast og kan ikke slettes.')
             brukt = liste.i_bruk(rad)
             if brukt:
-                return _feil(liste.raad_ved_bruk(rad, brukt), 409)
+                return json_feil(liste.raad_ved_bruk(rad, brukt), 409)
             try:
                 rad.delete()
             except ProtectedError:
-                return _feil(liste.raad_ved_bruk(rad, '?'), 409)
+                return json_feil(liste.raad_ved_bruk(rad, '?'), 409)
             return JsonResponse({'status': 'ok'})
 
         feil = liste.sett_felter(rad, data)
         if feil:
-            return _feil(feil)
+            return json_feil(feil)
         rad.save()
         return JsonResponse({'status': 'ok', 'data': liste.til_dict(rad)})
 
@@ -200,13 +196,13 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
         """Hele lista, ikke «opp» per rad: to «opp» som krysser hverandre i
         nettet gir ellers en rekkefølge ingen ba om."""
         if not kan_lede(request.user):
-            return _feil(nekt, 403)
+            return json_feil(nekt, 403)
         ider = json_body(request).get('ider')
         if not isinstance(ider, list) or not all(isinstance(i, int) for i in ider):
-            return _feil('Send `ider` som en liste med tall.')
+            return json_feil('Send `ider` som en liste med tall.')
         rader = {r.pk: r for r in liste.model.objects.filter(pk__in=ider)}
         if len(rader) != len(set(ider)):
-            return _feil('Lista inneholder ukjente rader — hent den på nytt.')
+            return json_feil('Lista inneholder ukjente rader — hent den på nytt.')
         felter = ['rekkefolge'] + (
             ['updated_at'] if any(f.name == 'updated_at' for f in liste.model._meta.fields) else [])
         for plass, rad_pk in enumerate(ider):

@@ -34,7 +34,6 @@ flate — se `ko/module.py` og `TODO.md`.
 """
 from __future__ import annotations
 
-import json
 
 from django.db import IntegrityError, transaction
 from django.http import JsonResponse
@@ -47,6 +46,7 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import (
     er_global_admin, har_tilgang, modul_kreves, nivaa_for,
 )
+from core.jsonkropp import json_body, json_feil
 from core.jsdata import js_json
 from core.ratelimit import rate_limit
 from core.sortering import Norsk
@@ -60,18 +60,6 @@ from .tilstede import tilstede
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
-
-def _json_body(request):
-    try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _feil(melding, status=400):
-    return JsonResponse({'status': 'error', 'message': melding}, status=status)
-
 
 def _tid(raa):
     """Et klokkeslett fra klienten, eller `None`.
@@ -271,9 +259,9 @@ def ansvar_view(request):
     """Sett eget ansvarsmerke (§5.1). `les` holder: merket styrer ingenting,
     og den som bare leser kan likevel ha ansvar for samband."""
     try:
-        omraade = services.sett_ansvar(request.user, _json_body(request).get('omraade'))
+        omraade = services.sett_ansvar(request.user, json_body(request).get('omraade'))
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'omraade': omraade})
 
 
@@ -328,7 +316,7 @@ def logg_view(request):
         try:
             qs = qs.filter(pk__gt=int(siden))
         except (TypeError, ValueError):
-            return _feil('«siden» må være et tall.')
+            return json_feil('«siden» må være et tall.')
 
     linjer = [_til_dict(l) for l in qs]
     fjernede = list(
@@ -372,7 +360,7 @@ def logg_skriv_view(request):
     logg som mangler nettopp de linjene man leter etter etterpå. `120/m` per
     bruker treffer en løkke, ikke et menneske.
     """
-    data = _json_body(request)
+    data = json_body(request)
     vakt = hent_aktiv_vakt()
     # `hendelse_id` gjør linja til en kommentar i hendelsen. 404 utenfor
     # vakta, som alle andre hendelsesstier.
@@ -391,7 +379,7 @@ def logg_skriv_view(request):
             hendelse=hendelse,
         )
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)}, status=201)
 
 
@@ -405,7 +393,7 @@ def logg_fest_view(request, pk):
     try:
         services.fest_linje(linje, bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 
@@ -438,9 +426,9 @@ def logg_del_view(request, pk):
     linje = get_object_or_404(Logglinje, pk=pk, vakt=vakt)
     try:
         services.del_linje(linje, bruker=request.user,
-                           oppdrag=_oppdrag_for_deling(_json_body(request), vakt))
+                           oppdrag=_oppdrag_for_deling(json_body(request), vakt))
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 
@@ -452,9 +440,9 @@ def logg_angre_deling_view(request, pk):
     linje = get_object_or_404(Logglinje, pk=pk, vakt=vakt)
     try:
         services.angre_deling(linje, bruker=request.user,
-                              oppdrag=_oppdrag_for_deling(_json_body(request), vakt))
+                              oppdrag=_oppdrag_for_deling(json_body(request), vakt))
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 
@@ -469,7 +457,7 @@ def logg_rett_view(request, pk):
     må lese den nye versjonen før hun retter videre.
     """
     linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
-    data = _json_body(request)
+    data = json_body(request)
     try:
         ny = services.korriger(
             linje,
@@ -478,14 +466,14 @@ def logg_rett_view(request, pk):
             tidspunkt=_tid(data.get('tidspunkt')),
         )
     except services.AlleredeKorrigert as feil:
-        return _feil(str(feil), status=409)
+        return json_feil(str(feil), status=409)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     except IntegrityError:
         # Unikhetskravet på `korrigerer` er sperren som holder når to
         # operatører trykker i samme sekund; sjekken i `korriger()` er for
         # feilmeldingens skyld. Uten denne grenen blir kappløpet en 500.
-        return _feil('Linja er allerede rettet av noen andre.', status=409)
+        return json_feil('Linja er allerede rettet av noen andre.', status=409)
     return JsonResponse({'status': 'ok', 'data': _til_dict(ny)}, status=201)
 
 
@@ -508,14 +496,14 @@ def logg_fjern_view(request, pk):
     den ligget i auditloggen i 730 dager, og inngangen vært et skuespill. Samme
     valg som `FELT_UTEN_VERDILOGGING` tar for `notat` i vaktlista.
     """
-    if not _json_body(request).get('confirm'):
-        return _feil('Bekreftelse mangler.', status=400)
+    if not json_body(request).get('confirm'):
+        return json_feil('Bekreftelse mangler.', status=400)
 
     linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
     try:
         antall = services.fjern(linje, bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
 
     from audit.models import AuditLog
     from core.klientip import klient_ip
@@ -562,11 +550,11 @@ def _lokasjon_fra(data):
 @rate_limit(group='ko:hendelse_ny', rate='60/m', method='POST')
 def hendelse_ny_view(request):
     """Ny hendelse — fra en logglinje (`fra_linje`) eller fra ingenting."""
-    data = _json_body(request)
+    data = json_body(request)
     vakt = hent_aktiv_vakt()
     lokasjon, feil = _lokasjon_fra(data)
     if feil:
-        return _feil(feil)
+        return json_feil(feil)
     fra_linje = None
     if data.get('fra_linje'):
         fra_linje = get_object_or_404(Logglinje, pk=data['fra_linje'], vakt=vakt)
@@ -580,7 +568,7 @@ def hendelse_ny_view(request):
             melder=data.get('melder'),
             lag=data.get('lag'))
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     hendelse = services.hendelse_med_telling(hendelse)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)},
                         status=201)
@@ -593,10 +581,10 @@ def hendelse_rediger_view(request, pk):
     """Tittel og lokasjon, med `versjon` — 409 når noen andre rakk det først
     (§7.1). `lokasjon_id` sendt som `null` tømmer; utelatt rører ikke."""
     hendelse = _hendelse(pk)
-    data = _json_body(request)
+    data = json_body(request)
     lokasjon, feil = _lokasjon_fra(data)
     if feil:
-        return _feil(feil)
+        return json_feil(feil)
     try:
         services.rediger_hendelse(
             hendelse, bruker=request.user, versjon=data.get('versjon'),
@@ -606,9 +594,9 @@ def hendelse_rediger_view(request, pk):
             melder=data.get('melder'),
             lag=data.get('lag'))
     except services.Konflikt as feil:
-        return _feil(str(feil), status=409)
+        return json_feil(str(feil), status=409)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -619,10 +607,10 @@ def hendelse_prioritet_view(request, pk):
     """Prioriteten — logget som egen linje (18. sep. 2026)."""
     hendelse = _hendelse(pk)
     try:
-        services.sett_prioritet(hendelse, _json_body(request).get('prioritet'),
+        services.sett_prioritet(hendelse, json_body(request).get('prioritet'),
                                 bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -645,9 +633,9 @@ def hendelse_lag_view(request, pk):
     eller gikk. Lukket hendelse tar ikke imot."""
     hendelse = _hendelse(pk)
     try:
-        services.sett_lag(hendelse, _json_body(request).get('lag'), bruker=request.user)
+        services.sett_lag(hendelse, json_body(request).get('lag'), bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     hendelse = services.hendelse_med_telling(hendelse)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
@@ -663,12 +651,12 @@ def hendelse_lukk_view(request, pk):
     try:
         services.lukk_hendelse(
             hendelse, bruker=request.user,
-            confirm=bool(_json_body(request).get('confirm')))
+            confirm=bool(json_body(request).get('confirm')))
     except services.HarApneOppdrag as feil:
         return JsonResponse({'status': 'error', 'message': str(feil),
                              'apne_oppdrag': feil.antall}, status=409)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -681,7 +669,7 @@ def hendelse_gjenapne_view(request, pk):
     try:
         services.gjenapne_hendelse(hendelse, bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -700,17 +688,17 @@ def oppdrag_hendelse_view(request, pk):
     from oppdrag.models import Oppdrag
 
     if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
-        return _feil('Krever skrivetilgang i oppdragsmodulen.', status=403)
+        return json_feil('Krever skrivetilgang i oppdragsmodulen.', status=403)
     vakt = hent_aktiv_vakt()
     oppdrag = get_object_or_404(Oppdrag, pk=pk, vakt=vakt)
-    data = _json_body(request)
+    data = json_body(request)
     hendelse = None
     if data.get('hendelse_id') is not None:
         hendelse = get_object_or_404(Hendelse, pk=data['hendelse_id'], vakt=vakt)
     try:
         services.knytt_oppdrag(oppdrag, hendelse, bruker=request.user)
     except services.Ugyldig as feil:
-        return _feil(str(feil))
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'hendelse_id': oppdrag.hendelse_id})
 
 
@@ -779,11 +767,11 @@ def nullstill_view(request, hva):
     etter i ettertid. Oppdragene nullstilles av oppdragsmodulens egen regel.
     """
     if hva not in NULLSTILL:
-        return _feil('Ukjent nullstilling.', 404)
+        return json_feil('Ukjent nullstilling.', 404)
     if not er_global_admin(request.user):
-        return _feil('Nullstilling er global admin.', 403)
-    if not _json_body(request).get('confirm'):
-        return _feil('Bekreftelse mangler.', status=400)
+        return json_feil('Nullstilling er global admin.', 403)
+    if not json_body(request).get('confirm'):
+        return json_feil('Bekreftelse mangler.', status=400)
     vakt = hent_aktiv_vakt()
     etikett, regel = NULLSTILL[hva]
     antall = regel(vakt)
@@ -811,7 +799,7 @@ def nullstill_view(request, hva):
 
 def _tavle_gate(request):
     if not har_tilgang(request.user, 'vaktliste', 'les'):
-        return _feil('Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.', 403)
+        return json_feil('Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.', 403)
     return None
 
 
@@ -857,21 +845,21 @@ def tavle_plasser_view(request):
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    data = _json_body(request)
+    data = json_body(request)
     ressurs = _tavle_ressurs(request, data)
     if ressurs is None:
-        return _feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent ressurs.', 404)
     lokasjon = None
     if not data.get('pause'):
         try:
             lokasjon = Lokasjon.objects.get(pk=int(data.get('lokasjon_id')))
         except (Lokasjon.DoesNotExist, TypeError, ValueError):
-            return _feil('Ukjent lokasjon.', 404)
+            return json_feil('Ukjent lokasjon.', 404)
     try:
         p = tavle.plasser(hent_aktiv_vakt(), ressurs, bruker=request.user,
                           lokasjon=lokasjon, pause=bool(data.get('pause')))
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok', 'data': {'id': p.pk}})
 
 
@@ -885,13 +873,13 @@ def tavle_uten_plass_view(request):
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    ressurs = _tavle_ressurs(request, _json_body(request))
+    ressurs = _tavle_ressurs(request, json_body(request))
     if ressurs is None:
-        return _feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent ressurs.', 404)
     try:
         tavle.avslutt(hent_aktiv_vakt(), ressurs, bruker=request.user)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok'})
 
 
@@ -929,8 +917,8 @@ def tavle_plassering_view(request, pk):
         return stengt
     p = Tavleplassering.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
     if p is None or _bil_skjult(request, p.ressurs_id):
-        return _feil('Ukjent plassering.', 404)
-    data = _json_body(request)
+        return json_feil('Ukjent plassering.', 404)
+    data = json_body(request)
     try:
         if request.method == 'DELETE':
             tavle.fjern(p, bruker=request.user)
@@ -958,7 +946,7 @@ def tavle_plassering_view(request, pk):
                 slutt = _tavle_tid(raa, 'Planlagt slutt') if raa else None
                 tavle.sett_planlagt_slutt(p, slutt)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok'})
 
 
@@ -973,10 +961,10 @@ def tavle_pauser_view(request):
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    data = _json_body(request)
+    data = json_body(request)
     ressurs = _tavle_ressurs(request, data)
     if ressurs is None:
-        return _feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent ressurs.', 404)
     # **Hvilken som helst rad** (23. sep. 2026): `lokasjon_id` er et sted,
     # uten er det Pause-raden.
     lokasjon = None
@@ -984,13 +972,13 @@ def tavle_pauser_view(request):
         from oppdrag.models import Lokasjon
         lokasjon = Lokasjon.objects.filter(pk=_heltall_eller_none(data.get('lokasjon_id'))).first()
         if lokasjon is None:
-            return _feil('Ukjent lokasjon.', 404)
+            return json_feil('Ukjent lokasjon.', 404)
     try:
         q = tavle.planlegg_pause(hent_aktiv_vakt(), ressurs, bruker=request.user,
                                  fra=_tavle_tid(data.get('fra'), 'Fra'),
                                  til=_tavle_tid(data.get('til'), 'Til'), lokasjon=lokasjon)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok', 'data': {'id': q.pk}})
 
 
@@ -1033,12 +1021,12 @@ def tavle_pause_view(request, ref):
     stengt = _tavle_gate(request)
     if stengt:
         return stengt
-    data = _json_body(request)
+    data = json_body(request)
     try:
         with transaction.atomic():
             q = _tavle_pause(request, ref)
             if q is None:
-                return _feil('Ukjent pause.', 404)
+                return json_feil('Ukjent pause.', 404)
             if request.method == 'DELETE':
                 tavle.slett_pause(q)
                 return JsonResponse({'status': 'ok'})
@@ -1046,7 +1034,7 @@ def tavle_pause_view(request, ref):
                                  fra=_tavle_tid(data.get('fra'), 'Fra'),
                                  til=_tavle_tid(data.get('til'), 'Til'))
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok'})
 
 
@@ -1065,10 +1053,10 @@ def tavle_pause_start_view(request, ref):
         with transaction.atomic():
             q = _tavle_pause(request, ref)
             if q is None:
-                return _feil('Ukjent pause.', 404)
+                return json_feil('Ukjent pause.', 404)
             tavle.start_pause(q, bruker=request.user)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok'})
 
 
@@ -1086,8 +1074,8 @@ def tavle_oppsett_view(request):
 
     if request.method == 'PUT':
         if not _kan_lede_ko(request):
-            return _feil('Å sette opp tavla er skriv_leder i KO.', 403)
-        data = _json_body(request)
+            return json_feil('Å sette opp tavla er skriv_leder i KO.', 403)
+        data = json_body(request)
         try:
             with transaction.atomic():
                 tavle.lagre_oppsett(skjulte_ider=data.get('skjulte'), fulgte_ider=data.get('fulgte'))
@@ -1096,7 +1084,7 @@ def tavle_oppsett_view(request):
                     tavle.lagre_rulling(andel=data.get('andel_bak', tavle.andel_bak()),
                                         steg=data.get('steg_min', tavle.steg_min()))
         except services.Ugyldig as e:
-            return _feil(str(e))
+            return json_feil(str(e))
     ute, fulgt = set(tavle.skjulte()), set(tavle.fulgte())
     return JsonResponse({'status': 'ok', 'data': {
         'lokasjoner': [{
@@ -1136,13 +1124,13 @@ def program_view(request):
     vakt = hent_aktiv_vakt()
     if request.method == 'POST':
         if not _kan_lede_ko(request):
-            return _feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
-        data = _json_body(request)
+            return json_feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
+        data = json_body(request)
         try:
             fra, til = _program_tider(data)
             post = program.lagre_post(vakt, data, fra=fra, til=til, bruker=request.user)
         except services.Ugyldig as e:
-            return _feil(str(e))
+            return json_feil(str(e))
         return JsonResponse({'status': 'ok', 'data': program.til_dict(post)})
     return JsonResponse({'status': 'ok', 'data': program.program_data(vakt)})
 
@@ -1156,19 +1144,19 @@ def program_post_view(request, pk):
     from .models import Programpost
 
     if not _kan_lede_ko(request):
-        return _feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
+        return json_feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
     post = Programpost.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
     if post is None:
-        return _feil('Ukjent konsert.', 404)
+        return json_feil('Ukjent konsert.', 404)
     if request.method == 'DELETE':
         program.slett_post(post, bruker=request.user)
         return JsonResponse({'status': 'ok'})
-    data = _json_body(request)
+    data = json_body(request)
     try:
         fra, til = _program_tider(data)
         post = program.lagre_post(post.vakt, data, fra=fra, til=til, bruker=request.user, post=post)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok', 'data': program.til_dict(post)})
 
 
@@ -1191,16 +1179,16 @@ def program_dekning_view(request):
     antall = _heltall_eller_none(request.GET.get('timer'))
     antall = 24 if antall is None else antall
     if not 1 <= antall <= program.MAKS_DEKNINGSTIMER:
-        return _feil(f'Oppgi mellom 1 og {program.MAKS_DEKNINGSTIMER} timer.')
+        return json_feil(f'Oppgi mellom 1 og {program.MAKS_DEKNINGSTIMER} timer.')
     if request.GET.get('fra'):
         try:
             start = _tavle_tid(request.GET.get('fra'), 'Fra')
         except services.Ugyldig as e:
-            return _feil(str(e))
+            return json_feil(str(e))
     else:
         start = program.dogn_start(request.GET.get('dogn', ''))
         if start is None:
-            return _feil('Oppgi vinduet som ?fra=<tidspunkt>&timer=N, eller døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
+            return json_feil('Oppgi vinduet som ?fra=<tidspunkt>&timer=N, eller døgnet som ?dogn=ÅÅÅÅ-MM-DD.')
     return JsonResponse({'status': 'ok', 'data': {
         'fra': start.isoformat(),
         'timer': program.paa_vakt_per_time(start, hent_aktiv_vakt(), antall)}})
@@ -1220,9 +1208,9 @@ def _program_vakt(request):
         return aktiv, None
     vakt = Vakt.objects.filter(pk=_heltall_eller_none(raa)).first()
     if vakt is None:
-        return None, _feil('Ukjent vakt.', 404)
+        return None, json_feil('Ukjent vakt.', 404)
     if vakt.pk != aktiv.pk and not _kan_lede_ko(request):
-        return None, _feil('Tidligere vakter er KO-lederens (skriv_leder i KO).', 403)
+        return None, json_feil('Tidligere vakter er KO-lederens (skriv_leder i KO).', 403)
     return vakt, None
 
 
@@ -1269,16 +1257,16 @@ def program_kopier_view(request):
     from .models import Programpost
 
     if not _kan_lede_ko(request):
-        return _feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
-    data = _json_body(request)
+        return json_feil('Å legge programmet er KO-lederens (skriv_leder i KO).', 403)
+    data = json_body(request)
     aktiv = hent_aktiv_vakt()
     kilde = Vakt.objects.filter(pk=_heltall_eller_none(data.get('fra_vakt_id'))).first()
     if kilde is None or kilde.pk == aktiv.pk:
-        return _feil('Velg en annen vakt å kopiere fra.')
+        return json_feil('Velg en annen vakt å kopiere fra.')
     try:
         forste = date.fromisoformat(str(data.get('forste_dogn') or ''))
     except ValueError:
-        return _feil('Oppgi første konsertdøgn som ÅÅÅÅ-MM-DD.')
+        return json_feil('Oppgi første konsertdøgn som ÅÅÅÅ-MM-DD.')
     har = Programpost.objects.filter(vakt=aktiv).count()
     if har and not data.get('confirm'):
         return JsonResponse({'status': 'error', 'message':
@@ -1287,5 +1275,5 @@ def program_kopier_view(request):
     try:
         svar = program.kopier_program(kilde, aktiv, forste_dogn=forste, bruker=request.user)
     except services.Ugyldig as e:
-        return _feil(str(e))
+        return json_feil(str(e))
     return JsonResponse({'status': 'ok', 'data': svar})

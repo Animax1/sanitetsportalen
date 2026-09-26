@@ -23,17 +23,14 @@ from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 from core.verdilister import Verdiliste, lag_views
 
 from . import choices, verdier
 from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
-from .views_common import json_body, kan_lede
-
-
-def _feil(melding, status=400):
-    return JsonResponse({'status': 'error', 'message': melding}, status=status)
+from .views_common import kan_lede
 
 
 class Verdimengde(Verdiliste):
@@ -135,21 +132,21 @@ def bilinnstillinger_view(request):
     if request.method == 'GET':
         return JsonResponse({'status': 'ok', 'data': verdier.bilinnstillinger()})
     if not er_global_admin(request.user):
-        return _feil('Bilinnstillingene settes av global admin.', 403)
+        return json_feil('Bilinnstillingene settes av global admin.', 403)
     data = json_body(request)
     terskler = data.get('terskler') or {}
     if not isinstance(terskler, dict):
-        return _feil('Send `terskler` som {hastegrad: [første, gjenta]}.')
+        return json_feil('Send `terskler` som {hastegrad: [første, gjenta]}.')
     nye = {}
     for hastegrad, par in terskler.items():
         if hastegrad not in choices.HASTEGRAD:
-            return _feil(f'Ukjent hastegrad «{hastegrad}».')
+            return json_feil(f'Ukjent hastegrad «{hastegrad}».')
         try:
             forste, gjenta = (int(par[0]), int(par[1]))
         except (TypeError, ValueError, IndexError, KeyError):
-            return _feil(f'{hastegrad}: send to hele tall i sekunder.')
+            return json_feil(f'{hastegrad}: send to hele tall i sekunder.')
         if forste < 0 or gjenta < 5 or forste > 86400 or gjenta > 86400:
-            return _feil(f'{hastegrad}: første varsel 0–86400 s, gjenta minst 5 s.')
+            return json_feil(f'{hastegrad}: første varsel 0–86400 s, gjenta minst 5 s.')
         nye[hastegrad] = (forste, gjenta)
     for hastegrad, (forste, gjenta) in nye.items():
         Lydvarsel.objects.update_or_create(
@@ -157,7 +154,7 @@ def bilinnstillinger_view(request):
     aktive = data.get('aktive')
     if aktive is not None:
         if not isinstance(aktive, dict) or any(h not in choices.HASTEGRAD for h in aktive):
-            return _feil('Send `aktive` som {hastegrad: true/false}.')
+            return json_feil('Send `aktive` som {hastegrad: true/false}.')
         for hastegrad, paa in aktive.items():
             Lydvarsel.objects.update_or_create(hastegrad=hastegrad, defaults={'aktiv': bool(paa)})
     from core.models import AppSetting

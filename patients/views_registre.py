@@ -14,7 +14,7 @@ from core.ratelimit import rate_limit
 from core.sortering import Norsk
 
 from .models import Forstehjelper, Helsepersonell
-from .views_common import _json_body
+from core.jsonkropp import json_body
 
 
 # ── Navneregistre: Forstehjelper og Helsepersonell ────────────────────────────
@@ -72,7 +72,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
         if not er_global_admin(request.user):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
-        data = _json_body(request)
+        data = json_body(request)
         name = (data.get('name') or '').strip()
         if not name:
             return JsonResponse({'error': 'Navn er påkrevd'}, status=400)
@@ -99,7 +99,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             return JsonResponse({'error': f'{etikett} ikke funnet'}, status=404)
 
         if request.method == 'PUT':
-            data = _json_body(request)
+            data = json_body(request)
             if 'name' in data:
                 name = (data['name'] or '').strip()
                 if not name:

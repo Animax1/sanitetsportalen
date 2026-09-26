@@ -50,7 +50,9 @@ from core.ratelimit import rate_limit
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
                      Ressursrolle)
 from . import services
-from .views import _feil, _int, _json_body, _nektet
+from core.jsonkropp import json_body, json_feil
+
+from .views import _int, _nektet
 
 
 def _ider(raa):
@@ -177,10 +179,10 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             return JsonResponse({'status': 'ok', 'data': [
                 _til_dict(r) for r in qs]})
 
-        data = _json_body(request)
+        data = json_body(request)
         navn = (data.get('navn') or '').strip()
         if not navn:
-            return _feil(f'{etikett} må ha et navn.')
+            return json_feil(f'{etikett} må ha et navn.')
 
         felter = {felt: (data.get(felt) or '').strip() for felt in ekstra_felt}
         if stige:
@@ -189,7 +191,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             gruppe_id = _int(data.get('gruppe_id'))
             if not gruppe_id or not Ressursgruppe.objects.filter(
                     pk=gruppe_id).exists():
-                return _feil(f'{etikett} må høre til en ressursgruppe.')
+                return json_feil(f'{etikett} må høre til en ressursgruppe.')
             felter['gruppe_id'] = gruppe_id
         try:
             with transaction.atomic():
@@ -198,7 +200,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
                     **felter,
                 )
         except IntegrityError:
-            return _feil(f'«{navn}» finnes allerede.')
+            return json_feil(f'«{navn}» finnes allerede.')
         return JsonResponse({'status': 'ok', 'data': _til_dict(rad)}, status=201)
 
     @modul_kreves('vaktliste', 'les', svar='json')
@@ -213,14 +215,14 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             rad = (model.objects.select_related('gruppe').get(pk=pk) if gruppe
                    else model.objects.get(pk=pk))
         except model.DoesNotExist:
-            return _feil(f'{etikett} ikke funnet', status=404)
+            return json_feil(f'{etikett} ikke funnet', status=404)
 
         if request.method == 'DELETE':
             # PROTECT dekker Korps og Ressursrolle. Kompetanse er en M2M og ville
             # sluppet gjennom — og stilltiende strippet kompetansen fra alle
             # som har den. Telle-sjekken under gjelder derfor alle tre.
             if _antall_bruk(model, rad):
-                return _feil(
+                return json_feil(
                     f'{etikett_bestemt} er i bruk og kan ikke slettes. '
                     f'Sett den inaktiv i stedet — da skjules den i '
                     f'nedtrekkslistene, men beholdes der den alt er brukt.',
@@ -228,16 +230,16 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             try:
                 rad.delete()
             except ProtectedError:
-                return _feil(
+                return json_feil(
                     f'{etikett_bestemt} er i bruk og kan ikke slettes. '
                     f'Sett den inaktiv i stedet.', status=409)
             return JsonResponse({'status': 'ok'})
 
-        data = _json_body(request)
+        data = json_body(request)
         if 'navn' in data:
             navn = (data.get('navn') or '').strip()
             if not navn:
-                return _feil(f'{etikett} må ha et navn.')
+                return json_feil(f'{etikett} må ha et navn.')
             rad.navn = navn
         for felt in ekstra_felt:
             if felt in data:
@@ -247,7 +249,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             # «A bygger på B, B bygger på A» har ikke noe svar på hvilken som
             # er øverst. Stoppes ved skriving, ikke ved lesing.
             if services.lager_sykel(rad.pk, forelder):
-                return _feil(
+                return json_feil(
                     'Det ville laget en ring i stigen: kompetansen kan ikke '
                     'bygge på noe som allerede bygger på den.')
             rad.bygger_paa_id = forelder
@@ -258,7 +260,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             with transaction.atomic():
                 rad.save()
         except IntegrityError:
-            return _feil(f'«{rad.navn}» finnes allerede.')
+            return json_feil(f'«{rad.navn}» finnes allerede.')
         return JsonResponse({'status': 'ok', 'data': _til_dict(rad)})
 
     return liste_view, detalj_view
@@ -466,16 +468,16 @@ def mannskap_view(request):
             'kontoer': _kontoer() if er_global_admin(request.user) else [],
         }})
 
-    data = _json_body(request)
+    data = json_body(request)
     navn = (data.get('navn') or '').strip()
     if not navn:
-        return _feil('Personen må ha et navn.')
+        return json_feil('Personen må ha et navn.')
 
     korps = Korps.objects.filter(pk=_int(data.get('korps_id'))).first()
     if korps is None:
         # Uten korps finnes ingen badge, og personen kan verken sorteres i
         # lista eller redigeres av en korps-bruker.
-        return _feil('Velg hvilket korps personen hører til.')
+        return json_feil('Velg hvilket korps personen hører til.')
 
     if not services.kan_fore_korps(request.user, korps.pk):
         return _nektet()
@@ -487,11 +489,11 @@ def mannskap_view(request):
     if data.get('user_id') and not admin:
         return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv når en vaktleder lagrer.')
     if data.get('user_id') and _er_adminkonto(_int(data.get('user_id'))):
-        return _feil(ADMINKONTO_MELDING)
+        return json_feil(ADMINKONTO_MELDING)
     try:
         epost = _normaliser_epost(data.get('epost'))
     except ValidationError:
-        return _feil('E-postadressen ser ikke riktig ut.')
+        return json_feil('E-postadressen ser ikke riktig ut.')
 
     try:
         with transaction.atomic():
@@ -508,7 +510,7 @@ def mannskap_view(request):
             person.save()
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
     except IntegrityError:
-        return _feil(f'«{navn}» finnes allerede i {korps.navn}. '
+        return json_feil(f'«{navn}» finnes allerede i {korps.navn}. '
                      f'To like navn i samme korps er umulige å skille i lista.')
 
     person = (Mannskap.objects.select_related('korps', 'user')
@@ -540,7 +542,7 @@ def mannskap_detalj_view(request, pk):
         person = (Mannskap.objects.select_related('korps', 'user')
                   .prefetch_related('kompetanser').get(pk=pk))
     except Mannskap.DoesNotExist:
-        return _feil('Personen finnes ikke', status=404)
+        return json_feil('Personen finnes ikke', status=404)
 
     if not services.kan_redigere_mannskap(request.user, person):
         return _nektet()
@@ -550,23 +552,23 @@ def mannskap_detalj_view(request, pk):
         try:
             person.delete()
         except ProtectedError:
-            return _feil(
+            return json_feil(
                 f'{person.navn} står på en vaktliste og kan ikke slettes. '
                 f'Sett personen inaktiv i stedet — da skjules hun i '
                 f'nedtrekkslistene, men blir stående der hun gikk vakt.',
                 status=409)
         return JsonResponse({'status': 'ok'})
 
-    data = _json_body(request)
+    data = json_body(request)
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
         if not navn:
-            return _feil('Personen må ha et navn.')
+            return json_feil('Personen må ha et navn.')
         person.navn = navn
     if 'korps_id' in data:
         korps = Korps.objects.filter(pk=_int(data['korps_id'])).first()
         if korps is None:
-            return _feil('Velg hvilket korps personen hører til.')
+            return json_feil('Velg hvilket korps personen hører til.')
         if not services.kan_flytte_mannskap(request.user, person, korps.pk):
             return _nektet('Flytting mellom korps krever full skrivetilgang.')
         person.korps = korps
@@ -576,7 +578,7 @@ def mannskap_detalj_view(request, pk):
         try:
             person.epost = _normaliser_epost(data.get('epost'))
         except ValidationError:
-            return _feil('E-postadressen ser ikke riktig ut.')
+            return json_feil('E-postadressen ser ikke riktig ut.')
     if 'issi' in data:
         person.issi = (data.get('issi') or '').strip()
     if 'notat' in data:
@@ -589,7 +591,7 @@ def mannskap_detalj_view(request, pk):
             # deres har det ikke. Et kall utenom skjemaet avvises.
             return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
         if _er_adminkonto(_int(data['user_id'])):
-            return _feil(ADMINKONTO_MELDING)
+            return json_feil(ADMINKONTO_MELDING)
         person.user_id = _int(data['user_id'])
     _koble_paa_epost(request, person)
 
@@ -599,7 +601,7 @@ def mannskap_detalj_view(request, pk):
             if 'kompetanse_ider' in data:
                 person.kompetanser.set(_ider(data.get('kompetanse_ider')))
     except IntegrityError:
-        return _feil(f'«{person.navn}» finnes allerede i {person.korps.navn}.')
+        return json_feil(f'«{person.navn}» finnes allerede i {person.korps.navn}.')
 
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))

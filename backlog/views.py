@@ -16,7 +16,6 @@ logg uten å slå opp hva som sto i den.
 """
 from __future__ import annotations
 
-import json
 
 from django.db.models import ProtectedError
 from django.http import JsonResponse
@@ -25,6 +24,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves, nivaa_for
 from core.jsdata import js_json
 from core.ratelimit import rate_limit
@@ -35,18 +35,6 @@ from .models import Innspill, Innspilltype, Kommentar
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
-
-def _json_body(request):
-    try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _feil(melding, status=400):
-    return JsonResponse({'status': 'error', 'message': melding}, status=status)
-
 
 def _nektet():
     return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
@@ -169,19 +157,19 @@ def innspill_view(request):
     if type_:
         type_id = _int(type_)
         if type_id is None or not Innspilltype.objects.filter(pk=type_id).exists():
-            return _feil(f'Ukjent type: {type_}')
+            return json_feil(f'Ukjent type: {type_}')
         qs = qs.filter(type_id=type_id)
 
     lost = request.GET.get('lost')
     if lost is not None and lost != '':
         if lost not in ('0', '1'):
-            return _feil('Filteret «lost» må være 0 eller 1')
+            return json_feil('Filteret «lost» må være 0 eller 1')
         qs = qs.filter(lost=(lost == '1'))
 
     modul = request.GET.get('modul')
     if modul:
         if not services.gyldig_modul_slug(modul):
-            return _feil(f'Ukjent modul: {modul}')
+            return json_feil(f'Ukjent modul: {modul}')
         qs = qs.filter(modul_slug=modul)
 
     naa = timezone.now()
@@ -193,18 +181,18 @@ def _opprett(request):
     if not har_tilgang(request.user, 'backlog', 'skriv_full'):
         return _nektet()
 
-    data = _json_body(request)
+    data = json_body(request)
     tittel = (data.get('tittel') or '').strip()
     if not tittel:
-        return _feil('Tittel må fylles ut')
+        return json_feil('Tittel må fylles ut')
 
     type_ = _hent_aktiv_type(data.get('type'))
     if type_ is None:
-        return _feil('Velg en type')
+        return json_feil('Velg en type')
 
     modul_slug = (data.get('modul_slug') or '').strip()
     if not services.gyldig_modul_slug(modul_slug):
-        return _feil(f'Ukjent modul: {modul_slug}')
+        return json_feil(f'Ukjent modul: {modul_slug}')
 
     innspill = Innspill.objects.create(
         type=type_,
@@ -239,7 +227,7 @@ def innspill_detalj_view(request, pk):
     """
     innspill = Innspill.objects.filter(pk=pk).first()
     if innspill is None:
-        return _feil('Innspillet finnes ikke', status=404)
+        return json_feil('Innspillet finnes ikke', status=404)
     if not services.kan_endres(innspill, request.user):
         return _nektet()
 
@@ -252,23 +240,23 @@ def innspill_detalj_view(request, pk):
         innspill.delete()
         return JsonResponse({'status': 'ok'})
 
-    data = _json_body(request)
+    data = json_body(request)
     if 'tittel' in data:
         tittel = (data.get('tittel') or '').strip()
         if not tittel:
-            return _feil('Tittel må fylles ut')
+            return json_feil('Tittel må fylles ut')
         innspill.tittel = tittel[:200]
     if 'beskrivelse' in data:
         innspill.beskrivelse = (data.get('beskrivelse') or '').strip()
     if 'type' in data:
         type_ = _hent_aktiv_type(data.get('type'))
         if type_ is None:
-            return _feil('Velg en type')
+            return json_feil('Velg en type')
         innspill.type = type_
     if 'modul_slug' in data:
         modul_slug = (data.get('modul_slug') or '').strip()
         if not services.gyldig_modul_slug(modul_slug):
-            return _feil(f'Ukjent modul: {modul_slug}')
+            return json_feil(f'Ukjent modul: {modul_slug}')
         innspill.modul_slug = modul_slug
 
     innspill.save()
@@ -291,7 +279,7 @@ def lost_view(request, pk, *, lost):
     """
     innspill = Innspill.objects.filter(pk=pk).first()
     if innspill is None:
-        return _feil('Innspillet finnes ikke', status=404)
+        return json_feil('Innspillet finnes ikke', status=404)
 
     innspill.lost = lost
     if lost:
@@ -332,13 +320,13 @@ def typer_view(request):
     if not har_tilgang(request.user, 'backlog', 'skriv_leder'):
         return _nektet()
 
-    navn = (_json_body(request).get('navn') or '').strip()
+    navn = (json_body(request).get('navn') or '').strip()
     if not navn:
-        return _feil('Navn må fylles ut')
+        return json_feil('Navn må fylles ut')
     if Innspilltype.objects.filter(navn__iexact=navn).exists():
         # `iexact`: «Bug» og «bug» er samme type for et menneske, og to rader
         # som ser like ut i et nedtrekk er verre enn en feilmelding.
-        return _feil(f'«{navn}» finnes allerede')
+        return json_feil(f'«{navn}» finnes allerede')
 
     type_ = Innspilltype.objects.create(navn=navn[:40])
     return JsonResponse({'status': 'ok', 'data': {
@@ -358,13 +346,13 @@ def type_detalj_view(request, pk):
     """
     type_ = Innspilltype.objects.filter(pk=pk).first()
     if type_ is None:
-        return _feil('Typen finnes ikke', status=404)
+        return json_feil('Typen finnes ikke', status=404)
 
     if request.method == 'DELETE':
         if not er_global_admin(request.user):
             return _nektet()
-        if not _json_body(request).get('confirm'):
-            return _feil('Sletting må bekreftes')
+        if not json_body(request).get('confirm'):
+            return json_feil('Sletting må bekreftes')
         try:
             type_.delete()
         except ProtectedError:
@@ -376,13 +364,13 @@ def type_detalj_view(request, pk):
             )}, status=409)
         return JsonResponse({'status': 'ok'})
 
-    data = _json_body(request)
+    data = json_body(request)
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
         if not navn:
-            return _feil('Navn må fylles ut')
+            return json_feil('Navn må fylles ut')
         if Innspilltype.objects.filter(navn__iexact=navn).exclude(pk=pk).exists():
-            return _feil(f'«{navn}» finnes allerede')
+            return json_feil(f'«{navn}» finnes allerede')
         type_.navn = navn[:40]
     if 'er_aktiv' in data:
         type_.er_aktiv = bool(data.get('er_aktiv'))
@@ -421,7 +409,7 @@ def kommentarer_view(request, pk):
     """
     innspill = Innspill.objects.filter(pk=pk).first()
     if innspill is None:
-        return _feil('Innspillet finnes ikke', status=404)
+        return json_feil('Innspillet finnes ikke', status=404)
 
     naa = timezone.now()
     if request.method == 'GET':
@@ -432,9 +420,9 @@ def kommentarer_view(request, pk):
     if not har_tilgang(request.user, 'backlog', 'skriv_full'):
         return _nektet()
 
-    tekst = (_json_body(request).get('tekst') or '').strip()
+    tekst = (json_body(request).get('tekst') or '').strip()
     if not tekst:
-        return _feil('Skriv noe før du lagrer')
+        return json_feil('Skriv noe før du lagrer')
 
     kommentar = Kommentar.objects.create(
         innspill=innspill,
@@ -460,7 +448,7 @@ def kommentar_detalj_view(request, pk):
     """
     kommentar = Kommentar.objects.filter(pk=pk).first()
     if kommentar is None:
-        return _feil('Kommentaren finnes ikke', status=404)
+        return json_feil('Kommentaren finnes ikke', status=404)
     if not services.kan_endre_kommentar(kommentar, request.user):
         return _nektet()
 
@@ -468,9 +456,9 @@ def kommentar_detalj_view(request, pk):
         kommentar.delete()
         return JsonResponse({'status': 'ok'})
 
-    tekst = (_json_body(request).get('tekst') or '').strip()
+    tekst = (json_body(request).get('tekst') or '').strip()
     if not tekst:
-        return _feil('Skriv noe før du lagrer')
+        return json_feil('Skriv noe før du lagrer')
     kommentar.tekst = tekst
     kommentar.save()
     return JsonResponse({'status': 'ok', 'data': _kommentar_til_dict(

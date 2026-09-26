@@ -1,14 +1,20 @@
-"""JSON-kroppen fra en forespørsel — rammeverkets versjon (26. sep. 2026).
+"""JSON inn og feil ut — rammeverkets versjon (26. sep. 2026, E5).
 
-Fem moduler har hver sin `_json_body`/`json_body` (E5 i
-`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`). Denne er den oppdragsmodulen
-herdet i M8, og den første som bor i `core`: verdilistefabrikken
-(`core.verdilister`) trengte en, og en sjette kopi ville gjort E5 større.
-De andre samles hit når E5 tas.
+Fem moduler hadde hver sin `_json_body`/`json_body`, og fire hadde i tillegg sin
+egen `_feil` — pluss en i `core.verdilister`. Innholdet hadde *ikke* glidd:
+M8 rettet alle fem samtidig. Men det var flaks at det gikk, ikke en egenskap:
+M8 fant kopiene ved å lete, og en sjette kopi skrevet før M8 ville stått igjen
+med 500 på `[]`. `core/tests_jsonkropp.py` håndhever at ingen modul definerer
+sin egen.
+
+Avhengighetsretningen er den vanlige: modulene importerer herfra, `core`
+importerer ingen modul.
 """
 from __future__ import annotations
 
 import json
+
+from django.http import JsonResponse
 
 
 def json_body(request) -> dict:
@@ -21,3 +27,8 @@ def json_body(request) -> dict:
     except (json.JSONDecodeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def json_feil(melding, status=400) -> JsonResponse:
+    """`{'status': 'error', 'message': …}` — formen klientenes `apiFetch` leser."""
+    return JsonResponse({'status': 'error', 'message': melding}, status=status)

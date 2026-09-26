@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Én `json_body` og én `json_feil`, i `core` (E5, første del)  `#core`
+
+**Hvorfor:** `_json_body` sto i fem moduler (`patients`, `vaktliste`, `backlog`, `ko`,
+`oppdrag`) og `_feil` i fire, pluss én i `core.verdilister`. **Innholdet hadde ikke glidd** —
+M8 rettet «`[]` gir 500» i alle fem samtidig — men det var fordi M8 fant alle kopiene ved å
+lete, ikke fordi noe holdt dem like. En sjette kopi skrevet dagen før M8 ville stått igjen.
+
+**Nå:** `core/jsonkropp.py` har `json_body(request)` og `json_feil(melding, status=400)`.
+Alle modulene importerer derfra; definisjonene og de fire `import json` som bare fantes for
+dem er borte. Ingen atferdsendring. `patients/CLAUDE.md` pekte på `_json_body` i
+`views_common.py` og er rettet.
+
+**Regelen er utledet, ikke listet:** `core/tests_jsonkropp.py` leser alle appene med AST og
+avviser en toppnivå-funksjon som heter `json_body`, `_json_body`, `json_feil` eller `_feil`
+utenfor `core/jsonkropp.py` — en ny modul er dekket den dagen den kommer. Metoder
+(`verifiser_vakt._feil`) rammes ikke. Oppførselsprøvene for `[]`/`null`/`"x"` som sto i
+`oppdrag` og `vaktliste` peker nå på `core.jsonkropp`.
+
+**Mutasjon:** 3 mutanter, alle røde — en `_json_body` lagt tilbake i `ko/views.py`,
+`isinstance`-sjekken fjernet (3 tester røde, i tre apper), `message` → `melding` i
+feilsvaret.
+
 ## 2026-09-26 — TODO som ikke stemte, og resten av `hent_aktiv_vakt`-flyttingen (F3)  `#docs #core`
 
 **Hvorfor:** tre punkter i `TODO.md` sa noe annet enn koden.

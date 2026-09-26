@@ -10,7 +10,7 @@ from accounts.models import CustomUser
 from patients.js_test_utils import JS_DIR, build_harness, node_available, run_node
 from vaktliste.models import Korps, Mannskap
 from vaktliste.tests_tilgang import _bruker, _klient
-from vaktliste.views import _json_body
+from core.jsonkropp import json_body
 
 SW_JS = JS_DIR / 'vaktliste-sw.js'
 
@@ -60,7 +60,7 @@ class JsonKroppTests(SimpleTestCase):
 
     def test_liste_gir_tom_dict(self):
         req = RequestFactory().post('/', data=b'[1, 2]', content_type='application/json')
-        self.assertEqual(_json_body(req), {})
+        self.assertEqual(json_body(req), {})
 
 
 class KopiensAlderJsTests(SimpleTestCase):

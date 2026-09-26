@@ -19,6 +19,7 @@ import logging
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
+from core.jsonkropp import json_body
 from core.arkiv import logg_arkivhendelse, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
@@ -27,7 +28,6 @@ from core.vakt import hent_aktiv_vakt
 from .arkiv import OppdragArkivHandler, arkiver_vakt
 from .models import Oppdrag, OppdragArkiv
 from .statistikk import arkiv_stats
-from .views_common import json_body
 
 logger = logging.getLogger(__name__)
 

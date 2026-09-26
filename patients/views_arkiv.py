@@ -12,7 +12,7 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from .services import arkiver_aktiv_vakt, compute_arkiv_stats
-from .views_common import _json_body
+from core.jsonkropp import json_body
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def arkiv_lagre_view(request):
     if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
-    data = _json_body(request)
+    data = json_body(request)
     arrangement_navn = (data.get('arrangement_navn') or '').strip()
     if not arrangement_navn:
         return JsonResponse({'error': 'arrangement_navn er påkrevd'}, status=400)
@@ -133,7 +133,7 @@ def arkiv_detalj_view(request, pk):
     if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
-    data = _json_body(request)
+    data = json_body(request)
     if not data.get('confirm'):
         return JsonResponse(
             {'error': 'Bekreftelse mangler. Send {\"confirm\": true} for å slette.'},

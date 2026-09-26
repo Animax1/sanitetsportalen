@@ -11,7 +11,7 @@ from oppdrag import choices
 from oppdrag.models import Oppdrag, Problemstilling, Statusmelding
 from oppdrag.tests import _enhet, _oppdrag
 from oppdrag.tests_views import _bruker, _klient
-from oppdrag.views_common import json_body
+from core.jsonkropp import json_body
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

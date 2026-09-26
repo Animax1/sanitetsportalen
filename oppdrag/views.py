@@ -21,6 +21,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from core.jsonkropp import json_body
 from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
@@ -32,7 +33,7 @@ from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
-    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, json_body, kan_lede,
+    bytte_til_dict, endring_til_dict, er_enhetskonto, etag_for_svar, hendelse_til_dict, kan_lede,
     melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )

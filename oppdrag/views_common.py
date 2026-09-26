@@ -11,16 +11,6 @@ from core.auth_decorators import har_tilgang
 from . import choices, services
 
 
-def json_body(request):
-    """Parse JSON-kroppen, eller returner tom dict."""
-    try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return {}
-    # `[]`, `"x"` og `null` er gyldig JSON og ga 500 på første `.get()` (M8).
-    return data if isinstance(data, dict) else {}
-
-
 def etag_for(rader, ekstra=None) -> str:
     """ETag over en liste av sammenlignbare tupler.
 
@@ -80,7 +70,6 @@ def kan_lede(user) -> bool:
     Global admin trenger ingen egen `or`: `nivaa_for` gir admin toppen av stigen.
     """
     return not er_enhetskonto(user) and har_tilgang(user, 'oppdrag', 'skriv_leder')
-
 
 
 def status_tidspunkt_for(oppdrag_liste, meldinger=None) -> dict:

@@ -174,8 +174,8 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
       PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
 - [ ] **Pulje E — duplisering som alt har glidd.** E1–E4 levert 26. sep. Igjen:
-      småhjelperne (E5) — `core/jsonkropp.py` finnes nå, og de fem `_json_body`-kopiene
-      samles dit; vasking og helseprober (E6).
+      resten av småhjelperne (E5 — JSON-kroppen og feilsvaret er samlet i
+      `core/jsonkropp.py`; sesjonsdekoding, escaping, intervaller og JS-hjelpere står); vasking og helseprober (E6).
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);

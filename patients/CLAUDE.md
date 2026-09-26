@@ -9,7 +9,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 
 | Modul | Ansvar |
 |-------|--------|
-| `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
+| `views_common.py` | `_patient_to_dict` — delt av de andre. JSON-kroppen er `core.jsonkropp` |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, vaktavslutning/-gjenåpning |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
 | `views_arkiv.py` | Vaktarkivet |
