@@ -88,8 +88,8 @@ og de må ikke slås sammen.
 
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
   (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
-  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som `les` ikke ser og
-  som ingen under `skriv_full` kan fylle (`services.er_planlagt`). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
+  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som ingen under `skriv_full`
+  ser eller kan fylle (`services.KLADD`, `er_planlagt`; C2, 26. sep.). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
   og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
   viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren

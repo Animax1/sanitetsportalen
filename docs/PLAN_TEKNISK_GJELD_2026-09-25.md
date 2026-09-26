@@ -235,7 +235,7 @@ Punktet finnes **bare på staging**.
   følger `vis_telefon`.
 - **Tidspunkt:** avgjøres **før neste `staging → main`**.
 
-**C2. Planleggerens kladd er synlig for `les_alle` og `skriv_handling`.**
+**C2. Planleggerens kladd er synlig for `les_alle` og `skriv_handling`.** *Levert 26. sep. 2026 (André: skjul, skriverett = `skriv_full`+), se CHANGELOG.*
 - **Hvor:** `vaktliste/services.py:852`.
 - **Løftene som brytes:** tre kommentarer og grensesnittet sier «usynlig for korpsene til du
   deler dem ut»:

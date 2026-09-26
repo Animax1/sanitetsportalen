@@ -1440,9 +1440,10 @@ class TildeltAlleKorpsTests(TilgangsBasis):
         data = self.c_kb.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
         ider = {vp['id'] for vp in data['vaktposter']}
         self.assertIn(pk, ider)
-        # Fra 12. sep. 2026 ser korps-føreren alle, også lederens kladd —
-        # men hun kan ikke fylle den (`kanBemannePlass`). Leseren ser den ikke.
-        self.assertIn(planlagt, ider)
+        # Fra 12. sep. 2026 så korps-føreren alle, også lederens kladd. **Snudd
+        # 26. sep. 2026 (C2, André: «bare de som har skriverett kan se den»)**:
+        # kladden er skriverettens, se `vaktliste/tests_kladden.py`.
+        self.assertNotIn(planlagt, ider)
         ider_leser = {vp['id'] for vp in
                       self.c_leser.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']['vaktposter']}
         self.assertNotIn(planlagt, ider_leser, 'vaktlederens bord vises ikke for leseren')

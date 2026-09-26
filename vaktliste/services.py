@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
@@ -840,6 +841,12 @@ def poster_for_korps(qs, korps_id):
         | Q(mannskap__isnull=True, alle_korps=True))
 
 
+#: Lederens kladd som spørring: ledig, ikke åpnet for alle, og verken plassen
+#: eller ressursen reservert et korps. Samme sammenslåing som `reservert_korps()`.
+KLADD = Q(mannskap__isnull=True, alle_korps=False, korps__isnull=True,
+          ressurs__korps__isnull=True)
+
+
 def synlige_vaktposter(qs, user):
     """Skiftene brukeren får se: alle, eller bare sitt eget korps.
 
@@ -850,7 +857,14 @@ def synlige_vaktposter(qs, user):
     fail-closed, som skrivingen.
     """
     if ser_alle_korps(user):
-        return qs
+        if kan_skrive_alt(user):
+            return qs
+        # **Kladden er skriverettens** (26. sep. 2026, C2 — André: «bare de som
+        # har skriverett kan se den»). `les_alle` og `skriv_handling` ser alle
+        # korps, men ikke lederens halvferdige planlegging. Kladd er en *ledig*
+        # plass: en bemannet plass på en ressurs uten reservasjon (KO) er ikke
+        # kladd, og derfor holder ikke `er_planlagt()` alene her.
+        return qs.exclude(KLADD)
     korps = brukerens_korps(user)
     if korps is None:
         return qs.none()

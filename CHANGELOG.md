@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Planleggerens kladd var synlig for `les_alle` og korps-føreren (C2)  `#vaktliste/tilgang`
+
+**André: «skjul, bare de som har skriverett kan se den».** En ledig plass som ikke er delt
+ut — ikke reservert et korps, ikke åpnet for alle — er lederens kladd. Tre kommentarer og
+planleggeren lovet at den var «usynlig for korpsene til du deler dem ut», men
+`synlige_vaktposter()` slapp alt gjennom for den som ser alle korps: **`les_alle` og
+`skriv_handling` så halvferdig planlegging** som om det var vaktlista. Bare `er_planlagt()`
+var prøvd, aldri synligheten. Regelen «korps-føreren ser alle, også lederens kladd» sto som
+bevisst fra 12. sep.; den er nå snudd.
+
+**Tolkningen:** «skriverett» er **`skriv_full` og oppover** — de som kan dele ut og fylle en
+kladdeplass (`kan_skrive_alt`). `skriv_handling` («fører eget korps») ser den ikke.
+
+**Kladd er en *ledig* plass.** `services.KLADD` (et `Q`) er ledig + ikke `alle_korps` +
+verken plassen eller ressursen reservert — samme sammenslåing som `reservert_korps()`. En
+**bemannet** plass på en ressurs uten reservasjon (KO) er ikke kladd og vises som før;
+derfor holdt ikke `er_planlagt()` alene, den spør ikke om personen. Timeoversikten leser
+samme filter, så `ledige_plasser` teller heller ikke kladden for `les_alle`.
+Budsjettallene (`planlegging`) er uendret — et aggregat, vist i «Planlegger», som er
+lederens.
+
+**Tester:** `vaktliste/tests_kladden.py` — fem slags plasser mot seks kontotyper gjennom
+hovedsvaret, og tellingen i timeoversikten. `TildeltAlleKorpsTests` dokumenterte den gamle
+regelen og er snudd med henvisning. **Mutasjonstesting (tungt, tilgang):** 6 mutanter —
+skriveretten mister kladden, filteret fjernet, og hvert av de fire leddene i `KLADD` fjernet
+for seg. Alle drept. `vaktliste`+`ko` (2 204 tester): grønt.
+
 ## 2026-09-26 — Overnattingsfanen viste andre korps' skift til en ren `les` (C1)  `#vaktliste/tilgang`
 
 **Funnet i kodegjennomgangen 25. sep., gikk til prod med `7c21318` samme kveld.** En ren

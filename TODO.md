@@ -161,9 +161,7 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       feltendringer og sletting av backup uten audit (B2); vaktlistas audithull (B3);
       `accounts/admin.py` (B4); `sikkerhetssjekk.py` mangler KO og backlog (B5); rå
       unntakstekst i `Utsending.feil` (B7).
-- [ ] **Pulje C — avgjørelser.** C1 levert 26. sep. C2 besluttet 26. sep. — skjul
-      planleggerens kladd for alle under `skriv_full`; i dag ser `les_alle` og
-      `skriv_handling` den, stikk i strid med tre kommentarer. C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
+- [ ] **Pulje C — avgjørelser.** C1 og C2 levert 26. sep. Igjen: C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
       predikat for «på vakt», eller fjern feltet.
 - [ ] **Pulje D — verifiseringen.** CI med PostgreSQL og node, og manglende node skal feile,
       ikke hoppe over ~160 tester (D1, erstatter «Vurder GitHub Actions»); død kode som
