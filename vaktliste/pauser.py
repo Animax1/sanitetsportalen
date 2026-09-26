@@ -21,6 +21,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from .intervaller import slaa_sammen
 from .models import Pause
 
 #: Samme tak som KOs planlagte pauser (`ko.tavle.MAKS_PAUSE`): lengre enn
@@ -52,27 +53,15 @@ def _klokke(t) -> str:
     return timezone.localtime(t).strftime('%H:%M')
 
 
-def _slaa_sammen(intervaller):
-    """Intervallene slått sammen der de overlapper eller møtes — et lag med
-    skift 14–22 og 22–06 er på vakt 14–06."""
-    ut = []
-    for fra, til in sorted(intervaller):
-        if ut and fra <= ut[-1][1]:
-            ut[-1] = (ut[-1][0], max(ut[-1][1], til))
-        else:
-            ut.append((fra, til))
-    return ut
-
-
 def skiftspenn(ressurs):
     """Tida ressursen har skift, som sammenslåtte `(fra, til)`.
 
     **Alle plassene teller, også de ledige.** Pausen gjelder laget, og laget
     er satt opp for den tida uansett om alle navnene er fylt inn ennå.
     """
-    return _slaa_sammen(
+    return slaa_sammen(
         (vp.fra_tid, vp.til_tid) for vp in ressurs.vaktposter.all()
-        if vp.fra_tid and vp.til_tid and vp.til_tid > vp.fra_tid)
+        if vp.fra_tid and vp.til_tid)
 
 
 def valider(ressurs, fra, til, *, pause=None) -> None:

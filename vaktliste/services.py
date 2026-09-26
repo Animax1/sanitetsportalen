@@ -18,7 +18,7 @@ from django.utils import timezone
 from core.auth_decorators import er_global_admin, har_tilgang
 from core.sortering import Norsk, norsk_nokkel
 
-from . import choices, pauser
+from . import choices, intervaller, pauser
 from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
 
 
@@ -1192,27 +1192,13 @@ def _overlappstimer(skift):
     spenn = sorted((vp.fra_tid, vp.til_tid) for vp in skift
                    if vp.fra_tid and vp.til_tid and vp.til_tid > vp.fra_tid)
     # `< 2` er en snarvei, ikke en regel: ett skift gir sum lik union og
-    # dermed null uansett. Det som *må* stå her er vakten mot `spenn[0]` på
-    # en tom liste. (Mutasjonsprøvd 15. sep. 2026: `< 1` overlever fordi den
-    # er ekvivalent, `< 0` gir IndexError og fanges.)
+    # dermed null uansett. (Til 26. sep. 2026 vernet den også `spenn[0]` på
+    # en tom liste; løkka bor nå i `intervaller.slaa_sammen`, som tåler det.)
     if len(spenn) < 2:
         return 0.0
-    sekunder = sum((til - fra).total_seconds() for fra, til in spenn)
-    # Unionen: slå sammen spenn som berører hverandre, og legg sammen
-    # lengdene av de sammenslåtte.
-    union = 0.0
-    start, slutt = spenn[0]
-    for fra, til in spenn[1:]:
-        # `>` og `>=` gir samme sum her — berører spennene hverandre nøyaktig,
-        # blir de enten ett segment eller to som til sammen er like lange.
-        # Mutanten overlever, og den er ekvivalent, ikke et hull i testene.
-        if fra > slutt:
-            union += (slutt - start).total_seconds()
-            start, slutt = fra, til
-        else:
-            slutt = max(slutt, til)
-    union += (slutt - start).total_seconds()
-    return round((sekunder - union) / 3600, 2)
+    sum_s = intervaller.sekunder(spenn)
+    union_s = intervaller.sekunder(intervaller.slaa_sammen(spenn))
+    return round((sum_s - union_s) / 3600, 2)
 
 
 def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):

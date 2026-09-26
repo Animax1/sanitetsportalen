@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Intervallene i vaktlista ett sted, og bilskjermens kopier kan ikke gli (E5, fjerde del)  `#vaktliste #oppdrag`
+
+**Intervallene.** «Slå sammen `(fra, til)` som overlapper eller møtes» sto tre ganger:
+`statistikk.union`, `pauser._slaa_sammen` og som egen løkke i `services._overlappstimer`
+(sum minus union). Nå `vaktliste/intervaller.py` — `slaa_sammen()` og `sekunder()` — og de
+tre kaller den. `slaa_sammen` forkaster tomme og baklengse intervaller selv, så `pauser`
+slipper å huske det. Ingen atferdsendring.
+
+**En overlevende mutant avdekket et eldre hull:** sammenslåingen av bemannet tid *per enhet*
+i bemanningsstatistikken kunne fjernes uten at noe ble rødt. `Ressurs.enhet` er en FK, så to
+ressurser (dagbil og nattbil) kan være samme bil — overlapper skiftene, ville
+`bemannet_timer` talt dobbelt. `test_to_ressurser_paa_samme_bil_telles_en_gang` holder det
+nå. **Samme dobbelttelling finnes i `enhetstimer`**, som summerer per ressurs — ført i
+`TODO.md`, ikke rettet her, fordi det endrer et tall brukeren ser.
+
+**Bilskjermens kopier.** `oppdrag-enhet.js` laster ikke `oppdrag-kort.js` (bilen skal ikke
+bære tavlas tilstand for å låne fem enlinjere), så `oppdragsnr`, `hendelsesnr`,
+`hastegradKlasse`, `_medAntall` og `_problemMedAntall` står i begge. Kopiene blir stående;
+`oppdrag/tests_js_kopier.py` krever at hver funksjon som står i begge filene er lik
+(kommentarer unntatt). **Én hadde glidd:** reservetabellen i `lydTerskler()` —
+sentralbordets manglet «Plassering», bilens hadde den. Rettet, og testen kjører begge i node
+og krever samme svar.
+
+*Vurdert og forkastet:* en felles `oppdrag-ord.js` for de fem. Riktigere på sikt, men en ny
+fil er en ny rad i rot-`CLAUDE.md` (34 tegn igjen) og et nytt ledd i lasterekkefølgen på
+tre sider — for fem enlinjere som nå ikke kan gli.
+
+**Mutasjon:** 8 mutanter, alle røde til slutt. Intervaller: `<=` → `<` (kanter slås ikke
+sammen), `max` fjernet, filteret for tomme fjernet, overlappet uten sammenslåing (9 røde),
+`pauser` uten sammenslåing, bemannet per enhet uten sammenslåing — **overlevde**, rød etter
+den nye testen. JS: `oppdragsnr` endret i bilen — rød; «Plassering» fjernet igjen — rød
+(det er den opprinnelige koden).
+
 ## 2026-09-26 — Fem HTML-escapere, to som ikke escapet `'` — og fire byggere utenfor skanningen (E5, tredje del)  `#frontend #sikkerhet #patients`
 
 **Hvorfor:** `static/js/` hadde fem escapere. `_escHtml` (i `portal-utils.js`) og `esc` (i

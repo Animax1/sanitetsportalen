@@ -17,7 +17,8 @@ from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
-from vaktliste.statistikk import bemanning_stats, lengste_hull, union
+from vaktliste.intervaller import slaa_sammen
+from vaktliste.statistikk import bemanning_stats, lengste_hull
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
 
 
@@ -30,7 +31,7 @@ class IntervallTests(TestCase):
 
     def test_union_slaar_sammen_overlapp_og_kant(self):
         self.assertEqual(
-            union([(self._t(0), self._t(60)), (self._t(30), self._t(90)),
+            slaa_sammen([(self._t(0), self._t(60)), (self._t(30), self._t(90)),
                    (self._t(90), self._t(100)), (self._t(200), self._t(210)),
                    (self._t(300), self._t(300))]),
             [(self._t(0), self._t(100)), (self._t(200), self._t(210))])
@@ -169,6 +170,18 @@ class UtnyttelseTests(Basis):
         self.assertEqual(u['andel'], 50)
         self.assertEqual(u['lengste_ledig'], 50.0)   # 70 → 120
         self.assertEqual(u['oppdrag'], 2)
+
+    def test_to_ressurser_paa_samme_bil_telles_en_gang(self):
+        """`Ressurs.enhet` er en FK: dagbilen og nattbilen kan være samme
+        enhet. Overlapper de, er bilen bemannet i unionen av tida — ikke i
+        summen. Ingen test holdt dette før 26. sep. 2026 (E5, mutant)."""
+        natt = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1 natt', enhet=self.enhet)
+        self._post(self.bil, 0, 120)                  # 20:00–22:00
+        self._post(natt, 60, 180)                     # 21:00–23:00
+        self._oppdrag(self.enhet, 0, ledig=30)
+        u = self.stats()['utnyttelse']['Ambulanse 1']
+        self.assertEqual(u['bemannet_timer'], 3.0, 'union, ikke 4 t')
+        self.assertEqual(u['lengste_ledig'], 150.0)  # 20:30 → 23:00
 
     def test_bil_uten_ressurs_er_ukjent(self):
         self._oppdrag(self.enhet2, 10, ledig=40)

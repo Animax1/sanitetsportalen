@@ -329,7 +329,7 @@ Rekkefølgen innad følger hvor mye kopiene allerede er forskjellige.
 - **Hvorfor det er mer enn pynt:** «kan lede oppdrag» er skrevet to ulike steder, og bare
   det ene utelukker enhetskontoer. Knappen kan da vises for noen som får 403.
 
-**E5. Småhjelpere:**
+**E5. Småhjelpere:** *Levert 26. sep. 2026, se CHANGELOG.*
 - `_json_body`/`_feil` (fem kopier)
 - sesjonsdekodingen (fire kopier, med ulik feilhåndtering)
 - escape-funksjonene (fem varianter)

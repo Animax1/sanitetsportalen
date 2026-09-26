@@ -173,10 +173,15 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       mellom `migrate` og containerbyttet kjører den gamle koden, og den velger kolonnen i
       hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
       PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
-- [ ] **Pulje E — duplisering som alt har glidd.** E1–E4 levert 26. sep. Igjen:
-      resten av småhjelperne (E5 — JSON-kroppen og feilsvaret er samlet i
-      `core/jsonkropp.py`, sesjonsdekodingen i `core/sesjoner.py`, escaperne gir likt svar;
-      intervallene i vaktlista og JS-hjelperne står); vasking og helseprober (E6).
+- [ ] **Pulje E — duplisering som alt har glidd.** E1–E5 levert 26. sep. Igjen: vasking og
+      helseprober (E6).
+- [ ] **`enhetstimer` i bemanningsstatistikken teller en bil to ganger** når to ressurser
+      er koblet til samme enhet og skiftene overlapper (`Ressurs.enhet` er en FK — dagbil og
+      nattbil kan være samme bil). `vaktliste/statistikk.py` summerer unionen *per ressurs*;
+      utnyttelsen per enhet slår sammen *per enhet* og er riktig. Funnet under E5, ikke rettet
+      der: det endrer et tall på statistikksiden, og da skal det være et eget valg. Rettingen er
+      å summere `bemannet_per_enhet` i stedet, med en test som
+      `test_to_ressurser_paa_samme_bil_telles_en_gang`.
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);

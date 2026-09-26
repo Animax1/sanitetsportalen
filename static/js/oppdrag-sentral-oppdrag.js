@@ -152,7 +152,7 @@ function lydTerskler() {
   // første utgaves tall. Som funksjon — se `koNokkel()` i enhetsskjermen.
   const fra = globalThis.window?.OPPDRAG_LYDVARSEL;
   if (fra && typeof fra === 'object' && Object.keys(fra).length) return fra;
-  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
+  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60], Plassering: [900, 60] };
 }
 
 

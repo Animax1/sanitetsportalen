@@ -29,6 +29,7 @@ from django.utils import timezone
 from core.sortering import norsk_nokkel
 from core.stats import BaseStatistikkHandler, register
 
+from .intervaller import slaa_sammen
 from .models import Ressurs, Vaktliste, Vaktpost
 
 
@@ -38,18 +39,6 @@ def _min(fra, til):
 
 def _timer(intervaller):
     return round(sum((til - fra).total_seconds() for fra, til in intervaller) / 3600, 2)
-
-
-def union(intervaller):
-    """Slå sammen overlappende `(fra, til)`. To skift som overlapper er én
-    bemannet periode, ikke to — ellers ble bilen bemannet dobbelt."""
-    ut = []
-    for fra, til in sorted(i for i in intervaller if i[1] > i[0]):
-        if ut and fra <= ut[-1][1]:
-            ut[-1] = (ut[-1][0], max(ut[-1][1], til))
-        else:
-            ut.append((fra, til))
-    return ut
 
 
 def lengste_hull(bemannet, opptatt):
@@ -117,7 +106,7 @@ def bemanning_stats(vakt, naa=None):
     skift_per_ressurs: dict[int, list] = {}
     for p in poster:
         skift_per_ressurs.setdefault(p.ressurs_id, []).append((p.fra_tid, p.til_tid))
-    bemannet_per_ressurs = {rid: union(s) for rid, s in skift_per_ressurs.items()}
+    bemannet_per_ressurs = {rid: slaa_sammen(s) for rid, s in skift_per_ressurs.items()}
     enhetstimer = round(sum(_timer(b) for rid, b in bemannet_per_ressurs.items()
                             if ressurser[rid].enhet_id is not None), 2)
     lagtimer = round(sum(_timer(b) for rid, b in bemannet_per_ressurs.items()
@@ -146,8 +135,8 @@ def bemanning_stats(vakt, naa=None):
             navn_per_enhet.setdefault(r.enhet_id, r.navn)
     utnyttelse = {}
     for enhet_id, navn in sorted(navn_per_enhet.items(), key=lambda p: norsk_nokkel(p[1])):
-        bemannet = union(bemannet_per_enhet.get(enhet_id, []))
-        opptatt = union(opptatt_per_enhet.get(enhet_id, []))
+        bemannet = slaa_sammen(bemannet_per_enhet.get(enhet_id, []))
+        opptatt = slaa_sammen(opptatt_per_enhet.get(enhet_id, []))
         bem_t = _timer(bemannet) if bemannet else None
         opp_t = _timer(opptatt)
         utnyttelse[navn] = {
