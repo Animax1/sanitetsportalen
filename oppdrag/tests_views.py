@@ -1139,6 +1139,27 @@ class HistorikklisteTests(OppdragBasis):
     def test_soek_paa_enhet(self):
         self.assertEqual(len(self._sok('Haugesund')), 3)
 
+    def _bil_nummer_to(self, oppdrag):
+        """En ferdig andre bil på et ferdig oppdrag. Direkte, ikke gjennom
+        `varsle_enhet`: den tar oppdraget ut av historikken igjen."""
+        from oppdrag.models import Oppdragsenhet
+        Oppdragsenhet.objects.create(oppdrag=oppdrag, enhet=self.annen_enhet,
+                                     status=choices.LEDIG, rekkefolge=2)
+
+    def test_soek_finner_bil_nummer_to(self):
+        """Søket så bare den primære enheten til 26. sep. 2026."""
+        maal = self.ferdigstilte[2]
+        self._bil_nummer_to(maal)
+        self.assertEqual([r['id'] for r in self._sok('Karmøy')], [maal.pk])
+
+    def test_to_treffende_enheter_gir_ett_treff(self):
+        """«a» står i begge bilnavnene — oppdraget skal likevel stå én gang."""
+        maal = self.ferdigstilte[2]
+        self._bil_nummer_to(maal)
+        ider = [r['id'] for r in self._sok('a')]
+        self.assertIn(maal.pk, ider)
+        self.assertEqual(len(ider), len(set(ider)), ider)
+
     def test_ukjent_soek_gir_tom_liste(self):
         self.assertEqual(self._sok('finnesikke'), [])
 

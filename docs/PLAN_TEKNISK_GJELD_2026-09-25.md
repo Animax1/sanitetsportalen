@@ -434,8 +434,8 @@ arv `base_portal`.
 
 **G6. Deploy 2 i oppdragsmodulen** står allerede i TODO.
 - **Omfang:** kartlagt til omtrent 80–100 produksjonslinjer og rundt 70 teststeder.
-- **Skjult feil i dag:** historikksøket `enhet__navn__icontains` (`oppdrag/views.py:1265`)
-  treffer bare den primære enheten.
+- ~~**Skjult feil i dag:** historikksøket treffer bare den primære enheten.~~ Rettet
+  26. sep. 2026 uten å vente på deploy 2, se CHANGELOG.
 - **Forutsetning:** A1.
 
 ---

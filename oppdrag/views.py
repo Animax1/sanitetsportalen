@@ -1254,10 +1254,15 @@ def historikk_liste_view(request):
         if sok.lstrip('#').isdigit():
             qs = qs.filter(oppdragsnummer=int(sok.lstrip('#')))
         else:
+            # **Alle enhetene på oppdraget, ikke bare den primære** (26. sep.
+            # 2026). `enhet__navn` er den første bilen; bil nummer to fantes
+            # ikke i søket. `distinct` fordi to treffende enheter ellers gir
+            # samme oppdrag to ganger.
             qs = qs.filter(
                 Q(problemstilling__icontains=sok)
                 | Q(lokasjon__navn__icontains=sok)
-                | Q(enhet__navn__icontains=sok))
+                | Q(enhet__navn__icontains=sok)
+                | Q(enheter__enhet__navn__icontains=sok)).distinct()
 
     # Bulk her også: historikken kan være hele vakta, og `oppdrag_til_dict`
     # slår ellers opp avbrytelsene én gang per rad.

@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Historikksøket fant ikke bil nummer to  `#oppdrag`
+
+**Hvorfor:** søket i historikken («Søk på nummer, problemstilling, lokasjon eller enhet»)
+så på `Oppdrag.enhet` — **den primære bilen**. Et oppdrag der Karmøy 12 var bil nummer to,
+ble ikke funnet på «Karmøy». Funnet under kodegjennomgangen (planens G6), og rettet nå i
+stedet for å vente på deploy 2: søket leter også i `enheter__enhet__navn`, med `distinct()`
+så et oppdrag med to treffende biler står én gang.
+
+**Tester:** `test_soek_finner_bil_nummer_to` og `test_to_treffende_enheter_gir_ett_treff`
+i `HistorikklisteTests`. Bil nummer to legges inn direkte som ferdig — `varsle_enhet` på et
+ferdig oppdrag tar det ut av historikken, og da ville testen målt noe annet enn den sier.
+
+**Mutasjon:** 2 mutanter, begge røde — leddet for alle enhetene fjernet, og `distinct()`
+fjernet.
+
 ## 2026-09-26 — Én fabrikk for vakter: to like vaktnavn samtidig gir 400, ikke 500  `#core #vaktliste #patients`
 
 **Hvorfor:** tre steder laget `Vakt`-rader, hvert med sin egen sjekk av navnet, og `Vakt.navn`
