@@ -175,10 +175,11 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       `test_to_ressurser_paa_samme_bil_telles_en_gang`.
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
-- [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep., og G1s server-status.
-      Igjen av G1: `AppSetting`-adminen og `appsetting`-kommandoen, vaktas livssyklus
-      (`avslutt_vakt_view`, `vakter_view`, `gjenaapne_vakt_view`) og testinfrastrukturen
-      (`js_test_utils`, `tests_modul_dekorator`) ut av `patients`. Store filer (G2);
+- [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep., og av G1 server-status,
+      `AppSetting`-adminen, `appsetting` og `kollaps_arkiv`. Vaktas livssyklus er flyttet inn i
+      punktet om arkiveringen under — den trenger et register, ikke en flytting.
+      Testinfrastrukturen (`js_test_utils`, `tests_modul_dekorator`) blir stående: rundt hundre
+      testfiler importerer den, og en flytting fanger ingen feil — tas når noen er der uansett. Store filer (G2);
       pasientsidens eget skall (G3 — klokka er felles fra 26. sep.; å arve `base_portal` venter
       til pasientsiden redesignes uansett).
 - [ ] **scipy og numpy (~160 MB) — valgfrie?** Vurdert under G5, ikke endret. Koden tåler
@@ -1012,7 +1013,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
-- [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
+- [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den** — og vaktas livssyklus med den
+      («Avslutt vakt», «Tidligere vakter», «Gjenåpne», i dag `patients/views_patients.py`). De
+      kan ikke bare flyttes til `core`: «Avslutt vakt» sletter pasientene, og `core` får ikke
+      importere `patients`. Det trengs et register der modulene melder hva som skjer når en
+      vakt avsluttes — samme idiom som `core/opprydding.py`. Vurdert og utsatt under G1
+      26. sep. 2026: det er et design, på den mest destruktive knappen i portalen. Utsatt 28. aug. 2026 —
       se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
       for frysing, verifisering og kollaps, men **opprettelsen** (`arkiver_aktiv_vakt()` i
       `patients/services.py` — handler-kontrakten har ingen `opprett_arkiv`) og **knappen**

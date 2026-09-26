@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — `appsetting`, `kollaps_arkiv` og `AppSetting`-adminen ut av `patients` (G1, andre del)  `#core`
+
+**Hvorfor:** tre ting i `patients` var rammeverk. `AppSettingAdmin` (i `patients/admin.py`),
+`manage.py appsetting` (nødverktøyet for portalinnstillingene) og **`manage.py kollaps_arkiv`**
+— cron-jobben som sletter radnivået i arkivene etter 24 måneder. Den siste sto ikke i planen,
+men den importerer bare `core` og `audit` og finner arkivene gjennom registeret; den er like
+mye rammeverk som de to andre. Alle tre bor nå i `core` (`git mv`, historikken følger).
+
+**Railway Cron er uberørt:** kommandoen heter det samme, og Django finner den i hvilken app den
+enn ligger. `KommandoeneBorIRammeverketTests` låser at begge løses til `core` og at ingen kopi
+ligger igjen i en annen app — Django lar den første appen vinne, så en kopi ville ligget død.
+Begge kommandoene er kjørt for alvor etter flyttingen (`appsetting --list`,
+`kollaps_arkiv --dry-run`).
+
+**Ikke flyttet, med vilje:**
+- **Vaktas livssyklus** («Avslutt vakt», «Tidligere vakter», «Gjenåpne»). «Avslutt vakt»
+  sletter pasientene, og `core` får ikke importere `patients` — det trengs et register, ikke en
+  flytting. Ført sammen med arkiveringspunktet i `TODO.md`.
+- **Testinfrastrukturen** (`js_test_utils`). Rundt hundre testfiler importerer den; å flytte den
+  er omflytting som ikke fanger en feil.
+
+**Mutasjon:** 1 mutant — en kopi av `appsetting` lagt tilbake i `patients` — rød.
+
 ## 2026-09-26 — Pasientsiden bruker den felles klokka (G3, kort del)  `#patients #frontend`
 
 **Hvorfor:** pasientsiden er et eget skall og hadde sin egen `updateClock` i

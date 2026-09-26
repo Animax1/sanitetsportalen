@@ -2,7 +2,6 @@
 from django.contrib import admin
 
 from .models import Patient, Forstehjelper
-from core.models import AppSetting
 
 
 @admin.register(Forstehjelper)
@@ -28,10 +27,3 @@ class PatientAdmin(admin.ModelAdmin):
     ordering = ['-vakt__startet', 'pasientnummer']
     autocomplete_fields = ['forstehjelper']
 
-
-@admin.register(AppSetting)
-class AppSettingAdmin(admin.ModelAdmin):
-    """Admin for AppSetting (nøkkel-verdi-par)."""
-
-    list_display = ['key', 'value']
-    search_fields = ['key']

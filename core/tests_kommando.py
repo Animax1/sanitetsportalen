@@ -115,7 +115,7 @@ class CronjobbeneBrukerDenTests(TestCase):
             'kollaps_arkiv',
             # Nøyaktig der staging-sporet brakk: `handler.kandidater()`,
             # den første spørringen etter at handlerne er funnet.
-            'patients.management.commands.kollaps_arkiv.Command._kjor_modul',
+            'core.management.commands.kollaps_arkiv.Command._kjor_modul',
             'ingen arkiv ble kollapset')
 
 
@@ -163,3 +163,31 @@ class SisteKjoringRegistreresTests(TestCase):
         from core.kommando import siste_kjoringer
         call_command('purge_old_logs', stdout=StringIO(), stderr=StringIO())
         self.assertTrue(siste_kjoringer()['purge_old_logs']['ok'])
+
+
+class KommandoeneBorIRammeverketTests(SimpleTestCase):
+    """`appsetting` og `kollaps_arkiv` er rammeverk, og bor i `core` (26. sep.
+    2026, G1). Railway Cron kjører `manage.py kollaps_arkiv` — navnet skal
+    løses til nøyaktig én app, og det skal være `core`."""
+
+    def test_kommandoene_loeses_til_core(self):
+        from django.core.management import get_commands
+        kommandoer = get_commands()
+        for navn in ('appsetting', 'kollaps_arkiv'):
+            self.assertEqual(kommandoer[navn], 'core', navn)
+
+    def test_ingen_kopi_i_en_annen_app(self):
+        """Django lar den første appen vinne, så en kopi ville ligget død."""
+        import os
+        from django.apps import apps
+        from django.core.management import find_commands
+        eiere = {navn: [a.label for a in apps.get_app_configs()
+                        if navn in find_commands(os.path.join(a.path, 'management'))]
+                 for navn in ('appsetting', 'kollaps_arkiv')}
+        self.assertEqual(eiere, {'appsetting': ['core'], 'kollaps_arkiv': ['core']})
+
+    def test_appsetting_er_registrert_i_core_sin_admin(self):
+        from django.contrib import admin
+        from core.admin import AppSettingAdmin
+        from core.models import AppSetting
+        self.assertIsInstance(admin.site._registry[AppSetting], AppSettingAdmin)

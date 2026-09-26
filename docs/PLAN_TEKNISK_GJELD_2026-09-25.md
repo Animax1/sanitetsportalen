@@ -395,7 +395,7 @@ egen runde. Eksempler:
 
 Ingen av disse gjør skade i dag. Hver av dem gjør neste endring dyrere.
 
-**G1. `patients` bærer rammeverk.** Flyttes til `core`: *Server-status levert 26. sep. 2026, se CHANGELOG; resten står.*
+**G1. `patients` bærer rammeverk.** Flyttes til `core`: *Server-status, `AppSetting`-adminen og kommandoene levert 26. sep. 2026, se CHANGELOG. Vaktas livssyklus er ført sammen med arkiveringen i TODO; testinfrastrukturen blir stående.*
 - **Server-status:** malen `patients/admin_status.html` (843 linjer, med 531 linjer
   inline-JS som ingen skanner eller node-test ser) flyttes til `core/templates/core/`.
   Skriptet flyttes til `static/js/portal-status.js`.

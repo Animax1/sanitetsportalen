@@ -13,7 +13,7 @@ from __future__ import annotations
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import ModuleSettings
+from .models import AppSetting, ModuleSettings
 from .modules import get_module
 
 
@@ -87,3 +87,11 @@ class ModuleSettingsAdmin(admin.ModelAdmin):
         if request.user.is_authenticated:
             obj.updated_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(AppSetting)
+class AppSettingAdmin(admin.ModelAdmin):
+    """Admin for AppSetting (nøkkel-verdi-par). Flyttet fra `patients` 26. sep. 2026 (G1)."""
+
+    list_display = ['key', 'value']
+    search_fields = ['key']
