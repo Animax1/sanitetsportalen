@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Testsjekkliste for `staging` til `main`  `#docs #drift`
+
+**Hvorfor:** André: «Er det noe spesifikt jeg skal teste på staging som følge av det vi har
+gjort før vi pusher til main?» `docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md` dekker bare det
+som er endret mellom `main` (`4813cee`) og `staging` (`b5243c3`), sortert etter hva en feil
+koster: data og destruktive flyter først (oppdragskjeden, bil nummer to, arkiv, vaktnavn som
+finnes, avslutt vakt, bil-kontoen, moduloppsettet), så sidene som er flyttet (server-status,
+KO-tavla, bakgrunnsfaner, vaktlista offline), så utseendet og Railway. Den har også
+kommandoene for pushen i **tre framspolinger** — `0660da0`, så `68fed55` (kolonneslettingen
+alene, med backup før), så resten. `TODO.md` sa «to omganger»; det er rettet til tre.
+
 ## 2026-09-26 — Veien til neste vakt, og en generalprøve  `#docs #drift`
 
 **Hvorfor:** neste vakt er om rundt 240 dager, og den blir **første gang flere biler per
