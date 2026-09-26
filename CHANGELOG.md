@@ -59,6 +59,16 @@ PostgreSQL:** ny kode oppretter en rad (kolonnen får `false`), gammel kodes `SE
 `django-ratelimit` trengte den, og feilsøkingsavsnittet for 500 ved innlogging anbefalte å
 kjøre den. Begge er rettet — rate-limitingen faller dessuten åpen ved cachefeil.
 
+**Migrasjonsprøvene fant en feil hele suiten gikk forbi.** `verifiser_migrasjoner` migrerer
+til et *eldre* punkt (`migrate vaktliste 0006`), og da fyrer `post_migrate` — der
+`_ensure_module_settings_defaults` lagde moduloppsett med **dagens** modell. Den kjenner ikke
+`backup_enabled`, mens kolonnen på det punktet ennå var `NOT NULL` uten standard:
+`null value in column "backup_enabled" … violates not-null constraint`, alle tre prøvene røde.
+En vanlig `migrate` til siste versjon går forbi det, så deployen hadde trolig virket — men
+mottakeren bruker nå den **historiske** modellen fra `post_migrate` (`kwargs['apps']`), som er
+riktig uansett. **4 681 tester grønne på SQLite, og feilen synes bare mot PostgreSQL med
+prøvene** — CI (D1) ville stoppet den før deploy.
+
 **Mutanter: 5, alle drept.** 410 → 200; advarselen fjernet; `db_default` fjernet (gir
 `NOT NULL constraint failed: core_modulesettings.backup_enabled` ved første nye modulrad —
 nøyaktig det prod ville fått); raden i `UTGAATTE_FELT` fjernet; ruten tilbake i

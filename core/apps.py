@@ -24,7 +24,16 @@ def _ensure_module_settings_defaults(sender, **kwargs):
         return
     # Lazy import: modeller må kun importeres etter at app-registret er ferdig.
     from core.models import ModuleSettings
-    ModuleSettings.ensure_defaults_exist()
+    # **Den historiske modellen, ikke dagens.** `apps` er tilstanden etter
+    # migreringen som nettopp kjørte — ved `migrate vaktliste 0006` er det ikke
+    # dagens skjema. Med dagens modell feilet raden mot en kolonne dagens kode
+    # ikke kjenner (`backup_enabled`, 26. sep. 2026).
+    historisk = kwargs.get('apps')
+    try:
+        modell = historisk.get_model('core', 'ModuleSettings') if historisk else None
+    except LookupError:
+        return   # core er ikke migrert så langt ennå; ingen tabell å fylle
+    ModuleSettings.ensure_defaults_exist(modell)
 
 
 class CoreConfig(AppConfig):

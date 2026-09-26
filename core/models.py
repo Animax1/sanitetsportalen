@@ -105,7 +105,7 @@ class ModuleSettings(models.Model):
         return set(cls.objects.filter(enabled=True).values_list('slug', flat=True))
 
     @classmethod
-    def ensure_defaults_exist(cls) -> None:
+    def ensure_defaults_exist(cls, modell=None) -> None:
         """Sørg for at hver registrert modul har en rad i tabellen.
 
         Idempotent: kjører ``get_or_create`` for hver modul. Kalles fra
@@ -114,13 +114,20 @@ class ModuleSettings(models.Model):
         Kjernemoduler får ``enabled=True`` per default og kan ikke deaktiveres.
         Andre moduler får ``enabled=True`` ved første registrering — admin må
         eksplisitt skru av.
+
+        ``modell`` er den historiske modellen fra ``post_migrate``. Den kjenner
+        feltene tabellen har *på det migrasjonspunktet*; ``cls`` kjenner dagens.
+        De er ulike når noen migrerer til et eldre punkt — og da ga dagens
+        modell en rad uten ``backup_enabled`` mot en kolonne som ennå var
+        ``NOT NULL`` uten standard (26. sep. 2026, funnet av migrasjonsprøvene).
         """
         # Lazy import: modules.py importerer fra denne fila, så vi kan ikke
         # importere på toppnivå.
         from core.modules import get_all_modules  # noqa: WPS433
 
+        modell = modell or cls
         for module in get_all_modules():
-            cls.objects.get_or_create(
+            modell.objects.get_or_create(
                 slug=module.slug,
                 defaults={'enabled': True},
             )
