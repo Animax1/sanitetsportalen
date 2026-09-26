@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — KO-loggen kunne velte en stempling i PostgreSQL: savepoint i `_trygt` (A3)  `#ko/loggen`
+
+**Hva som var galt:** `ko/signals.py` løfter bilens stemplinger inn i KO-loggen, og hver
+mottaker er pakket i `_trygt`, som lover at «en KO-logg som ikke lar seg skrive skal ikke ta
+ned en stempling i en bil». Løftet holdt bare for Python-feil. Mottakerne kjører inne i
+stemplingens `transaction.atomic()`, og **i PostgreSQL gjør en databasefeil hele
+transaksjonen ubrukelig**: `_trygt` fanget unntaket, stemplingen fortsatte, og neste
+spørring ble avvist med **«current transaction is aborted, commands ignored until end of
+transaction block»**. Bilen fikk 500 og stemplingen ble rullet tilbake. SQLite fortsetter
+transaksjonen, så suiten var grønn — samme felle som 30. aug. 2026.
+
+**Rettingen:** `with transaction.atomic():` rundt kallet i `_trygt`. Inne i en åpen
+transaksjon er det et **savepoint**, så bare KO-linja rulles tilbake. `varsle_bjelle` gjorde
+det allerede slik.
+
+**Bevist mot ekte PostgreSQL 16** i containeren, ikke bare resonnert:
+`test_en_databasefeil_i_loftet_stopper_ikke_stemplingen` fremkaller en databasefeil i
+mottakeren og stempler gjennom `/oppdrag/api/oppdrag/<pk>/status/rykker_ut/`. Uten
+rettingen: **500** med `InFailedSqlTransaction` på PostgreSQL, grønn på SQLite. Med
+rettingen: grønn på begge. Den eksisterende testen kastet `RuntimeError`, som er den
+ufarlige feilen, og kunne aldri se dette. **Kjør den mot PostgreSQL** (`DATABASE_URL=postgres://…`)
+— på SQLite beviser den ingenting.
+
+**Mutasjonstesting:** 1 mutant — savepointet fjernet — drept på PostgreSQL, overlever på
+SQLite (dokumentert i testen). Hele `ko` og `oppdrag` (1 645 tester) kjørt mot PostgreSQL:
+grønt.
+
 ## 2026-09-25 — Kodegjennomgang av hele appen: pseudokode og teknisk gjeld, med plan  `#core/dokumentasjon`
 
 **André:** «kjør en runde hvor du ser etter pseudokode og teknisk gjeld i hele appen. Ikke

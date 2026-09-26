@@ -294,3 +294,46 @@ class MottakerneKasterIkkeTests(TestCase):
                 hastegrad=choices.HASTEGRAD[0])
         self.assertTrue(Oppdrag.objects.filter(pk=oppdrag.pk).exists())
         self.assertEqual(Logglinje.objects.count(), 0)
+
+    def test_en_databasefeil_i_loftet_stopper_ikke_stemplingen(self):
+        """**Testen over prøver den ufarlige feilen.** En `RuntimeError` rører
+        ikke transaksjonen. En *databasefeil* gjør det i PostgreSQL: hver
+        spørring etterpå avvises med «current transaction is aborted», og
+        stemplingen ruller tilbake selv om `_trygt` fanget feilen (26. sep.
+        2026, A3 i `docs/PLAN_TEKNISK_GJELD_2026-09-25.md`).
+
+        **Grønn på SQLite også uten rettingen** — der fortsetter transaksjonen.
+        Den biter bare mot PostgreSQL: `DATABASE_URL=postgres://…` og samme
+        kommando. Går gjennom endepunktet bilen bruker, ikke `sett_status`,
+        så det er stemplingens egen `transaction.atomic()` som prøves.
+        """
+        from unittest.mock import patch
+
+        from django.db import connection
+        from django.test import Client, override_settings
+
+        from accounts.models import ModulTilgang
+
+        def databasefeil(*args, **kwargs):
+            with connection.cursor() as c:
+                c.execute('SELECT * FROM tabellen_som_ikke_finnes')
+
+        vakt = hent_aktiv_vakt()
+        bil = CustomUser.objects.create_user(
+            username='bil_a3', password='x', role='bruker', must_change_password=False)
+        ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
+        enhet = Enhet.objects.create(navn='HGSD 56', user=bil)
+        oppdrag = Oppdrag.objects.create(
+            vakt=vakt, oppdragsnummer=1, enhet=enhet,
+            problemstilling='Brystsmerter', lokasjon=Lokasjon.objects.create(navn='Scene sør'),
+            hastegrad=choices.HASTEGRAD[0])
+        klient = Client()
+        klient.force_login(bil)
+        with override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False), \
+                patch('ko.signals.systemlinje', side_effect=databasefeil), \
+                self.assertLogs('ko.signals', level='WARNING'):
+            res = klient.post(f'/oppdrag/api/oppdrag/{oppdrag.pk}/status/rykker_ut/',
+                              content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        oppdrag.refresh_from_db()
+        self.assertEqual(oppdrag.status, choices.RYKKER_UT)

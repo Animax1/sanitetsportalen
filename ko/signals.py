@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -61,7 +62,16 @@ def _trygt(navn):
     def ytre(fn):
         def indre(*args, **kwargs):
             try:
-                return fn(*args, **kwargs)
+                # **Savepointet er det som holder løftet** (26. sep. 2026, A3).
+                # Mottakeren kjører inne i stemplingens transaksjon. I
+                # PostgreSQL gjør en databasefeil hele transaksjonen ubrukelig
+                # — neste spørring avvises med «current transaction is
+                # aborted» — så uten savepointet ble stemplingen rullet
+                # tilbake selv om feilen her ble fanget. SQLite har ikke den
+                # oppførselen, og suiten var grønn. `varsle_bjelle` gjør det
+                # samme av samme grunn.
+                with transaction.atomic():
+                    return fn(*args, **kwargs)
             except Exception:   # noqa: BLE001 — bevisst bred, se modulens docstring
                 logger.warning('ko: kunne ikke skrive systemlinje for %s',
                                navn, exc_info=True)

@@ -93,7 +93,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
 - **Test:** PUT hastegrad og krev en ny ETag. Mutanten er å fjerne ett felt fra
   serialiseringen, og da skal testen bli rød.
 
-**A3. `_trygt` fanger unntak uten savepoint.**
+**A3. `_trygt` fanger unntak uten savepoint.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `ko/signals.py:59-74`.
 - **Feilen:** mottakerne kjører inne i `transaction.atomic()`. I PostgreSQL avbryter en
   databasefeil hele transaksjonen, og stemplingen feiler likevel. SQLite har ikke den
