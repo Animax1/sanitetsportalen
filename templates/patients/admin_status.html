@@ -112,6 +112,8 @@
       <div class="status-row"><span class="label">Type</span><span class="val" id="db-vendor">–</span></div>
       <div class="status-row"><span class="label">Svartid (SELECT 1)</span><span class="val" id="db-latency">–</span></div>
       <div class="status-row"><span class="label">Tilkoblinger</span><span class="val" id="db-conns">–</span></div>
+      <div class="status-row"><span class="label">Sortering av Æ Ø Å</span><span class="val" id="db-sortering">–</span></div>
+      <div class="sub" id="db-sortering-rekke">–</div>
       {% comment %}
         Tre tall under vakt (25. sep. 2026): svartid og tilkoblinger kan stå
         grønne mens én transaksjon holder en lås og alt står i kø bak den.
@@ -508,6 +510,7 @@ const ADMIN_URLS = {
       return;
     }
     renderDbAktivitet(db);
+    renderDbSortering(db.sortering || {});
     const lat = db.latency_ms || 0;
     setVal('db-latency', lat + ' ms', lat < 50 ? 'status-ok' : (lat < 200 ? 'status-warn' : 'status-crit'));
     if (db.maks_tilkoblinger) {
@@ -522,6 +525,26 @@ const ADMIN_URLS = {
   }
 
   const DB_KLASSE = { gronn: 'status-ok', gul: 'status-warn', rod: 'status-crit' };
+
+  // Vurderingen regnes på serveren (`sortering_vurdering()`), ikke her.
+  const SORTERING_TEKST = {
+    norsk: ['Norsk', 'status-ok'],
+    kodepunkt: ['Sist, men Å Æ Ø', 'status-warn'],
+    blandet: ['Blandet inn (Æ=AE, Ø=O, Å=A)', 'status-warn'],
+  };
+
+  function renderDbSortering(s) {
+    const rekke = document.getElementById('db-sortering-rekke');
+    if (s.feil || !s.vurdering) {
+      setVal('db-sortering', 'feil');
+      rekke.textContent = s.feil || '';
+      return;
+    }
+    const [tekst, klasse] = SORTERING_TEKST[s.vurdering] || [s.vurdering, ''];
+    setVal('db-sortering', tekst, klasse);
+    rekke.textContent = s.rekkefolge.join(' · ')
+      + (s.kollasjon ? ' — datcollate ' + s.kollasjon + ', PostgreSQL ' + s.versjon : '');
+  }
 
   function renderDbAktivitet(db) {
     const sig = db.signaler;

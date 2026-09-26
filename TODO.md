@@ -1007,10 +1007,19 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       ulik mellom SQLite og PostgreSQL, men mellom to PostgreSQL-er:** C.UTF-8 legger
       «Ålesund» sist, en_US (standarden i `postgres`-imaget, trolig også Railways)
       legger den *først*, som om Å var A. Prod er altså sannsynligvis feil på norsk i
-      dag — sjekk `datcollate` på Railway-basen før noe bygges. Fikses med
+      dag — **se raden «Sortering av Æ Ø Å» på `/portal-admin/server-status/`** før
+      noe bygges (26. sep. 2026; `datcollate` alene lyver på en ICU-base). Nedtrekkene
+      og brannlista er der det synes — registertabellen og sentralbordets ressursliste
+      sorteres på nytt i nettleseren. Fikses med
       `Collate(Lower(...), 'nb-NO-x-icu')` i spørringen (krever ICU, SQLite har det
       ikke) eller en egen sorteringsnøkkel. Merkes den dagen noen legger inn et korps
       eller en bil som begynner på Æ, Ø eller Å.
+
+- [ ] **`Meta.ordering` gjelder ikke i en spørring med `annotate(Count(...))`.** Django dropper
+      den i GROUP BY-spørringer (siden 3.1), så `vaktliste/api/mannskap/` kommer usortert fra
+      serveren. Uten følger i dag — registertabellen sorterer selv (`_sorterMannskap`) — men
+      neste leser av endepunktet arver rekkefølgen databasen tilfeldigvis gir. Ett
+      `.order_by(...)` i `mannskap_view`; funnet 26. sep. 2026 under sorteringsprøven.
 
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra

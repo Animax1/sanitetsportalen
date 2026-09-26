@@ -173,6 +173,10 @@ def _get_db_health():
     except Exception as exc:
         ut['error'] = _scrub_secrets(str(exc))[:200]
         return ut
+    try:
+        ut['sortering'] = _db_sortering(connection)
+    except Exception as exc:
+        ut['sortering'] = {'feil': _scrub_secrets(str(exc))[:200]}
     if connection.vendor == 'postgresql':
         try:
             with connection.cursor() as cur:
@@ -190,6 +194,50 @@ def _get_db_health():
         except Exception as exc:
             ut['aktivitet_feil'] = _scrub_secrets(str(exc))[:200]
     return ut
+
+
+# ── Hvordan basen sorterer Æ, Ø og Å (26. sep. 2026) ─────────────────────────
+#
+# Rekkefølgen i nedtrekkene er databasens kollasjon, og den er ikke den samme
+# overalt: en_US leser Æ som AE, Ø som O og Å som A; C legger dem sist, men
+# som Å, Æ, Ø. CI viste forskjellen, og ingen kunne se hva prod gjør uten
+# SQL-tilgang. Kortet viser derfor **svaret, ikke innstillingen** — på en
+# ICU-base sier `datcollate` «C.UTF-8» mens sorteringen er en_US.
+
+#: «bergen» med liten b: prøven skal også avsløre en sortering uten `lower()`,
+#: som ville satt små bokstaver etter alle store.
+SORTERINGSPROVE = ('Oslo', 'Ørsta', 'Ærø', 'Ålesund', 'bergen', 'Zeta')
+SORTERING_NORSK = ('bergen', 'Oslo', 'Zeta', 'Ærø', 'Ørsta', 'Ålesund')
+#: Kodepunktorden: Æ, Ø og Å sist, men Å (U+00E5) før Æ (U+00E6).
+SORTERING_KODEPUNKT = ('bergen', 'Oslo', 'Zeta', 'Ålesund', 'Ærø', 'Ørsta')
+
+
+def sortering_vurdering(rekkefolge) -> str:
+    """`norsk`, `kodepunkt` (sist, feil innbyrdes) eller `blandet` (inne
+    blant de andre bokstavene — en_US)."""
+    rekkefolge = tuple(rekkefolge)
+    if rekkefolge == SORTERING_NORSK:
+        return 'norsk'
+    if rekkefolge == SORTERING_KODEPUNKT:
+        return 'kodepunkt'
+    return 'blandet'
+
+
+def _db_sortering(connection) -> dict:
+    """Sorterer prøvenavnene i basen, slik appens egne `Lower('navn')` gjør.
+    Kolonnene er laget uten egen kollasjon, så basens standard er den som
+    gjelder — det er den prøven treffer."""
+    utvalg = ' UNION ALL '.join(['SELECT %s AS n'] * len(SORTERINGSPROVE))
+    with connection.cursor() as cur:
+        cur.execute(f'SELECT n FROM ({utvalg}) AS prove ORDER BY lower(n)', list(SORTERINGSPROVE))
+        rekkefolge = [rad[0] for rad in cur.fetchall()]
+        kollasjon = versjon = None
+        if connection.vendor == 'postgresql':
+            cur.execute("SELECT datcollate, current_setting('server_version') "
+                        "FROM pg_database WHERE datname = current_database()")
+            kollasjon, versjon = cur.fetchone()
+    return {'rekkefolge': rekkefolge, 'vurdering': sortering_vurdering(rekkefolge),
+            'kollasjon': kollasjon, 'versjon': versjon}
 
 
 # ── Databasen under vakt (25. sep. 2026, skisse «Databasekortet») ────────────

@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Server-status viser hvordan basen sorterer Æ, Ø og Å  `#core/drift`
+
+**Hvorfor:** CI viste at «ålesund» sorteres først i en_US og sist i C, og spørsmålet ble
+om prod gjør det samme. André: «Jeg syns at vi skal teste først om det faktisk skjer og er
+sikre.» SQL-en i Railway ga *syntax error near datlocprovider*, og uten tilgang til basen
+fra økta var svaret å la **portalen selv si det** — André: «da har vi mer kontroll».
+
+**Prøvd lokalt mot to PostgreSQL 16-baser gjennom de ekte endepunktene:**
+
+| Base | Korps-nedtrekket i vaktlista |
+|---|---|
+| en_US (ICU) | Aasen · **Ærø · Ålesund** · Andøy · Haugesund · Korps bergen · **Ørsta** · Oslo · Zeta |
+| C.UTF-8 | Aasen · Andøy · Haugesund · Korps bergen · Oslo · Zeta · **Ålesund · Ærø · Ørsta** |
+
+en_US leser Æ som AE, Ø som O og Å som A — «Øyvind Ødegård» står mellom Anne og Ola i
+nedtrekket for skift. C legger dem sist, men som Å, Æ, Ø. Førstehjelper-nedtrekket i
+pasientskjemaet og mannskapsnedtrekket gjør det samme. **Ikke** berørt: registertabellen i
+vaktlista og sentralbordets ressursliste — de sorteres på nytt i nettleseren.
+
+**Og `datcollate` lyver:** en_US-basen, laget med ICU, sa `C.UTF-8`. Raden viser derfor
+**svaret, ikke innstillingen** — basen sorterer seks prøvenavn med `ORDER BY lower(n)`,
+slik appens egne `Lower('navn')` gjør, og `sortering_vurdering()` kaller svaret `norsk`,
+`kodepunkt` eller `blandet`. `datcollate` og versjonen står under, som opplysning.
+Prøven har egen `try`: feiler den, står resten av databasekortet.
+
+**Mutanter: 6, alle drept** — vurderingen snudd, `kodepunkt`-grenen fjernet, `ORDER BY`
+fjernet, `lower()` fjernet, `try` fjernet, kallstedet fjernet. **`lower()` overlevde
+første gang**: prøvenavnene begynte alle med stor bokstav, så `lower()` endret ingenting.
+«Bergen» ble «bergen».
+
+**Bifunn, ikke rettet:** `vaktliste/api/mannskap/` bruker `annotate(Count(...))`, og da
+dropper Django `Meta.ordering`. Uten følger i dag; ført i TODO.
+
 ## 2026-09-26 — CI rød ved første kjøring: «ålesund» sorterte først, og tblib manglet  `#core/drift`
 
 **Første kjøring av D1 (`668acff` på staging) var rød: 1 ekte feil, 31 følgefeil.**
