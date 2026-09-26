@@ -8,7 +8,7 @@ de samme navnene for bakoverkompatibilitet — ingen eksisterende kode må
 endre imports før vi rydder opp i en senere fase.
 """
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone as djtz
@@ -126,3 +126,18 @@ def parse_minutes(t1_str, t2_str):
         except (ValueError, AttributeError):
             continue
     return None
+
+
+def les_iso_dato(raa) -> date | None:
+    """`YYYY-MM-DD` fra en URL eller et skjema → `date`, ellers ``None``.
+
+    **For filtre, ikke for validering av innsendte data** (26. sep. 2026, B6).
+    En ugyldig verdi i `?date_from=` gikk rett inn i `created_at__date__gte`,
+    og Django kastet `ValidationError` — 500 for en skrivefeil i adresselinja.
+    Et filter som ikke lar seg lese, ignoreres; den som kaller viser feltet tomt,
+    så det synes at det ikke ble brukt.
+    """
+    try:
+        return date.fromisoformat((raa or '').strip())
+    except (TypeError, ValueError):
+        return None

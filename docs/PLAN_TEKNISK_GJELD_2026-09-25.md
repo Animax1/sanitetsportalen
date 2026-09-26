@@ -199,7 +199,7 @@ CHANGELOG, og det er verifisert på staging med byggnummer.
 **B5. `scripts/sikkerhetssjekk.py` mangler `/ko/`, `/backlog/` og `/api/endringer/`.**
 - **Retting:** utled `STENGT_GET` fra `urlpatterns`, som `tests_modul_dekorator` gjør.
 
-**B6. Datofiltrene gir 500 på en ugyldig dato.**
+**B6. Datofiltrene gir 500 på en ugyldig dato.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `core/views_admin.py:220-223` og `accounts/views.py:808-811`.
 - **Retting:** én felles parser som ignorerer ugyldige verdier.
 

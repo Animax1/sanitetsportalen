@@ -25,6 +25,7 @@ from core.forms import ModuleSettingsForm
 from core.models import ModuleSettings, Vakt
 from core.modules import get_all_modules, get_module
 from core.ratelimit import rate_limit
+from core.validators import les_iso_dato
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -204,8 +205,11 @@ def _filter_audit_queryset(request) -> tuple:
     app_label = (request.GET.get('app_label') or '').strip()
     action = (request.GET.get('action') or '').strip()
     user_id = (request.GET.get('user') or '').strip()
-    date_from = (request.GET.get('date_from') or '').strip()
-    date_to = (request.GET.get('date_to') or '').strip()
+    # Et ugyldig datofilter ignoreres og vises tomt (B6) — ellers 500.
+    fra_dato = les_iso_dato(request.GET.get('date_from'))
+    til_dato = les_iso_dato(request.GET.get('date_to'))
+    date_from = fra_dato.isoformat() if fra_dato else ''
+    date_to = til_dato.isoformat() if til_dato else ''
     search = (request.GET.get('q') or '').strip()
 
     if app_label:
@@ -217,10 +221,10 @@ def _filter_audit_queryset(request) -> tuple:
             qs = qs.filter(user_id=int(user_id))
         except (TypeError, ValueError):
             pass
-    if date_from:
-        qs = qs.filter(created_at__date__gte=date_from)
-    if date_to:
-        qs = qs.filter(created_at__date__lte=date_to)
+    if fra_dato:
+        qs = qs.filter(created_at__date__gte=fra_dato)
+    if til_dato:
+        qs = qs.filter(created_at__date__lte=til_dato)
     if search:
         qs = qs.filter(
             Q(table_name__icontains=search)

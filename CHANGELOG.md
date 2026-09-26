@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Datofiltrene i auditlogg og innloggingslogg ga 500 på en ugyldig dato (B6)  `#core/drift`
+
+`?date_from=2026-13-45` — eller «i går», eller 30. februar — gikk rett inn i
+`created_at__date__gte`, og Django kastet `ValidationError`: **500** på
+`/portal-admin/auditlog/`, CSV-eksporten og `/portal-admin/innloggingslogg/` for en
+skrivefeil i adresselinja. Filterlogikken sto dessuten skrevet to ganger.
+
+**Rettingen:** `core.validators.les_iso_dato()` leser verdien til en `date` eller `None`.
+Et filter som ikke lar seg lese, ignoreres og vises tomt i skjemaet, så det synes at det
+ikke ble brukt — framfor en feilside, eller et filter som stille sto på en annen dag.
+
+**Tester:** `core/tests_datofilter.py` — fire ugyldige verdier × to felt × tre sider uten
+500, og at et gyldig filter fortsatt filtrerer (ellers ville en sperre som ignorerte alt
+vært grønn). **Mutasjonstesting:** 3 mutanter drept — funksjonen som alltid gir `None`, og
+den rå verdien tilbake i hvert av de to viewene. **To mutanter var no-ops og telles ikke**:
+den første versjonen byttet bare verdien i `filter()`, men `if fra_dato:` stoppet den
+ugyldige verdien før den nådde fram — løgn nr. 2 i mutasjonsavsnittet. Byttet på nytt så
+mutanten går utenom hele sperra. `core` (814) og `accounts`+`audit` (332): grønt.
+
 ## 2026-09-26 — Vaktlista: en ukjent rolle, korps eller enhet ga 500 eller feil melding (A7)  `#vaktliste/planlegging`
 
 **Tre feil med samme rot.** Fremmednøklene er utsatt til commit, så en `rolle_id`,

@@ -44,6 +44,7 @@ from .backends import finn_konto
 from .models import CustomUser, LoginEvent
 from core.klientip import klient_ip, ratelimit_nokkel
 from core.ratelimit import rate_limit
+from core.validators import les_iso_dato
 
 
 def _get_client_ip(request):
@@ -795,9 +796,12 @@ def login_event_list_view(request):
         'q': (request.GET.get('q') or '').strip(),
         'event_type': (request.GET.get('event_type') or '').strip(),
         'result': (request.GET.get('result') or '').strip(),
-        'date_from': (request.GET.get('date_from') or '').strip(),
-        'date_to': (request.GET.get('date_to') or '').strip(),
     }
+    # Et ugyldig datofilter ignoreres og vises tomt (B6) — ellers 500.
+    fra_dato = les_iso_dato(request.GET.get('date_from'))
+    til_dato = les_iso_dato(request.GET.get('date_to'))
+    filters['date_from'] = fra_dato.isoformat() if fra_dato else ''
+    filters['date_to'] = til_dato.isoformat() if til_dato else ''
 
     if filters['q']:
         qs = qs.filter(
@@ -810,10 +814,10 @@ def login_event_list_view(request):
         qs = qs.filter(success=True)
     elif filters['result'] == 'fail':
         qs = qs.filter(success=False)
-    if filters['date_from']:
-        qs = qs.filter(created_at__date__gte=filters['date_from'])
-    if filters['date_to']:
-        qs = qs.filter(created_at__date__lte=filters['date_to'])
+    if fra_dato:
+        qs = qs.filter(created_at__date__gte=fra_dato)
+    if til_dato:
+        qs = qs.filter(created_at__date__lte=til_dato)
 
     paginator = Paginator(qs.order_by('-created_at'), 50)
     page_obj = paginator.get_page(request.GET.get('page'))
