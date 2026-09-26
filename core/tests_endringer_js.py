@@ -17,7 +17,7 @@ from oppdrag.tests_runde_d import _konst
 from patients.js_test_utils import (KO_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, read_js, run_node)
 
-HARNESS = ((PORTAL_UTILS_JS, ('endringSkalHente', 'folgEndringer', 'sjekkEndringer')),)
+HARNESS = ((PORTAL_UTILS_JS, ('endringSkalHente', 'fanenErSkjult', 'folgEndringer', 'sjekkEndringer')),)
 
 FORSPILL = (_konst(PORTAL_UTILS_JS, 'ENDRING_MS') + """
     const endringFolgere = []; let endringTimer = null; let endringPaagaar = false;
@@ -146,6 +146,6 @@ class KallstedeneTests(SimpleTestCase):
             function koTavleErFramme() {}
             function folgEndringer(omrade, hent, aktiv) { kall.push([omrade, hent.name, aktiv && aktiv.name]); }
         """
-        ut = run_node(build_harness(((KO_JS, ('koTavleStart',)),)),
+        ut = run_node(build_harness(((PORTAL_UTILS_JS, ('fanenErSkjult', 'naarSynlig')), (KO_JS, ('koTavleStart',)))),
                       'koTavleStart(); console.log(JSON.stringify(kall));', preamble=pre)
         self.assertEqual(json.loads(ut.splitlines()[0]), [['tavle', 'koHentTavle', 'koTavleErFramme']])

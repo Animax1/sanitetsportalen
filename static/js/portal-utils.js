@@ -137,6 +137,20 @@ function endringSkalHente(forrige, ny) {
   return typeof ny === 'string' && ny !== '' && ny !== forrige;
 }
 
+// **En fane ingen ser på, poller ikke sikkerhetsnettet** (26. sep. 2026, G5).
+// Endringsnummeret gjorde det alt; nettene under hver side gjorde det ikke, så
+// en KO-fane i bakgrunnen hentet logg, tavle og plan hele vakta. Nettet trengs
+// ikke når fana kommer fram: endringsnummeret henter innen 2,5 s.
+// **Bruk den ikke på det som varsler eller sender** — bilens lydvarsel og
+// henting, køene. En bil med skjermen av skal fortsatt pipe.
+function fanenErSkjult() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+function naarSynlig(fn) {
+  return (...args) => (fanenErSkjult() ? undefined : fn(...args));
+}
+
 // Meld inn en liste: `hent()` kalles når tallet for `omrade` er nytt, men bare
 // mens `aktiv()` sier ja — en tavle som ikke står framme, spør ikke. Løkka
 // startes første gang noen melder seg; en side uten følgere spør aldri.
@@ -149,7 +163,7 @@ async function sjekkEndringer() {
   if (endringPaagaar) return;
   // En skjult fane eller en PC med skjermsparer spør ikke, og henter ved
   // neste synlige runde.
-  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  if (fanenErSkjult()) return;
   const aktive = endringFolgere.filter((f) => f.aktiv());
   if (!aktive.length) return;
   const omrader = [...new Set(aktive.map((f) => f.omrade))].sort();

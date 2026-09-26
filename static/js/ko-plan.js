@@ -706,5 +706,5 @@ function koPlanSynligNaa() {
 function koPlanStart() {
   if (!document.getElementById('ko-plan')) return;
   koPlanSynligNaa();
-  setInterval(() => { if (koPlanErFramme()) koHentPlan(); }, KO_PLAN_MS);
+  setInterval(naarSynlig(() => { if (koPlanErFramme()) koHentPlan(); }), KO_PLAN_MS);
 }

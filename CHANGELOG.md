@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — `requirements.txt` under 3.13, skallcachen som vokste, polling i skjulte faner, død CSS (G5)  `#drift #frontend #vaktliste #ko`
+
+**`requirements.txt`** var kompilert med Python 3.11 mens `runtime.txt` sier 3.13. Kompilert
+på nytt under 3.13 med de samme pinnene: **oppløsningen ble identisk**, bare overskriften
+endret seg — ingen pakke har en markør som skiller de to versjonene i dag. Verifisert med
+`pip install --dry-run --require-hashes` under 3.13: alle hjulene har hash. Verdien er at
+neste `pip-compile` løser for riktig versjon.
+
+**Service workerens skallcache vokste for hver deploy.** WhiteNoise hasher filnavnene, så en
+endret fil fikk ny URL, ble lagt til — og den gamle lå igjen på hver drifts-PC til neste
+`VERSJON`-bump. `kopiForst()` kaller nå `ryddEldreUtgaver()` når en fil hentes under et navn
+cachen ikke har: alle andre utgaver av *samme fil* (`filnokkel()`, Djangos 12 heks-tegn)
+kastes. Andre filer røres ikke. Testen kjører `kopiForst` mot en falsk `caches` i node.
+
+**Polling i skjulte faner.** Endringsnummeret hoppet alt over skjulte faner, men
+sikkerhetsnettene under hver side gjorde det ikke — en KO-fane i bakgrunnen hentet logg,
+tavle, plan og ressurser hele vakta. `naarSynlig(fn)` og `fanenErSkjult()` i
+`portal-utils.js`; sju nett i `ko*.js` og `oppdrag-sentral-lasting.js` går gjennom den.
+**Ikke** bilens lydvarsel og henting, køene, klokkene eller KO-vinduenes BroadcastChannel —
+det som varsler eller sender skal gå med skjermen av. `core/tests_js_polling.py` leser hvert
+`setInterval` ut av kilden og krever `naarSynlig` eller en rad i `UNNTAK` med grunnen.
+
+**Død CSS:** `.role-badge` med fire varianter (`style.css`, fra rollene som forsvant i deploy
+2), `.hendelse-hode*`/`.hendelse-tittel` (`oppdrag.css`, grupperingen på tavla som ble fjernet)
+og `.vl-fanerad` (`vaktliste.css`). Kontrollert mot maler, JS og Python, også dynamisk bygde
+klassenavn.
+
+**scipy/numpy vurdert, ikke endret** — se `TODO.md`: koden tåler at de mangler, så å fjerne
+dem er å fjerne χ² og Kruskal-Wallis fra statistikksiden. Et produktvalg.
+
+**Mutasjon:** 9 mutanter, alle røde til slutt. Skallcachen: kallstedet fjernet, den nye
+utgaven ikke spart, hashlengden løsnet, vilkåret snudd, filnøkkelen ikke sammenlignet.
+Pollingen: `naarSynlig` snudd, `fanenErSkjult` alltid nei, KO-loggen uten gate, og
+`sjekkEndringer` uten sjekk — den **så ut til å overleve**, men jeg hadde kjørt
+`core.tests_endringer` og ikke `core.tests_endringer_js`; med riktig modul er den rød. To
+harnesser som bygde `koTavleStart` alene tar nå med `naarSynlig` fra `portal-utils.js`.
+
 ## 2026-09-26 — Offsite-feilen ble vist uvasket to av tre steder; vaskingen og helseprobene ett sted (E6)  `#core #sikkerhet #drift`
 
 **Vaskingen.** `core/offsite.py` hadde sin egen `_vask`, som byttet ut S3-nøklene men ikke

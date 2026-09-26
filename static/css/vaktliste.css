@@ -1091,11 +1091,6 @@ button.vl-pause:hover { border-style: solid; }
   color: var(--text-main);
 }
 
-.vl-fanerad .vl-faner {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 @media print {
   .vl-vaktvelger { display: none !important; }
 }

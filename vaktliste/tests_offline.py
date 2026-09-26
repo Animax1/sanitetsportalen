@@ -313,3 +313,55 @@ class SwUtkastingTests(SimpleTestCase):
         """Sperrehake: forsvinner `VERSJON` i en refaktorering, måler prøvene
         over en streng testen selv fant på."""
         self.assertIn("const VERSJON = 'vl-sw-", read_js(SW_JS))
+
+
+class SkallcachenVokserIkkeTests(SimpleTestCase):
+    """En ny hash av en fil kaster de eldre utgavene (26. sep. 2026, G5).
+
+    Går gjennom `kopiForst` — den ekte inngangen — med en falsk `caches` og
+    `fetch`, så kallstedet ikke kan forsvinne mens hjelperen står og består.
+    """
+
+    HARNESS = ((SW_JS, ('filnokkel', 'ryddEldreUtgaver', 'kopiForst')),)
+
+    FORSPANN = """
+const lager = new Map();
+const cacheObj = {
+  match: async (req) => lager.get(req.url),
+  put: async (req, svar) => { lager.set(req.url, svar); },
+  keys: async () => [...lager.keys()].map((url) => ({ url })),
+  delete: async (req) => lager.delete(req.url),
+};
+globalThis.caches = { open: async () => cacheObj };
+globalThis.fetch = async (req) => ({ ok: true, clone() { return this; } });
+const R = (sti) => ({ url: 'https://portal.test' + sti });
+"""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kjor(self, kropp):
+        return run_node(self.harness, '(async () => {' + kropp + '})().catch((e) => {'
+                        ' console.error(e); process.exit(1); });', preamble=self.FORSPANN)
+
+    def test_filnokkelen(self):
+        self._kjor("""
+assert(filnokkel('https://p.t/static/js/a.1a2b3c4d5e6f.js') === 'https://p.t/static/js/a.js', 'js');
+assert(filnokkel('https://p.t/static/css/b.min.0123456789ab.css') === 'https://p.t/static/css/b.min.css', 'min.css');
+assert(filnokkel('https://p.t/static/js/a.js') === 'https://p.t/static/js/a.js', 'uten hash');
+assert(filnokkel('https://p.t/static/js/a.1a2b3c.js') === 'https://p.t/static/js/a.1a2b3c.js', 'for kort hash');
+""")
+
+    def test_ny_hash_kaster_den_gamle_og_rorer_ikke_andre_filer(self):
+        self._kjor("""
+await kopiForst(R('/static/js/a.111111111111.js'), 'skall');
+await kopiForst(R('/static/js/b.222222222222.js'), 'skall');
+await kopiForst(R('/static/js/a.333333333333.js'), 'skall');
+await new Promise((r) => setTimeout(r, 0));
+const urls = [...lager.keys()].sort();
+assert(JSON.stringify(urls) === JSON.stringify([
+  'https://portal.test/static/js/a.333333333333.js',
+  'https://portal.test/static/js/b.222222222222.js']), JSON.stringify(urls));
+""")

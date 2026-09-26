@@ -334,15 +334,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // stempler, vises på 2,5 sekunder både her og i `/ko/`. Nettet tar det
     // ingen skrev og et tall som ikke kom fram; ETag gjør at en runde uten
     // endring koster en 304 uten kropp.
-    setInterval(lastAlt, 30000);
+    setInterval(naarSynlig(lastAlt), 30000);
     folgEndringer('oppdrag', lastAlt);
     // «12 min siden» eldes uten at serveren sier noe — lista svarer 304 når
     // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
     // — men ikke over LASTEFEIL: en liste som ikke er hentet har ingen tall.
-    setInterval(() => {
+    setInterval(naarSynlig(() => {
       if (oppdragHentet) renderOppdrag();
       if (enheterHentet) renderEnheter();
-    }, 60000);
+    }), 60000);
   }
 });
 

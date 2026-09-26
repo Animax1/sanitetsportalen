@@ -1376,11 +1376,11 @@ function koTavleStart() {
   if (!document.getElementById('ko-tavle')) return;
   koTavleLyttere();
   koTavleSynligNaa();
-  setInterval(() => { if (koTavleErFramme()) koHentTavle(); }, KO_TAVLE_MS);
+  setInterval(naarSynlig(() => { if (koTavleErFramme()) koHentTavle(); }), KO_TAVLE_MS);
   // **Endringsnummeret** (`core/endringer.py`, 24. sep. 2026): tavla hentes
   // når tallet er nytt, og bare mens den står framme. To på tavla fordeler
   // arbeidet muntlig — 15 sekunder var lenge å vente på en kollegas flytting.
   folgEndringer('tavle', koHentTavle, koTavleErFramme);
   // Nå-streken flytter seg mellom rundene, uten et kall.
-  setInterval(() => { if (koTavleErFramme()) koTegnTavle(); }, 60000);
+  setInterval(naarSynlig(() => { if (koTavleErFramme()) koTegnTavle(); }), 60000);
 }

@@ -423,7 +423,7 @@ arv `base_portal`.
 - hendelsesfeltene i oppdragslista
 - `historikk_liste_view`
 
-**G5. Oppsett og drift:**
+**G5. Oppsett og drift:** *Levert 26. sep. 2026, se CHANGELOG (scipy vurdert, ført i TODO).*
 - **`requirements.txt`:** kompilert med Python 3.11 mens `runtime.txt` sier 3.13. Kompiler
   på nytt under 3.13.
 - **scipy og numpy:** vurder dem som valgfrie. De brukes av to statistiske tester.

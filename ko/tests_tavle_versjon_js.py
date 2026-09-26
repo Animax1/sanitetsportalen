@@ -7,7 +7,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
-from patients.js_test_utils import KO_JS, build_harness, node_available, run_node
+from patients.js_test_utils import KO_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node
 
 from .tests_tavle_runde2_js import FORSPILL, HARNESS, LAYOUT_JS, TAVLE_JS
 
@@ -73,7 +73,7 @@ class TavlaStarterSikkerhetsnettetTests(SimpleTestCase):
             function koHentTavle() {}
             function koTavleErFramme() {}
         """)
-        ut = run_node(build_harness(((KO_JS, ('koTavleStart',)),)),
+        ut = run_node(build_harness(((PORTAL_UTILS_JS, ('fanenErSkjult', 'naarSynlig')), (KO_JS, ('koTavleStart',)))),
                       'koTavleStart(); console.log(JSON.stringify(intervaller));', preamble=pre)
         self.assertEqual(json.loads(ut.splitlines()[0]), [60000, 60000],
                          'sikkerhetsnettet og nå-streken, hver for seg')

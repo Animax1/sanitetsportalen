@@ -134,7 +134,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
         self.assertIn('try {', blokk)
         self.assertIn('await oppstart();', blokk)
         self.assertIn('} finally {', blokk)
-        self.assertLess(blokk.index('} finally {'), blokk.index('setInterval(lastAlt, 30000)'))
+        self.assertLess(blokk.index('} finally {'), blokk.index('setInterval(naarSynlig(lastAlt), 30000)'))
         # Minuttegningen skriver ikke over LASTEFEIL.
         self.assertIn('if (oppdragHentet) renderOppdrag();', blokk)
         self.assertIn('if (enheterHentet) renderEnheter();', blokk)

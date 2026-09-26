@@ -787,11 +787,11 @@ document.addEventListener('DOMContentLoaded', () => {
   koTavleStart();
   koPlanStart();
   koSidebarLyttere();
-  setInterval(() => {
+  setInterval(naarSynlig(() => {
     // Ikke poll en liste ingen ser på: flere operatører sitter på samme side
     // hele vakta, og nedtrekket er lukket som standard.
     if (koSidebarSynlig) koHentTilstede();
-  }, KO_TILSTEDE_MS);
+  }), KO_TILSTEDE_MS);
 
   const skjema = document.getElementById('ko-logg-form');
   if (skjema) {
@@ -833,13 +833,13 @@ document.addEventListener('DOMContentLoaded', () => {
   koLeggHendelsevalgINyttOppdrag();
 
   koHentLogg();
-  setInterval(koHentLogg, KO_LOGG_MS);
+  setInterval(naarSynlig(koHentLogg), KO_LOGG_MS);
   folgEndringer('logg', koHentLogg);
 
   // Vaktlistas ressurser uten oppdragsenhet (pulje 6). Bare når flata finnes
   // — den tegnes ikke uten vaktlistetilgang.
   if (document.getElementById('vaktliste-ressurser')) {
     koHentRessurser();
-    setInterval(koHentRessurser, KO_RESSURSER_MS);
+    setInterval(naarSynlig(koHentRessurser), KO_RESSURSER_MS);
   }
 });

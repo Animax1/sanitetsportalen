@@ -182,9 +182,16 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       `test_to_ressurser_paa_samme_bil_telles_en_gang`.
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
-- [ ] **Pulje G — struktur, når man er i filene.** Rammeverket i `patients` til `core` (G1);
-      store filer (G2); pasientsidens eget skall (G3); N+1 i pollede endepunkter (G4);
-      `requirements.txt` kompilert for 3.11, SW-cachen, polling i skjulte faner (G5).
+- [ ] **Pulje G — struktur, når man er i filene.** G5 levert 26. sep. Igjen: rammeverket i
+      `patients` til `core` (G1); store filer (G2); pasientsidens eget skall (G3); N+1 i
+      pollede endepunkter (G4).
+- [ ] **scipy og numpy (~160 MB) — valgfrie?** Vurdert under G5, ikke endret. Koden tåler
+      alt at de mangler (`HAS_SCIPY` i `patients/services.py`): da står χ²- og
+      Kruskal-Wallis-merkene som «Ingen data», og resten av statistikken virker. Å ta dem ut
+      av `requirements.txt` er altså å **fjerne en funksjon**, ikke å rydde — og gevinsten er
+      byggetid, bildestørrelse og minnet hver worker holder etter første statistikkall. Et
+      tredje valg er å skrive de to testene i ren Python; χ² trenger den ufullstendige
+      gammafunksjonen, og det er numerikk som må prøves mot scipy før den erstatter den.
 
 *De tre vaktlisteønskene under henger sammen — to av dem trenger samme dagruppering.
 Sammenhengen, rekkefølgen og de åpne valgene står i

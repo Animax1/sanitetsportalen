@@ -509,22 +509,6 @@
   flex: 0 0 auto;
 }
 
-.hendelse-hode {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.4rem 0.9rem;
-  margin: 0.9rem 0 0.4rem;
-  border-bottom: 1px solid var(--border-color);
-}
-.hendelse-hode:first-child { margin-top: 0; }
-.hendelse-tittel { font-weight: 600; color: var(--text-main); }
-.hendelse-hode-lukket .hendelse-tittel,
-.hendelse-hode-uten .hendelse-tittel { color: var(--text-muted); font-weight: 500; }
-/* Radene under en overskrift får samme avstand som mellom rader ellers. */
-.hendelse-hode + .oppdrag-rad { margin-top: 0; }
-
 /* «Rett tid» i tidslinjen. Dempet: rettingen er en sjelden handling, og
  * knappen skal ikke konkurrere med klokkeslettet den står ved siden av. */
 .tidslinje-rett {

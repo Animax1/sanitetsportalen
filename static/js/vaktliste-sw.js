@@ -109,11 +109,37 @@ async function nettForst(req, cacheNavn) {
 }
 
 
+function filnokkel(url) {
+  // Ren funksjon, testes i node. Adressen uten WhiteNoise-hashen:
+  // `/static/js/a.1a2b3c4d5e6f.js` → `/static/js/a.js`. Hashen er Djangos
+  // `md5(...)[:12]` (`HashedFilesMixin.file_hash`).
+  let u;
+  try { u = new URL(url); } catch (e) { return url; }
+  return u.origin + u.pathname.replace(/\.[0-9a-f]{12}(\.[^./]+)$/, '$1');
+}
+
+
+async function ryddEldreUtgaver(cache, url) {
+  // **Skallcachen vokste for hver deploy** (26. sep. 2026, G5). Hver endret
+  // fil får et nytt hashet navn, den nye ble lagt til og den gamle lå igjen
+  // til neste `VERSJON`-bump. Når en fil hentes under et navn vi ikke har,
+  // er alle andre utgaver av den utdatert.
+  const nokkel = filnokkel(url);
+  const alle = await cache.keys();
+  await Promise.all(alle
+    .filter((r) => r.url !== url && filnokkel(r.url) === nokkel)
+    .map((r) => cache.delete(r)));
+}
+
+
 async function kopiForst(req, cacheNavn) {
   const cache = await caches.open(cacheNavn);
   const kopi = await cache.match(req);
-  const henting = fetch(req).then((svar) => {
-    if (svar && (svar.ok || svar.type === 'opaque')) cache.put(req, svar.clone());
+  const henting = fetch(req).then(async (svar) => {
+    if (svar && (svar.ok || svar.type === 'opaque')) {
+      await cache.put(req, svar.clone());
+      if (!kopi) await ryddEldreUtgaver(cache, req.url);
+    }
     return svar;
   }).catch(() => null);
   if (kopi) return kopi;
