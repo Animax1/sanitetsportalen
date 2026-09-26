@@ -1690,20 +1690,3 @@ def koblet_i_annen_vakt(enhet_id):
                .order_by('-vaktliste__vakt__startet')
                .first())
     return ressurs.vaktliste.vakt.navn if ressurs else None
-
-
-def vaktspenn(vaktliste):
-    """(start, slutt) for vakta — eller ``(None, None)`` hvis den mangler.
-
-    Starten er `Vakt.startet`; slutten er `Vaktliste.planlagt_slutt`. Se
-    modellkommentaren for hvorfor de to ikke bor samme sted.
-
-    Brukes av bemanningskurven, som skal tegnes over **hele** vakta: leste
-    den bare skiftene, ville hullet i begynnelsen vært usynlig nettopp fordi
-    ingen er satt opp der ennå.
-    """
-    start = vaktliste.vakt.startet
-    slutt = vaktliste.planlagt_slutt
-    if start is None or slutt is None or slutt <= start:
-        return (None, None)
-    return (start, slutt)

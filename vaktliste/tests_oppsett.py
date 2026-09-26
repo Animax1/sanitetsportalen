@@ -1005,14 +1005,6 @@ class VaktlengdeTests(TestCase):
         data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
         self.assertIsNotNone(data['vaktliste']['planlagt_slutt'])
 
-    def test_services_vaktspenn_krever_begge_ender(self):
-        self.assertEqual(services.vaktspenn(self.vl), (None, None))
-        self.vl.planlagt_slutt = self.start + timedelta(hours=8)
-        self.vl.save()
-        start, slutt = services.vaktspenn(self.vl)
-        self.assertIsNotNone(start)
-        self.assertIsNotNone(slutt)
-
     def test_lengden_er_skriv_full(self):
         """Spennet gjelder hele vakta, ikke ett korps' del av den."""
         for nivaa in ('les', 'skriv_handling'):

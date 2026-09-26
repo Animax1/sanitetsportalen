@@ -46,11 +46,6 @@ function _koNavn(s, kode) {
   return treff ? treff[1] : kode;
 }
 
-function _koMedianP90(sd) {
-  if (!sd || !sd.n) return '–';
-  return fmtMin(sd.median) + ' / ' + fmtMin(sd.p90) + ' (' + sd.n + ')';
-}
-
 // ── Tabellbyggere ────────────────────────────────────────────────────────
 // Cellene bygges med `+`, ikke mal-strenger — se statistikk-oppdrag.js.
 

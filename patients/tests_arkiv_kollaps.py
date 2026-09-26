@@ -18,16 +18,27 @@ from audit.models import AuditLog
 from core.backup import KIND_MANUAL, create_backup, get_handler
 from patients.models import ArkivertPasient, Patient, VaktArkiv
 from core.models import AppSetting
+from core.arkiv import get_handler as arkiv_handler, kollaps
 from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_full_stats,
     compute_arkiv_stats,
-    kollaps_arkiv, vakt_for_year,
+    vakt_for_year,
 )
 from accounts.test_helpers import gi_standardtilgang
 from patients.test_helpers import sett_aktiv_vakt
 
 User = get_user_model()
+
+
+def kollaps_arkiv(arkiv):
+    """Samme vei som `kollaps_arkiv`-kommandoen: registeret og `core.arkiv`.
+
+    Til 26. sep. 2026 kalte testene `patients.services.kollaps_arkiv`, en
+    innpakning ingen annen kode brukte (D2). Kollapsen er irreversibel, så
+    testene skal prøve den veien som faktisk sletter.
+    """
+    return kollaps(arkiv_handler('patients'), arkiv)
 
 
 class KollapsTestMixin:

@@ -638,37 +638,37 @@ class TimeFormatValidationTests(TestCase):
         )
 
     def test_validator_accepts_correct_format(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         self.assertEqual(
             validate_time_string('19.04.2026 14:30'),
             '19.04.2026 14:30',
         )
 
     def test_validator_accepts_empty_string(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         self.assertEqual(validate_time_string(''), '')
         self.assertEqual(validate_time_string(None), '')
 
     def test_validator_rejects_wrong_separator(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             validate_time_string('19/04/2026 14:30')
 
     def test_validator_rejects_iso_format(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             validate_time_string('2026-04-19T14:30')
 
     def test_validator_rejects_single_digit_day(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             validate_time_string('9.04.2026 14:30')
 
     def test_validator_rejects_invalid_date(self):
-        from patients.services import validate_time_string
+        from core.validators import validate_time_string
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             validate_time_string('32.04.2026 14:30')
@@ -1526,7 +1526,7 @@ class NowLocalStrTests(TestCase):
 
     def test_now_local_str_returns_correct_format(self):
         """Skal returnere 'dd.mm.YYYY HH:MM'-streng."""
-        from patients.services import now_local_str
+        from core.validators import now_local_str
         import re
         result = now_local_str()
         self.assertRegex(result, r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$')
@@ -1540,7 +1540,7 @@ class NowLocalStrTests(TestCase):
         TIME_ZONE='Europe/Oslo' selv om containeren kjører i UTC.
         """
         from django.utils import timezone as djtz
-        from patients.services import now_local_str
+        from core.validators import now_local_str
         # Sammenlign med direkte localtime-kall – skal være samme minutt
         expected = djtz.localtime(djtz.now()).strftime('%d.%m.%Y %H:%M')
         self.assertEqual(now_local_str(), expected)

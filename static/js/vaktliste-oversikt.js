@@ -83,30 +83,6 @@ function _bemanningPerTime(poster) {
 }
 
 
-function _posterPerGruppe() {
-  // **Kurven følger grupperingen** (Andrés bestilling, 30. aug. 2026). En
-  // samlet kurve summerte samleplassen, ambulansene og KO til ett tall, og
-  // det tallet svarer ikke på noe: fire på samleplassen og null på
-  // ambulansen ser likt ut som to og to. Gruppene beholder rekkefølgen
-  // serveren sender — den styrer også fanene.
-  const gruppePerRessurs = {};
-  (aktivListe.ressurser || []).forEach((r) => {
-    gruppePerRessurs[r.id] = r.gruppe_id;
-  });
-
-  const per = new Map();
-  (aktivListe.grupper || []).forEach((g) => per.set(g.id, { gruppe: g, poster: [] }));
-  (aktivListe.vaktposter || []).forEach((vp) => {
-    const bunke = per.get(gruppePerRessurs[vp.ressurs_id]);
-    if (bunke) bunke.poster.push(vp);
-  });
-
-  // Grupper uten et eneste skift tegnes ikke — en tom kurve per ubrukt
-  // gruppe er seks tomme kurver på en vakt med to ressurser.
-  return [...per.values()].filter((b) => b.poster.length);
-}
-
-
 function _timesteg(antall) {
   // Hvor ofte klokkeslettet skrives under søylene. Alle timer på en kort
   // vakt, sjeldnere når spennet er langt — ellers står tallene oppå

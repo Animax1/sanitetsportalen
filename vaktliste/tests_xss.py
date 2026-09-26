@@ -357,7 +357,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'mkGruppe', '_gruppedagbolker', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
-                        '_posterPerGruppe', '_vaktensSpenn',
+                        '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad',
                         '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
@@ -1610,7 +1610,7 @@ class KurvePerGruppeTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
-                        '_bemanningPerTime', '_posterPerGruppe',
+                        '_bemanningPerTime',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         '_ressurserIGruppe', '_tegnforklaring',
                         '_timesteg', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
@@ -1645,28 +1645,24 @@ class KurvePerGruppeTests(SimpleTestCase):
         self.harness = build_harness(self.HARNESS)
 
     def test_hver_gruppe_teller_bare_sine_egne(self):
+        """Gjennom `_posterIGruppe`, som `mkGruppekurve` bruker. Til 26. sep.
+        2026 ble regelen prøvd i `_posterPerGruppe()`, som ingenting kalte (D2)."""
         run_node(self.harness, self.VINDU + self.LISTE + """
-            const bunker = _posterPerGruppe();
-            assert(bunker.length === 2, 'to grupper med skift, fikk ' + bunker.length);
-            assert(bunker[0].gruppe.navn === 'Samleplass', 'rekkefolgen fra serveren');
-            assert(bunker[0].poster.length === 2, 'samleplassen har to');
-            assert(bunker[1].poster.length === 1, 'ambulansen har ett');
+            assert(_posterIGruppe(1).length === 2, 'samleplassen har to');
+            assert(_posterIGruppe(2).length === 1, 'ambulansen har ett');
+            assert(_posterIGruppe(3).length === 0, 'gruppa uten ressurser har ingen');
         """)
 
-    def test_gruppe_uten_skift_tegnes_ikke(self):
-        """Seks tomme kurver på en vakt med to ressurser er verre enn ingen."""
-        run_node(self.harness, self.VINDU + self.LISTE + """
-            const navn = _posterPerGruppe().map((b) => b.gruppe.navn);
-            assert(navn.indexOf('Ubrukt') === -1, 'fikk ' + navn.join(', '));
-        """)
+    # «Gruppe uten skift tegnes ikke» forsvant med `_posterPerGruppe()` (26. sep.
+    # 2026): den levende kurven gjør det motsatte siden 30. aug. — se
+    # `test_gruppe_uten_skift_faar_kurven_likevel`.
 
     def test_kurvene_deler_spenn(self):
         """Ellers ligger ikke søylene under hverandre, og to kurver man ikke
         kan sammenligne er verre enn én samlet."""
         run_node(self.harness, self.VINDU + self.LISTE + """
-            const bunker = _posterPerGruppe();
-            const a = _bemanningPerTime(bunker[0].poster);
-            const b = _bemanningPerTime(bunker[1].poster);
+            const a = _bemanningPerTime(_posterIGruppe(1));
+            const b = _bemanningPerTime(_posterIGruppe(2));
             assert(a.length === b.length, 'like mange timer');
             assert(a[0].tid === b[0].tid, 'samme starttime');
         """)
@@ -1839,7 +1835,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
-                        '_bemanningPerTime', '_posterPerGruppe',
+                        '_bemanningPerTime',
                         '_mkEnKurve', '_timesteg',
                         '_tegnforklaring', '_posterIGruppe',
                         '_ressurserIGruppe', 'mkGruppekurve', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
@@ -2029,7 +2025,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_probonoMerke', '_tidsspenn', '_telling', '_sammeDag',
                         '_driftrad', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg',
-                        '_posterPerGruppe', '_vaktensSpenn', '_posterIGruppe',
+                        '_vaktensSpenn', '_posterIGruppe',
                         '_plassKorps', '_bemanningPerTime', 'rollerForGruppe',
                         '_iso16', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',

@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Død kode som testene holdt i live (D2)  `#vaktliste #patients #statistikk`
+
+**Hvorfor:** «løgn nr. 3» fra mutasjonsavsnittet i `CLAUDE.md`, i praksis — tester som kaller
+en funksjon ingen annen kode kaller. Suiten ser da ut til å dekke mer enn den gjør, og
+funksjonen ser levende ut for neste som leser den.
+
+| Hva | Brukt av | Gjort |
+|---|---|---|
+| `_posterPerGruppe()` (`vaktliste-oversikt.js`) | tre tester | Slettet. Testene går nå gjennom `_posterIGruppe`, som `mkGruppekurve` bruker |
+| `_koMedianP90()` (`statistikk-ko.js`) | bare harnesslista | Slettet |
+| `services.vaktspenn()` (`vaktliste`) | én test | Slettet med testen |
+| `har_arkiv_backup_etter` (`patients.services`) | ingen | Slettet |
+| `kollaps_arkiv` (`patients.services`) | bare testene | Slettet. **Kollapstestene går nå samme vei som kommandoen**: registeret og `core.arkiv.kollaps` — kollapsen er irreversibel, så testene skal prøve veien som faktisk sletter |
+| Validatorene «re-eksportert» via `patients.services` | ett view, to tester, én test av omveien | Viewet og testene henter fra `core.validators`. Testen av omveien er slettet, og en ny (`test_ingen_henter_validatorene_via_patients_services`) holder den stengt |
+
+**Det verste funnet:** testen «gruppe uten skift tegnes ikke» prøvde **det motsatte** av det
+koden gjør. `mkGruppekurve` tegner en flat kurve uten skift siden 30. aug. 2026 («hullet man
+planlegger for å tette er størst når ingen er satt opp»), men den gamle regelen levde videre i
+`_posterPerGruppe()` — og testen var grønn. Slettet; den levende regelen har
+`test_gruppe_uten_skift_faar_kurven_likevel`.
+
+**«Re-eksporten» var mest en merkelapp:** alle åtte navnene brukes av `patients/services.py`
+selv. Det var kommentaren «bakoverkompatibilitet» og `noqa: F401` som var feil, ikke importen.
+
+**Mutanter: 2, begge drept** — filteret i `_posterIGruppe` fjernet (3 røde), og omveien lagt
+tilbake i `views_patients.py` (vakten rød).
+
+**TODO:** C3 og C4 står som åpne valg som venter til utviklingen er der (André: «vi er ikke
+ferdig med å utvikle og kan holde de der de er inntil videre»).
+
 ## 2026-09-26 — Norsk alfabetisk rekkefølge i hele portalen: Æ Ø Å sist, likt overalt  `#core`
 
 **Hvorfor:** raden på server-status viste staging: **«Blandet inn (Æ=AE, Ø=O, Å=A)» —

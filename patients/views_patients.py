@@ -23,14 +23,15 @@ from core.ratelimit import rate_limit
 from .choices import validate_patient_choice_fields
 from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
+from core.validators import now_local_str, validate_patient_time_fields
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
     hent_aktiv_vakt, vakt_for_year,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
-    validate_patient_time_fields, validate_plassering_unique,
-    SHARED_PLASSERINGER, now_local_str,
+    validate_plassering_unique,
+    SHARED_PLASSERINGER,
     recycle_patient_nr_if_last,
 )
 from .views_common import (

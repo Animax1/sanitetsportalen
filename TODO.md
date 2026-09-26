@@ -157,11 +157,18 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       pekes om (A4, 26. sep. 2026), og `enhet_varslet` i `ko/signals.py` fyrer bare på en ny
       rad. Var slik før også. Enten et eget signal på `Enhetsbytte`, eller at KO leser
       byttet — KOs sak, ikke oppdragsmodulens.
-- [ ] **Pulje C — avgjørelser.** C1 og C2 levert 26. sep. Igjen: C3: `Patient.is_active` inn eller ut. C4: `Vaktpost.avmeldt_at` — ett
-      predikat for «på vakt», eller fjern feltet.
-- [ ] **Pulje D — verifiseringen.** D1 (CI) levert 26. sep. Igjen: død kode som
-      testene holder i live (D2); XSS-skanner for `backlog.js` og `+`-uttrykk (D3);
-      `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
+- [ ] **Pulje C — avgjørelser, venter med vilje.** C1 og C2 levert 26. sep. C3 og C4
+      står der de står til utviklingen er kommet dit (André, 26. sep.: «vi er ikke ferdig
+      med å utvikle og kan holde de der de er inntil videre»):
+      - **C3: `Patient.is_active` inn eller ut.** Ingen kode setter feltet til `False`,
+        ingen JS sender `?include_archived`, og DELETE-grenen i `patients/signals.py` kan
+        ikke nås. Anbefaling: ut, med egen migrasjon.
+      - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
+        Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
+        med. Avgjøres **før** noen bygger en avmeldingsknapp.
+- [ ] **Pulje D — verifiseringen.** D1 (CI) og D2 (død kode) levert 26. sep. Igjen:
+      XSS-skanner for `backlog.js` og `+`-uttrykk (D3); `backup_enabled`,
+      `/api/`-fanger-alt og `createcachetable` (D4).
 - [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og

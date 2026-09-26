@@ -16,8 +16,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone as djtz
 
-# Re-eksport fra core (bakoverkompatibilitet)
-from core.validators import (  # noqa: F401
+from core.validators import (
     TIME_FIELDS,
     TIME_FORMAT,
     TIME_FORMAT_HUMAN,
@@ -895,32 +894,6 @@ def bygg_aggregat(arkiv):
         'basis': _compute_stats_from_dicts(_arkiv_pasienter_dicts(arkiv)),
         'full': _compute_full_stats_from_dicts(_arkiv_pasienter_dicts(arkiv)),
     }
-
-
-def kollaps_arkiv(arkiv):
-    """Frys statistikken og slett pasientradene permanent.
-
-    **Irreversibel.** Etter dette finnes ingen opplysninger om enkeltpasienter
-    i arkivet — kun aggregerte tall som ikke lar seg føre tilbake til en
-    person.
-
-    Idempotent: et allerede kollapset arkiv røres ikke, og funksjonen
-    returnerer 0.
-
-    Returnerer antall slettede pasientrader.
-    """
-    from core.arkiv import kollaps
-    return kollaps(_arkiv_handler(), arkiv)
-
-
-def har_arkiv_backup_etter(tidspunkt):
-    """Finnes det en arkiv-backup tatt etter ``tidspunkt``?
-
-    Brukes som sperre før kollaps: en backup laget etter at arkivet ble
-    opprettet inneholder arkivet, og gjør slettingen gjenopprettbar.
-    """
-    from core.arkiv import har_backup_etter
-    return har_backup_etter(_arkiv_handler(), tidspunkt)
 
 
 # ── Slettevindu (§4.2) ────────────────────────────────────────────────────────

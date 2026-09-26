@@ -217,29 +217,42 @@ class ErGlobalAdminTests(TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Bakoverkompatibilitet: re-eksporter fra patients.services og accounts.decorators
+# Bakoverkompatibilitet: omveiene via patients.services og accounts.decorators er borte
 # ════════════════════════════════════════════════════════════════════════════
 
 
 class BakoverkompatibilitetTests(TestCase):
-    """Sikrer at all eksisterende import fortsatt fungerer etter refaktoren."""
+    """At de gamle omveiene er borte, og ikke kommer tilbake.
 
-    def test_patients_services_re_eksporterer_validatorer(self):
-        from patients.services import (  # noqa: F401
-            TIME_FIELDS as p_fields,
-            TIME_FORMAT as p_format,
-            now_local_str as p_now,
-            parse_minutes as p_parse,
-            validate_patient_time_fields as p_val,
-            validate_time_string as p_str,
-        )
-        # Skal være de samme objektene som i core
-        self.assertIs(p_fields, TIME_FIELDS)
-        self.assertIs(p_format, TIME_FORMAT)
-        self.assertIs(p_now, now_local_str)
-        self.assertIs(p_parse, parse_minutes)
-        self.assertIs(p_val, validate_patient_time_fields)
-        self.assertIs(p_str, validate_time_string)
+    Testen som krevde at `patients.services` re-eksporterte validatorene er
+    slettet (26. sep. 2026, D2): de eneste leserne var to tester og ett view,
+    og de henter nå fra `core.validators`, der funksjonene bor.
+    """
+
+    def test_ingen_henter_validatorene_via_patients_services(self):
+        """`patients.services` importerer validatorene fordi den bruker dem,
+        ikke for å dele dem ut. En ny import via den gjør omveien levende igjen."""
+        import ast
+        from pathlib import Path
+
+        from django.conf import settings
+
+        import core.validators as validators
+        navn = {n for n in dir(validators) if not n.startswith('_')}
+        rot = Path(settings.BASE_DIR)
+        brudd = []
+        for fil in rot.glob('*/**/*.py'):
+            if '.venv' in fil.parts or 'staticfiles' in fil.parts:
+                continue
+            for node in ast.walk(ast.parse(fil.read_text(encoding='utf-8'))):
+                if (isinstance(node, ast.ImportFrom)
+                        and (node.module == 'patients.services'
+                             or (node.level == 1 and node.module == 'services'
+                                 and fil.parent.name == 'patients'))):
+                    for alias in node.names:
+                        if alias.name in navn:
+                            brudd.append(f'{fil.relative_to(rot)}: {alias.name}')
+        self.assertEqual(brudd, [], 'Importer fra core.validators')
 
     def test_shimen_er_borte(self):
         """`accounts/decorators.py` er slettet (14. sep. 2026, gjeldspunkt 3.3).

@@ -208,7 +208,7 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
                                  'mkKonkordansTabell', 'mkAvreistTabell',
                                  'mkAnnetStedTabell', 'mkUtfallTabell',
                                  'mkHendelserTabell')),
-        (STATISTIKK_KO_JS, ('_koNavn', '_koMedianP90', 'mkKoHvemLosteTabell',
+        (STATISTIKK_KO_JS, ('_koNavn', 'mkKoHvemLosteTabell',
                             'mkKoVerkenTabell', 'mkKoForsteRessursTabell',
                             'mkKoEskaleringTabell', 'mkKoStillhetTabell',
                             'mkKoVarighetTabell', 'mkKoLagTabell', 'mkKoLoggTabell')),

@@ -271,7 +271,7 @@ Punktet finnes **bare på staging**.
   En maskin uten node får en grønn suite der `avgjor()`, `klikkSkalKjore()` og de andre
   JS-reglene aldri har kjørt.
 
-**D2. Død kode som testene holder i live.** Løgn nr. 3 i mutasjonsavsnittet i
+**D2. Død kode som testene holder i live.** *Levert 26. sep. 2026, se CHANGELOG.* Løgn nr. 3 i mutasjonsavsnittet i
 `CLAUDE.md`, i praksis. Slett koden og testene, eller flytt funksjonen til den ideen den
 hører til:
 - `_posterPerGruppe()` (`vaktliste-oversikt.js:86`)
