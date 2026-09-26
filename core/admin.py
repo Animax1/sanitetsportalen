@@ -24,11 +24,10 @@ class ModuleSettingsAdmin(admin.ModelAdmin):
         'visningsnavn',
         'enabled',
         'kjerne_status',
-        'backup_enabled',
         'updated_at',
         'updated_by',
     ]
-    list_filter = ['enabled', 'backup_enabled']
+    list_filter = ['enabled']
     search_fields = ['slug', 'note']
     readonly_fields = ['slug', 'updated_at', 'updated_by', 'kjerne_status']
     fieldsets = (
@@ -36,7 +35,7 @@ class ModuleSettingsAdmin(admin.ModelAdmin):
             'fields': ('slug', 'kjerne_status'),
         }),
         ('Status', {
-            'fields': ('enabled', 'backup_enabled', 'note'),
+            'fields': ('enabled', 'note'),
         }),
         ('Audit', {
             'fields': ('updated_at', 'updated_by'),

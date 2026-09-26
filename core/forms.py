@@ -25,10 +25,9 @@ class ModuleSettingsForm(forms.ModelForm):
 
     class Meta:
         model = ModuleSettings
-        fields = ['enabled', 'backup_enabled', 'note']
+        fields = ['enabled', 'note']
         widgets = {
             'enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'backup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'note': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Valgfritt — f.eks. "Deaktivert pga. driftsavbrudd"',
@@ -37,7 +36,6 @@ class ModuleSettingsForm(forms.ModelForm):
         }
         labels = {
             'enabled': 'Aktivert',
-            'backup_enabled': 'Inkluder i backup',
             'note': 'Admin-notat',
         }
 

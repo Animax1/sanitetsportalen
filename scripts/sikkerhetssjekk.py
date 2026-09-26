@@ -43,6 +43,7 @@ _RUTEFIL = Path(__file__).with_name('sikkerhetsruter.json')
 _RUTER = json.loads(_RUTEFIL.read_text(encoding='utf-8'))
 #: Alt som skal være stengt — prøves anonymt med GET *og* POST uten CSRF. En
 #: rute som bare tar POST svarer 405 på GET, og det er også «stengt».
+#: 410 er de gamle `/api/`-adressene (26. sep. 2026, D4) — også stengt.
 STENGT = _RUTER['stengt']
 #: Skal svare uten innlogging — og bare disse. 400 er lov: en lenke med
 #: ugyldig token sier fra om det.
@@ -246,7 +247,7 @@ def test_stengt(base, r):
     for sti in STENGT:
         st, h, html = k.kall(sti)
         loc = h.get('location', '')
-        ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
+        ok = st in (401, 403, 404, 405, 410) or (st in (301, 302) and '/accounts/login/' in loc)
         if ok:
             continue
         r.feil(f'GET {sti} svarte {st} {loc} uten innlogging')
@@ -258,7 +259,7 @@ def test_stengt(base, r):
     for sti in STENGT:
         st, h, html = k.kall(sti, 'POST', json_data={})
         loc = h.get('location', '')
-        ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
+        ok = st in (401, 403, 404, 405, 410) or (st in (301, 302) and '/accounts/login/' in loc)
         if not ok:
             r.feil(f'POST {sti} uten innlogging og CSRF svarte {st}')
         elif st == 500:

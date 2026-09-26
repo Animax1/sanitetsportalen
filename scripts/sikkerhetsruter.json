@@ -2,6 +2,7 @@
  "_generert_av": "python manage.py sikkerhetsruter — rediger ikke for hånd",
  "stengt": [
   "/",
+  "/api/x",
   "/accounts/change-password/",
   "/accounts/logout/",
   "/api/endringer/",
@@ -182,7 +183,6 @@
  ],
  "omdirigerer": [
   "/admin/server-status/",
-  "/api/x",
   "/accounts/users/",
   "/accounts/users/1/",
   "/accounts/users/ny/",

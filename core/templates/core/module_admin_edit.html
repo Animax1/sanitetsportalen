@@ -40,16 +40,6 @@
   </div>
 
   <div class="mb-3">
-    <div class="form-check form-switch">
-      {{ form.backup_enabled }}
-      <label for="{{ form.backup_enabled.id_for_label }}" class="form-check-label">
-        <strong>{{ form.backup_enabled.label }}</strong>
-      </label>
-    </div>
-    <div class="text-muted" style="font-size:0.85rem;">{{ form.backup_enabled.help_text }}</div>
-  </div>
-
-  <div class="mb-3">
     <label for="{{ form.note.id_for_label }}" class="form-label">{{ form.note.label }}</label>
     {{ form.note }}
     <div class="text-muted" style="font-size:0.85rem;">{{ form.note.help_text }}</div>

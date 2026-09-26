@@ -76,8 +76,9 @@ urlpatterns = [
     # nye dashboard-routes. I praksis fanger de kun root-prefiks som ikke
     # lenger har en aktiv route.
 
-    # /api/<alt> → /pasienter/api/<alt>
-    re_path(r'^api/.*$', views_admin.legacy_root_redirect, name='legacy_api'),
+    # /api/<alt>: flyttet til /pasienter/api/ i fase 2. 410, ikke 301 — se
+    # `views_admin.api_flyttet` (26. sep. 2026, D4).
+    re_path(r'^api/.*$', views_admin.api_flyttet, name='api_flyttet'),
 
     # /admin/server-status/<alt> → /portal-admin/server-status/<alt>
     re_path(

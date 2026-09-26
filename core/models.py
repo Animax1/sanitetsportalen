@@ -44,10 +44,11 @@ class ModuleSettings(models.Model):
     (``Module.is_core=True``) kan ikke deaktiveres — det håndheves i admin
     via ``ModuleSettingsAdmin``.
 
-    ``backup_enabled`` har ingen effekt: hva som blir tatt backup av avgjøres
-    av backup-registeret (hvilke moduler som har en handler) og av
-    ``core.Backupplan`` (om, og hvor ofte). Å la feltet også kunne slå av
-    backup ville gitt to steder å se etter når en fil mangler.
+    Hva som blir tatt backup av avgjøres av backup-registeret (hvilke moduler
+    som har en handler) og av ``core.Backupplan`` (om, og hvor ofte) — ikke
+    her. ``backup_enabled`` sto her til 26. sep. 2026 uten noen virkning
+    (D4): en bryter som ikke gjør noe ser ut som en beslutning. Kolonnen står
+    igjen i basen til neste deploy, se migrasjon ``0012``.
     """
 
     slug = models.CharField(
@@ -62,15 +63,6 @@ class ModuleSettings(models.Model):
         help_text=(
             'Hvis avkrysset vises modulen i dashboard og nav-meny for brukere '
             'som har riktig permission-flagg. Kjernemoduler kan ikke deaktiveres.'
-        ),
-    )
-    backup_enabled = models.BooleanField(
-        default=False,
-        verbose_name='Inkluder i backup',
-        help_text=(
-            'Reservert for fremtidig modul-styrt backup. Per Fase 3a har dette '
-            'feltet ingen effekt — backup styres fortsatt av BACKUP_APPS i kode. '
-            'Settes opp i en senere fase.'
         ),
     )
     note = models.CharField(

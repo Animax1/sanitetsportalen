@@ -186,7 +186,7 @@ def appsetting_post_delete(sender, instance, **kwargs):
 # varsel. Det er blant de mest inngripende knappene i portalen, og den satte
 # ingen spor.
 
-MODULESETTINGS_FELTER = ('slug', 'enabled', 'backup_enabled')
+MODULESETTINGS_FELTER = ('slug', 'enabled')
 
 
 @receiver(pre_save, sender=ModuleSettings)

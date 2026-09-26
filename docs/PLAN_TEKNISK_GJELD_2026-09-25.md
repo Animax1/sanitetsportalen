@@ -286,7 +286,7 @@ hører til:
 - KO har sin egen skanner for `+`. Utvid den til `backlog.js`, og løs vaktlistas kjente
   `+`-gap (eget punkt i TODO) med samme mekanisme.
 
-**D4. Brytere og filtre uten virkning:**
+**D4. Brytere og filtre uten virkning:** *Levert 26. sep. 2026 (`backup_enabled` i to deploys, den andre står i TODO), se CHANGELOG.*
 - **`ModuleSettings.backup_enabled`:** fjern fra skjema, maler og admin, og deretter
   kolonnen. Fjern `BACKUP_APPS`-unntaket i `tests_dokumentråte.py` i samme commit.
 - **`/api/`-fanger-alt i `core/urls.py:80`:** svar 404/410. En POST mister kroppen i en

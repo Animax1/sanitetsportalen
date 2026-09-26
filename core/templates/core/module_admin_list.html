@@ -21,7 +21,6 @@
       <th>Modul</th>
       <th>Slug</th>
       <th>Status</th>
-      <th>Backup</th>
       <th>Sist endret</th>
       <th>Av</th>
       <th>Notat</th>
@@ -49,13 +48,6 @@
           {% endif %}
         {% else %}
           <span class="badge bg-warning text-dark">Ingen rad</span>
-        {% endif %}
-      </td>
-      <td>
-        {% if row.settings.backup_enabled %}
-          <i class="bi bi-check-circle-fill" style="color:var(--portal-success);"></i>
-        {% else %}
-          <span class="text-muted">—</span>
         {% endif %}
       </td>
       <td style="font-size:0.85rem;color:var(--portal-text-muted);">

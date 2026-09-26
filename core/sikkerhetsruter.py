@@ -41,7 +41,6 @@ AAPNE = {
 #: Gamle adresser som sender videre. Skal aldri svare 200 — men 301 til en
 #: annen side enn innloggingen er riktig her.
 OMDIRIGERER = {
-    '^api/.*$': 'gamle /api/-adresser til /pasienter/api/ (D4 i planen: bør bli 404/410)',
     '^admin/server-status/(?P<rest>.*)$': 'gammel server-status-adresse',
     'pasienter/^admin/server-status/(?P<rest>.*)$': 'gammel server-status-adresse',
     'accounts/users/': 'brukeradmin flyttet til /portal-admin/brukere/',

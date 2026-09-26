@@ -166,8 +166,13 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
         Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
         med. Avgjøres **før** noen bygger en avmeldingsknapp.
-- [ ] **Pulje D — verifiseringen.** D1 (CI), D2 (død kode) og D3 (skanneren for `+`)
-      levert 26. sep. Igjen: `backup_enabled`, `/api/`-fanger-alt og `createcachetable` (D4).
+- [ ] **Slett kolonnen `core_modulesettings.backup_enabled` — deploy 2 av D4.** Når
+      `core/0012` har vært i prod (ute fra 26. sep. 2026 eller senere): en migrasjon med
+      `RunSQL('ALTER TABLE core_modulesettings DROP COLUMN backup_enabled')` og ingen
+      `state_operations` (Django kjenner ikke feltet lenger). **Ikke før** — i vinduet
+      mellom `migrate` og containerbyttet kjører den gamle koden, og den velger kolonnen i
+      hver spørring mot moduloppsettet. SQLite trenger ingenting spesielt, men prøv mot
+      PostgreSQL. Raden i `UTGAATTE_FELT` blir stående: filene lever 730 dager.
 - [ ] **Pulje E — duplisering som alt har glidd.** Pasientstatistikken regnet to ganger
       med ulike svar (E1); verdilistefabrikken i KO og oppdrag (E2); arkivverifiseringen i
       `patients/views_arkiv.py` (E3); tilgangsgatene (E4); småhjelperne (E5); vasking og

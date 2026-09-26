@@ -41,7 +41,7 @@ class AnonymErStengtUteTests(TestCase):
     """Det scriptet gjør mot staging, gjort i suiten: aldri 200, aldri 500."""
 
     def _stengt(self, status, location):
-        return status in (401, 403, 404, 405) or (
+        return status in (401, 403, 404, 405, 410) or (
             status in (301, 302) and '/accounts/login/' in location)
 
     def test_get(self):

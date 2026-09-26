@@ -8,12 +8,13 @@ Legacy-redirectene står her fordi de peker på adminstier.
 from __future__ import annotations
 
 import csv
+import logging
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponsePermanentRedirect
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
@@ -356,20 +357,25 @@ def audit_log_csv_export_view(request):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Legacy-redirects (Fase 2 — uendret)
+# Gamle /api/-adresser (26. sep. 2026, D4)
 # ─────────────────────────────────────────────────────────────────────────────
 
+_flyttet_logg = logging.getLogger('core.api_flyttet')
 
-def legacy_root_redirect(request, subpath: str = '') -> HttpResponse:
-    """Redirect en gammel root-URL til den nye `/pasienter/`-versjonen.
 
-    Args:
-        subpath: Den delen av URL-en som kommer ETTER prefikset som ble
-                 fjernet. F.eks. for `/api/patients/` er subpath = "patients/".
+def api_flyttet(request) -> HttpResponse:
+    """410 for `/api/…`-adressene som flyttet til `/pasienter/api/` i fase 2.
 
-    Returnerer 301 Moved Permanently og bevarer query string.
+    **Var en 301 til og med 26. sep. 2026.** En 301 gjør en POST om til en GET
+    i nettleseren, så en gammel klient som lagret noe fikk et svar uten at
+    noe ble lagret — stille. Ingen JS i portalen bruker adressene, og det som
+    likevel treffer, skal feile synlig. **Hvert treff logges som advarsel**:
+    `path=`-linjene i loggen tar bare trege forespørsler, så uten denne ville et
+    gammelt kall vært usynlig i Railway.
+
+    `/api/varsler/` og `/api/endringer/` har egne ruter foran denne.
     """
-    new_path = '/pasienter' + request.path
-    if request.META.get('QUERY_STRING'):
-        new_path = f"{new_path}?{request.META['QUERY_STRING']}"
-    return HttpResponsePermanentRedirect(new_path)
+    _flyttet_logg.warning('Gammel /api/-adresse: %s %s', request.method, request.path)
+    return JsonResponse({
+        'error': 'Adressen er flyttet. Pasientmodulens API ligger under /pasienter/api/.',
+    }, status=410)

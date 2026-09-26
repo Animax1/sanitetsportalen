@@ -149,6 +149,9 @@ UTGAATTE_FELT: dict[str, frozenset[str]] = {
     # 19. sep. 2026, samme dag: tillegg-merket på linja ble til deling
     # (`delt_at`). Filene fra timene imellom bærer `beskrivelse` på linjene.
     'ko.logglinje': frozenset({'beskrivelse'}),
+    # 26. sep. 2026 (D4): en bryter uten virkning. Portalfila bærer den i hver
+    # `ModuleSettings`-rad til da.
+    'core.modulesettings': frozenset({'backup_enabled'}),
 }
 UTGAATTE_MODELLER: frozenset[str] = frozenset({
     'ko.ressursbehov',   # 19. sep. 2026, se over

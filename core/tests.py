@@ -445,39 +445,6 @@ class LegacyRedirectTests(TestCase):
     bokmerker, lenker og e-post-referanser må fortsatt fungere via 301.
     """
 
-    def test_api_patients_redirectes(self):
-        """/api/patients/ → 301 → /pasienter/api/patients/"""
-        resp = self.client.get('/api/patients/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], '/pasienter/api/patients/')
-
-    def test_api_full_stats_redirectes(self):
-        resp = self.client.get('/api/full-stats/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], '/pasienter/api/full-stats/')
-
-    def test_api_med_pk_redirectes(self):
-        resp = self.client.get('/api/patients/42/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], '/pasienter/api/patients/42/')
-
-    def test_api_med_query_string_bevares(self):
-        """Query string skal bevares i redirect."""
-        resp = self.client.get('/api/patients/?foo=bar&baz=2')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(
-            resp['Location'],
-            '/pasienter/api/patients/?foo=bar&baz=2',
-        )
-
-    def test_api_arkiv_redirectes(self):
-        resp = self.client.get('/api/innstillinger/arkiv/5/full-stats/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(
-            resp['Location'],
-            '/pasienter/api/innstillinger/arkiv/5/full-stats/',
-        )
-
     def test_admin_server_status_redirectes(self):
         """/admin/server-status/ → 301 → /portal-admin/server-status/"""
         resp = self.client.get('/admin/server-status/')
@@ -514,29 +481,33 @@ class LegacyRedirectTests(TestCase):
         # accounts/login returnerer 200 (loginskjema), ikke 301.
         self.assertNotEqual(resp.status_code, 301)
 
-    def test_redirect_er_permanent_301_ikke_302(self):
-        """Bekrefter eksplisitt 301 (Moved Permanently), ikke 302 (Found).
 
-        Forskjellen er kritisk: 301 cacher i nettleseren og oppdaterer
-        bokmerker; 302 gjør ikke det.
-        """
-        resp = self.client.get('/api/patients/')
-        self.assertEqual(resp.status_code, 301)
-        # Django setter kun status — ingen Cache-Control-header trengs.
+class ApiFlyttetTests(TestCase):
+    """`/api/…` svarer 410, ikke 301 (26. sep. 2026, D4).
 
-    def test_post_til_legacy_redirectes_med_307_kompatibel(self):
-        """POST til legacy-URL skal også redirecte (HttpResponsePermanentRedirect).
+    301 til `/pasienter/api/` gjorde en POST om til en GET i nettleseren: en
+    gammel klient som lagret noe, fikk et svar uten at noe ble lagret.
+    """
 
-        Django bruker 308 for POST-redirect via HttpResponsePermanentRedirect
-        i nyere versjoner — men i dag returnerer den 301 selv for POST. Vi
-        sjekker bare at det IKKE er 200 (ingen åpen ende) og at klient
-        kommer seg videre til /pasienter/.
-        """
-        # Bruker en URL som finnes både på gammel og ny path.
-        resp = self.client.post('/api/patients/', data='{}',
-                                content_type='application/json')
-        self.assertIn(resp.status_code, [301, 308])
-        self.assertTrue(resp['Location'].startswith('/pasienter/api/patients/'))
+    def test_get_gir_410_med_forklaring(self):
+        with self.assertLogs('core.api_flyttet', level='WARNING') as logg:
+            resp = self.client.get('/api/patients/?foo=bar')
+        self.assertEqual(resp.status_code, 410)
+        self.assertIn('/pasienter/api/', resp.json()['error'])
+        self.assertIn('GET /api/patients/', logg.output[0], 'treffet skal synes i loggen')
+
+    def test_post_videresendes_ikke(self):
+        """Det var hele feilen: POST-en ble en GET på veien."""
+        with self.assertLogs('core.api_flyttet', level='WARNING'):
+            resp = self.client.post('/api/patients/', data='{}', content_type='application/json')
+        self.assertEqual(resp.status_code, 410)
+        self.assertNotIn('Location', resp)
+
+    def test_de_levende_api_rutene_paavirkes_ikke(self):
+        """`/api/varsler/` og `/api/endringer/` står foran fangeren."""
+        for sti in ('/api/varsler/', '/api/endringer/'):
+            with self.subTest(sti=sti):
+                self.assertNotEqual(self.client.get(sti).status_code, 410)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1049,7 +1020,7 @@ class ModuleAdminUITests(TestCase):
         self.client.force_login(self.admin)
         resp = self.client.post(
             reverse('portaladmin:module_admin_edit', kwargs={'slug': non_core.slug}),
-            {'enabled': 'on', 'backup_enabled': 'on', 'note': 'Test-notat'},
+            {'enabled': 'on', 'note': 'Test-notat'},
         )
         # Redirect etter suksess
         self.assertEqual(resp.status_code, 302)
@@ -1073,7 +1044,7 @@ class ModuleAdminUITests(TestCase):
             slug=kjerne.slug, defaults={'enabled': True},
         )
         form = ModuleSettingsForm(
-            data={'enabled': False, 'backup_enabled': False, 'note': ''},
+            data={'enabled': False, 'note': ''},
             instance=settings_obj,
         )
         self.assertFalse(form.is_valid())

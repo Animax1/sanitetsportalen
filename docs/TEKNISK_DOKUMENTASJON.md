@@ -1678,11 +1678,11 @@ Det finnes **ingen separat backup-service** – automatisk backup håndteres in-
 `Procfile` (prosjektrot):
 
 ```
-release: python manage.py migrate --noinput && python manage.py createcachetable && python manage.py collectstatic --noinput
+release: python manage.py migrate --noinput && python manage.py collectstatic --noinput
 web: gunicorn myproject.wsgi --workers ${WEB_WORKERS:-1} --threads ${WEB_THREADS:-4} --bind 0.0.0.0:$PORT --timeout 60 --max-requests ${WEB_MAX_REQUESTS:-1000} --max-requests-jitter 50
 ```
 
-- `release` kjøres av Railway før hver ny deploy: oppdaterer databaseskjema, oppretter cache-tabell (nødvendig for `django-ratelimit`), samler statiske filer.
+- `release` kjøres av Railway før hver ny deploy: oppdaterer databaseskjema og samler statiske filer. `createcachetable` sto her til 26. sep. 2026 (D4), med påstanden at `django-ratelimit` trengte den — den lager bare tabellen for Djangos *databasecache*, og portalen bruker Redis eller LocMem (`CACHES` i `settings.py`).
 - `web` starter Gunicorn med parametriserte verdier. Defaulten er fortsatt 1 worker og 4 tråder for at `LocMemCache`-rate-limit-tellere skal fungere korrekt (se seksjon 15.1).
 - `--max-requests ${WEB_MAX_REQUESTS:-1000}` gjør at hver worker resirkuleres etter angitt antall forespørsler. Procfile-fallback er 1000, men Railway-variabelen `WEB_MAX_REQUESTS` kan overstyre dette (se §12.3). `--max-requests-jitter 50` forhindrer at alle workers restarter samtidig. Beskytter mot gradvis minnefragmentering fra tredjepartsbiblioteker.
 - `--timeout 60` avbryter en request som tar mer enn 60 sekunder og resirkulerer workeren.
@@ -2049,12 +2049,14 @@ Implementert (GDPR fase 3.1, aug. 2026): radene kollapser til frosne aggregater 
 
 **Symptom:** Server-feil ved POST til `/accounts/login/`.
 
-**Vanlig årsak:** `django-ratelimit` prøver å bruke en cache-backend som ikke eksisterer, f.eks. `DatabaseCache` uten at `createcachetable` er kjørt.
+**Ikke cachen:** rate-limitingen faller åpen ved cachefeil (`RATELIMIT_FAIL_OPEN` og
+try/except i `core.ratelimit`), så en død Redis gir ikke 500 her. Portalen bruker Redis
+eller LocMem, aldri `DatabaseCache` — `createcachetable` er derfor ikke svaret (fjernet fra
+`Procfile` 26. sep. 2026).
 
 **Løsning:**
-1. Sjekk at `CACHES`-konfigurasjonen bruker `LocMemCache` (standard i `settings.py`).
-2. Sjekk Railway-logger for spesifikk feilmelding.
-3. Kjør `python manage.py createcachetable` manuelt via Railway Run Command.
+1. Sjekk Railway-loggene for feilmeldingen; feilvarselet på e-post har tracebacken.
+2. Sjekk databasekortet på `/portal-admin/server-status/` og `/healthz/`.
 
 ### 16.2 Brukere eller data forsvinner
 

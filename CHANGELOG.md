@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — Brytere og ruter uten virkning: `/api/` gir 410, `backup_enabled` ut, `createcachetable` ut (D4)  `#core`
+
+**`/api/…` svarer 410 i stedet for 301.** Adressene flyttet til `/pasienter/api/` i fase 2.
+En **301 gjør en POST om til en GET** i nettleseren, så en gammel klient som lagret noe fikk
+et svar uten at noe ble lagret — stille. Ingen JS i portalen bruker dem; `/api/varsler/` og
+`/api/endringer/` har egne ruter foran. **Hvert treff logges som advarsel**
+(`core.api_flyttet`): André søkte på `path=/api/` i Railway uten funn, men de linjene tar
+bare trege forespørsler (over 200 ms eller over 1 MB minne) — derfor fant han ikke
+`/api/endringer/` heller, som polles hvert 2,5 s. Uten advarselen ville et gammelt kall vært
+usynlig. `sikkerhetsruter.json` er regenerert (9 omdirigeringer, var 10), og 410 teller som
+«stengt» i testen og i `scripts/sikkerhetssjekk.py`.
+
+**`ModuleSettings.backup_enabled` er ute av modellen — i to steg.** Feltet hadde ingen
+virkning (hjelpeteksten sa selv «ingen effekt»), og en bryter som ikke gjør noe ser ut som en
+beslutning. Å slette kolonnen i samme deploy ville gitt 500 i vinduet der Railway har kjørt
+`migrate` men ikke byttet container: den gamle koden velger kolonnen i hver spørring mot
+moduloppsettet. `core/0012` er derfor `SeparateDatabaseAndState`: Django glemmer feltet, og
+kolonnen får `db_default=False` — på PostgreSQL bare `SET DEFAULT false`. **Prøvd mot ekte
+PostgreSQL:** ny kode oppretter en rad (kolonnen får `false`), gammel kodes `SELECT` virker.
+**Deploy 2 — slette kolonnen — står i TODO.** Gamle portalfiler bærer feltet;
+`UTGAATTE_FELT` tar det ut, og en rundtur-test laster en slik rad.
+
+**`createcachetable` er ute av `Procfile`.** Den lager bare tabellen for Djangos
+*databasecache*; portalen bruker Redis eller LocMem. `TEKNISK_DOKUMENTASJON.md` påsto at
+`django-ratelimit` trengte den, og feilsøkingsavsnittet for 500 ved innlogging anbefalte å
+kjøre den. Begge er rettet — rate-limitingen faller dessuten åpen ved cachefeil.
+
+**Mutanter: 5, alle drept.** 410 → 200; advarselen fjernet; `db_default` fjernet (gir
+`NOT NULL constraint failed: core_modulesettings.backup_enabled` ved første nye modulrad —
+nøyaktig det prod ville fått); raden i `UTGAATTE_FELT` fjernet; ruten tilbake i
+`OMDIRIGERER`.
+
 ## 2026-09-26 — Én skanner for markup bygget med `+`, for alle JS-filene (D3)  `#core #backlog #ko`
 
 **Hvorfor:** `backlog.js` bygger markup med `'<…' + x` og hadde ingen statisk skanner. KO

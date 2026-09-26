@@ -216,3 +216,27 @@ class GammelFilLastesTests(TestCase):
 
         # Og gjenopprettingen er rullet tilbake — pasienten står som før.
         self.assertEqual(Patient.objects.get().pasientnummer, 42)
+
+
+class GammelPortalfilMedBackupEnabledTests(TestCase):
+    """Portalfila bar `backup_enabled` på hver `ModuleSettings`-rad til 26. sep.
+    2026 (D4). Den ligger 730 dager offsite og skal fortsatt lastes."""
+
+    def test_raden_lastes_uten_feltet(self):
+        import json
+        import tempfile
+
+        from django.core import management
+
+        from core.backup import fjern_utgaatte
+        from core.models import ModuleSettings
+        ModuleSettings.objects.filter(slug='backlog').delete()
+        fil = json.dumps([{'model': 'core.modulesettings', 'pk': 991, 'fields': {
+            'slug': 'backlog', 'enabled': False, 'backup_enabled': True, 'note': 'fra en gammel fil',
+            'updated_at': '2026-09-20T10:00:00Z', 'updated_by': None}}]).encode('utf-8')
+        ut = fjern_utgaatte(fil)
+        self.assertNotIn(b'backup_enabled', ut)
+        with tempfile.NamedTemporaryFile('wb', suffix='.json', delete=False) as f:
+            f.write(ut)
+        management.call_command('loaddata', f.name, verbosity=0)
+        self.assertEqual(ModuleSettings.objects.get(slug='backlog').note, 'fra en gammel fil')
