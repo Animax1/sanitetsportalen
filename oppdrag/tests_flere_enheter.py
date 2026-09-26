@@ -1965,14 +1965,50 @@ class VarselbjellaTests(FlereEnheterBasis):
     def test_den_forste_er_fortsatt_primaer_og_modusen_frosset(self):
         """Det broen gjorde, gjør `varsle_enhet` nå — også modusen, som en
         mutant fant manglet på den første raden 16. sep."""
+        from oppdrag.models import Enhetstype
+        self.a.enhetstype = Enhetstype.objects.create(navn='Lege', kan_passiv_vakt=True)
         self.a.passiv_vakt = True
-        self.a.save(update_fields=['passiv_vakt'])
+        self.a.save(update_fields=['enhetstype', 'passiv_vakt'])
         o = self._opprett(self.a, self.b)
         self.assertEqual(o.enhet, self.a)
         self.assertEqual(o.primaer.enhet, self.a)
-        self.assertEqual(services.koblingsrad(o, self.a).varslet_modus,
-                         services.gjeldende_modus(self.a))
+        # Bokstavelig, ikke `gjeldende_modus(self.a)`: uten en type som kan gå
+        # passiv er begge sider '' og testen sier ingenting (funnet ved A4).
+        self.assertEqual(services.koblingsrad(o, self.a).varslet_modus, 'passiv')
         self.assertEqual(len(self._varsler()), 1)
+
+    def test_flytt_i_venter_varsler_den_nye_bilen(self):
+        """**A4, 26. sep. 2026.** «Flytt» mens bilen venter pekte raden om og
+        lot varslingen stå: den nye bilen fikk ingen bjellerad, den gamle
+        ble aldri merket lest, og `varslet_at`/`varslet_modus` var den gamle
+        bilens — så lydterskelen og passiv-statistikken regnet feil bil."""
+        from accounts.models import CustomUser, ModulTilgang
+        from core.models import Notification
+        bil_b = CustomUser.objects.create_user(
+            username='bil12', password='x', must_change_password=False)
+        ModulTilgang.objects.create(bruker=bil_b, modul_slug='oppdrag', nivaa='skriv_handling')
+        from oppdrag.models import Enhetstype
+        self.b.user = bil_b
+        self.b.enhetstype = Enhetstype.objects.create(navn='Lege', kan_passiv_vakt=True)
+        self.b.passiv_vakt = True
+        self.b.save(update_fields=['user', 'enhetstype', 'passiv_vakt'])
+
+        o = self._opprett(self.a)
+        foer = services.koblingsrad(o, self.a).varslet_at
+        operatoer = _bruker('sentral_flytt', 'skriv_full')
+        sentral = _klient(operatoer)
+        res = sentral.post(f'/oppdrag/api/oppdrag/{o.pk}/flytt/',
+                           content_type='application/json', data={'enhet_id': self.b.pk})
+        self.assertEqual(res.status_code, 200, res.content)
+
+        rad = services.koblingsrad(o, self.b)
+        self.assertEqual(rad.varslet_modus, 'passiv', 'modusen er den nye bilens')
+        self.assertGreater(rad.varslet_at, foer)
+        self.assertEqual(rad.varslet_av, operatoer)
+        self.assertEqual(Notification.objects.filter(user=bil_b, is_read=False).count(), 1,
+                         'den nye bilen får bjella')
+        self.assertTrue(all(v.is_read for v in self._varsler()),
+                        'den gamle bilens varsel er ikke hennes lenger')
 
     def test_en_bjelle_som_feiler_stopper_ikke_varslingen(self):
         """En bil uten bjellerad er et savn; en varsling som velter

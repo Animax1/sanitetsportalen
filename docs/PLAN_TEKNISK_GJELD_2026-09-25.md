@@ -102,7 +102,7 @@ tjenestelag og view, så mutasjonstestingen er **tung** for A1–A6 og **middels
 - **Test:** krever PostgreSQL for å bli rød. Ta den med i D1, eller som en prøve i
   `core/migrasjonsprover.py`-stil.
 
-**A4. «Flytt» i Venter tar med seg den gamle bilens varsling.**
+**A4. «Flytt» i Venter tar med seg den gamle bilens varsling.** *Levert 26. sep. 2026, se CHANGELOG.*
 - **Hvor:** `oppdrag/services.py:1274-1276`.
 - **Feilen:** `varslet_modus` og `varslet_at` blir stående.
   - Passiv-statistikken og lydterskelen regnes fra feil bil.

@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-26 — «Flytt» i Venter tok med seg den gamle bilens varsling (A4)  `#oppdrag/enhetsskjerm`
+
+`flytt_til_enhet()` pekte koblingsraden om når bilen sto i **Venter**, og lot alt annet
+stå — docstringen sa «ingenting blir feil eier». Men varslingen var den gamle bilens:
+
+- **Den nye bilen fikk ingen rad i bjella** — samme feil som A1, via en annen dør.
+- **Den gamle bilens bjellerad ble aldri merket lest**, så den sto som et oppdrag hun
+  ikke lenger hadde.
+- **`varslet_at`** var den gamles: **lydvarselet i den nye bilen** målte ventetida fra da
+  den *forrige* ble varslet, og kunne pipe med én gang.
+- **`varslet_modus`** var den gamles: passiv-statistikken («oppdrag i passiv tid») talte
+  feil bil.
+
+**Rettingen:** raden pekes fortsatt om — `ta_av_enhet` nekter den siste bilen, og flytt av
+den eneste er det vanligste — men den gamles bjellerad merkes lest, `varslet_at`,
+`varslet_av` og `varslet_modus` settes for den nye, og den nye får bjella.
+
+**Og en test som ikke sa noe:** A1-testen for modusen sammenlignet
+`varslet_modus` med `gjeldende_modus(bilen)` på en enhet uten type som kan gå passiv vakt
+— `'' == ''`. Begge testene har nå en slik type og krever `'passiv'` bokstavelig.
+
+**Test:** `test_flytt_i_venter_varsler_den_nye_bilen`, gjennom flytt-endepunktet.
+**Mutasjonstesting:** 5 mutanter, én per linje i rettingen (lest-merkingen, `varslet_at`,
+`varslet_av`, `varslet_modus`, bjella). Alle drept. `oppdrag`+`ko`+`statistikk` (1 684):
+grønt.
+
+**Ikke gjort:** KO-loggen får ingen «varslet»-linje for den nye bilen ved flytt i Venter
+(`enhet_varslet` fyrer bare på en ny rad). Det var slik før også, og er KOs sak.
+
 ## 2026-09-26 — En arkivert vaktliste i drift styrte fortsatt sentralbordet, KO og e-posten (A6)  `#vaktliste/offline`
 
 **Arkiveringen satte bare `arkivert_at` og rørte ikke `status`.** En liste som ble

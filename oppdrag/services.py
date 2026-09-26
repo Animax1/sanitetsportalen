@@ -1273,8 +1273,20 @@ def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte
     )
     gammel = rad.enhet_id
     if rad.status == choices.VENTER:
+        # **Raden pekes om, og varslingen følger med** (26. sep. 2026, A4). Den
+        # sto igjen fra den gamle bilen: ny bil fikk ingen bjellerad, den gamle
+        # ble aldri merket lest, og `varslet_at`/`varslet_modus` var den gamles —
+        # så lydterskelen og passiv-statistikken regnet feil bil. Raden tas ikke
+        # av og legges på nytt: `ta_av_enhet` nekter den siste, og flytt av den
+        # eneste bilen er det vanligste tilfellet.
+        les_bjellevarselet(oppdrag, rad)
         rad.enhet = ny_enhet
-        rad.save(update_fields=['enhet', 'updated_at'])
+        rad.varslet_at = timezone.now()
+        rad.varslet_av = bruker
+        rad.varslet_modus = gjeldende_modus(ny_enhet)
+        rad.save(update_fields=['enhet', 'varslet_at', 'varslet_av', 'varslet_modus',
+                                'updated_at'])
+        varsle_bjelle(oppdrag, rad)
     else:
         ny_rad = varsle_enhet(oppdrag, ny_enhet, bruker=bruker)
         ny_rad.rekkefolge, rad.rekkefolge = rad.rekkefolge, ny_rad.rekkefolge
