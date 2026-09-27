@@ -917,8 +917,14 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       en ny vei. Kan gjøres uavhengig av KO.
 
 - [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
-      Avklart i tre runder (§2, B1–B20), §9 er tom. Tre puljer i §8; pulje 1 er modellen og
-      parksiden. Lagets utfallsregistrering: problemstilling,
+      Avklart i fire runder (§2, B1–B23), §9 er tom. Tre puljer i §8; pulje 1 er modellen og
+      parksiden.
+      - [ ] **Personvern for `/park/` når modulen er ferdig — før lansering** (André, 27. sep.
+            2026, B23). `PERSONVERN_DOKUMENTASJON.md` A.6 får en rad for registreringene, og
+            risikobildet i `FORSLAG_PARK.md` §4.6–4.7 skrives inn: portalens første side uten
+            innlogging, og at den kan vise KOs plassering av lagene så lenge
+            `park-ko-posisjon` er på. Skrives mot det som faktisk ble bygget, ikke mot
+            forslaget. Lagets utfallsregistrering: problemstilling,
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`

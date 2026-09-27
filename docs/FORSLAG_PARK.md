@@ -1,7 +1,7 @@
 # Forslag: `/park/` — lagets utfallsregistrering
 
 Status: **avklart, klar til pulje 1.** Første utkast 27. september 2026 fra staging `8327d8f`;
-André svarte i tre runder samme dag, og svarene står som **besluttet** under (B1–B20). §9 er
+André svarte i fire runder samme dag, og svarene står som **besluttet** under (B1–B23). §9 er
 tom — André: «Vi starter ikke kode før vi har alt av punkter på plass».
 Arbeidslista er `TODO.md`.
 
@@ -63,6 +63,9 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B18 | Lenkens levetid | **På tvers av vakter** (spørsmål 2a). Tiltakskortet kan stå; oppetiden er grensen |
 | B19 | Forhåndsvalg av sted | **Det nyeste vinner** (tredje runde): «Om KOs plassering er nyeste er det siste, om lagets valg er nyeste brukes det» (§5.1) |
 | B20 | Feilregistreringer | `skriv_leder` og admin kan **slette** en registrering fra lista på `/park/`, med grunn, logget. Ikke rette |
+| B21 | Måling | Hver registrering lagrer hvor forhåndsvalget kom fra og om laget endret det — så B19 kan vurderes med tall etter generalprøven |
+| B22 | Risikovalg | **Alternativene står i §4.7, og det som bringer risiko kan byttes om.** Forhåndsvalget fra KO er en bryter, ikke kode som kommenteres ut |
+| B23 | Personvern | `PERSONVERN_DOKUMENTASJON.md` oppdateres **når `/park/` er ferdig**, ikke underveis — men før lansering (`TODO.md`) |
 
 **Hva B3 og B4 endret fra første utkast.** Utkastet foreslo én lenke per lag, med
 begrunnelsen at et nedtrekk ingen kontrollerer er en påstand. André: «det blir svært
@@ -95,6 +98,8 @@ ganger også når den er på nett.
 | `lokasjon` / `lokasjon_navn` | FK til `oppdrag.Lokasjon` + frosset navn, som `Tavleplassering` |
 | `registrert_at` | Når raden kom inn. Uten offline er det også når det skjedde — ingen klienttid, ingen `vurder_klienttid` |
 | `idempotency_key` | Klientgenerert UUID, unik per lenke. Er også **angre-nøkkelen**, §4.4 |
+| `forhandsvalg_kilde` | `ko` / `registrering` / `telefon` / `ingen` — hvor stedet i nedtrekket kom fra (B21) |
+| `forhandsvalg_endret` | Om laget byttet sted før «Registrer» (B21). Sammen med feltet over svarer det på om «nyeste vinner» treffer |
 | `slettet_at`, `slettet_av_navn`, `slettet_grunn` | B20. Raden står, og statistikken utelater den — en sletting som ikke synes er en statistikk ingen kan etterprøve. Lagets angring sletter raden helt |
 
 **Ingen fritekst er sikkerhetsmodellen, ikke en forenkling** (B1). Et felt som tar imot hva
@@ -205,13 +210,69 @@ Fristen er en `AppSetting`, satt av admin på `/portal-admin/innstillinger/` gje
 
 ### 4.5 Rate-limit og CSRF
 
-- **Per lenke**: `park:registrer`, `120/m`. Én lenke deles nå av alle lagene (B3), så bøtta
-  må romme dem samlet — men være lav nok til at et skript med en lekket lenke ikke fyller
-  statistikken før noen ser det.
+- **Per telefon**, den strammeste: siden lager en tilfeldig telefon-ID første gang den åpnes
+  (`localStorage`) og sender den i en header. Den identifiserer ingen person, og den er
+  grunnen til at ett skript ikke kan bruke opp kvoten for alle lagene.
+- **Per lenke**, et tak: `park:registrer`, høyt nok til at alle lagene samlet aldri når det.
+  Det fanger misbruk i stor skala, ikke én telefon. Uten grensen per telefon *måtte* denne
+  vært lav, og da kunne en lekket lenke stengt ute alle lagene (§4.6).
 - **Per IP, bare for ugyldige tokens.** Ikke per IP på gyldige: telefoner på mobilnett deler
   IP-adresser bak operatørens NAT, og på en festival kan ti lag stå bak samme adresse.
 - **CSRF**: `csrf_exempt`, begrunnet ved dekoratøren. CSRF verner en innlogget sesjon; her
-  finnes ingen, og en fremmed side kan ikke sette headeren med tokenet.
+  finnes ingen. Tokenet går i en egen header, og en egen header utløser en forespørsel om
+  lov (CORS preflight) som serveren ikke besvarer — en fremmed side kommer ikke gjennom.
+
+Telefon-ID-en er en påstand fra klienten: et skript kan lage en ny for hvert kall. Den
+stopper derfor den ubevisste feilen og det enkle skriptet, ikke den som vet hva han gjør —
+**det er taket per lenke, oppetiden og at lenken kan fjernes som stopper ham.**
+
+### 4.6 Trusselbildet
+
+Den første siden i portalen som svarer uten innlogging. **Det reelle hullet er en lenke på
+avveie** — skjermbilde, videresending, nettleserloggen på en privat telefon. Tokenet selv
+(256 bits) lar seg ikke gjette.
+
+| Den som har lenken kan | Alvor | Det som demper |
+|---|---|---|
+| Legge inn falske registreringer | Middels — merkes kanskje ikke før sesongrapporten | Oppetiden, fjerning av lenken, taket per lenke, og **«slett alt fra denne lenken etter kl. X»** på `/park/` |
+| Stenge ute lagene ved å tømme kvoten | Høy under vakt | Grensen per telefon (§4.5) gjør at taket per lenke kan stå høyt |
+| Se hvor KO har plassert hvert lag, fortløpende | Lav til middels | **Risikovalg**, §4.7. Ett lag per kall, men alle kan hentes på under ett sekund |
+| Se lagnavn, steder og verdimengder | Lav | — |
+| Lese registreringer | Umulig — siden svarer aldri med dem | — |
+| Angre andres registreringer | Umulig — krever angre-nøkkelen | — |
+
+Og fire ting som *ikke* er hull, men som må holdes slik — hver med en test:
+
+- **Tokenet fjernes fra adressefeltet** (`history.replaceState`) straks siden har lest det.
+  Fragmentet holdes unna serverloggene, men *nettleserloggen* lagrer hele adressen.
+- **Viewene under `/park/r/` leser aldri `request.user`.** En portalbruker som åpner siden i
+  samme nettleser sender innloggingen sin med; den skal ikke bety noe.
+- **Ingen fritekst inn** (B1) — ingen lagret XSS mulig. Navnene som tegnes (lag, steder) er
+  satt av `skriv_leder` og escapes som ellers.
+- **Ugyldig, fjernet og stengt lenke gir samme svar.**
+
+### 4.7 Risikovalgene og alternativene (B22)
+
+Hvert valg som bringer risiko, med alternativet ved siden av. **Merket i koden** med
+`# RISIKOVALG(park-<navn>): … se FORSLAG_PARK.md §4.7` — så `grep RISIKOVALG` finner alle
+stedene, og hvert merke peker hit.
+
+| Valg | Nå | Alternativet | Hvordan byttes det |
+|---|---|---|---|
+| **`park-ko-posisjon`** — forhåndsvalg fra KO-tavla (B19) | **På** | Bare siste registrering og telefonens minne. Siden viser da bare lister, ingen posisjoner | **Bryter på `/portal-admin/innstillinger/`**, uten deploy. Av = endepunktet svarer aldri med KO-kilden, og registeret spørres ikke |
+| `park-delt-lenke` — én lenke for alle lagene (B3) | Én lenke | Én lenke per lag: sikker identitet, fjernes per lag, men flere lenker å dele ut (første utkast, §4.1 der) | Modellen tåler det: `Parklenke` får en nullbar `ressurs`. Kode, ikke bryter |
+| `park-lenke-en-gang` — lenken vises bare når den lages (B5) | Én gang | Lagret lesbart (kryptert), kan vises igjen — men en lekket base er da en lekket lenke | Kode + migrasjon. Frarådes |
+| `park-uten-innlogging` — hele siden | Uten | Delt konto per lag, som bilene. Fjerner alle hullene over, men lagene må logge inn og kontoene forvaltes | Egen modul i praksis. Frarådes med mindre en lenke faktisk misbrukes |
+
+**Hvorfor en bryter og ikke kode som kommenteres ut** for det første valget: kode i en
+kommentar kjøres ikke av testene, og har den ligget der et halvt år, virker den ikke den dagen
+noen tar den inn igjen. En bryter holder *begge* grenene prøvd hele tiden, og kan snus under
+generalprøven eller midt i en vakt av den som ser et problem — ikke av den som har en
+utviklermaskin. De tre andre er større valg der en bryter ville vært kompleksitet for et bytte
+som neppe skjer; der er merket i koden og raden her nok.
+
+**Å fjerne et valg for godt** er å slette koden bak merket og raden her — merkene står der det
+er noe å slette, ikke der det bare er noe å lese.
 
 ---
 
@@ -307,7 +368,7 @@ prøvd på generalprøven.
 | Pulje | Innhold |
 |---|---|
 | **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/park/r/` med lag husket og forhåndsvalg av sted (§5.1, registeret i `core`), angre, rate-limit, backup, modultestene |
-| **2 — Oppsettet** | `/park/` (lenker med oppetid, verdimengdene, lista med sletting), angrefristen i portalinnstillingene |
+| **2 — Oppsettet** | `/park/` (lenker med oppetid, verdimengdene, lista med sletting og «slett alt fra lenken etter kl. X»), angrefristen og `park-ko-posisjon`-bryteren i portalinnstillingene |
 | **3 — Tallene** | Statistikk-kilden «Lag» |
 
 **Anslag: 3 økter**, pluss litt for registeret i §5.1.
@@ -316,4 +377,5 @@ prøvd på generalprøven.
 
 ## 9. Det som gjenstår før koden
 
-Ingenting. Tredje runde besvarte forhåndsvalget (B19) og feilregistreringene (B20).
+Ingenting. Tredje runde besvarte forhåndsvalget (B19) og feilregistreringene (B20); fjerde
+runde målingen (B21), risikovalgene (B22) og personvernet (B23).

@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/park/`: trusselbildet og risikovalgene inn i notatet  `#docs #park #sikkerhet`
+
+**Hvorfor:** André: «på hvilken måte utsetter dette nettsiden sikkerhetshull messig?» — og etter
+svaret: «Husk og i notatet de ulike alternativene til det som bringer risiko her. Da kan vi lett
+bytte om.»
+
+- **§4.6 Trusselbildet.** Det reelle hullet er en lenke på avveie. KO-forhåndsvalget (B19)
+  endrer siden fra å vise lister til å vise **hvor KO har plassert hvert lag** — én per kall,
+  men alle kan hentes på under ett sekund.
+- **§4.7 Risikovalgene**, hvert med alternativet og hvordan det byttes. Merket i koden med
+  `# RISIKOVALG(park-<navn>)`, så `grep RISIKOVALG` finner alle. **`park-ko-posisjon` blir en
+  bryter i portalinnstillingene** i stedet for kode som kommenteres ut (André foreslo
+  kommentarer): utkommentert kode prøves ikke av testene og virker ikke den dagen den tas inn
+  igjen, og en bryter kan snus midt i en vakt uten deploy.
+- **Grense per telefon** (tilfeldig ID i `localStorage`, ingen person) i tillegg til taket per
+  lenke — ellers kunne én lekket lenke stengt ute alle lagene. **«Slett alt fra lenken etter
+  kl. X»** for opprydding etter misbruk. **Tokenet fjernes fra adressefeltet** — fragmentet
+  holdes unna serverloggene, men nettleserloggen lagrer det.
+- **Måling** (B21): `forhandsvalg_kilde` og `forhandsvalg_endret` på hver registrering, så
+  «nyeste vinner» kan vurderes med tall etter generalprøven.
+- **Personvern utsatt til modulen er ferdig** (B23), med eget punkt i `TODO.md` så det skjer
+  før lansering.
+
 ## 2026-09-27 — `/park/`: avklart — nyeste sted vinner, sletting for `skriv_leder`  `#docs #park #forslag`
 
 **Hvorfor:** Andrés tredje runde. «Sted fra ko, hva om vi bruker nyeste av de?»
