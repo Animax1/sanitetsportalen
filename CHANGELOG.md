@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Innloggingens rate-limit-tester tåler vinduskanten  `#test #ci #flaky`
+
+**Hvorfor:** CI på `main` (`50bdcdf`, omgang 3) ble rød på
+`test_per_ip_limit_protects_against_username_spraying`: «AssertionError: 200 not found in
+(403, 429)». Ikke en feil i koden, men en **flaky test**: IP-grensen er `50/5m`, og testen sendte
+nøyaktig 51 forsøk. `django_ratelimit` legger vinduskanten et jitret antall sekunder inn i hver
+periode; faller den midt i serien, deles forsøkene i to bøtter der ingen når 51. Nøyaktig det
+`CLAUDE.md` beskriver under «Rate-limit-tester må tåle vinduskanten» — testen var bare aldri
+skrevet om.
+
+- `accounts/tests.py`: begge innloggingstestene krever nå sperring **innen
+  `nok_til_a_bryte(grense)`** forsøk (2 × grensen + 1), ikke på nøyaktig forsøk nummer grense + 1.
+  `test_per_username_limit_blocks_after_10` hadde samme svakhet (11 mot `10/5m`), uten å ha truffet
+  ennå. At de første *grense* forsøkene går gjennom står fortsatt eksakt: en delt serie gir færre
+  sperringer, aldri flere.
+- **Mutanter: 2, begge drept** — IP-grensen fjernet, brukergrensen fjernet.
+
 ## 2026-09-27 — `main` omgang 3 av 3: `staging` er i produksjon  `#drift #deploy`
 
 **Hvorfor:** André, etter å ha sett over det som kom 27. sep.: «Kjør omgang 3». CI på omgang 2

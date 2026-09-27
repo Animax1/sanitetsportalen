@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
 from accounts.test_helpers import gi_standardtilgang
+from core.tests_ratelimit import nok_til_a_bryte
 
 
 def _create_session_for_user(user):
@@ -162,11 +163,18 @@ class RateLimitTests(TestCase):
                 'username': 'bruker1', 'password': 'feilpass',
             })
             self.assertFalse(self._is_blocked(r), f'Forsøk {i+1} skulle ikke være blokkert')
-        # 11. forsøk skal være blokkert
-        r = self.client.post('/accounts/login/', {
-            'username': 'bruker1', 'password': 'feilpass',
-        })
-        self.assertTrue(self._is_blocked(r))
+        # **Blokkert innen `nok_til_a_bryte(10)` forsøk, ikke nøyaktig på det
+        # 11.** Vinduskanten er jitret per nøkkel (se `core/tests_ratelimit.py`):
+        # faller den midt i serien, deles den i to bøtter der ingen når 11.
+        # De ti første er aldri blokkert — en delt serie gir færre sperringer,
+        # ikke flere — så den halvdelen av testen står eksakt.
+        blokkert = False
+        for _ in range(nok_til_a_bryte(10) - 10):
+            r = self.client.post('/accounts/login/', {
+                'username': 'bruker1', 'password': 'feilpass',
+            })
+            blokkert = blokkert or self._is_blocked(r)
+        self.assertTrue(blokkert)
 
     def test_different_usernames_not_blocked_under_ip_limit(self):
         """Ulike brukernavn fra samme IP deler IKKE per-bruker-kvoten.
@@ -204,11 +212,17 @@ class RateLimitTests(TestCase):
             })
             self.assertNotIn(r.status_code, (403, 429),
                 f'Forsøk {i+1} skulle ikke være blokkert før IP-grensen')
-        # 51. skal være blokkert av IP-limiteren
-        r = self.client.post('/accounts/login/', {
-            'username': 'spray50', 'password': 'feil',
-        })
-        self.assertIn(r.status_code, (403, 429))
+        # **Blokkert innen `nok_til_a_bryte(50)` forsøk** (27. sep. 2026: CI på
+        # `main` fikk 200 på det 51. — vinduskanten falt midt i serien). Samme
+        # regel som over. Brukernavnene går i ring, så ingen når sin egen
+        # grense på ti: det er IP-grensen som prøves.
+        blokkert = False
+        for i in range(50, nok_til_a_bryte(50)):
+            r = self.client.post('/accounts/login/', {
+                'username': f'spray{i % 60}', 'password': 'feil',
+            })
+            blokkert = blokkert or r.status_code in (403, 429)
+        self.assertTrue(blokkert)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
