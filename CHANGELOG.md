@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Server-status viser om migrasjonene er kjørt  `#drift #server-status`
+
+**Hvorfor:** André, om punktet i testsjekklista «Deploy-loggen for staging viser at `migrate`
+gikk gjennom»: «punktet fant jeg ikke i railway noe særlig enkelt». Release-loggen er
+tungvint å finne, og spørsmålet kan portalen svare på selv.
+
+- `core/admin_status.py`: ny rad **«Migrasjoner»** i konfigkortet på
+  `/portal-admin/server-status/` — «alle kjørt» (grønt) eller «N ikke kjørt: app.00xx_…»
+  (rødt). `ukjorte_migrasjoner()` stiller samme spørsmål som `migrate --plan`, uten å kjøre
+  noe. **Svaret caches bare når alt er kjørt**: det kan kun endre seg ved en deploy, som
+  starter en ny prosess, mens et rødt svar skal bli grønt av seg selv. En feil i sjekken
+  gir en rød rad, ikke et dødt dashbord.
+- **Hash-feil i installasjonen trenger ingen egen sjekk:** feiler `pip`, blir det ingen ny
+  container, og byggnummeret i footeren står på det gamle.
+- Testsjekklista §4 er skrevet om til de to sjekkene.
+
+**Tester:** `MigrasjonsradTests` (6), én gjennom det ekte JSON-endepunktet og én som
+fjerner `core.0013` fra basens migrasjonsliste. **Mutanter: 5, alle drept** — kallstedet
+fjernet, ukjørt meldt grønt, planen alltid tom, feil meldt grønt, og «caches også ukjørt».
+**Den siste overlevde først:** testen sjekket bare at raden ble grønn etterpå, og det ble
+den også med feilen. Den krever nå rødt på andre kall mens noe fortsatt er ukjørt.
+
 ## 2026-09-27 — Tilbake: admin kommer inn i en avslått modul, med vilje  `#tilgang #ko`
 
 **Hvorfor:** André, etter endringen over: «jeg liker resonnementet at admin skal kunne jobbe

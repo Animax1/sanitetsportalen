@@ -375,10 +375,53 @@ def _get_konfig_sjekk():
          'ok': bool(settings.ADMINS)},
         {'nokkel': 'Offsite backup', 'verdi': 'konfigurert' if _offsite_konfigurert() else 'ikke konfigurert',
          'ok': _offsite_konfigurert()},
+        _migrasjonsrad(),
     ]
     return {'rader': rader, 'alle_ok': all(r['ok'] for r in rader),
             'versjon': {'bygg': ver.get('bygg'), 'dato': ver.get('dato').isoformat() if ver.get('dato') else None,
                         'kilde': ver.get('kilde')}}
+
+
+#: Settes når alle migrasjonene er kjørt. Svaret kan bare endre seg ved en
+#: ny deploy, og den starter en ny prosess — så «alt kjørt» holder prosessen
+#: ut. Et svar med noe *ukjørt* caches ikke: det skal bli grønt av seg selv.
+_MIGRASJONER_OK = False
+
+
+def ukjorte_migrasjoner(connection=None):
+    """`['app.0013_navn', …]` — migrasjonene som finnes i koden, men ikke i basen.
+
+    Samme spørsmål som `manage.py migrate --plan` stiller, uten å kjøre noe.
+    """
+    from django.db import connection as standard  # noqa: WPS433
+    from django.db.migrations.executor import MigrationExecutor  # noqa: WPS433
+    executor = MigrationExecutor(connection or standard)
+    plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
+    return [f'{m.app_label}.{m.name}' for m, _bakover in plan]
+
+
+def _migrasjonsrad():
+    """Raden «Migrasjoner» i konfigkortet (27. sep. 2026).
+
+    André fant ikke i Railway om `migrate` hadde gått gjennom etter en deploy
+    — det står i release-loggen, som er tungvint å finne. Portalen kan svare
+    selv: står noe ukjørt, har release-fasen ikke gjort jobben sin. At
+    byggnummeret i footeren er nytt, sier i tillegg at installasjonen (med
+    hasher) gikk: feiler den, blir det ingen ny container å vise det i.
+    """
+    global _MIGRASJONER_OK  # noqa: WPS420
+    if _MIGRASJONER_OK:
+        return {'nokkel': 'Migrasjoner', 'verdi': 'alle kjørt', 'ok': True}
+    try:
+        ukjorte = ukjorte_migrasjoner()
+    except Exception as feil:  # noqa: BLE001 — kortet skal tegnes uansett
+        return {'nokkel': 'Migrasjoner', 'verdi': _scrub_secrets(f'kunne ikke sjekkes: {feil}'),
+                'ok': False}
+    if not ukjorte:
+        _MIGRASJONER_OK = True
+        return {'nokkel': 'Migrasjoner', 'verdi': 'alle kjørt', 'ok': True}
+    vist = ', '.join(ukjorte[:3]) + (f' (+{len(ukjorte) - 3})' if len(ukjorte) > 3 else '')
+    return {'nokkel': 'Migrasjoner', 'verdi': f'{len(ukjorte)} ikke kjørt: {vist}', 'ok': False}
 
 
 def _offsite_konfigurert():

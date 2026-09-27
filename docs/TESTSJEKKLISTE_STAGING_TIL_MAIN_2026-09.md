@@ -86,9 +86,12 @@ Funn går i `/backlog/`, med byggnummer.
 
 ## 4. Railway og drift (5 min)
 
-- [ ] Deploy-loggen for staging viser at `migrate` gikk gjennom (`core.0013`), og at
-      avhengighetene ble installert uten hash-feil. `requirements.txt` er kompilert på nytt,
-      men med samme pinner.
+- [ ] **Byggnummeret i footeren** er det siste som ble pushet. Da gikk installasjonen av
+      avhengighetene gjennom, hashene inkludert — feiler den, blir det ingen ny container.
+- [ ] `/portal-admin/server-status/`, kortet **Konfigurasjon**: raden **«Migrasjoner»** står
+      grønt med «alle kjørt» (27. sep.; `core.0013` er med). Rødt viser hvilke som mangler.
+      *Det står også i Railway: tjenesten → Deployments → deployen → loggen, «Applying
+      core.0013…» — men raden er enklere.*
 - [ ] `/healthz/` svarer 200.
 - [ ] Valgfritt: `railway ssh -- python manage.py kollaps_arkiv --dry-run`. Kommandoen er
       flyttet til en annen app, men har samme navn, så cron-jobben er uberørt.

@@ -765,3 +765,64 @@ class UtvidetStatusTests(TestCase):
                     'vakt-navn', 'vakt-drift', 'vakt-oppdrag', 'tregeste', 'konfig-rader', 'konfig-versjon',
                     'login-failed', 'cron-rader', 'epost-transport'):
             self.assertIn(f'id="{id_}"', html, id_)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class MigrasjonsradTests(TestCase):
+    """«Migrasjoner» i konfigkortet (27. sep. 2026). André fant ikke i Railway
+    om `migrate` hadde gått gjennom; portalen svarer selv."""
+
+    def setUp(self):
+        from core import admin_status
+        self.modul = admin_status
+        admin_status._MIGRASJONER_OK = False
+        self.addCleanup(setattr, admin_status, '_MIGRASJONER_OK', False)
+
+    def _rad(self):
+        rader = self.modul._get_konfig_sjekk()['rader']
+        return next(r for r in rader if r['nokkel'] == 'Migrasjoner')
+
+    def test_alle_kjort_er_gront(self):
+        self.assertEqual(self._rad(), {'nokkel': 'Migrasjoner', 'verdi': 'alle kjørt', 'ok': True})
+
+    def test_en_ukjort_migrasjon_vises_med_navn(self):
+        """Gjennom den ekte sjekken: fjern en kjørt migrasjon fra basens liste."""
+        from django.db.migrations.recorder import MigrationRecorder
+        MigrationRecorder.Migration.objects.filter(
+            app='core', name='0013_modulesettings_backup_enabled_slett_kolonnen').delete()
+        rad = self._rad()
+        self.assertFalse(rad['ok'])
+        self.assertIn('core.0013_modulesettings_backup_enabled_slett_kolonnen', rad['verdi'])
+        self.assertTrue(rad['verdi'].startswith('1 ikke kjørt'))
+
+    def test_ukjort_caches_ikke(self):
+        """Står noe ukjørt, spørres det på nytt hver gang: rødt så lenge det
+        står, grønt av seg selv når det er kjørt. (Første versjon sjekket bare
+        det siste, og en mutant som cachet «alt ok» ved første kall overlevde.)"""
+        from unittest import mock
+        with mock.patch.object(self.modul, 'ukjorte_migrasjoner', return_value=['core.0099_x']):
+            self.assertFalse(self._rad()['ok'])
+            self.assertFalse(self._rad()['ok'])
+        self.assertTrue(self._rad()['ok'])
+
+    def test_mange_ukjorte_kortes_ned(self):
+        from unittest import mock
+        navn = [f'core.00{i}_x' for i in range(10, 15)]
+        with mock.patch.object(self.modul, 'ukjorte_migrasjoner', return_value=navn):
+            self.assertEqual(self._rad()['verdi'],
+                             '5 ikke kjørt: core.0010_x, core.0011_x, core.0012_x (+2)')
+
+    def test_feil_i_sjekken_tar_ikke_ned_kortet(self):
+        from unittest import mock
+        with mock.patch.object(self.modul, 'ukjorte_migrasjoner', side_effect=RuntimeError('borte')):
+            rad = self._rad()
+        self.assertFalse(rad['ok'])
+        self.assertIn('kunne ikke sjekkes', rad['verdi'])
+
+    def test_raden_er_i_json_svaret(self):
+        admin = CustomUser.objects.create_user(
+            username='mig_admin', password='x', role='admin', must_change_password=False)
+        self.client.force_login(admin)
+        svar = self.client.get('/portal-admin/server-status/json/').json()
+        self.assertIn({'nokkel': 'Migrasjoner', 'verdi': 'alle kjørt', 'ok': True},
+                      svar['konfig']['rader'])
