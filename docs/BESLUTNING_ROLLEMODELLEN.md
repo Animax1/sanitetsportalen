@@ -292,10 +292,10 @@ gjennom `urlpatterns` for modulens prefiks og krever at hvert view er dekorert.*
 testen finnes ikke i dag — gjennomgangen i CHANGELOG (2026-08-22, «Kontrollert og funnet i
 orden») ble gjort for hånd, og holder bare til neste endepunkt.
 
-**`ModuleSettings.enabled=False` stenger URL-en med 403.** ~~Global admin slipper fortsatt
-inn — ellers kan man deaktivere seg selv ut av å kunne reaktivere.~~ **Endret 27. sep.
-2026:** stengt for alle. Begrunnelsen holdt ikke — bryteren står på `/portal-admin/moduler/`,
-som ikke er modulgatet, og kjernemodulene kan ikke slås av.
+**`ModuleSettings.enabled=False` stenger URL-en med 403.** Global admin slipper fortsatt
+inn, slik at en modul kan forberedes i kulissene før den slås på for andre (André, 27. sep.
+2026). Begrunnelsen som sto her — «ellers kan man deaktivere seg selv ut av å kunne
+reaktivere» — holdt ikke: bryteren på `/portal-admin/moduler/` er ikke modulgatet.
 
 ## 7. Modellendringer
 

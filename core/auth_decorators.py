@@ -129,8 +129,13 @@ def _modul_er_aktiv(user, modul_slug):
     """False hvis modulen er slått av i ModuleSettings.
 
     Toggelen var tidligere en ren menybryter — `GET /pasienter/` ga 200 med
-    modulen deaktivert (§2.2). Nå stenger den URL-en — **for alle, også global
-    admin** (27. sep. 2026). Kjernemoduler kan ikke deaktiveres.
+    modulen deaktivert (§2.2). Nå stenger den URL-en. Kjernemoduler kan ikke
+    deaktiveres, og **global admin slipper alltid inn — med vilje**: admin
+    skal kunne forberede en modul i kulissene før den slås på for andre
+    (André, 27. sep. 2026). Den gamle begrunnelsen, «ellers kan man
+    deaktivere seg selv ut av å kunne reaktivere», holdt ikke — bryteren på
+    `/portal-admin/moduler/` er `admin_required`, ikke modulgatet. Menyen
+    skjuler modulen også for admin; adressen virker.
     """
     cache = getattr(user, _MODUL_CACHE, None)
     if cache is None:
@@ -149,25 +154,18 @@ def _modul_er_aktiv(user, modul_slug):
 def nivaa_for(user, modul_slug):
     """Brukerens nivå på modulen, eller `None` for ingen tilgang.
 
-    Global admin får høyeste nivå på alt som er slått på. En deaktivert modul
-    gir `None` for alle.
-
-    **Også for admin** (27. sep. 2026). André slo av `/ko/` og kom inn ved å
-    skrive adressen: sjekken sto *etter* admin-grenen, med begrunnelsen «ellers
-    kunne man deaktivere seg selv ut av å kunne reaktivere». Den holdt ikke —
-    bryteren står på `/portal-admin/moduler/`, som er `admin_required` og ikke
-    modulgatet, og kjernemodulene kan ikke slås av. Menyen skjulte allerede
-    modulen for admin; da skal døra være stengt også.
+    Global admin får høyeste nivå på alt. En deaktivert modul gir `None` for
+    alle andre.
     """
     if not getattr(user, 'is_authenticated', False):
-        return None
-    if not _modul_er_aktiv(user, modul_slug):
         return None
     if er_global_admin(user):
         # Toppen av stigen, ikke `skriv_full` (13. sep. 2026, M10): med
         # `skriv_full` måtte hvert `skriv_leder`-kallsted huske
         # `er_global_admin(...) or`, og én glemt `or` var et 403 for admin.
         return max(NIVAA_HIERARKI, key=NIVAA_HIERARKI.get)
+    if not _modul_er_aktiv(user, modul_slug):
+        return None
     return _tilganger(user).get(modul_slug)
 
 

@@ -4,7 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Tilbake: admin kommer inn i en avslått modul, med vilje  `#tilgang #ko`
+
+**Hvorfor:** André, etter endringen over: «jeg liker resonnementet at admin skal kunne jobbe
+med det i kulissene så det kan du fint reversere. Det fungerer som det skal på vanlige
+brukere.» Del 1 av endringen «En avslått modul er stengt også for admin» er rullet tilbake;
+**del 2, «Opprett» gir ett oppdrag, står.**
+
+- `core/auth_decorators.py` (`nivaa_for`) og `ko/tilstede.py`: admin slipper igjen inn i en
+  avslått modul, og står igjen i KO-sidebaren når KO er av. Vanlige brukere får 403 som før.
+- **Begrunnelsen er byttet ut**, ikke bare tilbakeført. Den som sto — «ellers kan man
+  deaktivere seg selv ut av å kunne reaktivere» — holdt ikke, og en feil begrunnelse er en
+  invitasjon til å «rette» regelen igjen. Den ekte grunnen er **forberedelse i kulissene**:
+  admin kan sette opp en modul før den slås på for andre. Står i koden, testene,
+  `CLAUDE.md` og `BESLUTNING_ROLLEMODELLEN.md`.
+- `test_admin_kan_fortsatt_slaa_modulen_paa_igjen` og `test_kjernemodul_er_aldri_stengt_for_admin`
+  er beholdt — de gjelder uansett.
+- **Mutant: 1, drept** — modulsjekken flyttet foran admin-grenen (altså endringen som ble
+  rullet tilbake) gjør tre tester røde.
+
 ## 2026-09-27 — En avslått modul er stengt også for admin, og «Opprett» gir ett oppdrag  `#tilgang #oppdrag #ko #bug`
+
+> **Del 1 er rullet tilbake samme dag** — se oppføringen over. Del 2 står.
 
 **Hvorfor:** André, fra staging: «Når du slår en modul av og som f.eks /ko/ så kan du komme
 inn på siden om du skriver nettsiden» — og «Når du trykker flere ganger på rad på opprett

@@ -49,8 +49,8 @@ Funn går i `/backlog/`, med byggnummer.
 
 **Moduloppsett og backup** (runde 8: `backup_enabled`-kolonnen er slettet)
 - [ ] `/portal-admin/moduler/`: slå en modul av og på.
-- [ ] Slå av `/ko/` og skriv adressen **som admin**: 403 (27. sep.). Slå den på igjen fra
-      `/portal-admin/moduler/`, og siden virker.
+- [ ] Slå av `/ko/`: en **vanlig bruker** får 403 på adressen, admin kommer inn (med vilje —
+      forberedelse i kulissene). Menyen skjuler den for begge.
 - [ ] `/portal-admin/backup/`: ta en backup av én modul. Offsite skal stå grønt.
 
 ## 2. Bør testes: sider som er flyttet eller skrevet om (20 min)

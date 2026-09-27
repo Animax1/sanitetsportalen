@@ -714,7 +714,7 @@ Håndhevet med `@modul_kreves('patients', 'skriv_full')` fra `core/auth_decorato
 en modul er dekorert — risikoen ved dekoratør framfor middleware er en glemt dekoratør, og
 den lukkes ikke av en manuell gjennomgang.
 
-`ModuleSettings.enabled=False` gir 403 for alle, også global admin (27. sep. 2026).
+`ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
 
 **`CustomUser.role` er kontotype, ikke tilgangsnivå.** Avviklingen er fullført: feltet
 krympet til `admin`/`bruker` i deploy 2, sammen med `has_role_at_least`, `role_required`,

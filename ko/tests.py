@@ -116,9 +116,10 @@ class TilgangenVirkerTests(TestCase):
         self.client.force_login(_bruker('sjef', role='admin'))
         self.assertEqual(self.client.get('/ko/').status_code, 200)
 
-    def test_deaktivert_modul_stenger_for_alle_ogsaa_admin(self):
-        """`ModuleSettings.enabled=False` gir 403 for alle (27. sep. 2026).
-        André slo av `/ko/` og kom inn som admin ved å skrive adressen."""
+    def test_deaktivert_modul_stenger_for_andre_enn_admin(self):
+        """`ModuleSettings.enabled=False` gir 403 for alle andre enn global
+        admin, som skal kunne forberede modulen i kulissene (André,
+        27. sep. 2026)."""
         bruker = _bruker('leser2')
         _gi_ko(bruker)
         ModuleSettings.objects.update_or_create(
@@ -127,8 +128,7 @@ class TilgangenVirkerTests(TestCase):
         self.assertEqual(self.client.get('/ko/').status_code, 403)
 
         self.client.force_login(_bruker('sjef2', role='admin'))
-        self.assertEqual(self.client.get('/ko/').status_code, 403)
-        self.assertEqual(self.client.get('/ko/api/tilstede/').status_code, 403)
+        self.assertEqual(self.client.get('/ko/').status_code, 200)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -220,16 +220,15 @@ class SidebarenTests(TestCase):
 
         self.assertIsNotNone(tilstede()[0]['inaktiv_s'])
 
-    def test_deaktivert_modul_tar_alle_ut_av_lista(self):
+    def test_deaktivert_modul_tar_alle_andre_enn_admin_ut_av_lista(self):
         bruker = _bruker('operator')
         _gi_ko(bruker)
         sjef = _bruker('sjef', role='admin')
         self._logg_inn_som(bruker)
         self._logg_inn_som(sjef)
-        self.assertEqual(sorted(r['brukernavn'] for r in tilstede()), ['operator', 'sjef'])
         ModuleSettings.objects.update_or_create(
             slug='ko', defaults={'enabled': False})
-        self.assertEqual(tilstede(), [])
+        self.assertEqual([r['brukernavn'] for r in tilstede()], ['sjef'])
 
     def test_en_rad_per_person_ikke_per_sesjon(self):
         """Adminlista lister sesjoner, fordi den skal kunne avslutte én av

@@ -11,9 +11,8 @@ likevel tilgang til alt — en rå tabellspørring ville utelatt nettopp den som
 sitter i KO og administrerer portalen. Spørsmålet er «har denne kontoen
 lesetilgang til `ko`», og svaret er `har_tilgang`-semantikken:
 
-    modulen av    →  nei, for alle (også admin, 27. sep. 2026)
-    global admin  →  ja, uten rader
-    andre         →  ja hvis kontoen har en rad
+    global admin  →  ja, alltid, uten rader
+    andre         →  ja hvis modulen er på **og** kontoen har en rad
 
 Det regnes ut i mengder og ikke per bruker: `har_tilgang()` cacher på
 brukerobjektet, så et kall per pålogget konto er to spørringer per konto på en
@@ -32,11 +31,6 @@ from .models import Ansvarsmerke
 SLUG = 'ko'
 
 
-def _modulen_er_paa():
-    modul = get_module(SLUG)
-    return (modul is not None and modul.is_core) or SLUG in ModuleSettings.get_enabled_slugs()
-
-
 def _har_ko_tilgang_ider(bruker_ider):
     """Delmengden av `bruker_ider` som har lesetilgang til `ko`.
 
@@ -46,6 +40,15 @@ def _har_ko_tilgang_ider(bruker_ider):
     ider = set(bruker_ider)
     if not ider:
         return set()
+
+    modul = get_module(SLUG)
+    if modul is not None and not modul.is_core:
+        if SLUG not in ModuleSettings.get_enabled_slugs():
+            # Modulen er slått av. Da er det bare global admin igjen — samme
+            # svar som `_modul_er_aktiv` gir, og grunnen er den samme: admin
+            # skal kunne forberede modulen i kulissene.
+            return set()
+
     return set(
         ModulTilgang.objects
         .filter(modul_slug=SLUG, bruker_id__in=ider)
@@ -87,9 +90,6 @@ def tilstede():
     `oppdrag`, men den sperren finnes ikke ennå, og til den gjør det skal lista
     si sant om det den viser.
     """
-    if not _modulen_er_paa():
-        # Samme svar som `_modul_er_aktiv`: av er av, også for admin.
-        return []
     fra_sesjoner = aktive_sesjoner()
     admin_ider = {b.id for b, _ in fra_sesjoner
                   if getattr(b, 'role', None) == 'admin'}
