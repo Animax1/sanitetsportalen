@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/oppdrag/` i menyen bare for bilene og admin  `#oppdrag #meny`
+
+**Hvorfor:** André: «Skjule /oppdrag i burgermenyen og i dashbordet for de som ikke har
+skrive:handling og er admin. De kan fortsatt nå siden gjennom f.eks
+testportal.sanitet.net/oppdrag men de skal ikke ha enkel tilgang til det.» Og på spørsmålet om
+sentralbordet: «Sentralbordet jobber fra /ko/, så skjul det for dem også, de skal ikke
+sperres. skriv_handling er bilene og de skal bare være i /oppdrag som vi har snakket om.»
+
+- `core/modules.py`: nytt felt **`Module.snarvei_for_nivaaer`** og `har_snarvei_for(user)`.
+  Tomt betyr alle med tilgang, som før, så de andre modulene er uberørt. Global admin får
+  alltid snarveien. Brukt i `get_nav_modules` og `get_dashboard_modules`, **ikke** i
+  `is_visible_for` — den er tilgangsregelen og skal forbli én ting.
+- `oppdrag/module.py`: `snarvei_for_nivaaer=('skriv_handling',)`. Borte fra menyen, dashbordet
+  og «Mine moduler» på Min profil for `les`, `skriv_full` og `skriv_leder`; adressen gir
+  fortsatt 200.
+- **Å sperre** dem ble vurdert og avvist av André («de skal ikke sperres»). Punktet er
+  fjernet fra `TODO.md`.
+- **Tester:** `oppdrag/tests_snarvei.py` (5), gjennom den ekte forsiden og Min profil. `oppdrag/tests.py` hadde en test som låste sentralbordet *i* menyen; den er skrevet om til bilen.
+  **Mutanter: 6, alle drept** — menyens og dashbordets kallsted hver for seg, admin-unntaket,
+  tomt felt tolket som ingen, regelen invertert, feltet fjernet i oppdrag.
+
 ## 2026-09-27 — Historikksøket finner enheter med og uten mellomrom  `#oppdrag #bug`
 
 **Hvorfor:** André: «Når vi søker i oppdragshistorikk etter ressurser så må det ta høyde

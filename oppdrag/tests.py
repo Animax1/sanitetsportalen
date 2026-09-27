@@ -618,12 +618,15 @@ class ModulRegistreringTests(TestCase):
         slugs = {m.slug for m in get_visible_modules(bruker, only_enabled=False)}
         self.assertIn('oppdrag', slugs)
 
-    def test_modulen_er_i_nav_for_den_som_har_tilgang(self):
+    def test_modulen_er_i_nav_for_bilen(self):
+        """Bilen, ikke sentralbordet: fra 27. sep. 2026 har bare `skriv_handling`
+        og admin snarveien — sentralbordet arbeider fra `/ko/`
+        (`tests_snarvei.py`)."""
         bruker = CustomUser.objects.create_user(
             username='sentral4', password='x', role='bruker',
             must_change_password=False)
         ModulTilgang.objects.create(
-            bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
+            bruker=bruker, modul_slug='oppdrag', nivaa='skriv_handling')
 
         self.assertIn('oppdrag', {m.slug for m in get_nav_modules(bruker)})
 

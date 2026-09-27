@@ -147,21 +147,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ### Meldt fra staging 27. sep. 2026 (André)
 
-Tatt i den rekkefølgen de står. Historikksøket med og uten mellomrom er gjort (CHANGELOG
-27. sep.).
+Tatt i den rekkefølgen de står. Historikksøket med og uten mellomrom og snarveien til
+`/oppdrag/` er gjort (CHANGELOG 27. sep.).
 
 - [ ] **Vaktlista offline: merknader kan ikke redigeres** — «virker ut som bare stemplingen
       fungerer. Vi må se på om det går an å beholde full funksjonalitet i offline modus.»
       Først kartlegge hva offline-køen faktisk tar i dag, og hva «full funksjonalitet» vil
       koste: en redigering offline kan kollidere med en annens redigering online, og det
       trenger en regel (siste vinner, eller avvis og vis) før noe bygges.
-- [ ] **Skjul `/oppdrag/` i burgermenyen og på dashbordet** for dem som ikke trenger den —
-      siden skal fortsatt kunne nås på adressen. Hvem som skal se den må avklares (spurt
-      27. sep.): bilene (`skriv_handling`) og admin, og hva med sentralbordet
-      (`skriv_full`), som også arbeider fra `/ko/`?
-- [ ] **Vurder å låse `/oppdrag/` for dem som ikke skal bruke den**, ikke bare skjule den
-      — André ønsket spørsmålet stilt. Å skjule er bekvemmelighet, ikke tilgangskontroll;
-      skal noen faktisk ikke inn, er det `ModulTilgang` som skal si det.
 - [ ] **Varselprikk ved noe nytt i hendelsesloggen og sidebaren i `/ko/`** — «kan være en
       sirkulær gul prikk eller noe». Må avklare hva «nytt» er: siden jeg sist så på fanen,
       eller siden jeg sist åpnet hendelsen? Endringsnummeret (`folgEndringer`) sier *at*

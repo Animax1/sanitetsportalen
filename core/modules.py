@@ -93,6 +93,24 @@ class Module:
     show_in_dashboard: bool = True
     nivaaer: tuple[str, ...] = ('les', 'skriv_full')
     nivaa_navn: tuple[tuple[str, str], ...] = ()
+    #: Nivåene som får modulen i menyen og på dashbordet. Tom = alle med
+    #: tilgang. **Snarvei, ikke tilgang** (27. sep. 2026): den som står
+    #: utenfor, kommer fortsatt inn på adressen — det er `ModulTilgang` som
+    #: stenger. Global admin får alltid snarveien.
+    snarvei_for_nivaaer: tuple[str, ...] = ()
+
+    def har_snarvei_for(self, user) -> bool:
+        """Skal modulen stå i menyen og på dashbordet for `user`?
+
+        Spør bare om snarveien. At brukeren har tilgang i det hele tatt,
+        avgjøres før av `is_visible_for`.
+        """
+        if not self.snarvei_for_nivaaer:
+            return True
+        from core.auth_decorators import er_global_admin, nivaa_for  # noqa: WPS433
+        if er_global_admin(user):
+            return True
+        return nivaa_for(user, self.slug) in self.snarvei_for_nivaaer
 
     def etikett_for(self, nivaa: str) -> str:
         """Modulens egen etikett for nivået, eller stigens generiske.
@@ -230,9 +248,11 @@ def get_visible_modules(user, *, only_enabled: bool = True) -> list[Module]:
 
 def get_dashboard_modules(user) -> list[Module]:
     """Moduler som skal vises som kort på dashboardet."""
-    return [m for m in get_visible_modules(user) if m.show_in_dashboard]
+    return [m for m in get_visible_modules(user)
+            if m.show_in_dashboard and m.har_snarvei_for(user)]
 
 
 def get_nav_modules(user) -> list[Module]:
     """Moduler som skal vises i nav-baren (alle sider som extender base_portal)."""
-    return [m for m in get_visible_modules(user) if m.show_in_nav]
+    return [m for m in get_visible_modules(user)
+            if m.show_in_nav and m.har_snarvei_for(user)]

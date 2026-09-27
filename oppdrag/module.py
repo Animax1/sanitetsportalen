@@ -44,4 +44,9 @@ OppdragModule = Module(
         ('skriv_full', 'Skrive: full'),
         ('skriv_leder', 'Skrive: leder (verdimengdene)'),
     ),
+    # **Bare bilene og admin har `/oppdrag/` i menyen og på dashbordet**
+    # (André, 27. sep. 2026): «Sentralbordet jobber fra /ko/, så skjul det
+    # for dem også, de skal ikke sperres. skriv_handling er bilene og de skal
+    # bare være i /oppdrag.» Adressen virker fortsatt for alle med tilgang.
+    snarvei_for_nivaaer=('skriv_handling',),
 )
