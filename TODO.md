@@ -916,14 +916,26 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       i skjemaet, i datalaget og med en test — sperrer som bare dekker dagens veier, ser ikke
       en ny vei. Kan gjøres uavhengig av KO.
 
-- [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026). Ti
-      åpne spørsmål i §9 skal besvares før koden; puljene står i §10. Lagets utfallsregistrering: problemstilling,
+- [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
+      André har besvart første runde (§2, B1–B16); fire spørsmål i §9 gjenstår, og **ingen
+      kode før de er besvart**. Puljene står i §8. Lagets utfallsregistrering: problemstilling,
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
       (`FORSLAG_KO.md` §3.2) hører til her, og ble bevisst **ikke** bygget i pulje 3:
       uten `/park/` er det en bryter med én stilling, og at det korrelerer med «hvem
       stempler selv» er tilfeldig — den utledes av `Ressurs.enhet`.
+
+- [ ] **KO-tavla: stedet laget satte selv mot stedet KO plasserte det** (André, 27. sep.
+      2026, `FORSLAG_PARK.md` B16). En parkregistrering bærer `lokasjon_kilde` — arvet fra
+      tavla, eller endret av laget. Står laget på Parkscene på tavla og registrerer fra
+      Village, vet laget noe KO ikke vet. Hvordan det vises på lagkortet (et avvik-merke? stedet
+      fra siste registrering ved siden av plasseringen?) avgjøres når park er bygget — og det
+      skal **vises**, ikke flytte laget på tavla: tavla er KO sin plassering.
+- [ ] **MULIGHET: QR-kode for parklenka** (André, 27. sep. 2026: «ikke noe QR-kode nå»).
+      Lenka ligger i et tiltakskort i Bliksund. Blir QR aktuelt: `segno` (ren Python, SVG
+      server-side, utskrift uten JS) framfor et JS-bibliotek i `static/vendor/`. Merk at
+      lenka bare vises én gang (`FORSLAG_PARK.md` §4.1), så QR-en må lages i samme øyeblikk.
 
 ### Brukere, e-post og roller — se `docs/BESLUTNING_BRUKERE_OG_EPOST.md`
 
@@ -1050,8 +1062,9 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
-      `docs/FORSLAG_PARK.md` §3.2 foreslår tilfeldig token med hash i basen i stedet for
-      signering — en signatur alene kan ikke trekkes tilbake per lag.
+      **Endret 27. sep. 2026** (`docs/FORSLAG_PARK.md` B5, André: «best practice går
+      fremst»): tilfeldig token med hash i basen, ikke `django.core.signing` — en signatur
+      alene kan ikke trekkes tilbake, og dør når `SECRET_KEY` roteres.
 
 - [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
       29. aug. 2026, **besluttet samme dag** i to avklaringsrunder — alle ti

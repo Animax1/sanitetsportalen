@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/park/`: Andrés svar inn i notatet, fire spørsmål igjen  `#docs #park #forslag`
+
+**Hvorfor:** André svarte på første utkast av `docs/FORSLAG_PARK.md` og sa «Vi starter ikke
+kode før vi har alt av punkter på plass». Notatet er skrevet om med svarene som
+beslutninger (§2, B1–B16), og det som gjenstår står samlet i §9.
+
+- **Én lenke, ikke én per lag** (B3): «det blir svært komplisert for lagene». Lenka ligger i et
+  tiltakskort i Bliksund, settes opp med **oppetid fra og til** av `skriv_leder`/admin, og
+  laget velger seg selv i et nedtrekk som **huskes på telefonen** (B4) — på navn, fordi
+  `vaktliste.Ressurs` er nye rader for hver vaktliste. Prisen står i notatet: hvem som helst
+  med tiltakskortet kan registrere som et hvilket som helst lag.
+- **Ingen offline** (B14) — utkastet kalte det en forutsetning; André vurderte det
+  annerledes. Siden sier «Ikke lagret» uten nett og later aldri som den lagret. Dermed
+  trengs heller ingen klienttid.
+- **Antall** per registrering, alt på én side, lag og sted husket etter hver registrering
+  (B9). **Angre i 5 minutter**, fristen styrt av admin (B11); angre-nøkkelen er radens
+  idempotensnøkkel, så bare telefonen som sendte kan angre.
+- **Problemstillinger** kopieres fra `patients.choices.PROBLEMSTILLING` som startverdier, og er
+  parks egen liste etterpå (B6). **Utfall** settes av admin (B7). Statistikkfanen heter
+  **«Lag»** (B12).
+- **KO leser park** (B15): KO-tilgang holder for å se og handle i `/ko/`. Konsekvens i
+  rammeverket: statistikkregisteret må kunne ta en alternativ gate (`('ko', 'les')`).
+- **Stedet** forhåndsvelges fra KO-plasseringen gjennom et register i `core`, så park ikke
+  importerer `ko` (§5). `lokasjon_kilde` lagres, så tavla kan vise avvik — nytt punkt i
+  `TODO.md`, sammen med QR som mulighet (B13).
+- Rate-limit per lenke er hevet (`120/m`) fordi alle lagene deler den, og **ikke per IP på
+  gyldige tokens**: telefoner på mobilnett deler IP bak operatørens NAT.
+
 ## 2026-09-27 — Forslag: `/park/`-modulen  `#docs #park #forslag`
 
 **Hvorfor:** André: «Vi skal lage /park/-modulen … Skriv et notat med forslag og åpne
