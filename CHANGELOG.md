@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Forslag: `/park/`-modulen  `#docs #park #forslag`
+
+**Hvorfor:** André: «Vi skal lage /park/-modulen … Skriv et notat med forslag og åpne
+spørsmål, og avklar med meg før du skriver kode.» Park hadde stått som spredte punkter i
+`TODO.md` (KO-seksjonen og «Skalering mot 2027»), `RUNBOOK_VAKT.md` §3c og
+`FORSLAG_KO.md` §3.2 — ingen samlet beskrivelse.
+
+- **`docs/FORSLAG_PARK.md`**, ny. Lagets utfallsregistrering: tellemaskin uten innlogging,
+  uten fritekst, skrive-bare. Ingen kode.
+- Kontrollert mot koden før noe ble foreslått (CLAUDE.md, «Før du designer noe nytt»):
+  `vaktliste.Ressurs`/`Ressursgruppe`, `oppdrag.Lokasjon`, `ko.Tavleplassering`,
+  `accounts/signert_lenke.py`, `core.ratelimit`, `core.idempotency`, offline-køene.
+  `vurder_klienttid` viste seg å finnes i **to** kopier (`vaktliste/` og `oppdrag/`) — park
+  ville blitt den tredje, og notatet foreslår å løfte den til `core` i stedet.
+- **Avvik fra ordlyden i TODO, foreslått og ikke besluttet:** tilfeldig token med SHA-256 i
+  basen framfor `django.core.signing` — en signatur alene kan ikke trekkes tilbake per lag, og
+  roterer `SECRET_KEY` dør alle lenkene midt i vakta. Tokenet i URL-**fragmentet**
+  (`/park/r/#…`) så det aldri står i Railways tilgangslogg.
+- Andre forslag: én nøkkel per lag (ikke per vakt), rutingflagget `registrerer_i_park` på
+  `Ressursgruppe` som bool og ikke `choices`, KO leser park og ikke omvendt (derfor ingen
+  forhåndsutfylling av sted fra tavla ennå), offline fra første brukbare versjon.
+- Ti åpne spørsmål i §9 — verdimengdene for problemstilling og utfall er de viktigste.
+
 ## 2026-09-27 — Innloggingens rate-limit-tester tåler vinduskanten  `#test #ci #flaky`
 
 **Hvorfor:** CI på `main` (`50bdcdf`, omgang 3) ble rød på

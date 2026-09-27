@@ -916,7 +916,8 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       i skjemaet, i datalaget og med en test — sperrer som bare dekker dagens veier, ser ikke
       en ny vei. Kan gjøres uavhengig av KO.
 
-- [ ] **`/park/` — eget notat skrives etter KO.** Lagets utfallsregistrering: problemstilling,
+- [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026). Ti
+      åpne spørsmål i §9 skal besvares før koden; puljene står i §10. Lagets utfallsregistrering: problemstilling,
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
@@ -1049,6 +1050,8 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
+      `docs/FORSLAG_PARK.md` §3.2 foreslår tilfeldig token med hash i basen i stedet for
+      signering — en signatur alene kan ikke trekkes tilbake per lag.
 
 - [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
       29. aug. 2026, **besluttet samme dag** i to avklaringsrunder — alle ti
