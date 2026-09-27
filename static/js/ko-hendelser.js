@@ -159,6 +159,80 @@ function koPrioIkon(prio) {
     ? '<i class="bi bi-exclamation-triangle-fill h-ikon" title="Viktig"></i>' : '';
 }
 
+// ── Nytt siden sist du åpnet hendelsen (27. sep. 2026) ──────────────────────
+//
+// André: varselmerke i tabellen og sidebaren ved noe nytt, «i henhold til best
+// practice». Derfor **et tall og fet tittel, ikke en farget prikk**: en prikk
+// sier det bare med farge (WCAG 1.4.1), og gul er allerede prioriteten «Gul» —
+// samme farge ville betydd to ting. Tallet står i blått, som ingen prioritet
+// bruker, og skjermlesere får «3 nye» og ikke bare «3».
+//
+// Tellingen kommer fra serveren per konto (`nye` i pollen): lesemerket står der
+// og ikke i nettleseren, fordi «Logg ut» tømmer lagringen på de delte PC-ene.
+
+//: `{hendelse_id: antall}` fra siste poll.
+let koNyeTall = {};
+//: Siste lesemerke denne fana har sendt per hendelse — det samme sendes ikke to ganger.
+const koLestSendt = new Map();
+
+// Er hendelsen framme for øynene nå? Åpen her i en synlig fane, eller vist på
+// skjerm 2 (som selv melder den lest). En skjult fane leser ingenting.
+function koErFramme(id) {
+  const synlig = typeof document === 'undefined' || typeof document.visibilityState !== 'string'
+    || document.visibilityState === 'visible';
+  return (id === koApenHendelseId && synlig) || id === koMerketHendelse();
+}
+
+// Tallet merket skal vise. Hendelsen man har framme har ingen: den leses i det
+// den vises, og merket ville ellers blinket fram til neste poll.
+function koNye(h) {
+  if (koErFramme(h.id)) return 0;
+  return Number(koNyeTall[h.id] || 0);
+}
+
+function koNyeMerke(n) {
+  if (!n) return '';
+  const ord = n === 1 ? 'ny' : 'nye';
+  const hint = n + ' ' + ord + ' siden du sist åpnet hendelsen';
+  return '<span class="badge rounded-pill text-bg-primary ko-nye" title="' + escapeHtml(hint) + '">'
+    + escapeHtml(n > 99 ? '99+' : String(n))
+    + '<span class="visually-hidden"> ' + escapeHtml(ord) + '</span></span>';
+}
+
+function koSisteLinjeI(id) {
+  let siste = 0;
+  koLinjer.forEach((l) => { if (l.hendelse_id === id && l.id > siste) siste = l.id; });
+  return siste;
+}
+
+// Flytt lesemerket når den åpne hendelsen er framme. Kalles fra `koTegnDetalj`,
+// altså ved åpning og ved hver poll mens den står åpen. Går bare framover, og
+// sender ikke det samme to ganger. Feiler det, prøves det ved neste tegning.
+async function koMerkLest() {
+  const id = koApenHendelseId;
+  if (id === null || !koErFramme(id)) return;
+  const til = koSisteLinjeI(id);
+  if (!til || (koLestSendt.get(id) || 0) >= til) return;
+  koLestSendt.set(id, til);
+  koNyeTall[id] = 0;
+  try {
+    const res = await apiFetch('/ko/api/hendelser/' + id + '/lest/', {
+      method: 'POST', body: JSON.stringify({ til }),
+    });
+    if (!res.ok) koLestSendt.delete(id);
+  } catch (e) {
+    koLestSendt.delete(id);
+  }
+}
+
+// En hendelse som står åpen i en fane som kommer fram igjen, er lest nå — og
+// merkene i tabellen skal regnes på nytt. Kalles fra `DOMContentLoaded` i ko.js.
+function koLestStart() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') koTegnHendelser();
+  });
+}
+
 function koOppdragForHendelse(h) {
   const liste = (typeof oppdragsliste !== 'undefined' && Array.isArray(oppdragsliste)) ? oppdragsliste : [];
   return liste.filter((o) => o.hendelse_id === h.id);
@@ -167,8 +241,9 @@ function koOppdragForHendelse(h) {
 function koHendelseRadHtml(h) {
   const prio = escapeHtml(h.prioritet || 'gronn');
   const lukket = h.status !== 'apen';
+  const nye = koNye(h);
   const klasser = 'h-rad h-' + prio + (lukket ? ' h-lukket' : '')
-    + (h.id === koMerketHendelse() ? ' h-apen' : '');
+    + (h.id === koMerketHendelse() ? ' h-apen' : '') + (nye ? ' h-ny' : '');
   // Siste linje i hendelsens logg står under tittelen — det nyeste er det
   // man skummer etter.
   const linjer = koOperatorlinjer(h);
@@ -192,7 +267,7 @@ function koHendelseRadHtml(h) {
   return '<tr class="' + klasser + '" data-action="koApneHendelse" data-id="' + escapeHtml(h.id) + '"'
     + ' role="button" tabindex="0">'
     + '<td>' + koPrioIkon(h.prioritet) + '</td>'
-    + '<td class="h-nowrap"><span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></td>'
+    + '<td class="h-nowrap"><span class="hendelse-merke">' + escapeHtml(h.kode) + '</span>' + koNyeMerke(nye) + '</td>'
     + '<td class="h-nowrap text-muted">' + escapeHtml(koKlokke(h.opprettet_at)) + '</td>'
     + '<td><div class="h-tittel">' + escapeHtml(h.tittel) + '</div>' + under + melder + '</td>'
     + '<td>' + koPrioMerke(h.prioritet) + '</td>'
@@ -280,11 +355,12 @@ function koTegnLoggHode() {
 function koHSideRadHtml(h, naa) {
   const prio = escapeHtml(h.prioritet || 'gronn');
   const aktiv = h.id === koApenHendelseId;
+  const nye = koNye(h);
   const hint = [h.kode, h.tittel, h.lokasjon_navn].filter(Boolean).join(' · ');
-  return '<button type="button" class="ko-hs-rad h-' + prio + (aktiv ? ' aktiv' : '') + '"'
+  return '<button type="button" class="ko-hs-rad h-' + prio + (aktiv ? ' aktiv' : '') + (nye ? ' ny' : '') + '"'
     + ' data-action="koVelgHendelse" data-id="' + escapeHtml(h.id) + '" title="' + escapeHtml(hint) + '"'
     + (aktiv ? ' aria-current="true"' : '') + '>'
-    + '<span class="ko-hs-nr">' + koPrioIkon(h.prioritet) + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></span>'
+    + '<span class="ko-hs-nr">' + koPrioIkon(h.prioritet) + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span>' + koNyeMerke(nye) + '</span>'
     + '<span class="ko-hs-tittel">' + escapeHtml(h.tittel) + '</span>'
     + '<span class="ko-hs-sted">' + escapeHtml(h.lokasjon_navn || '') + '</span>'
     + '<span class="ko-hs-tid">' + escapeHtml(koSiden(h.opprettet_at, naa)) + '</span>'
@@ -448,8 +524,10 @@ function koHendelseVinduStart() {
   }
 }
 
-function koTaImotHendelser(liste) {
+function koTaImotHendelser(liste, nye) {
   koHendelser = new Map((liste || []).map((h) => [h.id, h]));
+  // Nøklene er tekst i JSON og id-ene tall — for et objekt er det det samme.
+  koNyeTall = Object.assign({}, nye || {});
   if (koApenHendelseId !== null && !koHendelser.has(koApenHendelseId)) koApenHendelseId = null;
   koTegnHendelser();
   koFyllHendelsevalg();
@@ -868,6 +946,7 @@ function koTegnDetalj() {
   const boks = document.getElementById('ko-hendelse-detalj');
   const h = koHendelser.get(koApenHendelseId);
   if (!boks || !h) { koApenHendelseId = null; koVisDetaljen(false); return; }
+  koMerkLest();
   const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid',
                                      'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
   koVisDetaljen(true);

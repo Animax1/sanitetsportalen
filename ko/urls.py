@@ -44,6 +44,9 @@ urlpatterns = [
          name='ko_api_hendelse_prioritet'),
     path('api/hendelser/<int:pk>/bli-med/', views.hendelse_bli_med_view,
          name='ko_api_hendelse_bli_med'),
+    # Lesemerket (27. sep. 2026): «nytt siden sist du åpnet hendelsen».
+    path('api/hendelser/<int:pk>/lest/', views.hendelse_lest_view,
+         name='ko_api_hendelse_lest'),
     # Lagene på hendelsen (19. sep. 2026): hele lista, differansen logges.
     path('api/hendelser/<int:pk>/lag/', views.hendelse_lag_view,
          name='ko_api_hendelse_lag'),

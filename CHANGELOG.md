@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Nytt i hendelsene: tall og fet tittel siden sist du åpnet  `#ko #hendelser`
+
+**Hvorfor:** André: «Varselstegn i hendelselogg og sidebar ved noe nytt, kan være en
+sirkulær gul prikk eller noe» — og på spørsmålet om hva «nytt» er: «Nytt siden sist du
+åpnet hendelsen, og så må de ikke være gul prikk men i henhold til best practice.»
+
+**Hvordan det ser ut:** et **tall i blått** ved H-nummeret og **fet tittel**, i tabellen i
+hendelsesloggen og i sidebaren ved siden av en åpen hendelse. Over 99 står «99+».
+- **Ikke en gul prikk:** gul er allerede prioriteten «Gul», og samme farge ville betydd to
+  ting. En prikk sier det dessuten bare med farge (WCAG 1.4.1). Tallet sier *hvor mye*, og
+  fet tittel er det man kjenner igjen fra e-post og chat.
+- **Skjermlesere** får «3 nye», ikke bare «3», og `title` sier «3 nye siden du sist åpnet
+  hendelsen».
+- Tallet sitter i nummerfeltet, som står også når sidebaren er på det smaleste.
+
+**Hva som er «nytt»:** logglinjer i hendelsen skrevet av **andre** etter at du sist hadde den
+framme — kommentarer, og systemlinjer som prioritet, lag og lukking. Egne linjer er aldri
+nye. Fjernede linjer teller ikke; en retting er en ny rad og teller.
+
+**Hvordan det virker:**
+- **Lesemerket står på serveren, per konto** (`ko.HendelseLest`, migrasjon `ko.0023`), ikke i
+  nettleseren: «Logg ut» tømmer lagringen med vilje på de delte PC-ene, og da ville alt stått
+  som nytt etter hver innlogging og på hver PC. En delt konto deler også merket.
+- `services.nye_for(bruker, vakt)` teller for hele vakta i **én spørring**; pollen sender det
+  som `nye`. `services.merk_lest()` flytter merket **bare framover** (to faner eller skjerm 2
+  kan melde i ulik rekkefølge) og **aldri forbi siste linje**.
+- `POST /ko/api/hendelser/<pk>/lest/` med `{"til": id}` — **`les` holder**, som
+  ansvarsmerket: merket er ditt eget og endrer ingenting andre ser.
+- Nettleseren sender merket når hendelsen er **framme**: åpen i en synlig fane, eller vist på
+  skjerm 2. En skjult fane leser ingenting, og når fana kommer fram igjen tegnes merkene på
+  nytt (`koLestStart`). Det samme merket sendes ikke to ganger, og et avvist forsøk prøves igjen.
+- Utenfor backupen (`ko/backup.py`), som ansvarsmerket: tilstand, ikke historikk.
+
+**Tester:** `ko/tests_nye.py` (25) — tjenestelaget, porten og pollen mot serveren, og tabellen,
+sidebaren og lesemerket i node gjennom de ekte inngangene (`koVelgHendelse`,
+`koTegnHendelser`, `koHentLogg`, `DOMContentLoaded`-kroken). **Mutanter: 27, 26 drept.**
+Server (11): egne linjer teller, grensen `>`→`>=`, fjernede teller, linjer uten hendelse
+teller, andres merke gjelder, merket bakover, forbi siste linje, lagres aldri, porten hevet,
+pollen uten tellingen, 400 fjernet. Nettleser (16): synlig-kravet, skjerm 2, framme-regelen,
+samme merke to ganger, avvist ikke prøvd igjen, skjult fane sender, kallstedet i
+`koTegnDetalj`, klassen og tallet i tabell og sidebar hver for seg, skjermleserordet, pollen
+uten `nye`, kroken uten `koLestStart`, lytteren uten synlig-sjekk. **Den ene som overlevde er
+ekvivalent:** `escapeHtml` rundt tallet kan fjernes uten at noe endres, fordi `koNye()`
+alltid gir et `Number`. Den står for skannerens skyld.
+**Og én forenkling underveis:** omgjøringen av nøklene til tall i `koTaImotHendelser` var en
+no-op (nøklene i et JS-objekt er alltid tekst), og er fjernet før den ble mutert.
+**Og en felle i testoppsettet:** fiksturene ble først lånt ved å importere testklassen
+`HendelsenIHendelsesvinduetTests`, og da kjørte Django alle testene i den én gang til fra
+`tests_nye.py` — 38 i stedet for 25. Et alias binder klassen like mye; nå lånes bare de tre
+ordbøkene. `docs/TEKNISK_DOKUMENTASJON.md` (186 ruter, 43 under `/ko/`) og
+`scripts/sikkerhetsruter.json` er oppdatert for det nye endepunktet.
+
 ## 2026-09-27 — `/oppdrag/` i menyen bare for bilene og admin  `#oppdrag #meny`
 
 **Hvorfor:** André: «Skjule /oppdrag i burgermenyen og i dashbordet for de som ikke har

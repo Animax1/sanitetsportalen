@@ -603,6 +603,45 @@ class HendelseDeltaker(models.Model):
         return f'{self.brukernavn} på H{self.hendelse.hendelsesnummer}'
 
 
+class HendelseLest(models.Model):
+    """Hvor langt i hendelsens logg brukeren har sett (27. sep. 2026).
+
+    André: varselmerke ved noe nytt i hendelsesloggen og sidebaren, «nytt
+    siden sist du åpnet hendelsen». **Ikke det samme som `HendelseDeltaker`**:
+    den sier hvem som har *registrert* noe, og å lese skal ikke melde noen inn.
+
+    **På serveren, ikke i nettleseren.** «Logg ut» tømmer `localStorage` med
+    vilje (delte drifts-PC-er), og da ville hver hendelse stått som ny etter
+    hver innlogging — og på hver PC man satte seg ved.
+
+    `til_linje` er id-en til den siste linja brukeren har hatt framme. Id-ene
+    stiger, så «nytt» er linjer med høyere id, skrevet av andre. Tilstand, ikke
+    historikk: utenfor backupen, som `Ansvarsmerke`.
+    """
+
+    hendelse = models.ForeignKey(
+        Hendelse, on_delete=models.CASCADE, related_name='lesemerker',
+        verbose_name='Hendelse')
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='ko_hendelser_lest', verbose_name='Bruker')
+    til_linje = models.BigIntegerField(default=0, verbose_name='Sett til og med linje')
+    oppdatert_at = models.DateTimeField(auto_now=True, verbose_name='Oppdatert')
+
+    class Meta:
+        verbose_name = 'Lesemerke for hendelse'
+        verbose_name_plural = 'Lesemerker for hendelser'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['hendelse', 'bruker'],
+                name='ett_lesemerke_per_bruker_og_hendelse',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.bruker_id} har sett H{self.hendelse.hendelsesnummer} til {self.til_linje}'
+
+
 class Ansvarsomraade(models.Model):
     """Ansvarsområdene operatørene kan velge mellom — «samband», «ressurser»…
 

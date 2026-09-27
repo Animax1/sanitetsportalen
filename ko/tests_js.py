@@ -344,6 +344,8 @@ PRIORITET_PREAMBLE = (
     "let koLoggfilter = 'alle';\n"
     # Skjerm 2 (24. sep. 2026): raden som er merket, er den skjerm 2 viser.
     'let koFolgerSett = 0; let koFolgerViser = null; let koHendelseKanal = null;\n'
+    # Nytt siden sist du åpnet hendelsen (27. sep. 2026).
+    'let koNyeTall = {}; const koLestSendt = new Map();\n'
     + _konst(KO_JS[1], 'KO_FOLGER_FRIST_MS')
 )
 
@@ -354,7 +356,8 @@ HENDELSE_HARNESS = (
              'koPrioriteter', 'koPrioritetNavn', 'koPrioritetRang', 'koPrioMerke', 'koPrioIkon',
              'koOppdragForHendelse', 'koHendelseRadHtml', 'koKlokke', 'koKanSkrive',
              'koIStrommen', 'koLinjeMerke', 'koHendelseLinjer', 'koOperatorlinjer',
-             'koMerketHendelse', 'koFolgerTilstede', 'koErFolger')),
+             'koMerketHendelse', 'koFolgerTilstede', 'koErFolger',
+             'koNye', 'koErFramme', 'koNyeMerke')),
 )
 
 
@@ -531,7 +534,8 @@ VINDU_HARNESS = HENDELSE_HARNESS + (
              'koHendelseMelding', 'koHendelseKanalMottak',
              'koDetaljLinjeHtml', 'koHendelseOppdragHtml', 'koPrioKnapperHtml', 'koLagBrikkeHtml',
              'koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koMittBrukernavn', 'koSiden',
-             'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett')),
+             'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett',
+             'koMerkLest', 'koSisteLinjeI')),
 )
 
 

@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.models import AppSetting
@@ -19,7 +20,7 @@ from core.vakt import hent_aktiv_vakt
 from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
-    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, Linjedeling,
+    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, HendelseLest, Linjedeling,
     Logglinje,
 )
 
@@ -1034,6 +1035,53 @@ def knytt_oppdrag(oppdrag, hendelse, *, bruker, naa=None):
     if hendelse is not None:
         bli_med(hendelse, bruker)
     return oppdrag
+
+
+def nye_for(bruker, vakt) -> dict[int, int]:
+    """`{hendelse_id: antall}` — linjer i hver hendelse som er nye for `bruker`
+    (27. sep. 2026, André: «nytt siden sist du åpnet hendelsen»).
+
+    **Nytt** er en gjeldende, ikke fjernet linje i hendelsen, skrevet av
+    *noen andre*, med høyere id enn brukerens lesemerke. Egne linjer er aldri
+    nye: den som skrev dem har sett dem. Systemlinjene teller — «H14 satt til
+    Viktig av Kari» er nettopp det man skal legge merke til. En retting er en
+    ny rad og teller som ny; det er den også.
+
+    Én spørring for hele vakta, som `hendelser_for`: lista følger hver poll.
+    Hendelser uten noe nytt står ikke i svaret.
+    """
+    merke = (HendelseLest.objects
+             .filter(hendelse=models.OuterRef('hendelse'), bruker=bruker)
+             .values('til_linje')[:1])
+    rader = (Logglinje.objects.gjeldende(vakt)
+             .filter(hendelse__isnull=False, fjernet_at__isnull=True)
+             .exclude(forfatter=bruker)
+             .annotate(merke=Coalesce(models.Subquery(merke), models.Value(0)))
+             .filter(pk__gt=models.F('merke'))
+             .order_by()
+             .values('hendelse_id')
+             .annotate(n=models.Count('pk')))
+    return {r['hendelse_id']: r['n'] for r in rader}
+
+
+def merk_lest(bruker, hendelse, til_linje) -> int:
+    """Flytt brukerens lesemerke i `hendelse` fram til `til_linje`.
+
+    **Bare framover**: to faner eller skjerm 2 kan melde i ulik rekkefølge, og
+    et eldre merke skal ikke gjøre linjer nye igjen. **Aldri forbi siste
+    linje** i hendelsen: et merke lenger fram ville stille lest linjer som
+    ennå ikke er skrevet. Returnerer merket slik det står.
+    """
+    siste = (Logglinje.objects.filter(hendelse=hendelse)
+             .aggregate(m=models.Max('pk'))['m'] or 0)
+    til = max(0, min(int(til_linje), siste))
+    with transaction.atomic():
+        rad, _ = HendelseLest.objects.select_for_update().get_or_create(
+            hendelse=hendelse, bruker=bruker)
+        if til > rad.til_linje:
+            rad.til_linje = til
+            rad.save(update_fields=['til_linje', 'oppdatert_at'])
+    return rad.til_linje
 
 
 def hendelser_for(vakt):

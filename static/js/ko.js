@@ -380,7 +380,7 @@ async function koHentLogg() {
     koTegnLogg();
     // Hendelsene følger med hver poll — hele lista, som `fjernede`: en
     // hendelse som lukkes eller omdøpes har ingen ny id.
-    if (data.hendelser) koTaImotHendelser(data.hendelser);
+    if (data.hendelser) koTaImotHendelser(data.hendelser, data.nye);
   } catch (e) {
     // En logg som ikke svarer skal ikke tømme skjermen: linjene som alt står
     // der er fortsatt sanne. Feilen vises bare når det ikke står noe.
@@ -787,6 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
   koTavleStart();
   koPlanStart();
   koSidebarLyttere();
+  koLestStart();
   setInterval(naarSynlig(() => {
     // Ikke poll en liste ingen ser på: flere operatører sitter på samme side
     // hele vakta, og nedtrekket er lukket som standard.

@@ -52,7 +52,9 @@ class KoBackupHandler(BaseBackupHandler):
     # Den bærer en tilstand nå («denne bilen ser denne linja»), ikke
     # historikk; det som ble sagt står på linja, og delingen med alle
     # (`Logglinje.delt_at`) er med. Se `ko/models.py`.
-    exclude = ['ko.Ansvarsmerke', 'ko.Linjedeling']
+    # `HendelseLest` (27. sep. 2026) er samme slags som ansvarsmerket: hvor
+    # langt hver konto har lest *nå*, med en peker til kontoen.
+    exclude = ['ko.Ansvarsmerke', 'ko.Linjedeling', 'ko.HendelseLest']
 
     #: FK-er ut av modulens eget datasett.
     #:

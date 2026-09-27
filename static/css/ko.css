@@ -242,6 +242,10 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 .ko-hs-nr { grid-area: nr; display: flex; align-items: center; white-space: nowrap; }
 .ko-hs-nr .h-ikon { width: auto; font-size: 0.85rem; margin-right: 0.2rem; }
 .ko-hs-tittel { grid-area: tittel; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Nytt siden sist du åpnet hendelsen (27. sep. 2026): fet tittel og et tall.
+   Fargen står på Bootstraps `text-bg-primary` — blått, som ingen prioritet bruker. */
+.h-tabell tr.h-ny .h-tittel, .ko-hs-rad.ny .ko-hs-tittel { font-weight: 800; }
+.ko-nye { margin-left: .3rem; font-size: .68em; vertical-align: middle; }
 .ko-hs-sted { grid-area: sted; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ko-hs-sted:empty { display: none; }
 .ko-hs-tid { grid-area: tid; color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }

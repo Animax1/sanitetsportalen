@@ -147,18 +147,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ### Meldt fra staging 27. sep. 2026 (André)
 
-Tatt i den rekkefølgen de står. Historikksøket med og uten mellomrom og snarveien til
-`/oppdrag/` er gjort (CHANGELOG 27. sep.).
+Historikksøket med og uten mellomrom, snarveien til `/oppdrag/` og merket for nytt i
+hendelsene er gjort (CHANGELOG 27. sep.).
 
 - [ ] **Vaktlista offline: merknader kan ikke redigeres** — «virker ut som bare stemplingen
       fungerer. Vi må se på om det går an å beholde full funksjonalitet i offline modus.»
       Først kartlegge hva offline-køen faktisk tar i dag, og hva «full funksjonalitet» vil
       koste: en redigering offline kan kollidere med en annens redigering online, og det
       trenger en regel (siste vinner, eller avvis og vis) før noe bygges.
-- [ ] **Varselprikk ved noe nytt i hendelsesloggen og sidebaren i `/ko/`** — «kan være en
-      sirkulær gul prikk eller noe». Må avklare hva «nytt» er: siden jeg sist så på fanen,
-      eller siden jeg sist åpnet hendelsen? Endringsnummeret (`folgEndringer`) sier *at*
-      noe er endret, ikke *hva*.
 
 ### Veien til neste vakt (om ~240 dager, fra 26. sep. 2026)
 

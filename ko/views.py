@@ -343,6 +343,10 @@ def logg_view(request):
         # Hele lista hver gang, som `fjernede`: en hendelse som lukkes eller
         # omdøpes får ingen ny id, og ville aldri kommet gjennom `?siden=`.
         'hendelser': [_hendelse_til_dict(h) for h in services.hendelser_for(vakt)],
+        # Nytt siden *denne brukeren* sist hadde hendelsen framme (27. sep.
+        # 2026). For seg og ikke i hver hendelse: hendelsene er like for alle,
+        # dette er per konto.
+        'nye': {str(k): v for k, v in services.nye_for(request.user, vakt).items()},
         # Delingstilstanden, hel hver gang (19. sep. 2026) — en angret deling
         # er fravær, og fravær kommer aldri gjennom `?siden=`.
         'delte': services.delte_for_vakt(vakt),
@@ -622,6 +626,25 @@ def hendelse_bli_med_view(request, pk):
     hendelse = _hendelse(pk)
     services.bli_med(hendelse, request.user)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_lest', rate='240/m', method='POST')
+def hendelse_lest_view(request, pk):
+    """«Jeg har sett hendelsen til og med linje `til`» (27. sep. 2026).
+
+    **`les` holder**: å lese er det nivået gir, og merket er brukerens eget —
+    det endrer ingenting noen andre ser. Samme grunn som ansvarsmerket.
+    Svarer med merket slik det står etterpå; det går bare framover.
+    """
+    hendelse = _hendelse(pk)
+    try:
+        til = int(json_body(request).get('til'))
+    except (TypeError, ValueError):
+        return json_feil('«til» må være et tall.')
+    return JsonResponse({'status': 'ok',
+                         'til': services.merk_lest(request.user, hendelse, til)})
 
 
 @modul_kreves('ko', 'skriv_full', svar='json')

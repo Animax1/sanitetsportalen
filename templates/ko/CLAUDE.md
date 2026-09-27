@@ -77,6 +77,14 @@ sidebaren, ikke skjermen; nummer og farge står. Kanten dras (`koHSideBredde`, h
 nettleser). En hendelse en annen lukker **blir stående, merket «Lukket»**, og går ut av
 sidebaren. H-merket og lagkortet (`koApneHendelse`) henter fram en skjult hendelseslogg.
 
+**Nytt siden sist du åpnet hendelsen** (27. sep. 2026): et tall og fet tittel på raden i
+tabellen og i sidebaren (`koNyeMerke`, `koNye`) — ikke en farget prikk: gul er prioriteten
+«Gul», og farge alene sier det ikke til alle. Tellingen er per konto fra serveren (`nye` i
+pollen, `ko.services.nye_for`); lesemerket (`ko.HendelseLest`) står der fordi «Logg ut»
+tømmer nettleserlagringen. `koMerkLest` sender det når hendelsen er **framme** (`koErFramme`:
+åpen i en synlig fane, eller på skjerm 2), bare framover og ikke to ganger; `koLestStart`
+tegner på nytt når fana kommer fram.
+
 **Loggen og sentralbordet følger endringsnummeret** (24. sep. 2026): `folgEndringer('logg',
 koHentLogg)` i ko.js og `folgEndringer('oppdrag', lastAlt)` i sentralbordets lastefil, i én
 forespørsel med tavla (`portal-utils.js`). Sikkerhetsnettet er 30 s for begge. Hva som øker
