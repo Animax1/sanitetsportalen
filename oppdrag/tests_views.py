@@ -1139,6 +1139,20 @@ class HistorikklisteTests(OppdragBasis):
     def test_soek_paa_enhet(self):
         self.assertEqual(len(self._sok('Haugesund')), 3)
 
+    def test_soek_paa_enhet_uten_mellomrom(self):
+        """«Haugesund56» finner «Haugesund 56» (André, 27. sep. 2026)."""
+        self.assertEqual(len(self._sok('Haugesund56')), 3)
+        self.assertEqual(len(self._sok('haugesund56')), 3)
+
+    def test_soek_med_mellomrom_finner_navn_uten(self):
+        """Og motsatt: navnet kan være lagret uten mellomrom."""
+        Enhet.objects.filter(pk=self.enhet.pk).update(navn='Haugesund56')
+        self.assertEqual(len(self._sok('Haugesund%2056')), 3)
+
+    def test_mellomrom_gjor_ikke_soeket_loest(self):
+        """Å fjerne mellomrom skal ikke gi treff som ikke står der."""
+        self.assertEqual(self._sok('Haugesund57'), [])
+
     def _bil_nummer_to(self, oppdrag):
         """En ferdig andre bil på et ferdig oppdrag. Direkte, ikke gjennom
         `varsle_enhet`: den tar oppdraget ut av historikken igjen."""

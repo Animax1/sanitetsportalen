@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Historikksøket finner enheter med og uten mellomrom  `#oppdrag #bug`
+
+**Hvorfor:** André: «Når vi søker i oppdragshistorikk etter ressurser så må det ta høyde
+for ressursnavn med og uten mellomrom.» «Haugesund56» fant ikke «Haugesund 56».
+
+- `oppdrag/views.py`: `_enheter_som_treffer(sok)` sammenligner navnet og søket **begge uten
+  mellomrom** (`Replace` i databasen, så det virker likt på SQLite og PostgreSQL). Det er en
+  overmengde av det gamle `icontains`, så ingen treff går tapt. Gjelder `/oppdrag/` og
+  `/ko/`, som bruker samme endepunkt.
+- **Kjent kant, uendret:** et søk som bare er tall er et **oppdragsnummer** — «56» finner
+  oppdrag 56, ikke «Haugesund 56». Det er med vilje (nummeret er hovedveien inn), men verdt å
+  vite.
+- **Tester:** tre nye i `HistorikklisteTests` — uten mellomrom, med mellomrom mot et navn uten,
+  og at «Haugesund57» ikke gir treff. **Mutanter: 2, begge drept** — søket ikke komprimert,
+  og navnet ikke komprimert.
+- `TODO.md`: de andre punktene fra samme melding står under «Meldt fra staging 27. sep.».
+
 ## 2026-09-27 — Server-status viser om migrasjonene er kjørt  `#drift #server-status`
 
 **Hvorfor:** André, om punktet i testsjekklista «Deploy-loggen for staging viser at `migrate`

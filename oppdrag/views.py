@@ -13,7 +13,8 @@ import json
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import Replace
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseNotModified, JsonResponse
@@ -525,6 +526,21 @@ def _opprett_oppdrag(request, vakt, data, lokasjon, enheter, naa):
         for enhet in enheter:
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
     return oppdrag
+
+
+def _enheter_som_treffer(sok):
+    """Enhetene hvis navn inneholder `sok`, **med og uten mellomrom** (27. sep.
+    2026, André: søket «må ta høyde for ressursnavn med og uten mellomrom»).
+
+    «Haugesund56» finner «Haugesund 56», og «Haugesund 56» finner
+    «Haugesund56»: begge sider sammenlignes uten mellomrom. En delmengde
+    `icontains` på det rå navnet gir, så ingen treff går tapt av dette.
+    """
+    kompakt = ''.join(sok.split())
+    return (Enhet.objects
+            .annotate(kompakt=Replace('navn', Value(' '), Value('')))
+            .filter(kompakt__icontains=kompakt)
+            .values('pk'))
 
 
 def _valider_problemstilling_og_antall(data, hastegrad, problemstilling, *, gjeldende=None):
@@ -1297,7 +1313,7 @@ def historikk_liste_view(request):
             qs = qs.filter(
                 Q(problemstilling__icontains=sok)
                 | Q(lokasjon__navn__icontains=sok)
-                | Q(enheter__enhet__navn__icontains=sok)).distinct()
+                | Q(enheter__enhet__in=_enheter_som_treffer(sok))).distinct()
 
     # Bulk her også: historikken kan være hele vakta, og `oppdrag_til_dict`
     # slår ellers opp avbrytelsene én gang per rad.
