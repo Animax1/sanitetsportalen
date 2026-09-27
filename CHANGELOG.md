@@ -20,6 +20,11 @@ skrevet om.
   ennå. At de første *grense* forsøkene går gjennom står fortsatt eksakt: en delt serie gir færre
   sperringer, aldri flere.
 - **Mutanter: 2, begge drept** — IP-grensen fjernet, brukergrensen fjernet.
+- **Oppfølging i `TODO.md`** (André: «Ja»): en vakt-test som finner rate-limit-tester som sender
+  nøyaktig grense + 1 forsøk. Regelen er brutt fem ganger mens den bare sto i prosa.
+- **CI grønn begge steder** etter at `7bb375a` gikk til `main`: `staging` (run 31, 18:49:57 UTC)
+  og `main` (run 32, 18:55:04 UTC). Samme commit `50bdcdf` hadde vært grønn på `staging` og rød
+  på `main` — identisk kode, to utfall, som bare en tidsavhengig test gir.
 
 ## 2026-09-27 — `main` omgang 3 av 3: `staging` er i produksjon  `#drift #deploy`
 

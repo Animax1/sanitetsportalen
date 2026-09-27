@@ -145,6 +145,21 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Vakt mot rate-limit-tester som ikke tåler vinduskanten — 27. sep. 2026
+
+- [ ] **En test som finner rate-limit-tester som sender nøyaktig grense + 1 forsøk.** Regelen
+      står i `CLAUDE.md` («Rate-limit-tester må tåle vinduskanten»), og hjelperen
+      `nok_til_a_bryte()` finnes i `core/tests_ratelimit.py` — men regelen håndheves bare av
+      prosa, og den er brutt **fem ganger**: tre funnet tidligere, og 27. sep. to til i
+      `accounts/tests.py` (CI på `main` ble rød på `50bdcdf`, mens samme commit var grønn på
+      `staging`). En slik feil viser seg bare når vinduskanten faller midt i serien, altså
+      sjelden og på en annen maskin enn din.
+      **Forslag:** gå gjennom testfilene med AST, finn løkker som poster mot et endepunkt med
+      `@rate_limit` eller et `is_ratelimited`-kall, og krev at antallet kommer fra
+      `nok_til_a_bryte()` — eller at testen står i en unntaksliste med begrunnelse. Først:
+      kartlegg hvor mange rate-limit-tester som finnes (sju testfiler nevner rate-limiting),
+      så vakten ikke blir en liste som forfaller.
+
 ### Offline og papir som reserve — avklart 27. sep. 2026, ikke påbegynt
 
 André meldte at merknader ikke kan redigeres offline i vaktlista («virker ut som bare
