@@ -21,6 +21,7 @@ UNNTAK = {
     ('oppdrag-enhet.js', 'lastBilinnstillinger'): 'tersklene lydvarselet bruker, hvert femte minutt',
     ('oppdrag-enhet.js', 'pollOgSynk'): 'bilens henting og kø — nye oppdrag skal gi lyd',
     ('patients-app.js', 'doAutoRefresh'): 'stoppes og startes av egen visibilitychange-lytter',
+    ('park-lag.js', 'parkTegnKvitteringer'): 'nedtellingen på «Angre», ingen nett',
     ('portal-clock.js', 'updateClock'): 'klokka i toppen, ingen nett',
     ('portal-utils.js', 'sjekkEndringer'): 'sjekker `fanenErSkjult()` selv',
     ('vaktliste-offline.js', 'synkKo'): 'sender stemplinger som ligger i kø — skal gå uansett',

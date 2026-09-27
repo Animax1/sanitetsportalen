@@ -305,6 +305,16 @@ Et nytt oppdrag når bilen på 0–15 s, og beskjeden går uansett over nødnett
 Vaktlista henter **ikke** data av seg selv: en endring en annen gjør, vises når siden
 lastes på nytt.
 
+**`/park/r/` — lagenes side, uten innlogging** (27. sep. 2026)
+
+| Hva | Hvor ofte | Nett | Stille når | Hvor |
+|---|---|---|---|---|
+| Nedtellingen på «Angre» | 1 s | nei | — | `park-lag.js` · `parkTegnKvitteringer` |
+
+Parksiden **poller ikke** (§3c: lagene registrerer uten å lese). Den spør bare når
+siden lastes, når laget bytter lag (forhåndsvalget av sted), og når det registrerer
+eller angrer.
+
 **Ingen løkke:** `/statistikk/`, `/backlog/`, portalinnstillingene og brukeradministrasjonen
 henter bare når siden lastes eller noen trykker.
 
@@ -715,7 +725,7 @@ passordene som gjaldt da backupen ble tatt.
 fordi alt peker på vakta:
 
 ```
-portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste
+portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → park
 ```
 
 `portal` bærer `core.Vakt`. Tas den ikke først, feiler de andre med

@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **186 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **192 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -919,7 +919,7 @@ pasientdata». Alle tre er borte — den første slettet i `patients/0017`.*
 | **Modulfiler** (seks) | «Pasientlista ble slettet ved et uhell — kan jeg få den tilbake uten å røre noe annet?» |
 | **Hel database** (`full`) | «Railway-prosjektet er borte — kan jeg reise portalen på nytt et annet sted?» |
 
-Ni handlere i registeret:
+Ti handlere i registeret:
 
 | Slug | Fil | Innhold |
 |---|---|---|
@@ -931,10 +931,11 @@ Ni handlere i registeret:
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
 | `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv** — loggen fryses aldri med signatur |
 | `backlog` | `backlog/backup.py` | Innspill. Eneste modulfil uten plass i rekkefølgen |
+| `park` | `park/backup.py` | Lagenes registreringer, lenkene (hashen, ikke tokenet) og verdimengdene. Sist i rekkefølgen — pekerne ut av modulen er strippet |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, rettighetsrader, Django-admins logg og backup-metadata |
 
 Gjenoppretting i tom base går i rekkefølge — **portal → ko → patients → arkiv → oppdrag →
-oppdrag_arkiv → vaktliste**. Tas ikke `portal` først, feiler de andre med
+oppdrag_arkiv → vaktliste → park**. Tas ikke `portal` først, feiler de andre med
 «Key (vakt_id)=(1) is not present in table core_vakt», fordi alt utenom `backlog` peker på
 vakta med et heltall. `ko` står nest først av samme grunn: `oppdrag.Oppdrag.hendelse` peker
 på `ko.Hendelse` (KO pulje 5), og hendelsene må finnes før oppdragene lastes.
@@ -1527,9 +1528,9 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 34 filer i `static/js/`, fordelt
-på åtte sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status og de to
-grensesnittene under `/oppdrag/`.
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 35 filer i `static/js/`, fordelt
+på ni sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
+grensesnittene under `/oppdrag/`, og parksiden `/park/r/`.
 
 | Modul | Lastes | Ansvar |
 |---|---|---|
@@ -1548,6 +1549,7 @@ grensesnittene under `/oppdrag/`.
 | `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |
 | `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
 | `ko-*.js` (fem) | **kun** `/ko/` | Rutenettet, hendelsene, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
+| `park-lag.js` | **kun** `/park/r/`, uten innlogging | Lagets registrering — se `park/CLAUDE.md` |
 
 **To sider er delt i flere filer** (14. sep. 2026): `vaktliste.js` var 3 801 linjer og
 `oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt navnerom**, så
@@ -1930,7 +1932,7 @@ men **en regel om kodebasen**. De feiler når noen bryter en beslutning uten å 
 | `DataOgSkjemaISammeTransaksjonTests` | En migrasjon som skriver rader og så endrer skjema må tømme PostgreSQLs triggerkø |
 | `SlettelistaDekkerDumpenTests` | Hver modell som dumpes i en backup må også tømmes ved gjenoppretting |
 | `SignalerFyrerIkkeUnderLoaddataTests` | Hvert lagringssignal har `@ikke_under_loaddata`. Leter i **alle** `*/signals.py`, ikke en håndskrevet liste |
-| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste virker i en tom base, og kantene den bygger på utledes av modellene |
+| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → park virker i en tom base, og kantene den bygger på utledes av modellene |
 | `ArkivSignaturLaastTests` | Arkivsignaturene er låst til literale hex-verdier. Feiler de etter en refaktorering, er det refaktoreringen som er feil |
 | `JsModulLastingTests` | Ingen side kaller en funksjon fra en modul den ikke laster |
 | `MorkTekstPaaMorkBakgrunnTests` | Hver Bootstrap-klasse for dempet tekst er overstyrt der malen kan se den |

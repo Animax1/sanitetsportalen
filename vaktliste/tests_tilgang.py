@@ -888,7 +888,7 @@ class LedernivaaetsPlassIStigenTests(TestCase):
     #: mot drift*, men om **hva som lar seg angre**: den som fører loggen kan
     #: rette tilbake, fordi en retting er en ny rad som peker på den gamle.
     #: Den som fjerner en linje tømmer innholdet for godt.
-    MED_LEDER = {'vaktliste', 'oppdrag', 'backlog', 'ko'}
+    MED_LEDER = {'vaktliste', 'oppdrag', 'backlog', 'ko', 'park'}
 
     def test_bare_modulene_som_har_forklart_nivaaet_tilbyr_det(self):
         """Matrisen tilbyr de nivåene modulen deklarerer og ingen andre. Kom

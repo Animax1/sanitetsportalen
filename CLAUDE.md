@@ -86,12 +86,12 @@ python manage.py runserver           # http://127.0.0.1:8000/
 # CI: `.github/workflows/tester.yml` — det samme, PostgreSQL, `KREV_NODE=1`.
 # Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): settings-vaktene.
 # `core/tests_ci.py` krever at hver app med tester står i CI-kjøringen.
-python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog myproject -v 2
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog park myproject -v 2
 
 # Samme suite, delt (~106 s mot 190). `core` står for seg: `core/tests_backup.py`
 # skriver ekte backupfiler til én mappe og rører det globale handlerregisteret.
 # `--parallel` trenger `tblib` (`requirements-ci.txt`), ellers blir én feil til mange.
-python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog myproject -v 1 --parallel 4
+python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog park myproject -v 1 --parallel 4
 python manage.py test core -v 1
 
 # Én enkelt test
@@ -173,6 +173,7 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `templates/ko/CLAUDE.md` | `templates/ko/` | Vinduene, ressursoversikten, tavla |
 | `templates/oppdrag/CLAUDE.md` | `templates/oppdrag/` | Sentralbordet, bilens skjerm, den delte lista |
 | `backlog/CLAUDE.md` | `backlog/` | Angrefristen, de tre nivåene, hvorfor modulen står utenfor vaktscopet |
+| `park/CLAUDE.md` | `park/` | Siden uten innlogging, lenken, forhåndsvalget |
 
 **Modulfilene lastes ikke alltid, og det er hele poenget — men det koster noe.** Rota leses
 hver gang; en modulfil når noen faktisk arbeider i mappa. Derfor står **det som må vites før
@@ -238,7 +239,7 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | `skriv_full` | Kan redigere felter |
 | `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
 
-**`skriv_leder` (30. aug. 2026) deklareres av vaktlista, oppdrag, KO og backlog**, med egne
+**`skriv_leder` (30. aug. 2026) deklareres av vaktlista, oppdrag, KO, backlog og park**, med egne
 etiketter (i oppdrag: «setter opp verdimengdene»). Skillet mot `skriv_full`
 er *hva slags skade en feil gjør*: den som bemanner setter folk på plasser og kan rette
 tilbake; den som setter opp fjerner en ressurs, og bemanningen forsvinner med den. Uten
@@ -434,7 +435,7 @@ skrevet for hånd, og ville ikke sett `core/signals.py` den dagen den kom. Den g
 
 Backup er **per modul**, ikke én samlet dump — pluss én hel databasebackup ved
 siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registeret
-(fra `apps.ready()`). Ni handlere i dag:
+(fra `apps.ready()`). Ti handlere i dag:
 
 | Slug | Fil | Innhold |
 |------|-----|---------|
@@ -446,10 +447,11 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
 | `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv**: loggen fryses aldri med en SHA-signatur, fordi et felt i signaturen er låst i 24 måneder og sletteinngangen i §4.4 da ville meldt tukling |
 | `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
+| `park` | `park/backup.py` | Lagenes registreringer og lenkene — hashen, ikke tokenet |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
 Gjenoppretting i tom base går i rekkefølge: **portal → ko → patients → arkiv →
-oppdrag → oppdrag_arkiv → vaktliste**, eller `full` alene. **Fasiten er
+oppdrag → oppdrag_arkiv → vaktliste → park**, eller `full` alene. **Fasiten er
 `core.backup.GJENOPPRETTINGSREKKEFOLGE`, ikke denne setningen** — den sto
 skrevet ut fire steder, og da `ko` kom ble tre av dem stående uten den.
 **Tre ting binder, ikke én:** alt utenom `backlog` peker på vakta med et
@@ -616,6 +618,7 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 | `core/kontokobling.py` | Kort på `/portal-admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
 | `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
 | `core/endringer.py` | Endringsnummer — `registrer`, `endret`; fanen: `folgEndringer()` | `<app>/endringer.py` |
+| `core/ressursplassering.py` | Hvor en ressurs står nå — `aapen_plassering()`; park spør, KO svarer | `<app>/ressursplassering.py` |
 
 **Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
 Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går
@@ -735,9 +738,9 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-34 filer i `static/js/` (ingen bundler), på åtte sider — pasientsiden,
-`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status og de to under
-`/oppdrag/`.
+35 filer i `static/js/` (ingen bundler), på ni sider — pasientsiden,
+`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to under
+`/oppdrag/`, og parksiden `/park/r/`.
 
 **Tre av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
@@ -777,6 +780,7 @@ håndhever det på cellebredden.
 | `vaktliste-*.js` (sju) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
+| `park-lag.js` | **kun** `/park/r/`, uten `portal-utils.js` | `park/CLAUDE.md` |
 | `portal-status.js` | **kun** server-status | dashbordet, `core/admin_status.py` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

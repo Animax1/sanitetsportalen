@@ -917,20 +917,24 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       en ny vei. Kan gjøres uavhengig av KO.
 
 - [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
-      Avklart i fire runder (§2, B1–B23), §9 er tom. Tre puljer i §8; pulje 1 er modellen og
-      parksiden.
+      Lagenes utfallsregistrering uten innlogging, via én lenke i tiltakskortet i Bliksund.
+      Avklart i fire runder (§2, B1–B23). **Pulje 1 er levert** (27. sep. 2026, se CHANGELOG);
+      modulens regler står i `park/CLAUDE.md`. Igjen:
+      - [ ] **Pulje 2 — oppsettet på `/park/`:** lage og fjerne lenker med oppetid (tokenet
+            vises én gang), problemstillingene (`skriv_leder`) og utfallene (admin),
+            sletting av en feilregistrering med grunn (B20) og «slett alt fra denne lenken
+            etter kl. X», og angrefristen og `park-ko-posisjon`-bryteren på
+            portalinnstillingene (`park/portalinnstillinger.py`). Til da: `manage.py
+            park_lenke`, og bryteren som `AppSetting['park_ko_posisjon']`.
+      - [ ] **Pulje 3 — statistikkfanen «Lag»** (`park/statistikk.py`, `nivaa = 'les'`):
+            per problemstilling, utfall, sted, lag og time, summert på `antall`, uten
+            slettede rader. Overskriften sier «kontakter», ikke «pasienter».
       - [ ] **Personvern for `/park/` når modulen er ferdig — før lansering** (André, 27. sep.
             2026, B23). `PERSONVERN_DOKUMENTASJON.md` A.6 får en rad for registreringene, og
             risikobildet i `FORSLAG_PARK.md` §4.6–4.7 skrives inn: portalens første side uten
             innlogging, og at den kan vise KOs plassering av lagene så lenge
             `park-ko-posisjon` er på. Skrives mot det som faktisk ble bygget, ikke mot
-            forslaget. Lagets utfallsregistrering: problemstilling,
-      lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
-      statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
-      trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
-      (`FORSLAG_KO.md` §3.2) hører til her, og ble bevisst **ikke** bygget i pulje 3:
-      uten `/park/` er det en bryter med én stilling, og at det korrelerer med «hvem
-      stempler selv» er tilfeldig — den utledes av `Ressurs.enhet`.
+            forslaget.
 
 - [ ] **MULIGHET: KO-tavla viser stedet laget registrerer fra ved siden av der KO plasserte
       det** (André, 27. sep. 2026, `FORSLAG_PARK.md` B16). Står laget på Parkscene på tavla og

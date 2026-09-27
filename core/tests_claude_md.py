@@ -72,7 +72,13 @@ ROT = Path(settings.BASE_DIR)
 #: (`core/sortering.py`) er en regel for alle moduler, og `core/tests_sortering.py`
 #: leser kildekoden i alle appene. Fire linjer, kortet ned fra sju; kommentaren om
 #: `--parallel` ble samtidig kortet og rettet (feilen var `tblib`, ikke `core`).
-ROT_TEGNGRENSE = 66_000
+#:
+#: **Hevet til 66 500 den 27. sep. 2026, bevisst:** park er modul nummer ni, og
+#: rota *skal* kartlegge den — modulfila, backup-handleren og JS-fila er rader
+#: testene krever. Pluss `core/ressursplassering.py`, et nytt register i
+#: rammeverket. Radene er kortet ned til kartet; alt annet står i
+#: `park/CLAUDE.md`.
+ROT_TEGNGRENSE = 66_500
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer

@@ -1,0 +1,79 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{# Ingen lenke ut av siden skal bære adressen med seg — tokenet står i fragmentet. #}
+<meta name="referrer" content="no-referrer">
+{% include "partials/_ikoner.html" %}
+<title>Registrering – Park</title>
+<link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+{% comment %}
+  Frittstående side uten innlogging (docs/FORSLAG_PARK.md §4). Laster verken
+  base_portal eller portal-utils.js: den har ingen sesjon, ingen bjelle og ingen
+  meny, og portal-utils sender portalens egne headere. Egen <style>, som
+  innloggingssidene — og dempet tekst overstyres her, fordi siden er mørk.
+{% endcomment %}
+<style>
+  body { background: #0f172a; color: #e5e7eb; font-family: "Segoe UI", system-ui, sans-serif; }
+  .park-kort { background: #111827; border: 1px solid #334155; border-radius: 12px; padding: 1rem; }
+  .park-tittel { font-size: 1.15rem; font-weight: 700; }
+  .form-label { font-weight: 600; margin-bottom: .25rem; }
+  .form-select, .form-control { background-color: #0b1220; color: #e5e7eb; border-color: #334155; font-size: 1.05rem; }
+  .form-select:focus, .form-control:focus { background-color: #0b1220; color: #e5e7eb; }
+  .form-control::placeholder { color: #94a3b8; }
+  .text-muted, .form-text, .park-kilde { color: #94a3b8 !important; }
+  .park-kilde { font-size: .85rem; min-height: 1.2em; }
+  .park-antall .btn { min-width: 3rem; }
+  .park-antall input { text-align: center; max-width: 5rem; }
+  .park-kvittering { border-left: 4px solid #22c55e; }
+  .park-feil { border-left: 4px solid #f87171; }
+  .park-registrer { font-size: 1.15rem; padding: .75rem; }
+</style>
+</head>
+<body>
+<main class="container py-3" style="max-width: 32rem;">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="park-tittel"><i class="bi bi-tree me-2"></i>Registrering</div>
+    <div class="text-muted small" id="park-vakt"></div>
+  </div>
+
+  <div id="park-melding" class="park-kort park-feil mb-3 d-none" role="alert"></div>
+  <div id="park-kvitteringer" class="mb-3" aria-live="polite"></div>
+
+  <form id="park-skjema" class="park-kort d-none" autocomplete="off" novalidate>
+    <div class="mb-3">
+      <label class="form-label" for="park-lag">Lag</label>
+      <select class="form-select" id="park-lag" required></select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="park-sted">Sted</label>
+      <select class="form-select" id="park-sted" required></select>
+      <div class="park-kilde mt-1" id="park-sted-kilde"></div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="park-problemstilling">Problemstilling</label>
+      <select class="form-select" id="park-problemstilling" required></select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="park-antall">Antall</label>
+      <div class="input-group park-antall">
+        <button class="btn btn-outline-light" type="button" id="park-antall-ned" aria-label="Færre">−</button>
+        <input class="form-control" type="number" inputmode="numeric" id="park-antall" min="1" max="99" value="1">
+        <button class="btn btn-outline-light" type="button" id="park-antall-opp" aria-label="Flere">+</button>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="park-utfall">Utfall</label>
+      <select class="form-select" id="park-utfall" required></select>
+    </div>
+    <button type="submit" class="btn btn-success w-100 park-registrer" id="park-registrer">
+      <i class="bi bi-check2-circle me-2"></i>Registrer
+    </button>
+  </form>
+</main>
+<script src="{% static 'js/park-lag.js' %}"></script>
+</body>
+</html>

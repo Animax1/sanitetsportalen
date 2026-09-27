@@ -191,6 +191,17 @@ class Ressursgruppe(BaseTimeStampedModel):
         help_text='Inaktive grupper skjules i nedtrekk, men beholdes på '
                   'ressurser som allerede bruker dem.',
     )
+    #: **Rutingflagget** (`docs/FORSLAG_KO.md` §3.2, `docs/FORSLAG_PARK.md`
+    #: §3.4). Ressursene i gruppa står i lagnedtrekket på `/park/r/`. Bevisst
+    #: ikke en `choices` med `oppdrag`/`park`: om en ressurs stempler i
+    #: `/oppdrag/` avgjøres allerede av `Ressurs.enhet`, og to kilder for samme
+    #: sannhet er uenige den dagen det teller.
+    registrerer_i_park = models.BooleanField(
+        default=False,
+        verbose_name='Registrerer i /park/',
+        help_text='Ressursene i gruppa kan velges på parksiden, der lagene '
+                  'registrerer hva de har gjort.',
+    )
 
     class Meta:
         verbose_name = 'Ressursgruppe'

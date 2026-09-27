@@ -72,7 +72,7 @@ jobs:
         run: python manage.py collectstatic --noinput -v 0
 
       - name: Testene utenom core
-        run: python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog myproject --noinput -v 1 --parallel 4
+        run: python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog park myproject --noinput -v 1 --parallel 4
 
       - name: core, serielt
         run: python manage.py test core --noinput -v 1

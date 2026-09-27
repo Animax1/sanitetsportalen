@@ -571,6 +571,7 @@ def _gruppe_til_dict(g):
         'rekkefolge': g.rekkefolge,
         'flere_enheter': g.flere_enheter,
         'er_aktiv': g.er_aktiv,
+        'registrerer_i_park': g.registrerer_i_park,
         'i_bruk': g.ressurser.count(),
     }
 
@@ -670,6 +671,10 @@ def gruppe_detalj_view(request, pk):
         gruppe.flere_enheter = bool(data['flere_enheter'])
     if 'er_aktiv' in data:
         gruppe.er_aktiv = bool(data['er_aktiv'])
+    # Rutingflagget (`docs/FORSLAG_PARK.md` §3.4): gruppas ressurser kan
+    # velges på parksiden. Oppsett, altså `skriv_leder` som resten her.
+    if 'registrerer_i_park' in data:
+        gruppe.registrerer_i_park = data['registrerer_i_park'] is True
     if 'rekkefolge' in data:
         gruppe.rekkefolge = _int(data['rekkefolge']) or 100
 

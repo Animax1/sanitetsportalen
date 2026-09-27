@@ -700,6 +700,13 @@ function mkGruppeRad(g) {
   // Den inaktive gruppa dempes, som mannskapsregisteret gjør det. Uten det
   // ser en deaktivert gruppe nøyaktig ut som en aktiv, og «hvorfor står den
   // ikke i nedtrekket?» blir et spørsmål ingen kan svare på ved å se.
+  // Rutingflagget (FORSLAG_PARK.md §3.4): gruppas ressurser står i
+  // lagnedtrekket på parksiden. Merket viser det; knappen snur det.
+  const park = g.registrerer_i_park
+    ? `<button class="btn btn-sm btn-outline-success" type="button" title="Gruppas ressurser kan velges på /park/"
+               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':0')}"><i class="bi bi-tree me-1"></i>Park</button>`
+    : `<button class="btn btn-sm btn-outline-secondary" type="button" title="Ikke med på /park/ — klikk for å ta med"
+               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':1')}"><i class="bi bi-tree me-1"></i>Ikke park</button>`;
   const dempet = g.er_aktiv ? '' : ' vl-inaktiv';
   const inaktivMerke = g.er_aktiv ? ''
     : '<span class="vl-merkelapp">inaktiv</span>';
@@ -713,6 +720,7 @@ function mkGruppeRad(g) {
         ${ett}
         ${bruk}
         ${endre}
+        ${park}
         ${aktiv}
         ${slett}
       </div>
@@ -789,6 +797,14 @@ async function settGruppeAktiv(arg) {
   // «id:0» / «id:1» — klikkdelegeringen sender ett argument.
   const [id, paa] = String(arg).split(':');
   await _gruppeKall(Number(id), { er_aktiv: paa === '1' },
+                    'Kunne ikke endre gruppa.');
+}
+
+
+async function settGruppePark(arg) {
+  // «id:0» / «id:1», som `settGruppeAktiv`.
+  const [id, paa] = String(arg).split(':');
+  await _gruppeKall(Number(id), { registrerer_i_park: paa === '1' },
                     'Kunne ikke endre gruppa.');
 }
 

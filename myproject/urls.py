@@ -63,6 +63,11 @@ urlpatterns = [
     # innspill beskriver portalen, ikke en vakt.
     path('backlog/', include('backlog.urls')),
 
+    # Park — lagenes utfallsregistrering (27. sep. 2026). Samme grunn til aa
+    # staa foer core. `/park/r/` svarer uten innlogging; se
+    # docs/FORSLAG_PARK.md §4.
+    path('park/', include('park.urls')),
+
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.
     path('', include('core.urls')),

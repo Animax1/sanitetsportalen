@@ -27,3 +27,7 @@ class KoConfig(AppConfig):
         # Statistikkfanen «KO» (pulje 7a). Uten registreringen finnes ikke
         # kilden, og statistikksiden viser ingen KO-fane.
         statistikk.register_handlers()
+        # Hvor lagene står, for parksidens forhåndsvalg (27. sep. 2026). KO
+        # kjenner ikke park; den svarer registeret i `core`.
+        from . import ressursplassering
+        ressursplassering.register_handlers()

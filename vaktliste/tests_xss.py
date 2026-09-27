@@ -284,6 +284,7 @@ REVIEWED_INTERPOLATIONS = {
     'p.antall': 'tall, i samme rene tekst som escapes ved innsetting',
     'p.planlagt': 'tall, i samme rene tekst som escapes ved innsetting',
     'bruk': 'markup bygget lokalt, tallet escapet inni',
+    'park': 'knapp bygget lokalt fra en ternær, ID-en escapet inni',
 }
 
 

@@ -21,7 +21,7 @@ from django.conf import settings
 from django.test import SimpleTestCase
 
 #: Modulappene. `core` skal kunne kjøre uten en eneste av dem.
-MODULAPPER = {'patients', 'oppdrag', 'vaktliste', 'statistikk', 'ko', 'backlog'}
+MODULAPPER = {'patients', 'oppdrag', 'vaktliste', 'statistikk', 'ko', 'backlog', 'park'}
 
 #: Importer som skal være der, med begrunnelse.
 #:
@@ -33,6 +33,7 @@ TILLATT = {
     ('core/modules.py', 'backlog.module'),
     ('core/modules.py', 'ko.module'),
     ('core/modules.py', 'oppdrag.module'),
+    ('core/modules.py', 'park.module'),
     ('core/modules.py', 'patients.module'),
     ('core/modules.py', 'statistikk.module'),
     ('core/modules.py', 'vaktliste.module'),

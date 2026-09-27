@@ -175,6 +175,7 @@ def _build_registry() -> tuple[Module, ...]:
     from core.module import CoreModule  # noqa: WPS433
     from ko.module import KoModule  # noqa: WPS433
     from oppdrag.module import OppdragModule  # noqa: WPS433
+    from park.module import ParkModule  # noqa: WPS433
     from patients.module import PatientsModule  # noqa: WPS433
     from statistikk.module import StatistikkModule  # noqa: WPS433
     from vaktliste.module import VaktlisteModule  # noqa: WPS433
@@ -187,6 +188,7 @@ def _build_registry() -> tuple[Module, ...]:
         VaktlisteModule,
         OppdragModule,
         KoModule,
+        ParkModule,
         BacklogModule,
     )
 

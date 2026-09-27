@@ -4,6 +4,72 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/park/` pulje 1: modellen og siden lagene registrerer på  `#park #ny-modul #sikkerhet`
+
+**Hvorfor:** André, etter fire avklaringsrunder på `docs/FORSLAG_PARK.md`: «Enig med bryter.
+La oss kjøre.» Lagene ute på området registrerer hva de har gjort — problemstilling ×
+antall, sted og utfall — **uten innlogging**, via én lenke i tiltakskortet i Bliksund.
+
+**Modulen** (`park/`, modul nummer ni, `les` og `skriv_leder`):
+
+- **Tabellene:** `Registrering` (frosne navn, `antall`, idempotensnøkkel som også er
+  angre-nøkkel, målingen `forhandsvalg_kilde`/`forhandsvalg_endret`, og feltene for
+  sletting i pulje 2), `Parklenke` (bare **SHA-256 av tokenet**, oppetid fra/til, fjerning
+  som markering), og verdimengdene `Problemstilling` (startverdier kopiert fra
+  `patients.choices`) og `Utfall` («Behandlet på stedet» øverst). **Ingen fritekst.**
+- **Siden uten innlogging, `/park/r/`**: alle nedtrekk på én side, lag og sted huskes etter
+  hver registrering, kvittering med «Angre (4:59)». Tokenet står i **fragmentet**
+  (`/park/r/#…`) og fjernes fra adressefeltet med `history.replaceState` — ellers lå det i
+  nettleserloggen. `park-lag.js` bygger alt med `textContent`, laster ikke
+  `portal-utils.js`, og siden har `<meta name="referrer" content="no-referrer">`.
+- **Porten** `@park_lenke_kreves` (`park/views_lag.py`): ugyldig, fjernet, stengt lenke,
+  modulen av og avsluttet vakt gir **samme 403**. Tre bøtter: per telefon (tilfeldig ID, ingen
+  person), tak per lenke, og per IP **bare** for ugyldige tokens — telefoner på mobilnett
+  deler IP bak NAT. `views_lag.py` leser aldri `request.user`; en test håndhever det på
+  kilden, og at hver API-rute bærer porten.
+- **Forhåndsvalget av sted — «det nyeste vinner»** (B19): KOs åpne plassering mot lagets siste
+  registrering, begge med serverens klokke. Park importerer ikke `ko`: nytt register
+  **`core/ressursplassering.py`**, som `ko/ressursplassering.py` melder seg inn i. En avslått
+  KO spørres ikke, og en feilende kilde gir `None`, ikke 500. KO-kilden står bak bryteren
+  `AppSetting['park_ko_posisjon']` (på uten rad) og er merket `# RISIKOVALG(park-ko-posisjon)`.
+- **Rutingflagget** `Ressursgruppe.registrerer_i_park` (`vaktliste` 0024), satt på for
+  standardgruppa «Lag» (0025), og en **«Park»-knapp** per gruppe i vaktlistas gruppeoppsett
+  (`skriv_leder`). Bare literal `true` slår det på.
+- **`manage.py park_lenke --lag/--list/--fjern`** lager lenker til oppsettsiden kommer i
+  pulje 2. Tokenet skrives ut én gang. Opprettelse og fjerning auditlogges, uten hashen.
+- `/park/` for innloggede: `les` får en henvisning til statistikken; `skriv_leder` ser
+  lenkene og registreringene.
+- Backup-handler `park` (sist i `GJENOPPRETTINGSREKKEFOLGE`, alle pekere ut av modulen og alle
+  brukerpekere strippet). Lenkene i backupen bærer hashen, ikke tokenet.
+
+**Rammeverket sa fra om alt det skulle**, og det er verdt å notere: åtte røde i `core` før
+dokumentene var i takt — sikkerhetsrutene (`park/r/` i `AAPNE`; API-et står som *stengt* og
+prøves anonymt), rå `fetch`, pollingen i RUNBOOK §3d, tallene (192 ruter, 35 JS-filer, ti
+handlere), rekkefølgen i fire dokumenter, testkommandoen, `MED_LEDER` og placeholder-fargen.
+**Taket på rota i `CLAUDE.md` er hevet bevisst til 66 500** — modulen *skal* kartlegges der,
+og `core/ressursplassering.py` er et nytt register. Begrunnelsen står ved konstanten.
+
+**Og én feil fanget av en ny test før den ble pushet:** innsettingen av flagget i
+`vaktliste/views.py` tok med seg linja `if 'rekkefolge' in data:`, så en PUT med
+`registrerer_i_park` ville gitt `KeyError: 'rekkefolge'` og 500.
+
+**Mutanter: 38, deretter 1 til — 37 drept, 1 no-op.** Tjenestelaget og porten tungt (oppetidens
+grenser, modulbryteren, avsluttet vakt, flagget, «eldste vinner», likt → KO, bryteren
+ignorert, slettet/deaktivert teller, antallets grenser, `bool` som antall, `bool()` på
+målingen, angre uten lenke, fristen streng/uklemt, de tre bøttene, telefon-ID ikke påkrevd,
+token fra query, porten fjernet fra en rute), JS middels (minnet før serveren, målingen,
+neste skjema, antallsgrensen, lagret token før fragmentet). **Overlevde:** «idempotens
+bort» — en ny sending etter at en liste var endret ville gitt 400 i stedet for kvitteringen;
+**test lagt til, nå drept.** «KO: pause teller» er en **no-op**: en pause-rad har aldri et
+sted, så filteret på sted tar den uansett. Filteret står igjen som forsvar.
+
+**Prøvd i Chromium** mot en lokal server (390 px bredde): lenke → lag → sted → 3 × «Skade
+bein/fot» → registrer → kvittering; ny lasting uten fragment husker laget og forhåndsvelger
+«Sist registrert 23:42»; «Angre» sletter raden. Ingen konsollfeil.
+
+Suiten: 3 980 + 915 tester grønne. Migrasjonsprøvene mot PostgreSQL er ikke kjørt her — de
+to nye datamigrasjonene skriver bare rader og endrer ikke skjema etterpå.
+
 ## 2026-09-27 — `/park/`: trusselbildet og risikovalgene inn i notatet  `#docs #park #sikkerhet`
 
 **Hvorfor:** André: «på hvilken måte utsetter dette nettsiden sikkerhetshull messig?» — og etter

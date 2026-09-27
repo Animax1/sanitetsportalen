@@ -39,7 +39,7 @@ from __future__ import annotations
 #: `avvik()` sagt fra.
 GJENOPPRETTINGSREKKEFOLGE: tuple[str, ...] = (
     'portal', 'ko', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
-    'vaktliste',
+    'vaktliste', 'park',
 )
 
 #: Modulfiler uten en eneste peker ut av sitt eget datasett. De kan tas når
