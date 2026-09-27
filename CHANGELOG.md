@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/park/`: andre avklaringsrunde, to spørsmål igjen  `#docs #park #forslag`
+
+**Hvorfor:** Andrés andre runde svar på `docs/FORSLAG_PARK.md`. «Gå gjennom svarene mine så ser
+vi om vi er klare til å kode.»
+
+- **KO gjør ingenting med registreringene** (B15, snudd fra første runde): «Vi skal bare bruke
+  det for /statistikk for ledelsen å se på.» KO-telleren, slettingen fra `/ko/` og den
+  «alternative gaten» i statistikkregisteret er tatt ut. Tavlepunktet i `TODO.md` er gjort om
+  til en **mulighet**.
+- **«Operatørene skal ikke nødvendigvis ha /statistikk»** (B17). Kontrollert i
+  `statistikk/views.py`: `/statistikk/` er allerede delt per fane — siden krever
+  `statistikk: les`, og hver fane `les` i kildemodulen (`lesbare_kilder`). Fanen «Lag» gates på
+  `park: les`, og ingen endring i rammeverket trengs.
+- **Lenka lever på tvers av vakter** (B18). **Stedslista arves fra `oppdrag.Lokasjon`**, og
+  forhåndsvalget er telefonens siste valg.
+- **Forhåndsvalg fra KO-plasseringen** («sted fra ko plassering hva mener du her?») forklart
+  og vurdert i §5.1: anbefalt **nei** — tavla henger etter virkeligheten, og et feil ferdig
+  utfylt sted blir ikke lest.
+- Utfall: **«Behandlet på stedet» øverst**, så de fem fra utkastet.
+- Igjen i §9: KO-forhåndsvalget, og hvem som sletter en feilregistrering etter fem minutter.
+  Anslaget er ned fra 4–5 til 3 økter.
+
 ## 2026-09-27 — `/park/`: Andrés svar inn i notatet, fire spørsmål igjen  `#docs #park #forslag`
 
 **Hvorfor:** André svarte på første utkast av `docs/FORSLAG_PARK.md` og sa «Vi starter ikke

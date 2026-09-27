@@ -917,8 +917,8 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       en ny vei. Kan gjøres uavhengig av KO.
 
 - [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
-      André har besvart første runde (§2, B1–B16); fire spørsmål i §9 gjenstår, og **ingen
-      kode før de er besvart**. Puljene står i §8. Lagets utfallsregistrering: problemstilling,
+      André har besvart to runder (§2, B1–B18); to spørsmål i §9 gjenstår, og **ingen kode
+      før de er besvart**. Puljene står i §8. Lagets utfallsregistrering: problemstilling,
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
@@ -926,12 +926,12 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       uten `/park/` er det en bryter med én stilling, og at det korrelerer med «hvem
       stempler selv» er tilfeldig — den utledes av `Ressurs.enhet`.
 
-- [ ] **KO-tavla: stedet laget satte selv mot stedet KO plasserte det** (André, 27. sep.
-      2026, `FORSLAG_PARK.md` B16). En parkregistrering bærer `lokasjon_kilde` — arvet fra
-      tavla, eller endret av laget. Står laget på Parkscene på tavla og registrerer fra
-      Village, vet laget noe KO ikke vet. Hvordan det vises på lagkortet (et avvik-merke? stedet
-      fra siste registrering ved siden av plasseringen?) avgjøres når park er bygget — og det
-      skal **vises**, ikke flytte laget på tavla: tavla er KO sin plassering.
+- [ ] **MULIGHET: KO-tavla viser stedet laget registrerer fra ved siden av der KO plasserte
+      det** (André, 27. sep. 2026, `FORSLAG_PARK.md` B16). Står laget på Parkscene på tavla og
+      registrerer fra Village, vet laget noe KO ikke vet. **Ikke i park-leveransen:** André
+      besluttet samme dag at KO ikke gjør noe med registreringene (B15), og dette krever at KO
+      leser park (`ko` → `park`, riktig retning). Tas det opp: vis avviket, flytt aldri laget
+      — tavla er KO sin plassering.
 - [ ] **MULIGHET: QR-kode for parklenka** (André, 27. sep. 2026: «ikke noe QR-kode nå»).
       Lenka ligger i et tiltakskort i Bliksund. Blir QR aktuelt: `segno` (ren Python, SVG
       server-side, utskrift uten JS) framfor et JS-bibliotek i `static/vendor/`. Merk at

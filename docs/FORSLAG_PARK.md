@@ -1,7 +1,7 @@
 # Forslag: `/park/` — lagets utfallsregistrering
 
 Status: **under avklaring.** Første utkast 27. september 2026 fra staging `8327d8f`; André
-svarte samme dag, og svarene står som **besluttet** under. §9 er det som gjenstår. **Ingen
+svarte i to runder samme dag, og svarene står som **besluttet** under. §9 er det som gjenstår. **Ingen
 kode før §9 er tom** (André: «Vi starter ikke kode før vi har alt av punkter på plass»).
 Arbeidslista er `TODO.md`.
 
@@ -30,7 +30,7 @@ registrerer, ikke laget. Statistikken ser de som kom inn, ikke de som ble tatt h
 | «Sandnes 2.1 hjalp tre med skrubbsår ved Parkscene, alle gikk videre selv» | En pasient. Ingen navn, ingen alder, intet nummer som sies høyt |
 | Én side med nedtrekk, på en telefon | Et skjema man fyller ut etterpå |
 | Skrive-bare for laget. Det ser en kvittering | En liste laget kan bla i |
-| Tall til KO og til statistikken «Lag» | Grunnlag for oppfølging av en enkeltperson |
+| Tall til statistikken «Lag», for ledelsen | Et verktøy KO arbeider i, eller grunnlag for oppfølging av en enkeltperson |
 
 **Den siste raden er premisset for resten.** Så lenge ingen enkeltregistrering skal kunne
 følges opp, trenger raden ingen personopplysninger — og da trenger endepunktet ingen
@@ -52,13 +52,15 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B7 | Utfall | Egen liste, satt opp av **admin** |
 | B8 | Personen | Ingen kjønn, ingen alder |
 | B9 | Antall | En registrering kan gjelde **flere med samme problemstilling**. Etter registrering starter en ny, med lag og sted husket — stedet kan endres. **Alt av nedtrekk på én side** |
-| B10 | Lokasjon | Arves (§5), men kan alltid endres av laget |
+| B10 | Lokasjon | **Lista arves fra `oppdrag.Lokasjon`** — de samme stedene KO bruker. Forhåndsvalget er det telefonen valgte sist; laget kan alltid endre det (§5) |
 | B11 | Angre | Ja. **5 minutter** som standard, styrt av admin |
 | B12 | Statistikk | En egen kilde, **«Lag»** |
 | B13 | QR-koder | Ikke nå. Står i `TODO.md` som mulighet |
 | B14 | Offline | **Ikke nødvendig** |
-| B15 | KO | De med `/ko/`-tilgang skal se registreringene og handle på dem i `/ko/` uten `ModulTilgang('park')` (§7) |
-| B16 | Tavla | Stedet laget setter selv og stedet KO har plassert det — hvordan det vises på tavla står i `TODO.md` |
+| B15 | KO | **KO gjør ingenting med registreringene** (andre runde): «Vi skal bare bruke det for /statistikk for ledelsen å se på.» Erstatter første rundes «KO-tilgang holder» (§7) |
+| B16 | Tavla | Å vise stedet laget satte mot stedet KO plasserte det er en **mulighet i `TODO.md`**, ikke en del av denne leveransen — den krever at KO leser park, og B15 sier at KO ikke gjør det nå |
+| B17 | Statistikk-tilgang | **Operatørene skal ikke nødvendigvis ha `/statistikk/`**, og tilgangen der kan bli delt opp. Den *er* delt per fane allerede (§7): fanen «Lag» krever `statistikk: les` **og** `park: les`. Ledelsen får `park: les`; operatørene får det ikke |
+| B18 | Lenkens levetid | **På tvers av vakter** (spørsmål 2a). Tiltakskortet kan stå; oppetiden er grensen |
 
 **Hva B3 og B4 endret fra første utkast.** Utkastet foreslo én lenke per lag, med
 begrunnelsen at et nedtrekk ingen kontrollerer er en påstand. André: «det blir svært
@@ -89,15 +91,14 @@ ganger også når den er på nett.
 | `antall` | Heltall ≥ 1, standard 1 (B9). Øvre grense 99 — et tall det er lett å skrive feil |
 | `utfall` | Tekst, validert mot `park.Utfall` (B7) |
 | `lokasjon` / `lokasjon_navn` | FK til `oppdrag.Lokasjon` + frosset navn, som `Tavleplassering` |
-| `lokasjon_kilde` | `ko` / `laget` — om stedet var arvet fra KO-plasseringen eller satt av laget. Det er det B16 trenger for å vise forskjellen |
 | `registrert_at` | Når raden kom inn. Uten offline er det også når det skjedde — ingen klienttid, ingen `vurder_klienttid` |
 | `idempotency_key` | Klientgenerert UUID, unik per lenke. Er også **angre-nøkkelen**, §4.4 |
-| `slettet_at`, `slettet_av_navn`, `slettet_grunn` | Bare for KO sin sletting (§7). Laget sin angring sletter raden helt — den har ikke vært synlig for noen i fem minutter som betyr noe |
+| `slettet_at`, `slettet_av_navn`, `slettet_grunn` | **Bare hvis §9 spørsmål 2 sier ja.** Lagets angring sletter raden helt |
 
 **Ingen fritekst er sikkerhetsmodellen, ikke en forenkling** (B1). Et felt som tar imot hva
 som helst fra et endepunkt uten innlogging er et felt der et navn havner en travel kveld,
 skrevet av noen vi ikke vet hvem er. Med bare nedtrekk kan raden ikke inneholde et navn, og
-da kan backupen, statistikken og KO vise den uten pasientmodulens vern.
+da kan backupen og statistikken vise den uten pasientmodulens vern.
 
 ### 3.2 `park.Parklenke`
 
@@ -110,15 +111,15 @@ da kan backupen, statistikken og KO vise den uten pasientmodulens vern.
 | `fjernet_at`, `fjernet_av_navn` | «Fjernes» (B3) er en markering, ikke sletting: registreringene beholder sin peker, og lista viser at lenken fantes |
 | `sist_brukt_at` | «Ingen registreringer på fire timer» kan bety en død lenke |
 
-**Lenken er ikke bundet til en vakt.** Registreringen havner på vakta som er aktiv når den
-sendes, og er ingen vakt aktiv, er siden stengt. Se §9, spørsmål 2 — det er et valg.
+**Lenken er ikke bundet til en vakt** (B18). Registreringen havner på vakta som er aktiv når
+den sendes, og er ingen vakt aktiv, er siden stengt — selv innenfor oppetiden.
 
 ### 3.3 Verdimengdene
 
 | Tabell | Hvem setter opp | Startverdier |
 |---|---|---|
 | `park.Problemstilling` | `skriv_leder` og admin (B6) | De 21 i `patients.choices.PROBLEMSTILLING`, kopiert inn av migrasjonen |
-| `park.Utfall` | Admin (B7) | §9, spørsmål 4 |
+| `park.Utfall` | Admin (B7) | **Behandlet på stedet** (øverst), Gikk videre selv, Fulgt til samleplass, Tilkalt bil, Avslo hjelp, Overlatt til andre (vakt/politi) |
 
 Begge med `navn`, `rekkefolge`, `er_aktiv` — mønsteret fra `oppdrag.Lokasjon` og
 `oppdrag.Problemstilling`. **Kopiert, ikke lest:** park importerer ikke pasientmodulen. Lista
@@ -153,7 +154,8 @@ API-nøkler, og bedre enn en signert streng her:
 
 **Konsekvensen av best practice er at lenken vises én gang**, i det den lages. Står den ikke
 i tiltakskortet da, lages en ny. Å kunne vise den igjen krever at tokenet lagres slik det
-kan leses, og da er en lekket base en lekket lenke. Se §9, spørsmål 2.
+kan leses, og da er en lekket base en lekket lenke. Følger av B5 («best practice går
+foran») — nevnt fordi det er den delen av valget som merkes i Bliksund.
 
 **Tokenet står i fragmentet: `/park/r/#<token>`.** Alt etter `#` sendes aldri til serveren
 — det havner ikke i Railways tilgangslogg, ikke i `Referer`. Siden leser det med JS og
@@ -163,10 +165,10 @@ sender det i headeren `X-Park-Lenke`.
 
 | Sti | Hvem | Hva |
 |---|---|---|
-| `/park/` | `les` | Registreringene denne vakta, per lag og per sted |
-| `/park/oppsett/` | `skriv_leder`, admin | Lenker (lag, fjern, oppetid), problemstillinger. Utfall: bare admin |
+| `/park/` | `skriv_leder`, admin | Oppsettet: lenker (lag, fjern, oppetid), problemstillinger; utfall bare for admin. Pluss lista over registreringene hvis §9 spørsmål 2 sier ja |
+| — | `les` | Ingen egen side. `les` er det som åpner fanen «Lag» i `/statistikk/` (B17) |
 | `/park/r/` | **Ingen innlogging** | Skjemaet. Én statisk side |
-| `/park/r/api/oppsett/` | Gyldig token | Vaktnavn, lagene, stedene, verdimengdene, og hvor KO har plassert hvert lag (§5) |
+| `/park/r/api/oppsett/` | Gyldig token | Vaktnavn, lagene, stedene og verdimengdene — ikke noe annet |
 | `/park/r/api/registrer/` | Gyldig token | Lagrer, svarer med kvittering |
 | `/park/r/api/angre/` | Gyldig token + angre-nøkkel | Sletter én rad innenfor fristen |
 
@@ -210,21 +212,32 @@ Fristen er en `AppSetting`, satt av admin på `/portal-admin/innstillinger/` gje
 
 ---
 
-## 5. Lokasjonen: arvet, men lagets egen (B10)
+## 5. Lokasjonen (B10)
 
-**Lista er `oppdrag.Lokasjon`** — den samme KO plasserer lag på. **Forhåndsvalget** er, i
-denne rekkefølgen:
+**Lista er `oppdrag.Lokasjon`** — de samme stedene KO plasserer lag på, vedlikeholdt ett
+sted. Park leser dem; `oppdrag` kjenner ikke park. Kanten `park → oppdrag` er ny og får sin
+egen test på den importerte siden, som `OppdragImportererIkkeVaktlista`.
 
-1. Stedet **KO har plassert laget** på tavla nå (`ko.Tavleplassering`, den åpne raden)
-2. Stedet **denne telefonen** valgte sist
-3. Ingenting — laget må velge
+**Forhåndsvalget er det telefonen valgte sist.** Første gang, og hvis stedet er deaktivert
+siden, må laget velge.
 
-Endrer laget stedet, lagres `lokasjon_kilde = 'laget'`. Da kan tavla vise forskjellen (B16).
+### 5.1 Forhåndsvalg fra KO-plasseringen — vurdert og ikke anbefalt
 
-**Retningen er problemet, og løsningen finnes.** KO skal lese park (§7), så park kan ikke
-importere `ko` — det ville vært en sirkel. Svaret er samme idiom som `core/kontokobling.py`
-og `core/driftstatus.py`: et lite register i `core` der KO melder inn «hvor står ressurs X nå»,
-og park spør registeret. Park vet ikke at KO finnes; er KO slått av, er punkt 1 tomt.
+*Hva det betyr:* KO har en tavle (`ko.Tavleplassering`) der operatøren setter et lag på et
+sted — «Sandnes 2.1 står på Parkscene fra 21:00». Tanken var at når Sandnes 2.1 åpner
+parksiden, står Parkscene allerede valgt, fordi KO har plassert laget der.
+
+| For | Mot |
+|---|---|
+| Ett trykk mindre når laget har flyttet på KOs ordre og ikke har rukket å endre selv | **To kilder til samme forhåndsvalg.** Telefonen sier Village, KO sier Parkscene — hvilken vinner? Enhver regel er feil halve tiden |
+| KO og statistikken sier det samme når tavla er oppdatert | **Tavla henger etter virkeligheten.** Blir laget flyttet over samband og KO ikke drar kortet, står feil sted ferdig utfylt — og et ferdig utfylt felt blir ikke lest. Feilen blir stille og havner i statistikken |
+| | **Endepunktet uten innlogging ville vist hvor KO har plassert hvert lag** til alle med lenken. Ikke følsomt, men mer enn siden trenger |
+| | Krever et nytt register i `core`, siden park ikke kan importere `ko`. En ny mekanisme for å spare ett trykk |
+
+**Anbefaling: ikke nå.** Telefonens siste valg speiler der laget faktisk *er*; tavla speiler
+der KO *tror* det er. For en registrering er det første riktig kilde. Og B15 sier at KO og
+park ikke skal kobles i denne omgang — forhåndsvalget ville vært den eneste koblingen.
+Står i §9 som spørsmål 1, fordi André ba om vurderingen.
 
 ---
 
@@ -235,29 +248,33 @@ og park spør registeret. Park vet ikke at KO finnes; er KO slått av, er punkt 
 | Modul | `park/module.py`, `nivaaer = ('les', 'skriv_leder')` (B2) |
 | Backup | `park/backup.py`. `ressurs`, `lokasjon` og brukerpekerne strippes; navnene er frosset. Plass i `GJENOPPRETTINGSREKKEFOLGE` etter `vaktliste` |
 | Arkiv | Ikke i første omgang. Park følger arkiveringen når den flytter til `/portal-admin/` (`TODO.md`), som KO |
-| Statistikk | `park/statistikk.py`, fanen **«Lag»** (B12): per problemstilling, utfall, sted, lag, time. Summerer `antall`. Overskriften sier «kontakter», ikke «pasienter» (`FORSLAG_KO.md` §8) |
-| Audit | Lenke laget og fjernet, verdimengdene, KO sin sletting. Registreringene selv logges ikke — de er dataene, ikke en endring av dem |
-| Endringsnummer | `park/endringer.py`, så KO følger med uten å polle tabellen |
+| Statistikk | `park/statistikk.py`, fanen **«Lag»** (B12): per problemstilling, utfall, sted, lag, time. Summerer `antall`. Overskriften sier «kontakter», ikke «pasienter» (`FORSLAG_KO.md` §8). Gates på `park: les` — ingen endring i rammeverket (§7) |
+| Audit | Lenke laget og fjernet, verdimengdene, og sletting hvis §9 spørsmål 2 sier ja. Registreringene selv logges ikke — de er dataene, ikke en endring av dem |
 | Personvern | Ny rad i `PERSONVERN_DOKUMENTASJON.md` A.6: tid, sted, problemstilling, antall — ingen identifikator |
 
 ---
 
-## 7. KO (B15)
+## 7. KO og statistikken (B15, B17)
 
-**Retningen er `ko` → `park`.** KO importerer parks tjenestelag for å lese og handle; park
-kjenner ikke KO. Det er retningen KO har mot `vaktliste` og `oppdrag` allerede.
+**KO rører ikke park.** Ingen import, ingen visning, ingen handling. Første utkast foreslo
+en teller på lagkortet og sletting fra `/ko/`; André: «ingen av de». Det gjør modulen
+mindre og fjerner den eneste kanten som ville gått *inn* i park.
 
-**Tilgangen:** handlingene i `/ko/` gates på KO-nivået, ikke på park. Det er forsvarlig og
-ikke en bakvei: KO-loggen har samme vern som pasientdata (`FORSLAG_KO.md` §4.4), og
-parkregistreringene er *mindre* følsomme enn den. Å kreve `ModulTilgang('park')` i tillegg
-ville vært en rad å huske for hver operatør, uten at den beskytter noe.
+**Statistikken trenger ingen endring i rammeverket.** `statistikk/views.py` krever
+`statistikk: les` for siden og `har_tilgang(user, h.slug, h.nivaa)` for hver fane
+(`lesbare_kilder`). Fanen «Lag» har `slug = 'park'`, `nivaa = 'les'`. Altså:
 
-**Statistikken «Lag» må følge samme regel**, ellers ser KO-operatøren registreringene i
-`/ko/` og ikke i statistikken. Registeret spør i dag om `har_tilgang(user, h.slug,
-h.nivaa)`; det trengs én utvidelse — en handler kan oppgi en **alternativ gate**
-(`('ko', 'les')`). Liten, men det er en endring i rammeverket, og derfor nevnt.
+| Konto | `statistikk` | `park` | Ser «Lag» |
+|---|---|---|---|
+| Ledelsen | `les` | `les` | Ja |
+| Operatør i KO | — | — | Nei, og ser ikke `/statistikk/` i det hele tatt |
+| Operatør med statistikk for pasienter | `les` | — | Nei — bare fanene hun har kildetilgang til |
+| `skriv_leder` i park | etter behov | `skriv_leder` | Ja, hvis hun også har `statistikk` |
 
-**Hva «handle på dem» betyr er §9, spørsmål 3.**
+Oppdelingen André nevner — hvem som ser hva i `/statistikk/` — finnes dermed allerede, per
+kildemodul. Første utkast foreslo en «alternativ gate» (`ko: les` skulle åpne fanen); den
+faller bort med B15 og B17, og det er bra: den ville vært en bakvei rundt nettopp den
+oppdelingen.
 
 ---
 
@@ -270,32 +287,23 @@ prøvd på generalprøven.
 |---|---|
 | **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/park/r/` med lag/sted husket, angre, rate-limit, backup, modultestene |
 | **2 — Oppsettet** | `/park/oppsett/` (lenker med oppetid, verdimengdene), angrefristen i portalinnstillingene |
-| **3 — KO** | Registeret for plassering (§5), registreringene i `/ko/`, handlingene fra §9.3 |
-| **4 — Tallene** | `/park/`-oversikten, statistikk-kilden «Lag» med alternativ gate |
+| **3 — Tallene** | Statistikk-kilden «Lag», og sletting hvis §9 spørsmål 2 sier ja |
 
-**Anslag: 4–5 økter.** Uten offline er det usikre borte; det største enkeltstykket er nå
-pulje 3.
+**Anslag: 3 økter.** Uten offline og uten KO er både det usikre og det største stykket borte.
 
 ---
 
 ## 9. Det som gjenstår før koden
 
-1. **Lokasjon — har jeg forstått «arves fra /ko eller /oppdrag» riktig?** Min lesning i §5:
-   lista er stedene fra `/oppdrag/` (de samme KO bruker), og forhåndsvalget er der KO har
-   plassert laget, ellers det telefonen valgte sist.
-2. **Lenkens levetid.** (a) Er lenken bundet til én vakt, eller lever den på tvers av vakter
-   så tiltakskortet kan stå — med oppetiden som eneste grense? Forslag: på tvers, §3.2.
-   (b) Er det greit at lenken bare vises **én gang**, når den lages (§4.1)? Det er
-   best practice, men betyr at mister man den, lages en ny og tiltakskortet må oppdateres.
-3. **Hva skal KO kunne gjøre med registreringene?** Forslag, i stigende omfang:
-   - (a) **Se dem** — en liste og en teller per lag på lagkortet. *Anbefalt.*
-   - (b) **Slette en feilregistrering** etter angrefristen, med grunn, logget. *Anbefalt.*
-   - (c) **Rette** problemstilling, antall, utfall eller sted.
-   - (d) **Lage en hendelse eller logglinje** av en registrering. *Frarådes* — et lag som
-     trenger ressurser sier det på samband, og to kanaler for samme bestilling er én for
-     mye.
+Andre runde besvarte lenkens levetid (B18), KO (B15), utfallene (§3.3) og
+statistikk-tilgangen (B17). To spørsmål står igjen:
 
-   Og hvilket KO-nivå per handling: `les` for (a), `skriv_full` for (b) og (c)?
-4. **Startverdiene for utfall.** Admin kan endre dem, men migrasjonen må ha noe. Utkast:
-   «Gikk videre selv», «Fulgt til samleplass», «Tilkalt bil», «Avslo hjelp», «Overlatt til
-   andre (vakt/politi)».
+1. **Forhåndsvalg fra KO-plasseringen — ja eller nei?** André ba om fordeler og ulemper; de
+   står i §5.1. Anbefaling: **nei**, bare telefonens siste valg. Kan legges til senere uten å
+   rive noe.
+2. **Hvem retter en feilregistrering etter fem minutter?** KO skal ikke (B15), og laget kan
+   bare angre innenfor fristen. Taster noen 30 i stedet for 3 og oppdager det etter ti
+   minutter, står tallet i statistikken for alltid. Forslag: `skriv_leder` og admin kan
+   **slette** en registrering fra lista på `/park/`, med en grunn, og slettingen logges. Ikke
+   rette — en sletting og en ny registrering fra laget er ærligere enn at noen andre skriver
+   om det laget sa. Alternativet er å akseptere feilen som støy.
