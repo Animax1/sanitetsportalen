@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `main` omgang 3 av 3: `staging` er i produksjon  `#drift #deploy`
+
+**Hvorfor:** André, etter å ha sett over det som kom 27. sep.: «Kjør omgang 3». CI på omgang 2
+(`68fed55`) var grønn (ferdig 18:16:52 UTC) før pushen. `main` spoles fram til siste commit
+på `staging` — denne — med alt fra 27. sep.: bilens dobbelttrykk, «Opprett» gir ett oppdrag,
+begrunnelsen for admin i avslåtte moduler, raden «Migrasjoner» på server-status,
+historikksøket med og uten mellomrom, `/oppdrag/` ut av menyen for sentralbordet, og merket for
+nytt i hendelsene. **Én migrasjon:** `ko.0023`, en ny tabell.
+
+**Verifiseres** ved at footeren på prod viser samme byggnummer som `staging`, og at raden
+«Migrasjoner» på `/portal-admin/server-status/` står grønt — første gang prod har den.
+
+`docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md` er flyttet til `docs/archived/`, slik den
+selv sa, og punktet i `TODO.md` er slettet.
+
 ## 2026-09-27 — `main` omgang 2 av 3: kolonneslettingen `68fed55` er i produksjon  `#drift #deploy`
 
 **Hvorfor:** André tok en manuell backup av prod og sa: «Vent til ci er grønn og da kan du pushe
