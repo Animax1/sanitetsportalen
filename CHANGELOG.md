@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `main` omgang 1 av 3: `0660da0` er i produksjon  `#drift #deploy`
+
+**Hvorfor:** André har gått gjennom testsjekklista for `staging` til `main`, og sa «Kjør
+omgang 1». `main` er spolt fram `4813cee..0660da0`: tekniske runder 6 og 7, felles
+oppretting av vakter og historikksøket. **Ingen migrasjoner** i omgangen. Kontrollert før
+pushen: alle tre omgangene er rene framspolinger fra `main`, og migrasjonene ligger der
+planen sier (`core.0013` alene i omgang 2, `ko.0023` i omgang 3).
+
+**Verifiseres på prod** ved at byggnummeret i footeren er `0660da0`. Raden «Migrasjoner» på
+server-status finnes først fra omgang 3.
+
 ## 2026-09-27 — Offline: papir og utskrift som reserve, ikke full redigering  `#docs #offline`
 
 **Hvorfor:** André meldte at merknader ikke kan redigeres offline i vaktlista. Etter en

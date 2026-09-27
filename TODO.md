@@ -177,13 +177,15 @@ eller sendt på e-post reserven.
 *Planen fra 26. sep. 2026. Neste vakt er den første der flere biler per oppdrag brukes i
 virkeligheten, og rekkefølgen under følger av det.*
 
-- [ ] **`staging` til `main` i god tid, i tre framspolinger** — når André har sett over
-      `staging` med [`docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md`](./docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md),
-      som også har kommandoene. Staging står flere runder foran prod (tekniske runder 6–8
-      og G6a); jo større én push er, jo vanskeligere er det å si hva som forårsaket en
-      feil. Kolonneslettingen `68fed55` (`backup_enabled`) går alene, med backup av prod
-      rett før: den er databaseendringen. Forutsetter at prod kjører `4813cee` eller nyere,
-      og det gjør den.
+- [ ] **`staging` til `main`, omgang 2 og 3** — **omgang 1 (`0660da0`) er i `main` 27. sep.
+      2026.** Kommandoene står i
+      [`docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md`](./docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md).
+      Omgang 2 er kolonneslettingen `68fed55` (`backup_enabled`) alene, med en manuell «full»
+      backup av prod rett før: den er databaseendringen. Omgang 3 er resten, fram til siste
+      commit på staging — etter at André har prøvd det som kom 27. sep. og ikke står i
+      sjekklista (merket for nytt i hendelsene, `/oppdrag/` ut av menyen for sentralbordet,
+      historikksøket med og uten mellomrom). Jo større én push er, jo vanskeligere er det å si
+      hva som forårsaket en feil.
 - [ ] **Fastfrysing noen uker før vakta:** ingen skjemaendringer, flyttinger eller nye
       moduler — bare feilrettinger. Det som kjører på vakta skal være det generalprøven
       prøvde. Det som skal være med på vakta — `/park/`, puss av `/ko/` og `/vaktliste/`,

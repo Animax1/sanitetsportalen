@@ -106,7 +106,7 @@ så ingenting trenger å stokkes om:
 
 | Omgang | Kommando | Hva som går ut |
 |---|---|---|
-| 1 | `git push origin 0660da0:main` | Tekniske runder 6 og 7, vaktfabrikken og historikksøket |
+| 1 ✅ 27. sep. | `git push origin 0660da0:main` | Tekniske runder 6 og 7, vaktfabrikken og historikksøket |
 | 2 | `git push origin 68fed55:main` | **Bare kolonneslettingen** (`backup_enabled`). Ta backup av prod rett før — det er den ene endringen som ikke kan angres uten tilbakerulling |
 | 3 | `git push origin <siste commit på staging>:main` (i dag `729fe04`) | Resten: felles klokke, kommandoene til `core`, bil-kontoen, G6a og dokumentene |
 
