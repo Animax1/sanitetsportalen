@@ -177,11 +177,10 @@ eller sendt på e-post reserven.
 *Planen fra 26. sep. 2026. Neste vakt er den første der flere biler per oppdrag brukes i
 virkeligheten, og rekkefølgen under følger av det.*
 
-- [ ] **`staging` til `main`, omgang 2 og 3** — **omgang 1 (`0660da0`) er i `main` 27. sep.
-      2026.** Kommandoene står i
+- [ ] **`staging` til `main`, omgang 3** — omgang 1 (`0660da0`) og omgang 2 (`68fed55`,
+      kolonneslettingen, med backup av prod før) er i `main` 27. sep. 2026. Kommandoen står i
       [`docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md`](./docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md).
-      Omgang 2 er kolonneslettingen `68fed55` (`backup_enabled`) alene, med en manuell «full»
-      backup av prod rett før: den er databaseendringen. Omgang 3 er resten, fram til siste
+      Omgang 3 er resten, fram til siste
       commit på staging — etter at André har prøvd det som kom 27. sep. og ikke står i
       sjekklista (merket for nytt i hendelsene, `/oppdrag/` ut av menyen for sentralbordet,
       historikksøket med og uten mellomrom). Jo større én push er, jo vanskeligere er det å si

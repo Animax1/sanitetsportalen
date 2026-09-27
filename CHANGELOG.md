@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `main` omgang 2 av 3: kolonneslettingen `68fed55` er i produksjon  `#drift #deploy`
+
+**Hvorfor:** André tok en manuell backup av prod og sa: «Vent til ci er grønn og da kan du pushe
+etter 3 minutter». CI på `0660da0` (omgang 1) ble grønn 18:10:09 UTC; `main` ble spolt fram
+`0660da0..68fed55` klokka 18:13:19. Omgangen er **bare** `core.0013` — `DROP COLUMN` på
+`ModuleSettings.backup_enabled`, som koden sluttet å bruke i omgang 1.
+
+**Verifiseres** ved at byggnummeret i footeren på prod er `68fed55`: feiler `migrate` i
+release-fasen, bytter ikke Railway container. `/portal-admin/moduler/` skal virke som før.
+
 ## 2026-09-27 — `main` omgang 1 av 3: `0660da0` er i produksjon  `#drift #deploy`
 
 **Hvorfor:** André har gått gjennom testsjekklista for `staging` til `main`, og sa «Kjør
