@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — `/park/`: avklart — nyeste sted vinner, sletting for `skriv_leder`  `#docs #park #forslag`
+
+**Hvorfor:** Andrés tredje runde. «Sted fra ko, hva om vi bruker nyeste av de?»
+
+- **Forhåndsvalget av sted: det nyeste vinner** (B19) — KOs åpne plassering på tavla mot
+  lagets siste registrering. **Begge tidene er serverens**, derfor er «lagets valg» siste
+  *registrering* og ikke telefonens minne: en telefonklokke som står feil ville gitt feil
+  vinner i stillhet. Regelen løser innvendingen fra forrige runde (en tavle som henger etter
+  vinner ikke over en ferskere registrering), og siden sier hvor valget kom fra — «Fra
+  KO-tavla 22:00». Park leser tavla gjennom et nytt register i `core`, så park ikke importerer
+  `ko`; endepunktet svarer for ett lag om gangen.
+- **Feilregistreringer** (B20): `skriv_leder` og admin sletter fra lista på `/park/`, med
+  grunn, logget. Raden står og statistikken utelater den.
+- §9 er tom. Tre puljer.
+
 ## 2026-09-27 — `/park/`: andre avklaringsrunde, to spørsmål igjen  `#docs #park #forslag`
 
 **Hvorfor:** Andrés andre runde svar på `docs/FORSLAG_PARK.md`. «Gå gjennom svarene mine så ser

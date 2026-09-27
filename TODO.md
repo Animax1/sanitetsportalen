@@ -917,8 +917,8 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       en ny vei. Kan gjøres uavhengig av KO.
 
 - [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
-      André har besvart to runder (§2, B1–B18); to spørsmål i §9 gjenstår, og **ingen kode
-      før de er besvart**. Puljene står i §8. Lagets utfallsregistrering: problemstilling,
+      Avklart i tre runder (§2, B1–B20), §9 er tom. Tre puljer i §8; pulje 1 er modellen og
+      parksiden. Lagets utfallsregistrering: problemstilling,
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`

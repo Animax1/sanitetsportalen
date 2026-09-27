@@ -1,8 +1,8 @@
 # Forslag: `/park/` — lagets utfallsregistrering
 
-Status: **under avklaring.** Første utkast 27. september 2026 fra staging `8327d8f`; André
-svarte i to runder samme dag, og svarene står som **besluttet** under. §9 er det som gjenstår. **Ingen
-kode før §9 er tom** (André: «Vi starter ikke kode før vi har alt av punkter på plass»).
+Status: **avklart, klar til pulje 1.** Første utkast 27. september 2026 fra staging `8327d8f`;
+André svarte i tre runder samme dag, og svarene står som **besluttet** under (B1–B20). §9 er
+tom — André: «Vi starter ikke kode før vi har alt av punkter på plass».
 Arbeidslista er `TODO.md`.
 
 Underlaget som allerede sto skrevet, og som dette notatet bygger på:
@@ -52,7 +52,7 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B7 | Utfall | Egen liste, satt opp av **admin** |
 | B8 | Personen | Ingen kjønn, ingen alder |
 | B9 | Antall | En registrering kan gjelde **flere med samme problemstilling**. Etter registrering starter en ny, med lag og sted husket — stedet kan endres. **Alt av nedtrekk på én side** |
-| B10 | Lokasjon | **Lista arves fra `oppdrag.Lokasjon`** — de samme stedene KO bruker. Forhåndsvalget er det telefonen valgte sist; laget kan alltid endre det (§5) |
+| B10 | Lokasjon | **Lista arves fra `oppdrag.Lokasjon`** — de samme stedene KO bruker. Laget kan alltid endre forhåndsvalget (§5) |
 | B11 | Angre | Ja. **5 minutter** som standard, styrt av admin |
 | B12 | Statistikk | En egen kilde, **«Lag»** |
 | B13 | QR-koder | Ikke nå. Står i `TODO.md` som mulighet |
@@ -61,6 +61,8 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B16 | Tavla | Å vise stedet laget satte mot stedet KO plasserte det er en **mulighet i `TODO.md`**, ikke en del av denne leveransen — den krever at KO leser park, og B15 sier at KO ikke gjør det nå |
 | B17 | Statistikk-tilgang | **Operatørene skal ikke nødvendigvis ha `/statistikk/`**, og tilgangen der kan bli delt opp. Den *er* delt per fane allerede (§7): fanen «Lag» krever `statistikk: les` **og** `park: les`. Ledelsen får `park: les`; operatørene får det ikke |
 | B18 | Lenkens levetid | **På tvers av vakter** (spørsmål 2a). Tiltakskortet kan stå; oppetiden er grensen |
+| B19 | Forhåndsvalg av sted | **Det nyeste vinner** (tredje runde): «Om KOs plassering er nyeste er det siste, om lagets valg er nyeste brukes det» (§5.1) |
+| B20 | Feilregistreringer | `skriv_leder` og admin kan **slette** en registrering fra lista på `/park/`, med grunn, logget. Ikke rette |
 
 **Hva B3 og B4 endret fra første utkast.** Utkastet foreslo én lenke per lag, med
 begrunnelsen at et nedtrekk ingen kontrollerer er en påstand. André: «det blir svært
@@ -93,7 +95,7 @@ ganger også når den er på nett.
 | `lokasjon` / `lokasjon_navn` | FK til `oppdrag.Lokasjon` + frosset navn, som `Tavleplassering` |
 | `registrert_at` | Når raden kom inn. Uten offline er det også når det skjedde — ingen klienttid, ingen `vurder_klienttid` |
 | `idempotency_key` | Klientgenerert UUID, unik per lenke. Er også **angre-nøkkelen**, §4.4 |
-| `slettet_at`, `slettet_av_navn`, `slettet_grunn` | **Bare hvis §9 spørsmål 2 sier ja.** Lagets angring sletter raden helt |
+| `slettet_at`, `slettet_av_navn`, `slettet_grunn` | B20. Raden står, og statistikken utelater den — en sletting som ikke synes er en statistikk ingen kan etterprøve. Lagets angring sletter raden helt |
 
 **Ingen fritekst er sikkerhetsmodellen, ikke en forenkling** (B1). Et felt som tar imot hva
 som helst fra et endepunkt uten innlogging er et felt der et navn havner en travel kveld,
@@ -165,10 +167,11 @@ sender det i headeren `X-Park-Lenke`.
 
 | Sti | Hvem | Hva |
 |---|---|---|
-| `/park/` | `skriv_leder`, admin | Oppsettet: lenker (lag, fjern, oppetid), problemstillinger; utfall bare for admin. Pluss lista over registreringene hvis §9 spørsmål 2 sier ja |
+| `/park/` | `skriv_leder`, admin | Oppsettet: lenker (lag, fjern, oppetid), problemstillinger; utfall bare for admin. Lista over registreringene med «Slett» (B20) |
 | — | `les` | Ingen egen side. `les` er det som åpner fanen «Lag» i `/statistikk/` (B17) |
 | `/park/r/` | **Ingen innlogging** | Skjemaet. Én statisk side |
 | `/park/r/api/oppsett/` | Gyldig token | Vaktnavn, lagene, stedene og verdimengdene — ikke noe annet |
+| `/park/r/api/sted/?lag=<id>` | Gyldig token | Forhåndsvalget for **ett** lag, med kilde og tid (§5.1) |
 | `/park/r/api/registrer/` | Gyldig token | Lagrer, svarer med kvittering |
 | `/park/r/api/angre/` | Gyldig token + angre-nøkkel | Sletter én rad innenfor fristen |
 
@@ -218,26 +221,44 @@ Fristen er en `AppSetting`, satt av admin på `/portal-admin/innstillinger/` gje
 sted. Park leser dem; `oppdrag` kjenner ikke park. Kanten `park → oppdrag` er ny og får sin
 egen test på den importerte siden, som `OppdragImportererIkkeVaktlista`.
 
-**Forhåndsvalget er det telefonen valgte sist.** Første gang, og hvis stedet er deaktivert
-siden, må laget velge.
+### 5.1 Forhåndsvalget: det nyeste vinner (B19)
 
-### 5.1 Forhåndsvalg fra KO-plasseringen — vurdert og ikke anbefalt
+To kilder, og den ferskeste gjelder:
 
-*Hva det betyr:* KO har en tavle (`ko.Tavleplassering`) der operatøren setter et lag på et
-sted — «Sandnes 2.1 står på Parkscene fra 21:00». Tanken var at når Sandnes 2.1 åpner
-parksiden, står Parkscene allerede valgt, fordi KO har plassert laget der.
+| Kilde | Hva | Tid |
+|---|---|---|
+| **KO** | Lagets åpne plassering på tavla (`ko.Tavleplassering`, `til` tom) | `fra` |
+| **Laget** | Stedet på lagets siste registrering — fra hvilken som helst telefon | `registrert_at` |
 
-| For | Mot |
+**Begge tidene er serverens.** Det er grunnen til at «lagets valg» er siste *registrering* og
+ikke det telefonen husker: telefonens klokke kan stå hvor som helst, og en sammenligning med
+en tid fra serveren ville da gitt feil vinner uten at noen så det. Telefonens eget minne
+brukes bare når ingen av de to finnes — første registrering, og KO har ikke plassert laget.
+Et nedtrekk laget endrer uten å registrere, står uansett på skjermen.
+
+**Regelen løser innvendingen fra første runde.** Tavla som henger etter var et problem fordi
+KO alltid ville vunnet. Med «nyeste vinner» taper en gammel plassering mot en ferskere
+registrering: KO satte laget på Parkscene 21:00, laget registrerte fra Village 21:30 —
+Village. KO flytter laget til Club 22:00 — Club.
+
+**Og forhåndsvalget sier hvor det kom fra**, under nedtrekket: «Fra KO-tavla 22:00» eller
+«Sist registrert 21:30». Et ferdig utfylt felt blir ikke lest; en linje som sier *hvorfor*
+det står der, blir det oftere.
+
+| Tilfelle | Forhåndsvalg |
 |---|---|
-| Ett trykk mindre når laget har flyttet på KOs ordre og ikke har rukket å endre selv | **To kilder til samme forhåndsvalg.** Telefonen sier Village, KO sier Parkscene — hvilken vinner? Enhver regel er feil halve tiden |
-| KO og statistikken sier det samme når tavla er oppdatert | **Tavla henger etter virkeligheten.** Blir laget flyttet over samband og KO ikke drar kortet, står feil sted ferdig utfylt — og et ferdig utfylt felt blir ikke lest. Feilen blir stille og havner i statistikken |
-| | **Endepunktet uten innlogging ville vist hvor KO har plassert hvert lag** til alle med lenken. Ikke følsomt, men mer enn siden trenger |
-| | Krever et nytt register i `core`, siden park ikke kan importere `ko`. En ny mekanisme for å spare ett trykk |
+| Laget er på en hendelse eller pause (ingen åpen plassering med sted) | Siste registrering |
+| Stedet er deaktivert siden | Ingenting — laget velger |
+| KO-modulen er slått av | Siste registrering |
 
-**Anbefaling: ikke nå.** Telefonens siste valg speiler der laget faktisk *er*; tavla speiler
-der KO *tror* det er. For en registrering er det første riktig kilde. Og B15 sier at KO og
-park ikke skal kobles i denne omgang — forhåndsvalget ville vært den eneste koblingen.
-Står i §9 som spørsmål 1, fordi André ba om vurderingen.
+**Retningen.** KO gjør fortsatt ingenting med registreringene (B15), og `ko` importerer ikke
+park. Men park må lese tavla, og park får ikke importere `ko` — KO står øverst. Løsningen er
+et lite register i `core` (`core/ressursplassering.py`), samme idiom som `core/kontokobling.py`:
+KO melder inn «åpen plassering for ressurs X, med sted og tid», park spør registeret. Park vet
+ikke at KO finnes.
+
+**Endepunktet svarer for ett lag om gangen** (`?lag=<id>`), ikke for alle. Lista over hvor KO
+har plassert hvert lag er mer enn siden trenger, selv om de som har lenken er få.
 
 ---
 
@@ -249,7 +270,7 @@ Står i §9 som spørsmål 1, fordi André ba om vurderingen.
 | Backup | `park/backup.py`. `ressurs`, `lokasjon` og brukerpekerne strippes; navnene er frosset. Plass i `GJENOPPRETTINGSREKKEFOLGE` etter `vaktliste` |
 | Arkiv | Ikke i første omgang. Park følger arkiveringen når den flytter til `/portal-admin/` (`TODO.md`), som KO |
 | Statistikk | `park/statistikk.py`, fanen **«Lag»** (B12): per problemstilling, utfall, sted, lag, time. Summerer `antall`. Overskriften sier «kontakter», ikke «pasienter» (`FORSLAG_KO.md` §8). Gates på `park: les` — ingen endring i rammeverket (§7) |
-| Audit | Lenke laget og fjernet, verdimengdene, og sletting hvis §9 spørsmål 2 sier ja. Registreringene selv logges ikke — de er dataene, ikke en endring av dem |
+| Audit | Lenke laget og fjernet, verdimengdene, og sletting (B20). Registreringene selv logges ikke — de er dataene, ikke en endring av dem |
 | Personvern | Ny rad i `PERSONVERN_DOKUMENTASJON.md` A.6: tid, sted, problemstilling, antall — ingen identifikator |
 
 ---
@@ -285,25 +306,14 @@ prøvd på generalprøven.
 
 | Pulje | Innhold |
 |---|---|
-| **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/park/r/` med lag/sted husket, angre, rate-limit, backup, modultestene |
-| **2 — Oppsettet** | `/park/oppsett/` (lenker med oppetid, verdimengdene), angrefristen i portalinnstillingene |
-| **3 — Tallene** | Statistikk-kilden «Lag», og sletting hvis §9 spørsmål 2 sier ja |
+| **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/park/r/` med lag husket og forhåndsvalg av sted (§5.1, registeret i `core`), angre, rate-limit, backup, modultestene |
+| **2 — Oppsettet** | `/park/` (lenker med oppetid, verdimengdene, lista med sletting), angrefristen i portalinnstillingene |
+| **3 — Tallene** | Statistikk-kilden «Lag» |
 
-**Anslag: 3 økter.** Uten offline og uten KO er både det usikre og det største stykket borte.
+**Anslag: 3 økter**, pluss litt for registeret i §5.1.
 
 ---
 
 ## 9. Det som gjenstår før koden
 
-Andre runde besvarte lenkens levetid (B18), KO (B15), utfallene (§3.3) og
-statistikk-tilgangen (B17). To spørsmål står igjen:
-
-1. **Forhåndsvalg fra KO-plasseringen — ja eller nei?** André ba om fordeler og ulemper; de
-   står i §5.1. Anbefaling: **nei**, bare telefonens siste valg. Kan legges til senere uten å
-   rive noe.
-2. **Hvem retter en feilregistrering etter fem minutter?** KO skal ikke (B15), og laget kan
-   bare angre innenfor fristen. Taster noen 30 i stedet for 3 og oppdager det etter ti
-   minutter, står tallet i statistikken for alltid. Forslag: `skriv_leder` og admin kan
-   **slette** en registrering fra lista på `/park/`, med en grunn, og slettingen logges. Ikke
-   rette — en sletting og en ny registrering fra laget er ærligere enn at noen andre skriver
-   om det laget sa. Alternativet er å akseptere feilen som støy.
+Ingenting. Tredje runde besvarte forhåndsvalget (B19) og feilregistreringene (B20).
