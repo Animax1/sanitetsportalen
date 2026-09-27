@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Offline: papir og utskrift som reserve, ikke full redigering  `#docs #offline`
+
+**Hvorfor:** André meldte at merknader ikke kan redigeres offline i vaktlista. Etter en
+gjennomgang av måtene å løse redigering på samme rad offline og online (siste vinner,
+versjonsnummer, felt for felt, hendelser, CRDT): «Det er snakk om usannsynlige scenarioer og i
+etterkant er det nok bedre å kunne ha det offline for å kunne gjøre utskrift og så redigere
+oppå der. Kanskje noe å se på også ift /ko og /pasienter/?»
+
+Ingen kode. `TODO.md` har fått seksjonen «Offline og papir som reserve» med konklusjonen per
+modul: vaktlista er i hovedsak dekket (vurder merknadene i fila på e-post), `/ko/` får utskrift
+av loggen og logglinjer offline (de legges til og kolliderer ikke), og `/pasienter/` får
+papirskjema som reserve og **ingen** offline-kopi — helseopplysninger på delte PC-er, og
+pasientnummeret deles ut av serveren. Seksjonen «Meldt fra staging 27. sep.» er slettet: alle
+punktene i den er gjort eller flyttet hit.
+
 ## 2026-09-27 — Nytt i hendelsene: tall og fet tittel siden sist du åpnet  `#ko #hendelser`
 
 **Hvorfor:** André: «Varselstegn i hendelselogg og sidebar ved noe nytt, kan være en

@@ -145,16 +145,32 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
-### Meldt fra staging 27. sep. 2026 (André)
+### Offline og papir som reserve — avklart 27. sep. 2026, ikke påbegynt
 
-Historikksøket med og uten mellomrom, snarveien til `/oppdrag/` og merket for nytt i
-hendelsene er gjort (CHANGELOG 27. sep.).
+André meldte at merknader ikke kan redigeres offline i vaktlista («virker ut som bare
+stemplingen fungerer»). Etter en gjennomgang av alternativene (siste vinner, versjonsnummer,
+felt for felt, hendelser, CRDT) var konklusjonen hans: **konfliktene er usannsynlige, og det
+som trengs offline er å *ha* dataene og kunne skrive dem ut — redigeringen kan gjøres på
+papiret og føres inn når nettet er tilbake.** Full redigering offline bygges derfor ikke.
 
-- [ ] **Vaktlista offline: merknader kan ikke redigeres** — «virker ut som bare stemplingen
-      fungerer. Vi må se på om det går an å beholde full funksjonalitet i offline modus.»
-      Først kartlegge hva offline-køen faktisk tar i dag, og hva «full funksjonalitet» vil
-      koste: en redigering offline kan kollidere med en annens redigering online, og det
-      trenger en regel (siste vinner, eller avvis og vis) før noe bygges.
+**Skillet som styrer hva som hjelper:** offline-kopien i nettleseren hjelper når *én PC* har
+mistet nett. Er *portalen eller Railway* nede, har ingen den — da er det som alt er skrevet ut
+eller sendt på e-post reserven.
+
+- [ ] **Vaktlista:** les og utskrift offline er i hovedsak på plass (service workeren, 24 t;
+      utskriftsstilen; fila på e-post fra `vaktliste/fil.py`). Vurder om **merknadene** skal
+      med i fila på e-post — i dag har den telefon og ISSI, men ikke merknad, med vilje.
+- [ ] **`/ko/`: utskrift av loggen** (står også under KO: «utskriften skal ha alt»).
+- [ ] **`/ko/`: logglinjer offline.** Passer naturlig: en linje *legges til*, ingen konflikt,
+      og `Logglinje` skiller allerede `tidspunkt` (når det skjedde) fra `registrert_at` (når
+      det kom inn). Samme kø-mønster som stemplingene i vaktlista og bilen. Tavla og
+      sentralbordet offline gir lite — bilene får ingenting før nettet er tilbake uansett.
+- [ ] **`/pasienter/`: papirskjema som reserve, ingen offline-kopi av lista.** Det er
+      helseopplysninger på delte PC-er — samme grunn som at backupen ikke kan lastes ned.
+      Utskrift av pasientlister krever en rutine (hvem har arket, destruksjon) og hører
+      hjemme i DPIA-notatet. Registrering offline er teknisk enkel (idempotensnøklene
+      finnes), men **pasientnummeret** deles ut av serveren — offline ville gitt et annet
+      nummer på papiret enn i systemet.
 
 ### Veien til neste vakt (om ~240 dager, fra 26. sep. 2026)
 
