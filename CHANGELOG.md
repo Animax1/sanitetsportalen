@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — En avslått modul er stengt også for admin, og «Opprett» gir ett oppdrag  `#tilgang #oppdrag #ko #bug`
+
+**Hvorfor:** André, fra staging: «Når du slår en modul av og som f.eks /ko/ så kan du komme
+inn på siden om du skriver nettsiden» — og «Når du trykker flere ganger på rad på opprett
+oppdrag så får du flere oppdrag lagd, så det må begrenses.»
+
+**1. Avslått modul var åpen for global admin.** Vanlige brukere fikk 403 allerede;
+`nivaa_for` ga admin toppen av stigen *før* den så på `ModuleSettings`, med begrunnelsen
+«ellers kunne man deaktivere seg selv ut av å kunne reaktivere». Den holdt ikke: bryteren
+står på `/portal-admin/moduler/`, som er `admin_required` og **ikke** modulgatet, og
+kjernemodulene (`accounts`, `core`) kan ikke slås av. Menyen skjulte allerede modulen for
+admin — bare døra sto åpen. Nå sjekkes modulen først, for alle.
+- `core/auth_decorators.py`: `nivaa_for` — `_modul_er_aktiv` før admin-grenen.
+- `ko/tilstede.py`: sidebaren speilet den gamle regelen i mengdeform; `_modulen_er_paa()`
+  gir tom liste når KO er av.
+- Fire tester som låste den gamle regelen er skrevet om, og
+  `test_admin_kan_fortsatt_slaa_modulen_paa_igjen` holder bekymringen den gamle regelen
+  fantes for. `CLAUDE.md`, `TEKNISK_DOKUMENTASJON.md` og `BESLUTNING_ROLLEMODELLEN.md` rettet.
+- **Konsekvens:** vil admin forberede en modul før den slås på for alle, må den stå på.
+  Statistikkfanene og bjellevarsler fra en avslått modul er også borte for admin.
+
+**2. Flere trykk på «Opprett» ga flere oppdrag.** `opprettOppdrag()` hadde verken lås eller
+nøkkel, og POST-en på `/oppdrag/api/oppdrag/` var ikke idempotent. To lag, som i
+pasientregistreringen:
+- **Klienten:** `withSubmitGuard('nytt-opprett', …)` — knappen står fast i malen, så låsen
+  holder her (i motsetning til bilens knapper). Og en **idempotensnøkkel per åpning av
+  vinduet** (`nullstillNyttOppdrag`), nullstilt etter suksess, beholdt etter en feil.
+  409 `duplikat` er stille.
+- **Serveren:** `core.idempotency` i `oppdrag_liste_view` — reservert *etter* validering
+  (en 400 brenner ikke nøkkelen), frigitt hvis opprettelsen kaster, og et trykk etter at
+  det første var ferdig får samme oppdrag tilbake. Selve opprettelsen er skilt ut i
+  `_opprett_oppdrag()`. Uten nøkkel oppfører endepunktet seg som før.
+- `nyIdempotensNokkel()` er **flyttet** fra `patients-utils.js` til `portal-utils.js` —
+  `patients-utils.js` kan ikke lastes utenfor pasientsiden, og en kopi ville vært den tredje.
+- Gjelder også `/ko/`, som bruker samme skjema.
+
+**Tester:** `oppdrag/tests_opprett_dobbelttrykk.py` (12: sju mot serveren, fem mot knappen i
+node), og de omskrevne i `ko/tests.py`, `statistikk/tests.py` og
+`accounts/tests_modultilgang.py`. **Mutanter: 15, alle drept** — tilgang tungt (aktiv-sjekken før admin fjernet, `is_core`-unntaket fjernet, sidebarsperra fjernet og invertert), serveren middels (ferdig-grenen, 409 `pagar`, `forkast` ved unntak, `fullfor`, nøkkel ikke per bruker, nøkkel ignorert), knappen middels (låsen, nullstilling etter suksess, nøkkel i kroppen, 409-grenen, ny nøkkel ved åpning). Én ble først hoppet over fordi mønsteret traff **to** steder — stemplingsviewet har samme `elif` — og kjørt på nytt med et entydig mønster. Hele suiten fant i tillegg to eldre harnesser i `oppdrag/tests_runde_d.py` som hentet `opprettOppdrag`/`nullstillNyttOppdrag` uten de nye hjelperne; de har fått dem.
+
 ## 2026-09-27 — Bilen: dobbelttrykk ga «Oppdraget står i Leverer — skjermen er oppdatert»  `#oppdrag #bug #bilen`
 
 **Hvorfor:** André, fra bilskjermen midt i en vanlig kjøring: en rød boks med «Oppdraget står

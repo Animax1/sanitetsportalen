@@ -294,7 +294,7 @@ class ModulTilgangSynlighetTests(TestCase):
         self.assertEqual(ModulTilgang.objects.filter(bruker=admin).count(), 0)
         self.assertIn('statistikk', [m.slug for m in get_visible_modules(admin)])
 
-    def test_deaktivert_modul_stenger_for_alle_andre_enn_admin(self):
+    def test_deaktivert_modul_stenger_for_alle(self):
         """Toggelen var en menybryter (§2.2). Nå er den en dør.
 
         `GET /pasienter/` ga 200 med modulen deaktivert. Verdt å vite *før*
@@ -306,9 +306,9 @@ class ModulTilgangSynlighetTests(TestCase):
         lead = _bruker('leder')
         self.assertFalse(har_tilgang(lead, 'statistikk', 'les'))
 
-        # Admin slipper fortsatt inn — ellers kan man deaktivere seg selv ut
-        # av å kunne reaktivere.
-        self.assertTrue(har_tilgang(_bruker('admin'), 'statistikk', 'les'))
+        # Også admin (27. sep. 2026). Reaktiveringen står på
+        # `/portal-admin/moduler/`, som ikke er modulgatet.
+        self.assertFalse(har_tilgang(_bruker('admin'), 'statistikk', 'les'))
 
     def test_anonym_bruker_har_ingenting(self):
         from django.contrib.auth.models import AnonymousUser

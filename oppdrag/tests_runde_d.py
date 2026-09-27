@@ -148,7 +148,8 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
     nedtrekkene øverst."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue',
+                           'nyIdempotensNokkel')),
         (OPPDRAG_SENTRAL_JS, ('fyllNedtrekk', 'mkEnhetsvalg', '_valgteEnheter',
                               '_grupperEnheter', '_typeRekkefolge',
                               'nullstillNyttOppdrag', 'hastegradEndret',
@@ -158,6 +159,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
     #: En liten DOM: avkryssingslista lager input-objekter av sin egen
     #: innerHTML, nedtrekkene har `options`, `value` og `selectedIndex`.
     DOM = """
+        let nyttOppdragNokkel = null;
         function nedtrekk(verdier) {
           const sel = { options: verdier.map((v) => ({value: v})), selectedIndex: 0 };
           Object.defineProperty(sel, 'value', {
@@ -385,10 +387,11 @@ class HastegradknappeneTests(SimpleTestCase):
         Fra 23. sep. 2026 står lokasjon og problemstilling på «Velg…» også,
         og samme regel gjelder dem: hvert obligatorisk felt stopper for seg,
         i skjemaets rekkefølge, og først når alle er valgt går kallet."""
-        harness = build_harness(((OPPDRAG_SENTRAL_JS, ('opprettOppdrag', '_valgteEnheter',
-                                                        'nyttOppdragMangler')),))
+        harness = build_harness(((PORTAL_UTILS_JS, ('withSubmitGuard', 'nyIdempotensNokkel')),
+                                 (OPPDRAG_SENTRAL_JS, ('opprettOppdrag', '_opprettOppdrag',
+                                                       '_valgteEnheter', 'nyttOppdragMangler'))))
         ut = run_node(harness, """
-            let kall = 0;
+            let kall = 0; let nyttOppdragNokkel = null;
             globalThis.apiFetch = async () => { kall += 1; return { ok: true, json: async () => ({ status: 'ok', data: { id: 1 } }) }; };
             globalThis.nullstillNyttOppdrag = () => {}; globalThis.lastAlt = async () => {};
             globalThis.bootstrap = { Modal: { getInstance: () => ({ hide() {} }) } };

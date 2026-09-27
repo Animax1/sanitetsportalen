@@ -103,7 +103,20 @@ async function hentTilbakeOppdrag(id) {
 
 // ── Oppretting ──────────────────────────────────────────
 
+//: Én nøkkel per åpning av «Nytt oppdrag» (`nullstillNyttOppdrag`). Serveren
+//: oppretter ett oppdrag per nøkkel, så flere trykk på «Opprett» — eller en
+//: nettverks-retry — gir ett oppdrag (André, 27. sep. 2026: «Når du trykker
+//: flere ganger på rad på opprett oppdrag så får du flere oppdrag lagd»).
+let nyttOppdragNokkel = null;
+
 async function opprettOppdrag() {
+  // Knappen står fast i malen og tegnes ikke på nytt mens vinduet er åpent,
+  // så `withSubmitGuard` holder her — i motsetning til bilens knapper. Den er
+  // første lag; nøkkelen er det som holder når låsen ikke gjør det.
+  await withSubmitGuard('nytt-opprett', _opprettOppdrag);
+}
+
+async function _opprettOppdrag() {
   const feil = document.getElementById('nytt-feil');
   feil.classList.add('d-none');
 
@@ -133,14 +146,22 @@ async function opprettOppdrag() {
       problemstilling: document.getElementById('nytt-problemstilling').value,
       hastegrad: document.getElementById('nytt-hastegrad').value,
       fritekst: document.getElementById('nytt-fritekst').value,
+      idempotency_key: nyttOppdragNokkel || (nyttOppdragNokkel = nyIdempotensNokkel()),
     }),
   });
   const d = await res.json();
+  if (res.status === 409 && d.duplikat) {
+    // Et trykk til mens det første fortsatt ble lagret. Oppdraget er på vei;
+    // lista hentes, og ingenting annet skal skje.
+    return;
+  }
   if (!res.ok || d.status !== 'ok') {
     feil.textContent = d.message || 'Kunne ikke opprette oppdraget.';
     feil.classList.remove('d-none');
     return;
   }
+  // Neste oppdrag er et nytt oppdrag, også om vinduet ikke lukkes og åpnes.
+  nyttOppdragNokkel = null;
   bootstrap.Modal.getInstance(document.getElementById('nyttOppdragModal'))?.hide();
   document.getElementById('nytt-fritekst').value = '';
   document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
@@ -182,6 +203,7 @@ function nullstillNyttOppdrag() {
   // Ved hver åpning (André, 12. sep. 2026: «husker den avhukede enheter fra
   // forrige opprettelse», og senere «nedtrekksfeltene … må starte øverst på
   // hver»). Uavhengig av hvilken vei forrige forsøk gikk.
+  nyttOppdragNokkel = nyIdempotensNokkel();
   document.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => { i.checked = false; });
   document.getElementById('nytt-feil')?.classList.add('d-none');
   ['nytt-hastegrad', 'nytt-lokasjon', 'nytt-problemstilling'].forEach((id) => {

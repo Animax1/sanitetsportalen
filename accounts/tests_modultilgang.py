@@ -160,11 +160,34 @@ class GlobalAdminTests(TestCase):
         for slug in ('patients', 'statistikk'):
             self.assertTrue(har_tilgang(admin, slug, 'skriv_full'))
 
-    def test_admin_slipper_inn_i_deaktivert_modul(self):
-        """Ellers kan man deaktivere seg selv ut av å kunne reaktivere."""
+    def test_admin_stenges_ute_av_deaktivert_modul(self):
+        """Av er av, også for admin (27. sep. 2026). André slo av `/ko/` og
+        kom inn ved å skrive adressen."""
         ModuleSettings.objects.update_or_create(
             slug='patients', defaults={'enabled': False})
-        self.assertTrue(har_tilgang(_bruker('ga2', 'admin'), 'patients', 'les'))
+        admin = _bruker('ga2', 'admin')
+        self.assertFalse(har_tilgang(admin, 'patients', 'les'))
+        self.assertIsNone(nivaa_for(admin, 'patients'))
+
+    @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+    def test_admin_kan_fortsatt_slaa_modulen_paa_igjen(self):
+        """Grunnen admin slapp inn før: «ellers kan man deaktivere seg selv ut
+        av å kunne reaktivere». Det er denne som holder den bekymringen —
+        bryteren er `admin_required`, ikke modulgatet."""
+        ModuleSettings.objects.update_or_create(
+            slug='patients', defaults={'enabled': False})
+        admin = _bruker('ga3', 'admin')
+        self.client.force_login(admin)
+        self.assertEqual(self.client.get('/portal-admin/moduler/patients/').status_code, 200)
+        svar = self.client.post('/portal-admin/moduler/patients/', {'enabled': 'on', 'note': ''})
+        self.assertEqual(svar.status_code, 302)
+        self.assertTrue(ModuleSettings.objects.get(slug='patients').enabled)
+        self.assertEqual(self.client.get('/pasienter/').status_code, 200)
+
+    def test_kjernemodul_er_aldri_stengt_for_admin(self):
+        ModuleSettings.objects.update_or_create(
+            slug='accounts', defaults={'enabled': False})
+        self.assertTrue(har_tilgang(_bruker('ga4', 'admin'), 'accounts', 'les'))
 
     def test_deaktivert_modul_stenger_for_andre(self):
         bruker = _bruker('deakt')

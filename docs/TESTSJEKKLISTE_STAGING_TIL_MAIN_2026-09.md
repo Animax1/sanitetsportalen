@@ -23,6 +23,8 @@ Funn går i `/backlog/`, med byggnummer.
 **Oppdrag og biler** (runde 7: transaksjonen og låsingen i statusmeldingene, G4 og G6a)
 - [ ] Kjør ett oppdrag gjennom hele kjeden fra en bil på telefonen: Rykker ut → Fremme →
       Avreist → Leverer → Ledig. Hver status skal komme én gang, med riktig tid.
+- [ ] Trykk **«Opprett» flere ganger fort** i «Nytt oppdrag», på `/oppdrag/` og på `/ko/`:
+      ett oppdrag (27. sep.). Åpne vinduet igjen og opprett: det blir et nytt.
 - [ ] **Dobbelttrykk** på en stemplingsknapp i bilen (27. sep.): skjermen viser neste steg
       med en gang, knappene er grå et øyeblikk, bare én status kommer — og **ingen rød boks**
       med «Oppdraget står i …».
@@ -47,6 +49,8 @@ Funn går i `/backlog/`, med byggnummer.
 
 **Moduloppsett og backup** (runde 8: `backup_enabled`-kolonnen er slettet)
 - [ ] `/portal-admin/moduler/`: slå en modul av og på.
+- [ ] Slå av `/ko/` og skriv adressen **som admin**: 403 (27. sep.). Slå den på igjen fra
+      `/portal-admin/moduler/`, og siden virker.
 - [ ] `/portal-admin/backup/`: ta en backup av én modul. Offsite skal stå grønt.
 
 ## 2. Bør testes: sider som er flyttet eller skrevet om (20 min)

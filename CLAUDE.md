@@ -260,7 +260,7 @@ og da måtte hvert `skriv_leder`-kallsted huske `er_global_admin(...) or`).
 `admin_required` setter `_admin_required` på viewet, og `core/tests_sikkerhet_runde2.py`
 går gjennom alt under `/portal-admin/`, `/varsler/` og `/min-profil/` med anonym og
 vanlig bruker — dekoratørtesten dekket bare modulprefiksene.
-`ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
+`ModuleSettings.enabled=False` gir 403 **for alle, også global admin** (27. sep. 2026).
 
 **Hvert view under en modul må være dekorert.** `patients/tests_modul_dekorator.py` går
 gjennom `urlpatterns` og håndhever det — risikoen ved dekoratør framfor middleware er en

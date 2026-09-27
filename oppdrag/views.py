@@ -466,7 +466,43 @@ def oppdrag_liste_view(request):
     # en ressurs»): oppdraget står som «Trenger ressurs» fra første sekund,
     # med samme opptrapping på tavla som når en bil rykket videre. Ingen lyd
     # — lyd går bare til enhetene, og ingen er varslet.
+    # **Idempotens** (27. sep. 2026, André: «Når du trykker flere ganger på rad
+    # på opprett oppdrag så får du flere oppdrag lagd»). Reserveres etter all
+    # validering, som i pasientregistreringen: en avvist innsending skal ikke
+    # brenne nøkkelen for det rettede forsøket.
+    idem = bygg_nokkel('oppdrag_create', request.user.pk, data.get('idempotency_key'))
+    if idem:
+        idem_status, verdi = reserver(idem)
+        if idem_status == 'ferdig':
+            # Et trykk til etter at det første var ferdig: svar med oppdraget
+            # det laget. Er det slettet siden, beskytter nøkkelen ingenting.
+            tidligere = Oppdrag.objects.filter(pk=verdi).first()
+            if tidligere is not None:
+                return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(tidligere)})
+            forkast(idem)
+        elif idem_status == 'pagar':
+            return JsonResponse(
+                {'status': 'error', 'message': 'Oppdraget er allerede sendt inn.',
+                 'duplikat': True},
+                status=409)
+
     naa = timezone.now()
+    try:
+        oppdrag = _opprett_oppdrag(request, vakt, data, lokasjon, enheter, naa)
+    except Exception:
+        # Frigi nøkkelen, ellers står operatøren igjen med en reservasjon for
+        # et oppdrag som aldri ble laget, og kan ikke prøve igjen på fem minutter.
+        if idem:
+            forkast(idem)
+        raise
+    if idem:
+        fullfor(idem, oppdrag.pk)
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+def _opprett_oppdrag(request, vakt, data, lokasjon, enheter, naa):
+    """Selve opprettelsen, i én transaksjon. Skilt ut så nøkkelen kan
+    frigis rundt den uten å rykke hele blokken ett nivå inn."""
     with transaction.atomic():
         # **Alle enhetene varsles gjennom `varsle_enhet`, også den første**
         # (26. sep. 2026, A1). Oppdraget ble opprettet med `enhet=enheter[0]`,
@@ -488,7 +524,7 @@ def oppdrag_liste_view(request):
         )
         for enhet in enheter:
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
-    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+    return oppdrag
 
 
 def _valider_problemstilling_og_antall(data, hastegrad, problemstilling, *, gjeldende=None):
