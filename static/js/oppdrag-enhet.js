@@ -908,6 +908,7 @@ function renderAlt() {
   visUsendt();
   const stempel = document.getElementById('enhet-oppdatert');
   if (stempel) stempel.textContent = 'Oppdatert ' + klokke(new Date().toISOString());
+  if (stemplingPaagaar) laasStempelknapper();
 }
 
 
@@ -971,6 +972,15 @@ async function synk() {
         // Samme trykk er allerede underveis. La den andre fullføre.
         break;
       }
+      if (res.status === 409) {
+        // **Oppdraget har gått videre uten dette trykket** — sentralen førte
+        // statusen, eller trykket var sendt før. Ingen feil å vise: skjermen
+        // hentes på nytt under og viser hvor oppdraget står (André, 26. sep.
+        // 2026: «Det trenger vi absolutt ikke og er støy!»). Beskjeder bilen
+        // kan handle på — «Udefinert», grovsortering — er 400 og vises fortsatt.
+        koFjern(rad.nokkel);
+        continue;
+      }
       if (res.status >= 400 && res.status < 500) {
         // Serveren avviste den, og vil gjøre det igjen: ulovlig overgang,
         // manglende tilgang, oppdrag borte. Å beholde raden ville låst køen
@@ -993,15 +1003,45 @@ async function synk() {
 }
 
 
+//: Minste tid stemplingsknappene står låst etter et trykk. Et dobbelttrykk
+//: er typisk under 300 ms; sendingen tar ofte kortere enn det med god dekning.
+const STEMPEL_LAAS_MS = 700;
+
+//: True fra et trykk legges i køen til sendingen er ferdig og låsetida gått.
+let stemplingPaagaar = false;
+
+function laasStempelknapper() {
+  // Grå knapper mens et trykk sendes. Kalles av `renderAlt`, så de står
+  // låst også når en poll tegner skjermen på nytt midt i sendingen.
+  document.querySelectorAll('[data-action^="stemple"]').forEach((b) => { b.disabled = true; });
+}
+
 async function _stemple(id, overgang, knappId, sted, stedTekst) {
-  await withSubmitGuard(knappId, async () => {
+  // **Én stempling om gangen, uansett hvilken knapp** (27. sep. 2026).
+  // `withSubmitGuard` låste knappen som ble trykket — men `renderAlt()` under
+  // tegnet den på nytt med én gang, så låsen og «Lagrer…» satt på et element
+  // som ikke fantes lenger, og den nye knappen sto ulåst med *samme* tekst.
+  // Et nytt trykk sendte samme overgang én gang til, og bilen fikk «Oppdraget
+  // står i Leverer — skjermen er oppdatert» midt i en vanlig kjøring (André,
+  // 26. sep. 2026). Låsen er derfor modulens, ikke knappens.
+  if (stemplingPaagaar) return;
+  stemplingPaagaar = true;
+  const start = Date.now();
+  try {
     // Skriv lokalt FØRST. Skjermen skal vise trykket med en gang, også uten
     // dekning — en knapp som ser ut til å ha virket, men ikke har det, er
-    // verre enn en som feiler synlig.
+    // verre enn en som feiler synlig. **Og projiser det inn i visningen**:
+    // uten det sto knappen med samme tekst til serveren hadde svart.
     koLeggTil(id, overgang, sted, stedTekst);
+    mineOppdrag = projiser(mineOppdrag, koLes());
     renderAlt();
     await synk();
-  });
+  } finally {
+    const igjen = STEMPEL_LAAS_MS - (Date.now() - start);
+    if (igjen > 0) await new Promise((r) => setTimeout(r, igjen));
+    stemplingPaagaar = false;
+    renderAlt();
+  }
 }
 
 async function stempleNeste(id) {

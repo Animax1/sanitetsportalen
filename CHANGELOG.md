@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-27 — Bilen: dobbelttrykk ga «Oppdraget står i Leverer — skjermen er oppdatert»  `#oppdrag #bug #bilen`
+
+**Hvorfor:** André, fra bilskjermen midt i en vanlig kjøring: en rød boks med «Oppdraget står
+i Leverer — skjermen er oppdatert.» — «Det trenger vi absolutt ikke og er støy!»
+
+**Årsaken var et dobbelttrykk, ikke sentralen.** `_stemple` la trykket i køen, kalte
+`renderAlt()` — med den *gamle* projeksjonen — og sendte så. Knappen ble tegnet på nytt med
+**samme tekst** («Leverer»), og låsen fra `withSubmitGuard` satt på elementet som nettopp var
+fjernet fra DOM-en. Neste trykk (eller et dobbelttrykk med tommelen) sendte samme overgang én
+gang til, og serveren svarte 409 fra `UlovligOvergang`.
+
+**Rettingen, i `static/js/oppdrag-enhet.js`:**
+- **Én stempling om gangen, uansett knapp:** `stemplingPaagaar` på modulnivå, holdt i minst
+  `STEMPEL_LAAS_MS` (700 ms) — et dobbelttrykk er under 300 ms, og sendingen kan ta kortere.
+- **Skjermen viser neste steg med en gang:** `projiser(mineOppdrag, koLes())` før tegningen.
+- **Knappene er grå mens det sendes:** `renderAlt()` kaller `laasStempelknapper()`, så også en
+  poll som tegner midt i sendingen gir låste knapper. Låsen ligger i `renderAlt`, ikke i
+  byggerne — da slipper hver bygger og hver harness å kjenne den.
+- **409 er stille** i `synk()`: raden fjernes fra køen, og skjermen hentes på nytt som før.
+  Oppdraget har gått videre uten trykket (sentralen førte statusen, eller trykket var sendt
+  før), og det finnes ingenting bilen kan gjøre med beskjeden. **400 vises fortsatt** —
+  «Udefinert» og grovsorteringen er beskjeder hun kan handle på.
+
+**Tester:** `oppdrag/tests_bilen_dobbelttrykk.py` (7), gjennom den ekte `_stemple` med en treg
+server, og den ekte `renderAlt` mot et minimalt DOM. **Mutanter: 6, alle drept** — låsesjekken
+fjernet, re-projiseringen fjernet, den stille 409-grenen fjernet, låsen aldri sluppet,
+kallstedet i `renderAlt` fjernet og kallstedet gjort ubetinget. Kallstedet **overlevde først**:
+de fem første testene stubbet `renderAlt`, og da kunne regelen forsvinne uten at noe ble rødt
+(mutantfelle 3 i `CLAUDE.md`). Testklassen `KnappeneErGraaMensDetSendesTests` ble lagt til for den.
+
 ## 2026-09-26 — Testsjekkliste for `staging` til `main`  `#docs #drift`
 
 **Hvorfor:** André: «Er det noe spesifikt jeg skal teste på staging som følge av det vi har

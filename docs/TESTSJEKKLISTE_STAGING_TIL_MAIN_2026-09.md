@@ -23,6 +23,9 @@ Funn går i `/backlog/`, med byggnummer.
 **Oppdrag og biler** (runde 7: transaksjonen og låsingen i statusmeldingene, G4 og G6a)
 - [ ] Kjør ett oppdrag gjennom hele kjeden fra en bil på telefonen: Rykker ut → Fremme →
       Avreist → Leverer → Ledig. Hver status skal komme én gang, med riktig tid.
+- [ ] **Dobbelttrykk** på en stemplingsknapp i bilen (27. sep.): skjermen viser neste steg
+      med en gang, knappene er grå et øyeblikk, bare én status kommer — og **ingen rød boks**
+      med «Oppdraget står i …».
 - [ ] Legg til **bil nummer to** på et oppdrag og kjør begge ferdig. Tavla, detaljvinduet,
       historikken og **historikksøket på bil nr. 2** skal vise riktige biler.
 - [ ] **Arkiver vakta i oppdrag** og åpne arkivstatistikken: tall per bil og antall
