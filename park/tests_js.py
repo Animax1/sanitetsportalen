@@ -17,6 +17,7 @@ from django.test import SimpleTestCase
 from patients.js_test_utils import JS_DIR, build_harness, node_available, read_js, run_node
 
 PARK_JS = JS_DIR / 'park-lag.js'
+OPPSETT_JS = JS_DIR / 'park-oppsett.js'
 
 HARNESS = ((PARK_JS, ('parkLesToken', 'parkVelgLag', 'parkVelgSted', 'parkKildeTekst',
                       'parkKlokke', 'parkKanRegistrere', 'parkNesteSkjema', 'parkKropp',
@@ -109,7 +110,51 @@ class ParkReglerTests(SimpleTestCase):
                          '22:00 · Skade · Club · OK')
 
 
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class OppsettReglerTests(SimpleTestCase):
+    """`park-oppsett.js`: hvem som får knappene, hva en lenke er nå, og
+    tidspunktene mellom skjemaet og serveren."""
+
+    def setUp(self):
+        self.harness = build_harness(((OPPSETT_JS, (
+            'parkKanSetteOppUtfall', 'parkKanSletteVerdi', 'parkLenkeStatus',
+            'parkLokalFelt', 'parkStandardOppetid')),))
+
+    def _j(self, uttrykk):
+        return json.loads(run_node(self.harness, f'console.log(JSON.stringify({uttrykk}));')
+                          .splitlines()[0])
+
+    def test_utfall_og_sletting_er_bare_admin(self):
+        for fn in ('parkKanSetteOppUtfall', 'parkKanSletteVerdi'):
+            self.assertTrue(self._j(f'{fn}({{park: "les", admin: true}})'), fn)
+            self.assertFalse(self._j(f'{fn}({{park: "skriv_leder", admin: false}})'), fn)
+            self.assertFalse(self._j(f'{fn}({{}})'), fn)
+            self.assertFalse(self._j(f'{fn}(undefined)'), fn)
+
+    def test_lenkens_status(self):
+        l = "{fjernet: false, aapen_fra: '2026-10-01T08:00:00Z', aapen_til: '2026-10-02T08:00:00Z'}"
+        self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-01T07:59:00Z'))"), 'Ikke åpnet ennå')
+        self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-01T08:00:00Z'))"), 'Åpen')
+        self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-02T08:00:00Z'))"), 'Stengt')
+        self.assertEqual(self._j(f"parkLenkeStatus(Object.assign({l}, {{fjernet: true}}), "
+                                 f"Date.parse('2026-10-01T09:00:00Z'))"), 'Fjernet')
+
+    def test_standardoppetiden_er_tre_dogn_i_lokal_tid(self):
+        ut = run_node(self.harness, '''
+          const ms = new Date(2026, 9, 1, 8, 5).getTime();
+          console.log(JSON.stringify(parkStandardOppetid(ms)));''')
+        self.assertEqual(json.loads(ut.splitlines()[0]),
+                         {'fra': '2026-10-01T08:05', 'til': '2026-10-04T08:05'})
+
+
 class ParkMarkupTests(SimpleTestCase):
+
+    def test_ingen_markup_i_oppsettet_heller(self):
+        kilde = read_js(OPPSETT_JS)
+        kilde = re.sub(r'/\*.*?\*/', '', kilde, flags=re.S)
+        kilde = re.sub(r'//[^\n]*', '', kilde)
+        self.assertNotIn('innerHTML', kilde)
+        self.assertEqual(re.findall(r'`[^`]*<[a-z][^`]*`', kilde), [])
 
     def test_ingen_markup_i_mal_strenger(self):
         """Navn fra serveren går gjennom `textContent`. En mal-streng med en

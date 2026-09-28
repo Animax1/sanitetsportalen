@@ -738,9 +738,9 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-35 filer i `static/js/` (ingen bundler), på ni sider — pasientsiden,
-`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to under
-`/oppdrag/`, og parksiden `/park/r/`.
+36 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
+`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, og de to under
+både `/oppdrag/` og `/park/`.
 
 **Tre av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
@@ -781,6 +781,7 @@ håndhever det på cellebredden.
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 | `park-lag.js` | **kun** `/park/r/`, uten `portal-utils.js` | `park/CLAUDE.md` |
+| `park-oppsett.js` | **kun** `/park/`, `skriv_leder` | `park/CLAUDE.md` |
 | `portal-status.js` | **kun** server-status | dashbordet, `core/admin_status.py` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

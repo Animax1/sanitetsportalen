@@ -1,11 +1,15 @@
 {% extends "core/base_portal.html" %}
+{% load static %}
 
 {% block title %}Park – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  Pulje 1: oversikten. Å lage, fjerne og sette oppetid på lenker, verdimengdene
-  og slettingen kommer i pulje 2 (docs/FORSLAG_PARK.md §8) — til da lages
-  lenkene med `manage.py park_lenke`.
+  Oppsettet for park (pulje 2, docs/FORSLAG_PARK.md §4.2): lenkene med oppetid,
+  registreringene med sletting, og de to verdimengdene. Alt tegnes av
+  park-oppsett.js med textContent — ingen markup i mal-strenger.
+
+  `les` får bare henvisningen: tallene hører hjemme i statistikken (B17), og en
+  menyoppføring som fører til en vegg er verre enn ingen.
 {% endcomment %}
 
 {% block content %}
@@ -17,52 +21,91 @@
     <p>Lagenes registreringer skal vises som fanen «Lag» i
        <a href="/statistikk/">statistikken</a>. Den fanen er ikke bygget ennå.</p>
   {% else %}
-    <h2 class="h6 mt-3">Lenker</h2>
-    {% if lag_tilgjengelig == 0 %}
-      <div class="alert alert-warning py-2">
-        Ingen lag kan velges på parksiden: ingen ressursgruppe i vaktlista som
-        gjelder nå har «Registrerer i /park/» krysset av.
-      </div>
-    {% endif %}
-    <div class="table-responsive">
-      <table class="table table-sm table-dark align-middle">
-        <thead><tr><th>Navn</th><th>Åpen fra</th><th>Åpen til</th><th>Status</th><th>Sist brukt</th></tr></thead>
-        <tbody>
-        {% for l in lenker %}
-          <tr>
-            <td>{{ l.navn }}</td>
-            <td>{{ l.aapen_fra|date:"d.m.Y H:i" }}</td>
-            <td>{{ l.aapen_til|date:"d.m.Y H:i" }}</td>
-            <td>{% if l.fjernet_at %}Fjernet{% else %}Aktiv{% endif %}</td>
-            <td>{{ l.sist_brukt_at|date:"d.m.Y H:i"|default:"Aldri" }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="5">Ingen lenker ennå.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <script nonce="{{ csp_nonce }}">
+      window.MODUL_TILGANG = {
+        park: "{{ modul_nivaa }}",
+        admin: {{ er_global_admin|yesno:"true,false" }}
+      };
+    </script>
 
-    <h2 class="h6 mt-4">Registreringer{% if vakt %} — {{ vakt.navn }}{% endif %}</h2>
-    <div class="table-responsive">
-      <table class="table table-sm table-dark align-middle">
-        <thead><tr><th>Tid</th><th>Lag</th><th>Sted</th><th>Problemstilling</th><th>Antall</th><th>Utfall</th></tr></thead>
-        <tbody>
-        {% for r in registreringer %}
-          <tr{% if r.slettet_at %} class="text-decoration-line-through"{% endif %}>
-            <td>{{ r.registrert_at|date:"d.m H:i" }}</td>
-            <td>{{ r.ressurs_navn }}</td>
-            <td>{{ r.lokasjon_navn }}</td>
-            <td>{{ r.problemstilling }}</td>
-            <td>{{ r.antall }}</td>
-            <td>{{ r.utfall }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6">Ingen registreringer på denne vakta.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <div class="alert alert-danger d-none" id="park-feil" role="alert"></div>
+
+    <section class="mb-4">
+      <h2 class="h6">Lenker</h2>
+      <p class="small text-muted mb-2">
+        Lenken legges i tiltakskortet. <strong>Adressen vises bare én gang</strong>, når den
+        lages — bare en hash lagres. Mister du den, lag en ny og oppdater tiltakskortet.
+      </p>
+      <form class="row g-2 align-items-end mb-2" id="park-ny-lenke" autocomplete="off">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1" for="park-lenke-navn">Hvor den ligger</label>
+          <input class="form-control form-control-sm" id="park-lenke-navn" maxlength="120"
+                 placeholder="Tiltakskort Bliksund">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1" for="park-lenke-fra">Åpen fra</label>
+          <input class="form-control form-control-sm" type="datetime-local" id="park-lenke-fra">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1" for="park-lenke-til">Åpen til</label>
+          <input class="form-control form-control-sm" type="datetime-local" id="park-lenke-til">
+        </div>
+        <div class="col-12 col-md-2">
+          <button class="btn btn-sm btn-primary w-100" type="submit" id="park-lenke-knapp">
+            <i class="bi bi-plus-lg me-1"></i>Lag lenke</button>
+        </div>
+      </form>
+      <div class="alert alert-success d-none" id="park-ny-adresse"></div>
+      <div class="table-responsive"><div id="park-lenker"></div></div>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="h6">Registreringer <span class="text-muted small" id="park-reg-vakt"></span></h2>
+      <p class="small text-muted mb-2">
+        Laget kan angre selv i noen minutter. Etter det slettes en feilregistrering her, med en
+        grunn. Raden blir stående overstreket, og statistikken utelater den.
+      </p>
+      <details class="mb-2">
+        <summary class="small">Rydd etter en lenke som har kommet på avveie</summary>
+        <form class="row g-2 align-items-end mt-1" id="park-rydd" autocomplete="off">
+          <div class="col-12 col-md-3">
+            <label class="form-label small mb-1" for="park-rydd-lenke">Lenke</label>
+            <select class="form-select form-select-sm" id="park-rydd-lenke"></select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small mb-1" for="park-rydd-etter">Alt registrert etter</label>
+            <input class="form-control form-control-sm" type="datetime-local" id="park-rydd-etter">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small mb-1" for="park-rydd-grunn">Grunn</label>
+            <input class="form-control form-control-sm" id="park-rydd-grunn" maxlength="200"
+                   placeholder="Lenken delt i feil gruppe">
+          </div>
+          <div class="col-12 col-md-2">
+            <button class="btn btn-sm btn-outline-danger w-100" type="submit" id="park-rydd-knapp">
+              Slett</button>
+          </div>
+        </form>
+      </details>
+      <div class="table-responsive"><div id="park-registreringer"></div></div>
+    </section>
+
+    <section class="mb-4">
+      <div class="row g-4">
+        <div class="col-12 col-lg-6">
+          <h2 class="h6">Problemstillinger</h2>
+          <div id="park-problemstillinger"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <h2 class="h6">Utfall <span class="small text-muted">— settes opp av global admin</span></h2>
+          <div id="park-utfall"></div>
+        </div>
+      </div>
+    </section>
   {% endif %}
 </div>
+{% if leder %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/park-oppsett.js' %}"></script>
+{% endif %}
 {% endblock %}

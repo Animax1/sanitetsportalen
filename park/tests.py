@@ -509,21 +509,222 @@ class IndexTests(_Grunnlag):
         c.force_login(_bruker('ingen'))
         self.assertEqual(c.get('/park/').status_code, 403)
 
-    def test_les_faar_henvisningen_og_ikke_lenkene(self):
+    def test_les_faar_henvisningen_og_ikke_oppsettet(self):
         c = Client()
         c.force_login(_gi(_bruker('les'), 'les'))
         html = c.get('/park/').content.decode()
         self.assertIn('/statistikk/', html)
-        self.assertNotIn('Tiltakskort', html)
+        self.assertNotIn('park-oppsett.', html)
+        self.assertNotIn('park-ny-lenke', html)
 
-    def test_leder_ser_lenkene_og_registreringene(self):
-        self._registrer()
+    def test_leder_faar_oppsettet(self):
         c = Client()
         c.force_login(_gi(_bruker('leder'), 'skriv_leder'))
         html = c.get('/park/').content.decode()
-        self.assertIn('Tiltakskort', html)
-        self.assertIn('Sandnes 2.1', html)
-        self.assertNotIn(self.lenke.hemmelighet_hash, html)
+        self.assertIn('js/park-oppsett.', html)
+        self.assertIn('id="park-ny-lenke"', html)
+        self.assertIn('park: "skriv_leder"', html)
+        self.assertIn('admin: false', html)
+
+
+class _Oppsett(_Grunnlag):
+    """Klientene for pulje 2: en leder, en som bare leser, og global admin."""
+
+    def setUp(self):
+        super().setUp()
+        self.leder = Client()
+        self.leder.force_login(_gi(_bruker('leder'), 'skriv_leder'))
+        self.les = Client()
+        self.les.force_login(_gi(_bruker('les'), 'les'))
+        self.admin = Client()
+        self.admin.force_login(_bruker('adm', role='admin'))
+
+    def _post(self, c, url, data=None, metode='post'):
+        import json
+        return getattr(c, metode)(url, data=json.dumps(data or {}), content_type='application/json')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class LenkeoppsettTests(_Oppsett):
+
+    def _ny(self, c, **over):
+        data = {'navn': 'Bliksund', 'aapen_fra': '2026-10-01T08:00', 'aapen_til': '2026-10-04T08:00'}
+        data.update(over)
+        return self._post(c, '/park/api/lenker/', data)
+
+    def test_ny_lenke_viser_adressen_en_gang(self):
+        svar = self._ny(self.leder)
+        self.assertEqual(svar.status_code, 201)
+        adresse = svar.json()['adresse']
+        self.assertIn('/park/r/#', adresse)
+        token = adresse.split('#', 1)[1]
+        lenke = Parklenke.objects.get(navn='Bliksund')
+        self.assertEqual(lenke.hemmelighet_hash, services.hash_token(token))
+        self.assertEqual(lenke.opprettet_av_navn, 'leder')
+        lista = self.leder.get('/park/api/lenker/').content.decode()
+        self.assertNotIn(token, lista, 'adressen vises aldri igjen')
+        self.assertNotIn(lenke.hemmelighet_hash, lista)
+
+    def test_oppetiden_leses_som_norsk_tid(self):
+        self._ny(self.leder)
+        lenke = Parklenke.objects.get(navn='Bliksund')
+        self.assertEqual(timezone.localtime(lenke.aapen_fra).strftime('%H:%M'), '08:00')
+
+    def test_ugyldig_oppetid(self):
+        self.assertEqual(self._ny(self.leder, aapen_til='2026-09-30T08:00').status_code, 400)
+        self.assertEqual(self._ny(self.leder, aapen_fra='').status_code, 400)
+        self.assertEqual(self._ny(self.leder, navn='').status_code, 400)
+
+    def test_les_kan_hverken_se_eller_lage(self):
+        self.assertEqual(self.les.get('/park/api/lenker/').status_code, 403)
+        self.assertEqual(self._ny(self.les).status_code, 403)
+
+    def test_fjern_krever_bekreftelse(self):
+        url = f'/park/api/lenker/{self.lenke.pk}/fjern/'
+        self.assertEqual(self._post(self.leder, url).status_code, 400)
+        self.assertEqual(services.aapen_lenke(self.token), self.lenke)
+        self.assertEqual(self._post(self.leder, url, {'confirm': True}).status_code, 200)
+        self.assertIsNone(services.aapen_lenke(self.token))
+        self.assertEqual(self._post(self.les, url, {'confirm': True}).status_code, 403)
+
+    def test_lista_viser_status_og_antall(self):
+        self._registrer()
+        rad = next(l for l in self.leder.get('/park/api/lenker/').json()['data'] if l['id'] == self.lenke.pk)
+        self.assertTrue(rad['aapen_naa'])
+        self.assertEqual(rad['antall'], 1)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SlettingTests(_Oppsett):
+
+    def test_slett_en_krever_grunn_og_raden_blir_staaende(self):
+        rad = self._registrer()
+        url = f'/park/api/registreringer/{rad.pk}/slett/'
+        self.assertEqual(self._post(self.leder, url, {'grunn': '  '}).status_code, 400)
+        self.assertEqual(self._post(self.les, url, {'grunn': 'x'}).status_code, 403)
+        self.assertEqual(self._post(self.leder, url, {'grunn': 'Trykket feil lag'}).status_code, 200)
+        rad.refresh_from_db()
+        self.assertEqual((rad.slettet_grunn, rad.slettet_av_navn), ('Trykket feil lag', 'leder'))
+        self.assertIsNotNone(rad.slettet_at)
+        self.assertEqual(self._post(self.leder, url, {'grunn': 'igjen'}).status_code, 400)
+        self.assertTrue(AuditLog.objects.filter(table_name='park_registrering', record_id=rad.pk,
+                                                field_name='slettet').exists())
+
+    def test_slettet_teller_ikke_for_laget(self):
+        rad = self._registrer()
+        services.slett_registrering(rad, bruker=None, grunn='feil')
+        self.assertEqual(services.antall_for_laget(self.vakt, self.lag1.pk), 0)
+
+    def test_lista_viser_de_slettede_merket(self):
+        rad = self._registrer()
+        services.slett_registrering(rad, bruker=None, grunn='feil')
+        d = self.leder.get('/park/api/registreringer/').json()
+        self.assertEqual([(r['id'], r['slettet']) for r in d['data']], [(rad.pk, True)])
+        self.assertEqual(self.les.get('/park/api/registreringer/').status_code, 403)
+
+    def test_slett_etter_viser_antallet_foer_det_sletter(self):
+        naa = timezone.now()
+        gammel = self._registrer()
+        Registrering.objects.filter(pk=gammel.pk).update(registrert_at=naa - timedelta(hours=2))
+        ny1, ny2 = self._registrer(), self._registrer()
+        annen, _ = services.lag_lenke(navn='annen', aapen_fra=naa - timedelta(hours=1),
+                                      aapen_til=naa + timedelta(hours=1))
+        fra_annen, _ = services.registrer(annen, self.vakt, self._data())
+        url = f'/park/api/lenker/{self.lenke.pk}/slett-etter/'
+        etter = timezone.localtime(naa - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M')
+
+        svar = self._post(self.leder, url, {'etter': etter, 'grunn': 'lekket'})
+        self.assertEqual((svar.status_code, svar.json()['antall']), (409, 2))
+        self.assertFalse(Registrering.objects.filter(slettet_at__isnull=False).exists(),
+                         'uten confirm slettes ingenting')
+
+        self.assertEqual(self._post(self.leder, url, {'etter': etter, 'confirm': True}).status_code, 400,
+                         'grunnen er påkrevd')
+        svar = self._post(self.leder, url, {'etter': etter, 'grunn': 'lekket', 'confirm': True})
+        self.assertEqual((svar.status_code, svar.json()['antall']), (200, 2))
+        slettet = set(Registrering.objects.filter(slettet_at__isnull=False).values_list('pk', flat=True))
+        self.assertEqual(slettet, {ny1.pk, ny2.pk}, 'bare denne lenken, bare etter tidspunktet')
+        self.assertNotIn(fra_annen.pk, slettet)
+        self.assertEqual(AuditLog.objects.filter(field_name='slettet_etter').count(), 1,
+                         'én auditrad for én beslutning')
+        self.assertEqual(self._post(self.les, url, {'etter': etter, 'grunn': 'x', 'confirm': True}).status_code, 403)
+
+    def test_slett_etter_skriver_ikke_over_en_tidligere_sletting(self):
+        """En rad som alt er slettet med sin egen grunn, skal beholde den — og
+        ikke telles med i antallet den som rydder får se."""
+        forst, andre = self._registrer(), self._registrer()
+        services.slett_registrering(forst, bruker=None, grunn='feil lag')
+        etter = timezone.now() - timedelta(hours=1)
+        self.assertEqual(services.slett_fra_lenke(self.lenke, etter=etter, vakt=self.vakt,
+                                                  bruker=None, grunn='lekket'), 1)
+        forst.refresh_from_db()
+        andre.refresh_from_db()
+        self.assertEqual((forst.slettet_grunn, andre.slettet_grunn), ('feil lag', 'lekket'))
+
+    def test_slett_etter_uten_tidspunkt(self):
+        url = f'/park/api/lenker/{self.lenke.pk}/slett-etter/'
+        self.assertEqual(self._post(self.leder, url, {'grunn': 'x'}).status_code, 400)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class VerdimengdeneTests(_Oppsett):
+
+    def test_leder_setter_opp_problemstillinger(self):
+        svar = self._post(self.leder, '/park/api/problemstillinger/', {'navn': 'Plaster'})
+        self.assertEqual(svar.status_code, 200)
+        self.assertIn('Plaster', [p.navn for p in services.problemstillinger()])
+        self.assertEqual(self._post(self.les, '/park/api/problemstillinger/', {'navn': 'Vann'}).status_code, 403)
+
+    def test_utfall_er_bare_admin(self):
+        self.assertEqual(self._post(self.leder, '/park/api/utfall/', {'navn': 'Ny'}).status_code, 403)
+        self.assertEqual(self._post(self.admin, '/park/api/utfall/', {'navn': 'Ny'}).status_code, 200)
+        u = Utfall.objects.get(navn='Ny')
+        self.assertEqual(self._post(self.leder, f'/park/api/utfall/{u.pk}/', {'er_aktiv': False},
+                                    metode='put').status_code, 403)
+
+    def test_i_bruk_kan_ikke_slettes(self):
+        self._registrer()
+        url = f'/park/api/problemstillinger/{self.ps.pk}/'
+        self.assertEqual(self._post(self.admin, url, {'confirm': True}, metode='delete').status_code, 409)
+        self.assertEqual(self._post(self.leder, url, {'confirm': True}, metode='delete').status_code, 403,
+                         'sletting er global admin')
+
+    def test_deaktivert_forsvinner_fra_siden(self):
+        self._post(self.leder, f'/park/api/problemstillinger/{self.ps.pk}/', {'er_aktiv': False}, metode='put')
+        self.assertNotIn(self.ps, services.problemstillinger())
+
+
+class PortalinnstillingeneTests(TestCase):
+
+    def setUp(self):
+        from park.portalinnstillinger import ParkInnstillinger
+        self.h = ParkInnstillinger()
+
+    def test_fravaerende_er_behold(self):
+        self.assertEqual(self.h.valider({}), {})
+
+    def test_bryteren_av_og_paa(self):
+        self.h.lagre(self.h.valider({'park_ko_posisjon_sendt': '1'}))
+        self.assertFalse(services.ko_posisjon_paa())
+        self.h.lagre(self.h.valider({'park_ko_posisjon_sendt': '1', 'park_ko_posisjon': '1'}))
+        self.assertTrue(services.ko_posisjon_paa())
+
+    def test_angrefristen(self):
+        from django.core.exceptions import ValidationError
+        self.h.lagre(self.h.valider({'park_angrefrist': '10'}))
+        self.assertEqual(services.angrefrist_min(), 10)
+        for feil in ('0', '31', 'x', ''):
+            with self.assertRaises(ValidationError, msg=feil):
+                self.h.valider({'park_angrefrist': feil})
+
+    def test_registrert_og_malen_tegnes(self):
+        from django.template.loader import render_to_string
+        from core.portalinnstillinger import all_handlers
+        self.assertIn('park', [h.slug for h in all_handlers()])
+        html = render_to_string(self.h.mal, self.h.kontekst())
+        self.assertIn('name="park_angrefrist"', html)
+        self.assertIn('name="park_ko_posisjon_sendt"', html)
+        self.assertIn('checked', html, 'bryteren er på uten rad')
 
 
 class KommandoenTests(_Grunnlag):

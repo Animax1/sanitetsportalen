@@ -296,6 +296,64 @@ def angre(lenke, raa_nokkel, naa=None) -> None:
     rad.delete()
 
 
+# ── Sletting av feilregistreringer (B20) ─────────────────────────────────────
+
+GRUNN_MAKS = 200
+
+
+def _grunn(raa) -> str:
+    grunn = str(raa or '').strip()
+    if not grunn:
+        raise Ugyldig('Skriv hvorfor registreringen slettes.')
+    if len(grunn) > GRUNN_MAKS:
+        raise Ugyldig(f'Grunnen er for lang (maks {GRUNN_MAKS} tegn).')
+    return grunn
+
+
+def slett_registrering(rad, *, bruker, grunn, ip=None, naa=None) -> None:
+    """`skriv_leder` sletter én feilregistrering (B20).
+
+    **Raden står**, merket slettet, og statistikken utelater den — en sletting
+    som ikke synes, er en statistikk ingen kan etterprøve. Ikke rette: en
+    sletting og en ny registrering fra laget er ærligere enn at noen andre
+    skriver om det laget sa.
+    """
+    grunn = _grunn(grunn)
+    if rad.slettet_at is not None:
+        raise Ugyldig('Registreringen er allerede slettet.')
+    rad.slettet_at = naa or timezone.now()
+    rad.slettet_av = bruker if getattr(bruker, 'is_authenticated', False) else None
+    rad.slettet_av_navn = _navn(bruker)
+    rad.slettet_grunn = grunn
+    rad.save(update_fields=['slettet_at', 'slettet_av', 'slettet_av_navn', 'slettet_grunn'])
+    _audit_rad('park_registrering', rad.pk, 'slettet', grunn, bruker, ip)
+
+
+def fra_lenke_etter(lenke, etter, vakt):
+    """Registreringene en lenke har levert siden `etter`, på denne vakta —
+    de som ikke alt er slettet. Det «slett alt fra lenken» treffer (§4.6)."""
+    return Registrering.objects.filter(
+        lenke=lenke, vakt=vakt, registrert_at__gte=etter, slettet_at__isnull=True)
+
+
+def slett_fra_lenke(lenke, *, etter, vakt, bruker, grunn, ip=None, naa=None) -> int:
+    """Opprydding etter en lekket lenke: alt den har levert siden `etter`.
+
+    Samme merking som én og én, og **én** auditrad med antallet — hundre
+    auditrader for én beslutning ville druknet det som skjedde.
+    """
+    grunn = _grunn(grunn)
+    naa = naa or timezone.now()
+    with transaction.atomic():
+        antall = fra_lenke_etter(lenke, etter, vakt).update(
+            slettet_at=naa,
+            slettet_av=bruker if getattr(bruker, 'is_authenticated', False) else None,
+            slettet_av_navn=_navn(bruker), slettet_grunn=grunn)
+        _audit_rad('park_parklenke', lenke.pk, 'slettet_etter',
+                   f'{antall} registrering(er) fra {tid_tekst(etter)}: {grunn}', bruker, ip)
+    return antall
+
+
 def antall_for_laget(vakt, ressurs_id) -> int:
     """Hvor mange registreringer laget har denne vakta — kvitteringens teller."""
     return Registrering.objects.filter(
@@ -326,11 +384,16 @@ def tid_tekst(t) -> str:
 
 
 def _audit(lenke, handling, felt, tekst, bruker, ip) -> None:
+    _audit_rad('park_parklenke', lenke.pk, felt, tekst, bruker, ip, handling=handling)
+
+
+def _audit_rad(tabell, pk, felt, tekst, bruker, ip, *, handling='UPDATE') -> None:
+    """En handling, ikke en feltendring — logges der den skjer (CLAUDE.md)."""
     from audit.models import AuditLog
 
     AuditLog.objects.create(
-        table_name='park_parklenke', record_id=lenke.pk, action=handling,
-        field_name=felt, new_value=tekst,
+        table_name=tabell, record_id=pk, action=handling, field_name=felt,
+        new_value=tekst,
         user=bruker if getattr(bruker, 'is_authenticated', False) else None, ip=ip)
 
 

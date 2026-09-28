@@ -17,6 +17,25 @@ from . import views, views_lag
 urlpatterns = [
     path('', views.index_view, name='park_index'),
 
+    # Oppsettet (pulje 2). Navngitte stier for handlingene, som backlog og KO:
+    # et fritt ledd i kroppen er et sted å ta feil.
+    path('api/lenker/', views.lenker_view, name='park_api_lenker'),
+    path('api/lenker/<int:pk>/fjern/', views.lenke_fjern_view, name='park_api_lenke_fjern'),
+    path('api/lenker/<int:pk>/slett-etter/', views.lenke_slett_etter_view,
+         name='park_api_lenke_slett_etter'),
+    path('api/registreringer/', views.registreringer_view, name='park_api_registreringer'),
+    path('api/registreringer/<int:pk>/slett/', views.registrering_slett_view,
+         name='park_api_registrering_slett'),
+    path('api/problemstillinger/', views.problemstillinger_view,
+         name='park_api_problemstillinger'),
+    path('api/problemstillinger/rekkefolge/', views.problemstillinger_rekkefolge_view,
+         name='park_api_problemstillinger_rekkefolge'),
+    path('api/problemstillinger/<int:pk>/', views.problemstilling_detalj_view,
+         name='park_api_problemstilling_detalj'),
+    path('api/utfall/', views.utfall_view, name='park_api_utfall'),
+    path('api/utfall/rekkefolge/', views.utfall_rekkefolge_view, name='park_api_utfall_rekkefolge'),
+    path('api/utfall/<int:pk>/', views.utfall_detalj_view, name='park_api_utfall_detalj'),
+
     # Siden lagene bruker. Uten innlogging; tokenet står i fragmentet.
     path('r/', views_lag.side_view, name='park_lag_side'),
     path('r/api/oppsett/', views_lag.oppsett_view, name='park_lag_oppsett'),

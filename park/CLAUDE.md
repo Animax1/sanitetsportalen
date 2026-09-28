@@ -18,7 +18,9 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Hva som er en gyldig registrering | `services.registrer()` |
 | Hva som kan angres, og hvor lenge | `services.kan_angres()`, `angrefrist_min()` |
 | Porten uten innlogging og grensene | `views_lag.park_lenke_kreves` |
-| Reglene i nettleseren | `park-lag.js` — `parkVelgSted()`, `parkKropp()` m.fl. |
+| Sletting av feilregistreringer, én og alt fra en lenke | `services.slett_registrering()`, `slett_fra_lenke()` |
+| Hvem som setter opp hva på `/park/` | `views.py`, tabellen i docstringen |
+| Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
 
 ## Portalens første side uten innlogging
 
@@ -31,7 +33,7 @@ håndhever det på kilden, og at hver API-rute bærer `@park_lenke_kreves`.
   havner aldri i Railways tilgangslogg. Siden fjerner det fra adressefeltet med
   `history.replaceState` — nettleserloggen lagrer ellers hele adressen.
 - **Bare hashen lagres** (`Parklenke.hemmelighet_hash`). Tokenet vises én gang, når lenken
-  lages (`manage.py park_lenke --lag …`; oppsettsiden er pulje 2).
+  lages — på `/park/` eller med `manage.py park_lenke --lag …`, som står igjen som reserve.
 - **Ugyldig, fjernet, stengt lenke, modulen av og ingen åpen vakt gir samme 403.**
 - **Svarene inneholder aldri registreringer** — heller ikke lagets egne. Kvitteringen er det
   klienten sendte, pluss en teller.
@@ -69,7 +71,7 @@ merke peker til `docs/FORSLAG_PARK.md` §4.7, der alternativet står.
 
 | Merke | Hva | Byttes |
 |---|---|---|
-| `park-ko-posisjon` | Forhåndsvalg fra KO-tavla viser hvor KO har plassert hvert lag | **Bryter**, `AppSetting['park_ko_posisjon']`; på uten rad. Feltet på portalinnstillingene er pulje 2 |
+| `park-ko-posisjon` | Forhåndsvalg fra KO-tavla viser hvor KO har plassert hvert lag | **Bryter** på `/portal-admin/innstillinger/` (`park/portalinnstillinger.py`); på uten rad |
 | `park-lenke-en-gang` | Bare hashen lagres, lenken vises én gang | Kode + migrasjon |
 
 ## Målingen (B21)
@@ -78,8 +80,19 @@ merke peker til `docs/FORSLAG_PARK.md` §4.7, der alternativet står.
 vinner» treffer: endrer lagene ofte et forhåndsvalg som kom fra KO, er tavla for treg til å
 være en god kilde. `forhandsvalg_endret` er `True` bare når klienten sender literal `true`.
 
+## Sletting, ikke retting (B20)
+
+En feilregistrering **slettes** av `skriv_leder`, med en grunn — den rettes ikke. En sletting
+og en ny registrering fra laget er ærligere enn at noen andre skriver om det laget sa. Raden
+blir stående merket, og statistikken utelater den.
+
+**«Slett alt fra denne lenken etter kl. X»** er oppryddingen etter en lekket lenke (§4.6).
+Uten `confirm` svarer den **409 med antallet** og sletter ingenting — den som rydder skal se
+hvor mye som går før det går. Én auditrad for hele slettingen, ikke én per rad.
+
 ## Tilgang
 
 `les` og `skriv_leder` (`module.py`). `les` gir fanen «Lag» i `/statistikk/` (pulje 3) og en
-henvisning på `/park/`; `skriv_leder` ser lenkene og registreringene. KO gjør ingenting med
-registreringene (B15).
+henvisning på `/park/`; `skriv_leder` setter opp lenkene og problemstillingene og sletter.
+**Utfallene er global admin** (B7), og å slette en rad fra en verdimengde likeså
+(`core.verdilister`). KO gjør ingenting med registreringene (B15).

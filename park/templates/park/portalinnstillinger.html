@@ -1,0 +1,34 @@
+{% comment %}
+Parks felter på /portal-admin/innstillinger/ (docs/FORSLAG_PARK.md, B11 og B22).
+Malbiten bor i modulen; verdiene kommer fra `park/portalinnstillinger.py`.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Park — lagenes registrering</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="park_angrefrist">Angrefrist</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="park_angrefrist" name="park_angrefrist" class="form-control"
+               min="{{ park_angrefrist_min }}" max="{{ park_angrefrist_maks }}" value="{{ park_angrefrist }}">
+        <span class="input-group-text">minutter</span>
+      </div>
+      <div class="form-text">
+        Hvor lenge laget kan angre en registrering fra telefonen,
+        {{ park_angrefrist_min }}–{{ park_angrefrist_maks }} minutter. Etter det kan bare
+        <em>skriv_leder</em> i park slette den, med en grunn.
+      </div>
+      <div class="form-check mt-3">
+        <input type="hidden" name="park_ko_posisjon_sendt" value="1">
+        <input class="form-check-input" type="checkbox" id="park_ko_posisjon"
+               name="park_ko_posisjon" value="1"{% if park_ko_posisjon %} checked{% endif %}>
+        <label class="form-check-label" for="park_ko_posisjon">
+          Forhåndsvelg stedet fra KO-tavla
+        </label>
+        <div class="form-text">
+          Parksiden velger stedet laget sist registrerte fra — eller, når KO har flyttet laget
+          senere, stedet på tavla. <strong>Med dette på kan alle som har lenken se hvor KO har
+          plassert hvert lag.</strong> Slås det av, brukes bare lagets siste registrering.
+          Se FORSLAG_PARK.md §4.7.
+        </div>
+      </div>
+    </div>
+  </div>

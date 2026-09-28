@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **192 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **203 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -1528,9 +1528,9 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 35 filer i `static/js/`, fordelt
-på ni sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
-grensesnittene under `/oppdrag/`, og parksiden `/park/r/`.
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 36 filer i `static/js/`, fordelt
+på ti sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
+grensesnittene under `/oppdrag/`, og de to i park: `/park/` og parksiden `/park/r/`.
 
 | Modul | Lastes | Ansvar |
 |---|---|---|
@@ -1550,6 +1550,7 @@ grensesnittene under `/oppdrag/`, og parksiden `/park/r/`.
 | `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
 | `ko-*.js` (fem) | **kun** `/ko/` | Rutenettet, hendelsene, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
 | `park-lag.js` | **kun** `/park/r/`, uten innlogging | Lagets registrering — se `park/CLAUDE.md` |
+| `park-oppsett.js` | **kun** `/park/`, for `skriv_leder` | Lenkene, slettingen og verdimengdene — se `park/CLAUDE.md` |
 
 **To sider er delt i flere filer** (14. sep. 2026): `vaktliste.js` var 3 801 linjer og
 `oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt navnerom**, så

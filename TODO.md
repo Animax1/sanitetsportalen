@@ -918,14 +918,8 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
 
 - [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
       Lagenes utfallsregistrering uten innlogging, via én lenke i tiltakskortet i Bliksund.
-      Avklart i fire runder (§2, B1–B23). **Pulje 1 er levert** (27. sep. 2026, se CHANGELOG);
+      Avklart i fire runder (§2, B1–B23). **Pulje 1 og 2 er levert** (27.–28. sep. 2026, se CHANGELOG);
       modulens regler står i `park/CLAUDE.md`. Igjen:
-      - [ ] **Pulje 2 — oppsettet på `/park/`:** lage og fjerne lenker med oppetid (tokenet
-            vises én gang), problemstillingene (`skriv_leder`) og utfallene (admin),
-            sletting av en feilregistrering med grunn (B20) og «slett alt fra denne lenken
-            etter kl. X», og angrefristen og `park-ko-posisjon`-bryteren på
-            portalinnstillingene (`park/portalinnstillinger.py`). Til da: `manage.py
-            park_lenke`, og bryteren som `AppSetting['park_ko_posisjon']`.
       - [ ] **Pulje 3 — statistikkfanen «Lag»** (`park/statistikk.py`, `nivaa = 'les'`):
             per problemstilling, utfall, sted, lag og time, summert på `antall`, uten
             slettede rader. Overskriften sier «kontakter», ikke «pasienter».

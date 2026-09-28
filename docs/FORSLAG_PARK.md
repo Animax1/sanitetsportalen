@@ -1,10 +1,11 @@
 # Forslag: `/park/` — lagets utfallsregistrering
 
-> **Pulje 1 er bygget** (27. sep. 2026): modellen, parksiden uten innlogging, forhåndsvalget,
-> angre, grensene og backup. Lenker lages med `manage.py park_lenke` til oppsettsiden
-> kommer i pulje 2. Modulens regler står i `park/CLAUDE.md`, historien i `CHANGELOG.md`.
+> **Pulje 1 og 2 er bygget** (27.–28. sep. 2026): modellen, parksiden uten innlogging,
+> forhåndsvalget, angre, grensene, backup — og oppsettet på `/park/` med lenker, sletting,
+> verdimengdene og bryterne på portalinnstillingene. Modulens regler står i
+> `park/CLAUDE.md`, historien i `CHANGELOG.md`.
 
-Status: **avklart; pulje 2 og 3 gjenstår.** Første utkast 27. september 2026 fra staging `8327d8f`;
+Status: **avklart; pulje 3 (statistikkfanen «Lag») gjenstår.** Første utkast 27. september 2026 fra staging `8327d8f`;
 André svarte i fire runder samme dag, og svarene står som **besluttet** under (B1–B23). §9 er
 tom — André: «Vi starter ikke kode før vi har alt av punkter på plass».
 Arbeidslista er `TODO.md`.

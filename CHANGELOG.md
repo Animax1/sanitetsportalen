@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — `/park/` pulje 2: oppsettet — lenker, sletting, verdimengdene, bryterne  `#park #sikkerhet`
+
+**Hvorfor:** André: «Ja legg på staging og bare begynn med pulje 2 og legg den ut på staging
+også når du er ferdig med den.» Pulje 1 gikk til `staging` som `6b52246`. Til nå måtte en lenke
+lages med `manage.py park_lenke`; nå gjøres alt på `/park/`.
+
+- **Lenkene** (`skriv_leder`): lag med navn og oppetid fra/til (standard nå + tre døgn, i
+  lokal tid). **Adressen vises én gang** i et felt med «Kopier», og står aldri i lista igjen —
+  heller ikke hashen. Lista viser status (Åpen / Ikke åpnet ennå / Stengt / Fjernet),
+  antall registreringer og «Sist brukt». «Fjern» krever `confirm`.
+- **Sletting av feilregistreringer** (B20): «Slett» per rad med grunn (påkrevd, maks 200 tegn).
+  Raden står overstreket med «Slettet av leder: Trykket feil lag». Ingen retting.
+- **«Rydd etter en lenke som har kommet på avveie»** — slett alt fra én lenke etter kl. X, på
+  denne vakta. **Første kall svarer 409 med antallet og sletter ingenting**; så bekrefter man.
+  Én auditrad for hele slettingen, og rader som alt er slettet beholder sin egen grunn.
+- **Verdimengdene** gjennom `core.verdilister` (samme fabrikk som oppdrag og KO): problemstillinger
+  for `skriv_leder`, **utfall bare for global admin** (B7), legg til, endre navn, ↑/↓,
+  deaktiver; sletting er global admin og gir 409 når raden er i bruk.
+- **Portalinnstillingene** (`park/portalinnstillinger.py`): angrefristen (1–30 min) og bryteren
+  **«Forhåndsvelg stedet fra KO-tavla»** — `RISIKOVALG(park-ko-posisjon)` — med teksten «Med dette
+  på kan alle som har lenken se hvor KO har plassert hvert lag».
+- `park-oppsett.js` bygger alt med `textContent`, som `park-lag.js`. `parkEl` het det samme i
+  begge filene med ulik betydning — omdøpt til `parkNode` her. Oppetiden vises med år: en lenke
+  lever på tvers av vakter, og «1.1.–1.1.» sa ikke hvilket år den stenger (funnet i nettleseren).
+
+**Mutanter: 22, deretter 1 til — 22 drept, 1 lukket med ny test.** Portene (hvert endepunkt senket
+fra `skriv_leder` til `les`, utfall til leder, problemstillinger til alle, `confirm` og 409 fjernet),
+tjenestelaget (grunnen, dobbel sletting, lenke- og tidsfilteret, `i_bruk` alltid 0, naiv tid som
+UTC), innstillingene (bryter uten følgefelt, grense av med én) og JS (utfall for leder, statusgrensen).
+**Overlevde:** «slett-etter: allerede slettet med» — en ny rydding ville skrevet over grunnen på en
+rad som alt var slettet, og talt den med. **Test lagt til, nå drept.**
+
+**Prøvd i Chromium** med en innlogget `skriv_leder`: lag lenke → adressen vises → brukt på
+parksiden i en fane uten innlogging → registreringen står på `/park/` → slettet med grunn →
+«Plaster» lagt til nederst; utfallene har ingen knapper for en leder. Ingen konsollfeil.
+
+Suiten: 4 004 + 915 tester grønne. Tallene i dokumentene: 203 ruter, 36 JS-filer, ti sider.
+
 ## 2026-09-27 — `/park/` pulje 1: modellen og siden lagene registrerer på  `#park #ny-modul #sikkerhet`
 
 **Hvorfor:** André, etter fire avklaringsrunder på `docs/FORSLAG_PARK.md`: «Enig med bryter.
