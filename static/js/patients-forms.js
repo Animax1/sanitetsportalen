@@ -99,9 +99,10 @@ async function _saveNewImpl() {
 // EDIT PATIENT
 // ════════════════════════════════════════════════════════
 function openEdit(data) {
-  // Kun `skriv_full` får åpne redigeringsskjemaet. `les` kunne tidligere
-  // åpne det (rollen var read_write) og møtte 403 først på lagre.
-  if (modulNivaa() !== 'skriv_full') return;
+  // `skriv_full` *eller høyere* får åpne redigeringsskjemaet. `les` kunne
+  // tidligere åpne det (rollen var read_write) og møtte 403 først på lagre.
+  // Minst, ikke lik: admin er `skriv_leder` og ble stengt ute (se nivaaMinst).
+  if (!nivaaMinst(window.MODUL_TILGANG, 'patients', 'skriv_full')) return;
   currentEditId = data.id;
   document.getElementById('edit-title').textContent = `Pasient #${data.patient_nr}`;
 

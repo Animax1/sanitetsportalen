@@ -207,8 +207,7 @@ førstehjelper, helsepersonell, bil — er modulens sak, og meldes inn gjennom
 `core/kontokobling.py`. Se «Avhengighetsretningen».
 
 Importér alltid fra `core.auth_decorators`. **`accounts/decorators.py` er slettet**
-(14. sep. 2026, gjeldspunkt 3.3): den var en ren re-eksport av `admin_required`, og den
-eneste leseren var testen som verifiserte at den virket.
+(14. sep. 2026, gjeldspunkt 3.3): en ren re-eksport av `admin_required`.
 
 *Og slettingen avdekket at regelen sto brutt:* testen lette bare etter
 `from accounts.decorators import`, mens `accounts/views.py` brukte `from .decorators
@@ -270,6 +269,7 @@ i lista der, med begrunnelse.
 
 **Grensesnittet gater på `window.MODUL_TILGANG`, ikke på rollen.** Gjør det ikke det, viser
 vi knapper som fører til 403 — og en knapp som fører til en vegg er verre enn ingen knapp.
+**Sammenlign med `nivaaMinst()`, aldri `===`** — admin er `skriv_leder`.
 
 **`CustomUser.role` er kontotype, ikke tilgangsnivå.** Feltet krympet i deploy 2 til
 `admin` og `bruker`; de fire verdiene som beskrev tilgang er borte, sammen med
@@ -769,7 +769,7 @@ håndhever det på cellebredden.
 
 | Fil | Lastes | Hva den gjør |
 |-----|--------|--------------|
-| `portal-utils.js` | **alle sider** | `apiFetch`, `withSubmitGuard`, escaping, `fmtMin`, `klokke`, `data-action`, `folgEndringer` |
+| `portal-utils.js` | **alle sider** | `nivaaMinst`, `apiFetch`, `withSubmitGuard`, escaping, `fmtMin`, `klokke`, `data-action`, `folgEndringer` |
 | `patients-utils.js`, `-table.js`, `-forms.js`, `-app.js` | pasientsiden, alltid | `patients/CLAUDE.md` |
 | `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
 | `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |

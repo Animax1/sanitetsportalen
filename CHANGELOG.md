@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — Admin fikk opprette pasienter, men ikke redigere dem  `#pasienter` `#bug`
+
+**Meldt av André fra staging og prod:** «Du får opprette pasienter men ikke redigere når du trykker
+på dem» — både i **pasientlista** og på **tavla**. Klikket gjorde ingenting, uten feilmelding.
+
+**Årsaken:** `openEdit()` i `patients-forms.js` spurte `modulNivaa() !== 'skriv_full'`, altså
+*lik* og ikke *minst*. Global admin får toppen av stigen fra `nivaa_for` — `skriv_leder` — også på
+moduler som ikke deklarerer trinnet (M10, 13. sep. 2026). Admin var dermed «mer enn skriv_full» og
+ble stengt ute. Serveren sammenlignet riktig med rang (`har_tilgang`), så lagringen ville virket;
+det var bare døra inn i skjemaet som var feil. En vanlig bruker med `skriv_full` var ikke rammet.
+Gjenskapt i Chromium før rettingen: admin — lista `false`; `skriv_full` — `true`.
+
+- **`nivaaMinst(modul, nivaa)` i `portal-utils.js`** — én stige for nettleseren på alle sider,
+  «minst, aldri lik». `openEdit()` bruker den. `modulNivaa()` i `patients-utils.js` er slettet
+  (ingen andre lesere).
+- **Backlog hadde sin egen kopi av stigen** (`NIVAA_RANG` + `backlogNivaaMinst`); den delegerer nå.
+  Rangtabellen står *inne i* funksjonen, ikke som global `const`: filene deler ett navnerom, og to
+  toppnivå-`const` med samme navn stopper hele siden.
+- **Resten er gjennomgått:** vaktlista og KO sammenligner med `===`, men har admin med eksplisitt
+  (`_erAdmin() ||`, `t.admin`), og `=== 'skriv_handling'` der er med vilje (eget korps). Ingen
+  andre steder var rammet.
+
+**Tester:** `core/tests_tilgangsnivaa_js.py` krever at stigen i JS er lik `NIVAA_HIERARKI`, par for
+par — kommer det et trinn til på serveren, blir den rød. `patients/tests_redigering_js.py` henter
+nivået fra `nivaa_for()` for en ekte admin, skriver og leser og sender det gjennom `openEdit()` —
+**ikke et nivå skrevet av**; det var nettopp antakelsen «admin er skriv_full» som var feil.
+**Mutasjoner: 12, 11 drept.** Overlevde: sperra `har === undefined || kreves === undefined` fjernet
+— ekvivalent, fordi `undefined >= n` er `false` i JS uansett; den står for lesbarhetens skyld.
+**Røyktest i Chromium etter rettingen:** admin og `skriv_full` åpner fra både lista og tavla, og
+admin lagrer (`PUT 200`).
+
+**Planen for arkiv og tidligere vakter** (avklart samme dag) står i `TODO.md` under «Avslutt vakt,
+arkiv og tidligere vakter i statistikken».
+
 ## 2026-09-28 — `/park/` heter nå «Lagregistrering» på `/lag/`  `#park`
 
 **Hvorfor:** André: «Bør vi for tydelighetens skyld endre navn fra /park til /lag? Da appen skal

@@ -15,6 +15,34 @@
 // ════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════
+// TILGANGSNIVÅ
+// ════════════════════════════════════════════════════════
+
+// **«Minst», aldri «lik»** (28. sep. 2026). Nivåene er en stige, og global
+// admin får toppen av den fra `nivaa_for` — `skriv_leder`, også på moduler som
+// ikke deklarerer trinnet. `openEdit()` på pasientsiden spurte
+// `=== 'skriv_full'`, og admin fikk opprette pasienter, men ikke åpne dem
+// («Du får opprette pasienter men ikke redigere»). Serveren sammenligner med
+// rang (`har_tilgang`); dette er samme regel i nettleseren.
+//
+// Rangen står inne i funksjonen, ikke som en global: filene deler ett
+// navnerom, og en `const` med samme navn i en modulfil stopper hele siden.
+// `core/tests_tilgangsnivaa_js.py` krever at den er lik `NIVAA_HIERARKI`.
+//
+// **Tilgangen er et argument** — kalleren sender `window.MODUL_TILGANG`. Fila
+// lastes også av sider som ikke setter globalen (`/statistikk/`), og der skal
+// den ikke leses (`JsModulLastingTests`).
+function nivaaMinst(tilgang, modul, nivaa) {
+  const rang = {les: 0, les_alle: 1, skriv_handling: 2, skriv_full: 3, skriv_leder: 4};
+  tilgang = tilgang || {};
+  if (tilgang.admin === true) return true;
+  const har = rang[String(tilgang[modul] || '').toLowerCase()];
+  const kreves = rang[nivaa];
+  if (har === undefined || kreves === undefined) return false;
+  return har >= kreves;
+}
+
+// ════════════════════════════════════════════════════════
 // CSRF & API HELPERS  (Django-specific)
 // ════════════════════════════════════════════════════════
 

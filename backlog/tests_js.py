@@ -18,16 +18,15 @@ from patients.js_test_utils import (JS_DIR, PORTAL_UTILS_JS, build_harness,
 BACKLOG_JS = JS_DIR / 'backlog.js'
 
 HARNESS = (
-    (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+    (PORTAL_UTILS_JS, ('nivaaMinst', 'escapeHtml', 'escHtmlValue')),
     (BACKLOG_JS, ('backlogNivaaMinst', 'backlogKanMeldeInn', 'backlogKanLose',
                   'backlogTellertekst', 'backlogTidspunkt', 'backlogTypemerke',
                   'backlogModulnavn', 'backlogKort', 'backlogKommentarrad')),
 )
 
-#: Konstanten på toppnivå klippes ikke med av `build_harness`, og uten den er
-#: hvert oppslag `undefined` — da ville testen bestått på tull.
-PREAMBLE = ('const NIVAA_RANG = {les: 0, les_alle: 1, skriv_handling: 2, '
-            'skriv_full: 3, skriv_leder: 4};\n')
+#: Rangen står inne i `nivaaMinst()` (portal-utils.js) siden 28. sep. 2026, så
+#: den følger med når funksjonen klippes ut — ingen kopi her som kan gli fra.
+PREAMBLE = ''
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

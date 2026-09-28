@@ -11,15 +11,10 @@ let backlogRedigerer = null;   // id under retting, eller null for nytt
 // **Gatene leser MODUL_TILGANG, ikke rollen** (CLAUDE.md). Egne funksjoner og
 // ikke `if`-er spredt i byggerne, fordi de avgjør hvilke knapper som finnes —
 // og en knapp som fører til 403 er verre enn ingen knapp.
-const NIVAA_RANG = {les: 0, les_alle: 1, skriv_handling: 2, skriv_full: 3, skriv_leder: 4};
-
+// Rangen bor i `nivaaMinst()` i portal-utils.js — én stige for hele portalen
+// (28. sep. 2026; backlog hadde sin egen kopi av den).
 function backlogNivaaMinst(nivaa) {
-  const tilgang = (window.MODUL_TILGANG || {});
-  if (tilgang.admin) return true;
-  const har = NIVAA_RANG[tilgang.backlog];
-  const kreves = NIVAA_RANG[nivaa];
-  if (har === undefined || kreves === undefined) return false;
-  return har >= kreves;
+  return nivaaMinst(window.MODUL_TILGANG, 'backlog', nivaa);
 }
 
 // Skrevet over flere linjer med vilje: `extract_function()` i

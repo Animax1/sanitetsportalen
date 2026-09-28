@@ -3,8 +3,10 @@
 // ROLE-BASED VISIBILITY
 // ════════════════════════════════════════════════════════
 
-// Modulnivået, lest fra globalen malen setter (§7.4). Rollen sier ikke noe om
-// hva du får gjøre i en modul.
+// Modulnivået leses fra globalen malen setter (§7.4), med `nivaaMinst()` i
+// portal-utils.js. Rollen sier ikke noe om hva du får gjøre i en modul.
+// `modulNivaa()` sto her og ga nivået rått, og kallstedet sammenlignet med
+// `===` — admin er `skriv_leder` og ble stengt ute av redigeringen.
 //
 // **Standarden er ingen tilgang.** Mangler globalen, oppfører koden seg som om
 // brukeren ikke har noe.
@@ -14,9 +16,6 @@
 // markupen — inkludert URL-ene til admin-sidene — lå i HTML-en for enhver som
 // kunne lese modulen. Endepunktene var gatet, så det var ingen tilgangsgrense,
 // men det er ingen grunn til å sende noe vi vet mottakeren ikke skal ha.
-function modulNivaa() {
-  return ((window.MODUL_TILGANG || {}).patients || '').toLowerCase();
-}
 
 // ════════════════════════════════════════════════════════
 // STATE & MODALS
