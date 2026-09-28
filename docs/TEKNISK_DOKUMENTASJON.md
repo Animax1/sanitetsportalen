@@ -667,7 +667,7 @@ Innloggingen er delt i tre faser håndtert av én view (`accounts/views.py`, `lo
 **Steg 4 – Innlogging fullført**
 
 - `login(request, user)` kalles.
-- `_invalidate_other_sessions()` sletter alle andre aktive sesjoner for brukeren (single-session-policy).
+- `avslutt_andre_sesjoner()` sletter alle andre aktive sesjoner for brukeren (single-session-policy).
 - Brukeren omdirigeres til `next`-parameter eller `/`.
 
 ### 6.2 MFA-mekanisme
@@ -743,7 +743,7 @@ Dobbel rate-limit på `POST /accounts/login/`:
 
 ### 6.5 Single-session
 
-`_invalidate_other_sessions()` (`accounts/views.py`) kjøres etter vellykket innlogging, passordbytte og MFA-bekreftelse. Den itererer over alle aktive `Session`-objekter, dekoder dem og sletter de som tilhører samme bruker og ikke er den nåværende sesjonen.
+`avslutt_andre_sesjoner()` (`accounts/sesjoner.py`) kjøres etter vellykket innlogging, passordbytte og MFA-bekreftelse. Den itererer over alle aktive `Session`-objekter, dekoder dem og sletter de som tilhører samme bruker og ikke er den nåværende sesjonen.
 
 Sesjon-invalidering skjer også automatisk ved MFA-bytte og passordbytte.
 
@@ -758,7 +758,7 @@ Sesjon-invalidering skjer også automatisk ved MFA-bytte og passordbytte.
 - **Tvinget bytte:** `must_change_password=True` satt som standard for nye brukere. `MustChangePasswordMiddleware` omdirigerer alle forespørsler (unntatt passordbytte og logout) til `/accounts/change-password/`.
 - **Frivillig bytte:** Brukeren må oppgi nåværende passord (`ChangePasswordForm`), med mindre `must_change_password=True`.
 - **Admin-reset:** `user_detail_view` med `action=reset_password` genererer et 12-tegns midlertidig passord, setter `must_change_password=True`, invaliderer alle brukerens sesjoner og viser det midlertidige passordet til adminen.
-- **Sesjonssikkerhet:** Etter passordbytte kalles `update_session_auth_hash()` for å beholde nåværende sesjon, og `_invalidate_other_sessions()` for å logge ut alle andre sesjoner.
+- **Sesjonssikkerhet:** Etter passordbytte kalles `update_session_auth_hash()` for å beholde nåværende sesjon, og `avslutt_andre_sesjoner()` for å logge ut alle andre sesjoner.
 
 ---
 

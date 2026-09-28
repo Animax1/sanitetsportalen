@@ -18,15 +18,23 @@ en kontakt-e-post på en bil.
 **§6.2 — MFA kan ikke omgås.** Reset gir nytt passord, men MFA-steget gjelder
 fortsatt ved innlogging. Det følger av at flyten ender på innloggingssiden og
 ikke logger noen inn. Mistes MFA-enheten, er admin eneste vei — ``reset_mfa``
-er og forblir admin-only. Ellers er MFA verdiløst.
+er og forblir admin-only, og `manage.py nullstill_mfa` krever Railway-innlogging.
+Ellers er MFA verdiløst.
 
 **§6.7 — ingen kontoenumerering.** Svaret er identisk enten adressen finnes
 eller ikke. For en frivillig organisasjon avslører «har konto» *hvem som er
 medlem og har vakter* — en personopplysning i seg selv, uavhengig av om noen
 kommer inn. Det gjelder også rate-limit-svaret: strupes kun eksisterende
 adresser, er strupingen i seg selv et svar.
+
+**Og tiden er et svar** (28. sep. 2026). Utsendingen er en HTTPS-POST til
+AHASend med ti sekunders tidsgrense, og den skjedde bare for en adresse med
+konto. Siden var identisk; svartiden skilte dem med hundrevis av
+millisekunder. E-posten bygges i forespørselen og sendes i en egen tråd —
+`send_i_bakgrunnen`.
 """
 import logging
+import threading
 
 from . import signert_lenke
 
@@ -83,13 +91,8 @@ def finn_bruker(epost):
     return user if kan_resettes(user) else None
 
 
-def send_reset(user, request):
-    """Send reset-lenken. Returnerer True hvis den gikk ut.
-
-    Feiler utsendingen, logges det og False returneres — men kallstedet skal
-    **ikke** vise noe annet svar til brukeren. Ellers er en feilmelding et
-    signal om at adressen finnes.
-    """
+def lag_reset_epost(user, request):
+    """E-posten med reset-lenken, klar til å sendes. Rører ikke nettverket."""
     from django.conf import settings
     from django.core.mail import EmailMessage
     from django.urls import reverse
@@ -111,17 +114,60 @@ def send_reset(user, request):
         f'Bruker du to-faktor, gjelder den fortsatt ved innlogging.\n\n'
         f'Spørsmål? Svar på denne e-posten, eller skriv til {SUPPORT_EPOST}.\n'
     )
+    return EmailMessage(
+        subject='Nytt passord i Sanitetsportalen',
+        body=kropp,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+        reply_to=[SUPPORT_EPOST],
+    )
 
+
+def send_reset(user, request):
+    """Send reset-lenken. Returnerer True hvis den gikk ut.
+
+    Feiler utsendingen, logges det og False returneres — men kallstedet skal
+    **ikke** vise noe annet svar til brukeren. Ellers er en feilmelding et
+    signal om at adressen finnes.
+    """
+    return _send(lag_reset_epost(user, request), user.pk)
+
+
+def _send(melding, bruker_id) -> bool:
     try:
-        EmailMessage(
-            subject='Nytt passord i Sanitetsportalen',
-            body=kropp,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
-            reply_to=[SUPPORT_EPOST],
-        ).send(fail_silently=False)
+        melding.send(fail_silently=False)
         return True
     except Exception:
-        logger.warning('Kunne ikke sende reset-lenke til bruker %s', user.pk,
+        # Bruker-ID-en, aldri adressen: loggen skal ikke bære e-postadresser.
+        logger.warning('Kunne ikke sende reset-lenke til bruker %s', bruker_id,
                        exc_info=True)
         return False
+
+
+_utsendinger: list[threading.Thread] = []
+_utsendinger_laas = threading.Lock()
+
+
+def send_i_bakgrunnen(melding, bruker_id) -> threading.Thread:
+    """Send `melding` i en egen tråd, og svar med en gang.
+
+    Tråden rører ikke databasen — meldingen er ferdig bygget — så den trenger
+    ingen egen tilkobling. Den er `daemon`: en e-post som går tapt når
+    prosessen resirkuleres er en reset brukeren ber om igjen, ikke en
+    prosess som henger.
+    """
+    trad = threading.Thread(target=_send, args=(melding, bruker_id), daemon=True,
+                            name='reset-epost')
+    with _utsendinger_laas:
+        _utsendinger[:] = [t for t in _utsendinger if t.is_alive()]
+        _utsendinger.append(trad)
+    trad.start()
+    return trad
+
+
+def vent_paa_utsendinger(tidsgrense: float = 10) -> None:
+    """Vent til trådene er ferdige. For tester og kommandoer — aldri i et view."""
+    with _utsendinger_laas:
+        trader = list(_utsendinger)
+    for trad in trader:
+        trad.join(tidsgrense)

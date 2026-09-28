@@ -246,6 +246,9 @@ class LoginEvent(models.Model):
 
     # Hendelsestyper for MFA-audit
     EVENT_LOGIN = 'login'
+    # Passordet var riktig, men MFA gjenstår (28. sep. 2026). Sto før som
+    # `login` med `success=True`, så en halv innlogging så hel ut i loggen.
+    EVENT_PASSORD_OK = 'passord_ok'
     EVENT_MFA_SETUP_COMPLETED = 'mfa_setup_completed'
     EVENT_MFA_VERIFY_SUCCESS = 'mfa_verify_success'
     EVENT_MFA_VERIFY_FAILED = 'mfa_verify_failed'
@@ -255,6 +258,7 @@ class LoginEvent(models.Model):
 
     EVENT_TYPE_CHOICES = [
         (EVENT_LOGIN, 'Innlogging'),
+        (EVENT_PASSORD_OK, 'Passord riktig, MFA gjenstår'),
         (EVENT_MFA_SETUP_COMPLETED, 'MFA-oppsett fullført'),
         (EVENT_MFA_VERIFY_SUCCESS, 'MFA-verifisering vellykket'),
         (EVENT_MFA_VERIFY_FAILED, 'MFA-verifisering feilet'),

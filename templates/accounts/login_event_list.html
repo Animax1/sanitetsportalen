@@ -124,7 +124,9 @@
         {% endif %}
       </td>
       <td>
-        {% if evt.success %}
+        {% if evt.event_type == 'passord_ok' %}
+          <span class="badge bg-secondary" title="Passordet var riktig; MFA-steget er logget for seg">Halvveis</span>
+        {% elif evt.success %}
           <span class="badge bg-success">OK</span>
         {% else %}
           <span class="badge bg-danger">Feilet</span>

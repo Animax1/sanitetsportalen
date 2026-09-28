@@ -16,14 +16,22 @@ Uten `--passord` genereres et passord uten forvekslingstegn, og det skrives ut
 én gang. **Som standard fjernes kravet om passordbytte**, slik at kontoen
 kommer rett inn i portalen — det er som regel hele poenget med å kjøre denne.
 Vil du beholde kravet, bruk `--behold-tvungen-bytte`.
+
+**Sesjonene avsluttes, og handlingen logges** (28. sep. 2026). Kommandoen satte
+passordet og ingenting mer: en stjålet sesjon overlevde, og i auditloggen sto
+ingenting — mens den samme handlingen i adminflaten gjorde begge deler.
+Passordet skrives aldri i loggen, bare at det ble satt og hvor fra.
 """
 from django.contrib.auth.password_validation import (
     ValidationError, validate_password,
 )
 from django.core.management.base import BaseCommand, CommandError
 
+from accounts import kontolaas
 from accounts.backends import finn_kandidater
 from accounts.passord import lag_midlertidig_passord
+from accounts.sesjoner import avslutt_alle_sesjoner
+from audit.models import AuditLog
 
 
 class Command(BaseCommand):
@@ -72,17 +80,20 @@ class Command(BaseCommand):
         bruker.set_password(passord)
         felter = ['password']
 
-        # Kontolåsen nullstilles: har noen prøvd seg fram, skal ikke den nye
-        # verdien møte en sperre satt av forsøkene på den gamle.
-        bruker.failed_login_attempts = 0
-        bruker.locked_until = None
-        felter += ['failed_login_attempts', 'locked_until']
-
         if not options['behold_tvungen_bytte']:
             bruker.must_change_password = False
             felter.append('must_change_password')
 
         bruker.save(update_fields=felter)
+        # Kontolåsen nullstilles: har noen prøvd seg fram, skal ikke den nye
+        # verdien møte en sperre satt av forsøkene på den gamle. `laas_opp`
+        # tar også maskinlåsene på en delt konto.
+        kontolaas.laas_opp(bruker)
+        avslutt_alle_sesjoner(bruker)
+        AuditLog.objects.create(
+            table_name='accounts_customuser', record_id=bruker.pk, action='UPDATE',
+            field_name='password', new_value='satt fra kommandolinja (sett_passord)',
+        )
 
         self.stdout.write(self.style.SUCCESS(
             f'Passord satt for {bruker.username!r}.'))
@@ -98,3 +109,4 @@ class Command(BaseCommand):
                 '  Kravet om passordbytte er fjernet — kontoen går rett inn '
                 'i portalen.')
         self.stdout.write('  Kontolåsen og telleren for feilede forsøk er nullstilt.')
+        self.stdout.write('  Alle sesjoner for kontoen er avsluttet.')

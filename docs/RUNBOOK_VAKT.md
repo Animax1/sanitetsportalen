@@ -802,6 +802,41 @@ Se også `docs/DEPLOY_GUIDE.md` §10.
 
 ---
 
+## 8d. Mistet MFA-enhet — ingen annen admin kan hjelpe
+
+Telefonen med autentiseringsappen er borte, reservekodene er borte, og det finnes ingen
+annen administrator som kan trykke «Nullstill MFA» i brukeradministrasjonen. Da er veien
+inn Railway (28. sep. 2026):
+
+```powershell
+railway ssh --service web -- python manage.py nullstill_mfa <brukernavn> --ja
+```
+
+Kommandoen gjør **nøyaktig** det knappen gjør — samme funksjon, `accounts.mfa.nullstill_mfa`:
+
+- MFA-enhetene og reservekodene slettes
+- «Krev MFA» settes på kontoen, så neste innlogging viser en ny QR-kode
+- alle sesjoner for kontoen avsluttes, også de som sto midt i en innlogging
+- én rad i innloggingsloggen og én i auditloggen, med kilden «fra kommandolinja»
+
+Deretter: logg inn med brukernavn og passord, skann den nye QR-koden, og **ta vare på de
+nye reservekodene** — det er dem som gjør at du slipper denne siden neste gang.
+
+**`--ja` er påkrevd** av samme grunn som i `gjenopprett`: `railway ssh` har ingen terminal
+å spørre i. Uten flagget sier kommandoen hva den ville gjort, og gjør ingenting. Den tar
+én navngitt konto om gangen. Brukernavn med æ, ø eller å skrives med `\u`-rømming —
+`andré` — og `python manage.py sjekk_brukernavn` viser formen for hver konto.
+
+**Railway-innloggingen er vakta, og det er bevisst.** Den som når kommandoen, har allerede
+tilgang til databasen og miljøvariablene; kommandoen gir ingen tilgang som ikke fantes.
+Det betyr også at **Railway- og GitHub-kontoene er nøkkelen til portalen**, og at 2FA på
+dem er det som faktisk beskytter MFA-en her. Begge har 2FA (André, 28. sep. 2026).
+
+Har du glemt **passordet** i tillegg: `python manage.py sett_passord <brukernavn>` først.
+Den avslutter også alle sesjoner og skriver en auditrad.
+
+---
+
 ## 9. Hvis alt annet feiler: last-shed
 
 Som absolutt siste utvei hvis systemet er utilgjengelig:

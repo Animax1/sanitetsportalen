@@ -145,6 +145,34 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Sikkerhetsgjennomgangen 28. sep. 2026 — pulje 2–4, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
+
+Pulje 1 (kontoovertakelse) er levert, se CHANGELOG 28. sep. 2026. Beslutningene er tatt og
+står i dokumentet. Hver pulje går på egen gren med tester som gjennomfører angrepet, og
+mutasjoner på nivået i `CLAUDE.md`. **`staging` går ikke til `main` før pulje 2 er ferdig**
+(André: «vi har tid til å gjøre oss ferdig med disse puljene først»).
+
+- [ ] **Pulje 2 — blokkerer `staging` → `main`.** All koden er ny på `staging`.
+      Fritekst (`annet_tekster` og liknende) fjernes før `core.vaktstatistikk.frys()` lagrer —
+      som en regel i handleren, ikke en `if` i `core`. Arkivsletting tar `pre_slett`-backup og
+      krever tittelen skrevet inn, som vaktslettingen. Gjenåpning med `select_for_update`, og
+      dobbel vaktsletting avvises. `core.jsonkropp.json_body` avviser `Infinity`, `NaN` og
+      `1e999` (500 fra `/lag/r/` i dag). Rydd frosne rader med fritekst på staging.
+- [ ] **Pulje 3 — backup og offsite.** `SPBK2` med objektnavnet som AAD, `SPBK1` som
+      lesesti prøvd mot en ekte blob. Slug fra filnavnet, ikke S3-metadata; `hent()` nekter å
+      overskrive. `restore_backup` avviser modeller utenfor handleren (`full` unntatt).
+      `AuditLog` og `LoginEvent` røres ikke av en full gjenoppretting. `verifiser_backup`
+      nuller `OFFSITE_*`. `OFFSITE_BACKUP_KEY` minst 32 tegn. Audit på `Backupplan`, og
+      feiltekstene i `core/views_backup.py` gjennom `vask()`.
+- [ ] **Pulje 4 — opprydding og drift.** Escaping i `patients-table.js` (førstehjelper,
+      helsepersonell); slett `window.USER_NAME`, `RegexValidator` på brukernavn, `_csv_trygg`
+      på brukernavnkolonna. Vaktliste: navnebytte følger ikke plasser «åpne for alle»,
+      `konto_finnes` bare for `kan_lede`, e-post plantet på egen mannskapsrad kobles ikke
+      stille. Park: slett tokenet ved 403, advarsel over 7 dagers oppetid. HMAC-referanse i
+      stedet for rå `session_key` i adminlista. Enhetskontoer avvises på `skriv_full` i
+      oppdrag og i statistikkens oppdragskilde. `pip-audit` i CI. `X-Forwarded-For` bare når
+      `RAILWAY_ENVIRONMENT` er satt. Ukryptert hel backup på volumet i risikoregisteret.
+
 ### Avslutt vakt, arkiv og tidligere vakter i statistikken — steg 1–3 levert 28. sep. 2026
 
 André: «etter hver vakt [...] arkiveres modulene samtlige som admin trykker [...] og statistikk

@@ -1,6 +1,5 @@
 """Views for brukerkontoer og admin-panel."""
 import base64
-import hashlib
 import hmac
 import io
 import secrets
@@ -12,7 +11,6 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError, Q
@@ -20,14 +18,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
-from datetime import timedelta
 
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from core.ratelimit import er_rate_limited as core_er_rate_limited
 
 from audit.models import AuditLog
-from core.sesjoner import slett_brukerens_sesjoner
 from core.url_safety import safe_redirect_url
 
 from core.auth_decorators import admin_required
@@ -38,10 +34,15 @@ from .forms import (
 )
 from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .passord_reset import (
-    finn_bruker, les_token as les_reset_token, send_reset,
+    finn_bruker, lag_reset_epost, les_token as les_reset_token,
+    send_i_bakgrunnen,
 )
 from .passord import lag_midlertidig_passord
+from . import kontolaas, mfa
 from .backends import finn_konto
+from .sesjoner import (
+    avslutt_alle_sesjoner, avslutt_andre_sesjoner, registrer_aktiv_sesjon,
+)
 from .models import CustomUser, LoginEvent
 from core.klientip import klient_ip, ratelimit_nokkel
 from core.ratelimit import rate_limit
@@ -51,71 +52,6 @@ from core.validators import les_iso_dato
 def _get_client_ip(request):
     """Klientens IP — `core.klientip`, samme svar som audit og rate-limit."""
     return klient_ip(request)
-
-
-def _registrer_aktiv_sesjon(user, session_key):
-    """Avslutt brukerens forrige sesjon og registrer den nye (N10).
-
-    Portalen har én-sesjon-per-bruker som policy: logger du inn på en ny enhet,
-    ryker den gamle. Det var tidligere implementert ved å iterere **alle**
-    ikke-utløpte sesjoner og kalle ``get_decoded()`` på hver — signaturverifisering
-    og JSON-parsing per rad. Django har ingen indeks fra bruker til sesjon, så
-    mønsteret er i og for seg det vanlige; problemet var hvor det ble kalt.
-    Kostnaden traff innloggingsstien, altså de ti minuttene ved vaktstart der
-    alle logger på samtidig.
-
-    Nå lagrer vi sesjonsnøkkelen på brukeren, og invalidering blir ett indeksert
-    oppslag. Feltet er en cache av policyen, ikke fasit for hvilke sesjoner som
-    finnes. Derfor beholder de sikkerhetskritiske stiene — passordbytte,
-    admin-reset, frys og sletting — den grundige gjennomgangen.
-
-    **Tom `current_session_key` betyr ikke «ingen sesjoner».** Den betyr at vi
-    ikke *vet* om det finnes noen: brukeren kan ha en sesjon opprettet før feltet
-    ble innført. Skjedde i produksjon 13. august 2026 — en bruker som allerede var
-    innlogget på én enhet forble innlogget der etter å ha logget inn på en annen,
-    fordi det ikke sto noen nøkkel å slette. Derfor faller vi tilbake til den
-    grundige gjennomgangen når feltet er tomt. Det koster ett fullt gjennomløp
-    per bruker, første gang de logger inn etter at feltet ble innført; deretter
-    gjelder den raske stien.
-    """
-    forrige = user.current_session_key
-
-    if not forrige:
-        _invalidate_other_sessions(user, session_key)
-        return
-
-    if forrige != session_key:
-        Session.objects.filter(session_key=forrige).delete()
-        user.current_session_key = session_key
-        user.save(update_fields=['current_session_key'])
-
-
-def _invalidate_other_sessions(user, current_session_key):
-    """Slett alle aktive sesjoner for brukeren, unntatt nåværende sesjon.
-
-    Grundig variant: itererer og dekoder alle ikke-utløpte sesjoner. Brukes ved
-    passordbytte, der det å garantere at ingen annen sesjon overlever er selve
-    poenget — og hvor kostnaden er irrelevant fordi operasjonen er sjelden.
-    Innloggingsstien bruker ``_registrer_aktiv_sesjon()`` i stedet.
-    """
-    slett_brukerens_sesjoner(user, unntatt=current_session_key)
-
-    if user.current_session_key != current_session_key:
-        user.current_session_key = current_session_key
-        user.save(update_fields=['current_session_key'])
-
-
-def _invalidate_all_sessions(user):
-    """Slett alle aktive sesjoner for brukeren (admin-reset, frys, sletting).
-
-    Grundig av samme grunn som over: brukes kun i sikkerhetsoperasjoner der en
-    overlevende sesjon er hele feilmodusen man vil unngå.
-    """
-    slett_brukerens_sesjoner(user)
-
-    if user.current_session_key:
-        user.current_session_key = None
-        user.save(update_fields=['current_session_key'])
 
 
 def _log_user_admin_action(request, target_user, action, field_name=None,
@@ -167,8 +103,8 @@ _TRUST_SALT = 'accounts.mfa_trust'
 def _trust_avtrykk(user):
     """Passordavtrykk i trust-cookien (13. sep. 2026, M12): bytter passordet,
     eller nullstilles det, stemmer ikke avtrykket lenger, og enheten må
-    godkjennes på nytt. Samme grep som `signert_lenke._passordavtrykk`."""
-    return hashlib.sha256((user.password or '').encode('utf-8')).hexdigest()[:16]
+    godkjennes på nytt. Samme avtrykk som binder MFA-stegene, `accounts.mfa`."""
+    return mfa.passordavtrykk(user)
 
 
 def _trust_token(user, device):
@@ -240,10 +176,44 @@ def _generate_qr_base64(config_url):
 
 
 def _do_complete_login(request, user, next_url='/'):
-    """Fullfør innlogging: kall login(), avslutt forrige sesjon, redirect."""
+    """Fullfør innlogging: alle faktorer er bevist.
+
+    **Det eneste stedet en innlogging fullføres** (28. sep. 2026). Før satte
+    passordsteget `last_login_at` også når MFA gjensto, og telleren for
+    feilede forsøk ble bare nullstilt etter en TOTP-kode — innlogging med
+    klarert enhet eller et fullført oppsett lot gamle skrivefeil stå og hope
+    seg opp til en lås.
+    """
+    mfa.avslutt_steg(request)
+    user.last_login_at = timezone.now()
+    user.save(update_fields=['last_login_at'])
+    kontolaas.nullstill(user, _get_client_ip(request))
     login(request, user)
-    _registrer_aktiv_sesjon(request.user, request.session.session_key)
+    registrer_aktiv_sesjon(request.user, request.session.session_key)
     return redirect(next_url)
+
+
+def _laast_melding(user):
+    """Meldingen til den som har riktig passord til en låst konto.
+
+    En maskinlås (delt konto, `accounts.kontolaas`) har ingen `locked_until`;
+    da er sperretiden hele svaret.
+    """
+    if user.locked_until and user.locked_until > timezone.now():
+        remaining = int((user.locked_until - timezone.now()).total_seconds() / 60) + 1
+    else:
+        remaining = int(kontolaas.SPERRETID.total_seconds() / 60)
+    return f'Kontoen er midlertidig låst. Prøv igjen om {remaining} minutt(er).'
+
+
+def _steget_er_utlopt(request):
+    """MFA-steget holder ikke lenger: tilbake til passordet, med en forklaring.
+
+    Uten meldingen ser det ut som om koden ble avvist uten grunn — og den som
+    brukte et kvarter på å installere appen, fortjener å vite hvorfor.
+    """
+    messages.info(request, 'Innloggingen må begynne på nytt. Skriv inn brukernavn og passord.')
+    return redirect('accounts:login')
 
 
 def ratelimited_view(request, exception=None):
@@ -267,8 +237,17 @@ def _brukernavn_nokkel(group, request):
     Innlogging slår opp brukernavnet uten hensyn til store bokstaver (se
     `accounts/backends.py`). Teller vi på den rå verdien, får «kari» og
     «Kari» hver sin bøtte mot én og samme konto.
+
+    **En delt konto telles per maskin** (28. sep. 2026, André: «brukernavn +
+    IP»). Bøtta per brukernavn var en lås til ved siden av kontolåsen: ti
+    forsøk fra hvor som helst, og bilen fikk 429 overalt. Taket mot gjetting
+    fra mange adresser står i `accounts.kontolaas.DELT_KONTO_TAK`.
     """
-    return (request.POST.get('username') or '').strip().lower()
+    navn = (request.POST.get('username') or '').strip().lower()
+    konto = finn_konto(navn) if navn else None
+    if konto is not None and konto.er_delt_konto:
+        return f'{navn}|{ratelimit_nokkel(group, request)}'
+    return navn
 
 
 def _er_rate_limited(request, group, key, rate):
@@ -288,25 +267,6 @@ def _er_rate_limited(request, group, key, rate):
     return core_er_rate_limited(
         request, group=group, key=key, rate=rate, method='POST',
     )
-
-
-def _registrer_mislykket_forsok(user):
-    """Tell opp feilede forsøk og lås kontoen i 15 min ved femte.
-
-    Delt mellom passord-steget og MFA-steget. Uten dette var MFA-verifiseringen
-    det eneste steget uten kontosperre: man kunne gjette TOTP-koder i det
-    uendelige uten at telleren ble rørt.
-
-    Returnerer True hvis kontoen ble låst av dette forsøket.
-    """
-    user.failed_login_attempts += 1
-    if user.failed_login_attempts >= 5:
-        user.locked_until = timezone.now() + timedelta(minutes=15)
-        user.failed_login_attempts = 0
-        user.save(update_fields=['failed_login_attempts', 'locked_until'])
-        return True
-    user.save(update_fields=['failed_login_attempts', 'locked_until'])
-    return False
 
 
 @never_cache
@@ -363,11 +323,11 @@ def login_view(request):
     user_agent = request.META.get('HTTP_USER_AGENT', '')
 
     # ── Stage 2: MFA-oppsett ─────────────────────────────────────────────────
-    if 'mfa_setup_user_id' in request.session:
+    if mfa.OPPSETT in request.session:
         return _handle_mfa_setup(request, next_url)
 
     # ── Stage 3: MFA-verifisering ────────────────────────────────────────────
-    if 'mfa_verify_user_id' in request.session:
+    if mfa.VERIFISERING in request.session:
         return _handle_mfa_verify(request, next_url)
 
     # ── Stage 1: Username/password ───────────────────────────────────────────
@@ -410,30 +370,29 @@ def login_view(request):
         # bare den som har riktig passord vite at kontoen er låst; alle andre
         # får samme svar som ved feil passord.
         user = authenticate(request, username=username, password=password)
-        if user is not None and user.is_active and user.is_locked():
-            remaining = int((user.locked_until - timezone.now()).total_seconds() / 60) + 1
-            error = f'Kontoen er midlertidig låst. Prøv igjen om {remaining} minutt(er).'
+        if user is not None and user.is_active and kontolaas.er_laast(user, ip):
+            error = _laast_melding(user)
             LoginEvent.objects.create(
                 user=user, username_attempt=username, success=False,
                 ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
             )
         else:
             if user is not None and user.is_active:
-                # Telleren nullstilles først når begge faktorene er bevist
-                # (13. sep. 2026, M1): for en konto med MFA skjer det i
-                # `_handle_mfa_verify`. Nullstilte passordsteget den, kunne
-                # den som hadde passordet gjette fire koder, logge inn på
-                # nytt og få fire nye. `locked_until` står til den går ut.
-                user.last_login_at = timezone.now()
-                felter = ['last_login_at']
-                if not user.mfa_required:
-                    user.failed_login_attempts = 0
-                    user.locked_until = None
-                    felter += ['failed_login_attempts', 'locked_until']
-                user.save(update_fields=felter)
+                # Telleren nullstilles og `last_login_at` settes først når
+                # begge faktorene er bevist (13. sep. 2026, M1; 28. sep.
+                # 2026): `_do_complete_login`. Nullstilte passordsteget
+                # telleren, kunne den som hadde passordet gjette fire koder,
+                # logge inn på nytt og få fire nye.
+                #
+                # Og passordsteget er ikke en innlogging når MFA gjenstår.
+                # Det sto som «Innlogging — OK», så filteret «ok» i
+                # innloggingsloggen viste passordtreff mot MFA-kontoer som
+                # vellykkede innlogginger.
                 LoginEvent.objects.create(
                     user=user, username_attempt=username, success=True,
-                    ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
+                    ip=ip, user_agent=user_agent,
+                    event_type=(LoginEvent.EVENT_PASSORD_OK if user.mfa_required
+                                else LoginEvent.EVENT_LOGIN),
                 )
 
                 if user.mfa_required:
@@ -444,8 +403,7 @@ def login_view(request):
 
                     if confirmed_device is None:
                         # Stage 2: Tving MFA-oppsett
-                        request.session['mfa_setup_user_id'] = user.pk
-                        request.session['mfa_next_url'] = next_url
+                        mfa.start_steg(request, user, mfa.OPPSETT, next_url)
                         return redirect('accounts:login')
                     else:
                         # Sjekk trust-cookie
@@ -454,8 +412,7 @@ def login_view(request):
                                        LoginEvent.EVENT_MFA_TRUST_COOKIE_USED)
                             return _do_complete_login(request, user, next_url)
                         # Stage 3: Krev TOTP-verifisering
-                        request.session['mfa_verify_user_id'] = user.pk
-                        request.session['mfa_next_url'] = next_url
+                        mfa.start_steg(request, user, mfa.VERIFISERING, next_url)
                         return redirect('accounts:login')
                 else:
                     # Ingen MFA – logg inn direkte
@@ -468,7 +425,7 @@ def login_view(request):
                 # med riktig passord, som over.
                 error = 'Feil brukernavn eller passord.'
                 if user_obj:
-                    _registrer_mislykket_forsok(user_obj)
+                    kontolaas.registrer_mislykket(user_obj, ip)
                 LoginEvent.objects.create(
                     user=user_obj, username_attempt=username, success=False,
                     ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
@@ -483,16 +440,23 @@ def login_view(request):
 
 def _handle_mfa_setup(request, next_url):
     """Håndter MFA-oppsett (Stage 2): QR-kode + backup-koder + bekreftelse."""
-    user_id = request.session.get('mfa_setup_user_id')
     # Verdien ble validert da den ble lagt i sesjonen, men vi validerer på nytt
     # ved lesing: en sesjon kan stamme fra en eldre release uten sjekken.
     next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
-    try:
-        user = CustomUser.objects.get(pk=user_id, is_active=True)
-    except CustomUser.DoesNotExist:
-        request.session.pop('mfa_setup_user_id', None)
-        return redirect('accounts:login')
+    # Bundet til passordet og tidsbegrenset — se `accounts/mfa.py`.
+    user = mfa.hent_steg_bruker(request, mfa.OPPSETT)
+    if user is None:
+        return _steget_er_utlopt(request)
+
+    # **Et oppsett til er ikke et oppsett** (28. sep. 2026). Har kontoen fått
+    # en bekreftet enhet siden steget startet, er det ikke denne sesjonen som
+    # gjorde det. Uten sjekken kunne en gammel oppsettsesjon legge til sin
+    # egen enhet ved siden av eierens — og, før den kom så langt, slette
+    # eierens reservekoder under.
+    if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
+        mfa.avslutt_steg(request)
+        return _steget_er_utlopt(request)
 
     # Hent eller opprett en ubekreftet TOTP-enhet
     device_id = request.session.get('mfa_setup_device_id')
@@ -537,15 +501,9 @@ def _handle_mfa_setup(request, next_url):
         if device.verify_token(code):
             device.confirmed = True
             device.save()
-            request.session.pop('mfa_setup_user_id', None)
-            request.session.pop('mfa_setup_device_id', None)
-            request.session.pop('mfa_setup_backup_codes', None)
             _log_event(user, user.username, True, request,
                        LoginEvent.EVENT_MFA_SETUP_COMPLETED)
-            # Logg inn brukeren
-            login(request, user)
-            _registrer_aktiv_sesjon(request.user, request.session.session_key)
-            return redirect(next_url)
+            return _do_complete_login(request, user, next_url)
         else:
             error = 'Feil kode. Prøv igjen – kontroller at klokkene er synkronisert.'
 
@@ -561,16 +519,13 @@ def _handle_mfa_setup(request, next_url):
 
 def _handle_mfa_verify(request, next_url):
     """Håndter MFA-verifisering (Stage 3): verifiser TOTP eller backup-kode."""
-    user_id = request.session.get('mfa_verify_user_id')
     # Verdien ble validert da den ble lagt i sesjonen, men vi validerer på nytt
     # ved lesing: en sesjon kan stamme fra en eldre release uten sjekken.
     next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
-    try:
-        user = CustomUser.objects.get(pk=user_id, is_active=True)
-    except CustomUser.DoesNotExist:
-        request.session.pop('mfa_verify_user_id', None)
-        return redirect('accounts:login')
+    user = mfa.hent_steg_bruker(request, mfa.VERIFISERING)
+    if user is None:
+        return _steget_er_utlopt(request)
 
     error = None
 
@@ -585,10 +540,9 @@ def _handle_mfa_verify(request, next_url):
     # Kontosperren fra passord-steget gjelder også her. Uten sjekken kunne en
     # låst konto fortsatt gjette TOTP-koder, siden sperren bare ble lest i
     # steg 1.
-    if user.is_locked():
-        remaining = int((user.locked_until - timezone.now()).total_seconds() / 60) + 1
+    if kontolaas.er_laast(user, _get_client_ip(request)):
         return render(request, 'accounts/mfa_verify.html', {
-            'error': f'Kontoen er midlertidig låst. Prøv igjen om {remaining} minutt(er).',
+            'error': _laast_melding(user),
         })
 
     if request.method == 'POST':
@@ -628,17 +582,8 @@ def _handle_mfa_verify(request, next_url):
                        LoginEvent.EVENT_MFA_BACKUP_USED if used_backup
                        else LoginEvent.EVENT_MFA_VERIFY_SUCCESS)
 
-            # Nullstill telleren — brukeren har bevist begge faktorer.
-            if user.failed_login_attempts or user.locked_until:
-                user.failed_login_attempts = 0
-                user.locked_until = None
-                user.save(update_fields=['failed_login_attempts', 'locked_until'])
-
-            request.session.pop('mfa_verify_user_id', None)
-            request.session.pop('mfa_next_url', None)
-            login(request, user)
-            _registrer_aktiv_sesjon(request.user, request.session.session_key)
-            response = redirect(next_url)
+            # Telleren nullstilles i `_do_complete_login` — begge faktorer er bevist.
+            response = _do_complete_login(request, user, next_url)
             if trust_device and used_device:
                 # S6: request.is_secure() tar hensyn til SECURE_PROXY_SSL_HEADER
                 # og er derfor riktig både på Railway og i offline-modus. Det
@@ -650,7 +595,8 @@ def _handle_mfa_verify(request, next_url):
         else:
             _log_event(user, user.username, False, request,
                        LoginEvent.EVENT_MFA_VERIFY_FAILED)
-            if _registrer_mislykket_forsok(user):
+            kontolaas.registrer_mislykket(user, _get_client_ip(request))
+            if user.is_locked():
                 error = 'For mange feil forsøk. Kontoen er låst i 15 minutter.'
             elif code:
                 error = 'Feil kode. Prøv igjen.'
@@ -737,7 +683,7 @@ def change_password_view(request):
             # ikke fantes, og neste innlogging fra en annen enhet drepte
             # ingenting (13. sep. 2026, M11).
             update_session_auth_hash(request, request.user)
-            _invalidate_other_sessions(request.user, request.session.session_key)
+            avslutt_andre_sesjoner(request.user, request.session.session_key)
 
             messages.success(request, 'Passordet er oppdatert.')
             return redirect('/')
@@ -806,7 +752,8 @@ def login_event_list_view(request):
     if filters['event_type']:
         qs = qs.filter(event_type=filters['event_type'])
     if filters['result'] == 'ok':
-        qs = qs.filter(success=True)
+        # «OK» er en fullført innlogging. Passordsteget foran MFA er ikke det.
+        qs = qs.filter(success=True).exclude(event_type=LoginEvent.EVENT_PASSORD_OK)
     elif filters['result'] == 'fail':
         qs = qs.filter(success=False)
     if fra_dato:
@@ -1041,7 +988,10 @@ def glemt_passord_view(request):
         if form.is_valid():
             bruker = finn_bruker(form.cleaned_data['email'])
             if bruker is not None:
-                send_reset(bruker, request)
+                # I bakgrunnen (28. sep. 2026): utsendingen er en HTTPS-POST
+                # til AHASend, og ventetiden på den skilte en adresse med
+                # konto fra en uten — svaret var identisk, tiden var det ikke.
+                send_i_bakgrunnen(lag_reset_epost(bruker, request), bruker.pk)
             # Ingen else. Utfallet er det samme uansett — også hvis
             # utsendingen feilet, for en feilmelding ville vært et svar.
             return render(request, 'accounts/glemt_passord_sendt.html')
@@ -1073,7 +1023,7 @@ def passord_reset_view(request, token):
             user.set_password(form.cleaned_data['new_password1'])
             user.must_change_password = False
             user.save(update_fields=['password', 'must_change_password'])
-            _invalidate_all_sessions(user)
+            avslutt_alle_sesjoner(user)
             messages.success(
                 request,
                 'Passordet er endret. Logg inn med det nye passordet.',
@@ -1112,6 +1062,9 @@ def invitasjon_view(request, token):
             user.set_password(form.cleaned_data['new_password1'])
             user.must_change_password = False
             user.save(update_fields=['password', 'must_change_password'])
+            # En invitasjon kan sendes til en konto som alt har et passord, og
+            # da er lenken en passordreset — med samme krav (28. sep. 2026).
+            avslutt_alle_sesjoner(user)
             messages.success(
                 request,
                 'Passordet er satt. Logg inn for å komme i gang.',
@@ -1192,7 +1145,7 @@ def user_detail_view(request, pk):
                 # Dette er en sikkerhetsinnstilling; å la den vente på en
                 # cookie ville gjort den valgfri i praksis.
                 if user.mfa_required and not mfa_for:
-                    _invalidate_all_sessions(user)
+                    avslutt_alle_sesjoner(user)
                     messages.success(
                         request,
                         f'Bruker oppdatert. «{user.username}» er logget ut, '
@@ -1254,7 +1207,7 @@ def user_detail_view(request, pk):
                 )
                 return redirect('portaladmin:user_detail', pk=pk)
 
-            _invalidate_all_sessions(user)
+            avslutt_alle_sesjoner(user)
             _log_user_admin_action(
                 request, user, 'UPDATE',
                 field_name='sessions', old_value='active', new_value='cleared',
@@ -1276,7 +1229,7 @@ def user_detail_view(request, pk):
 
             user.is_active = False
             user.save(update_fields=['is_active'])
-            _invalidate_all_sessions(user)
+            avslutt_alle_sesjoner(user)
             _log_user_admin_action(
                 request, user, 'UPDATE',
                 field_name='is_active', old_value='True', new_value='False',
@@ -1305,9 +1258,8 @@ def user_detail_view(request, pk):
 
         elif action == 'unlock':
             laast_til = user.locked_until
-            user.failed_login_attempts = 0
-            user.locked_until = None
-            user.save(update_fields=['failed_login_attempts', 'locked_until'])
+            # Også maskinlåsene på en delt konto — `accounts.kontolaas`.
+            kontolaas.laas_opp(user)
             _log_user_admin_action(request, user, 'UPDATE', field_name='locked_until',
                                    old_value=str(laast_til), new_value='None')
             messages.success(request, f'Kontoen til «{user.username}» er låst opp.')
@@ -1319,7 +1271,7 @@ def user_detail_view(request, pk):
             user.must_change_password = True
             user.save(update_fields=['password', 'must_change_password'])
 
-            _invalidate_all_sessions(user)
+            avslutt_alle_sesjoner(user)
             # **Aldri passordet**, bare at det ble byttet (B2). Dette var den
             # mest inngripende handlingen på en konto, og den eneste uten spor.
             _log_user_admin_action(request, user, 'UPDATE', field_name='password',
@@ -1328,22 +1280,12 @@ def user_detail_view(request, pk):
             messages.success(request, 'Nytt midlertidig passord generert (vises nedenfor).')
 
         elif action == 'reset_mfa':
-            # Slett alle TOTP-enheter
-            TOTPDevice.objects.filter(user=user).delete()
-            # Slett alle static/backup-enheter
-            StaticDevice.objects.filter(user=user).delete()
-            # Sett mfa_required=True (brukeren tvinges til oppsett på nytt)
-            user.mfa_required = True
-            user.save(update_fields=['mfa_required'])
-            # Invalider alle sesjoner
-            _invalidate_all_sessions(user)
-            # Logg hendelsen
-            _log_event(user, user.username, True, request,
-                       LoginEvent.EVENT_MFA_RESET_BY_ADMIN)
-            # Innloggingsloggen sier at det skjedde, men ikke *hvem* som gjorde
-            # det: raden står på brukeren. Auditloggen bærer admin (B2).
-            _log_user_admin_action(request, user, 'UPDATE', field_name='mfa',
-                                   new_value='nullstilt av admin')
+            # Samme tjeneste som `manage.py nullstill_mfa` — `accounts/mfa.py`.
+            mfa.nullstill_mfa(
+                user, kilde='av admin', utfort_av=request.user,
+                ip=_get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
             messages.success(
                 request,
                 f'MFA nullstilt for «{user.username}» — de må sette opp på nytt ved neste pålogging.',
@@ -1474,10 +1416,10 @@ def user_delete_view(request, pk):
 
     username = user.username
 
-    # Sesjonene må bort før raden slettes — _invalidate_all_sessions slår opp
+    # Sesjonene må bort før raden slettes — avslutt_alle_sesjoner slår opp
     # på bruker-ID i sesjonsdataene, og etter delete() finnes ingen kobling å
     # slå opp på. Sesjonsradene ville da blitt liggende til de utløp.
-    _invalidate_all_sessions(user)
+    avslutt_alle_sesjoner(user)
 
     # Revisjonsraden skrives før slettingen slik at record_id og navnet er
     # kjent. Raden har ingen FK til brukeren og overlever derfor slettingen.

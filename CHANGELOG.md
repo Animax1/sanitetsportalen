@@ -4,6 +4,92 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — Sikkerhet, pulje 1: MFA-oppsettet overlevde passordreset, og seks hull til i innloggingen  `#sikkerhet` `#mfa` `#innlogging`
+
+**Hvorfor:** André bad om en kodegjennomgang med sikkerhet i fokus. Den ble gjort to ganger
+uavhengig av hverandre og slått sammen — `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`, med
+funnene, beslutningene og pulje 2–4 (de står i `TODO.md`). Dette er pulje 1: alt som ga
+kontoovertakelse eller svekket innloggingen.
+
+**Det alvorlige: kontoovertakelse gjennom et halvferdig MFA-oppsett.** Den som hadde
+passordet til en konto med «Krev MFA» men uten enhet ennå (ny konto, eller rett etter
+«Nullstill MFA»), kunne logge inn, **stoppe på QR-koden og vente**. Admin så det og trykket
+«Nytt midlertidig passord» — men `slett_brukerens_sesjoner` slettet bare innloggede
+sesjoner, og sesjonen på oppsettsiden var anonym. Angriperen sendte koden fra sin egen
+enhet og var inne, **med det gamle passordet, etter resetten**. Resetten satte
+`must_change_password`, så passordbyttet krevde ikke engang det gamle passordet. Variant: en
+gammel oppsettsesjon kunne legge til **en enhet nummer to** etter at eieren hadde satt opp
+sin, og slette eierens reservekoder på veien. Testene prøvde at oppsettet virket, ingen at
+det sluttet å virke når passordet byttet under det.
+
+**Hva, i `accounts/mfa.py` (ny):**
+- **Den halvinnloggede sesjonen er bundet til passordet** — et avtrykk (16 tegn SHA-256 av
+  hashen, samme som trust-cookien) lagres ved passordsteget og sjekkes på hvert MFA-steg.
+  Dekker alle veier passordet byttes på: adminflaten, reset-lenken, invitasjonen, `sett_passord`.
+- **Levetid 15 minutter** (`STEG_LEVETID`) — tid til å installere en autentiseringsapp.
+  Utløpt steg sender tilbake til passordet med «Innloggingen må begynne på nytt».
+- **Steg 2 avviser når kontoen alt har en bekreftet enhet.** Sjekken står før noe opprettes,
+  så eierens reservekoder ikke slettes.
+- **`slett_brukerens_sesjoner` tar også de halvinnloggede** (`core.sesjoner.gjelder_bruker`,
+  `HALVINNLOGGET_NOKLER`). Gjelder frys, «Nullstill MFA», passordreset — og innlogging et
+  annet sted, gjennom én-sesjon-regelen.
+- Sesjoner fra før denne releasen har ikke avtrykket og må begynne på nytt, én gang.
+
+**De seks andre:**
+- **Innloggingsloggen viste halve innlogginger som «OK».** Passordsteget skrev
+  `Innlogging — OK` og `last_login_at` også når MFA gjensto. Ny hendelsestype
+  `passord_ok` («Passord riktig, MFA gjenstår», merket «Halvveis»), filteret «ok» tar den
+  ikke med, og `last_login_at` settes først når innloggingen er fullført. Migrasjon
+  `accounts/0017` (bare `choices`).
+- **Én funksjon fullfører en innlogging** — `_do_complete_login`. Telleren for feilede forsøk
+  ble bare nullstilt etter en TOTP-kode; innlogging med **klarert enhet** eller et **fullført
+  oppsett** lot gamle skrivefeil stå og hope seg opp til en lås.
+- **Telleren tapte samtidige forsøk.** Den leste et objekt hentet tidligere og skrev +1;
+  fem samtidige gjett talte én. Nå `select_for_update` (`accounts/kontolaas.py`, ny).
+- **`sett_passord` og invitasjonslenken logget ikke ut.** En stjålet sesjon overlevde
+  passordbyttet. En invitasjon kan sendes til en konto som alt har passord, og er da en
+  reset. `sett_passord` skriver nå også en auditrad — «satt fra kommandolinja», aldri passordet.
+- **«Glemt passord» røpet hvem som har konto — på tiden.** Svaret var identisk (§6.7), men
+  utsendingen er en HTTPS-POST til AHASend, og den skjedde bare for en adresse med konto.
+  E-posten bygges i forespørselen og sendes i en egen tråd (`send_i_bakgrunnen`). Loggen
+  ved feil bærer bruker-ID, ikke adressen.
+- **Bilkontoene kunne holdes låst av hvem som helst** (André: «brukernavn + IP og behold IP
+  brems»). Fem feil passord hvert kvarter fra hvor som helst låste en forutsigbar konto midt
+  i en hendelse, og «Lås opp» ble opphevet ved neste runde. For en **delt konto** låses nå
+  **maskinen som gjettet** (5 feil → 15 min, i cachen), og kontoen først ved **50 feil
+  totalt** (`DELT_KONTO_TAK`, i databasen — taket kan ikke ligge i cachen, som nullstilles
+  mellom vaktene i lavkostnad-modus). Bøtta per brukernavn (10/5 min) var en lås til, og
+  går også per IP for delte kontoer. «Lås opp» slipper maskinlåsene med. Personlige kontoer
+  låses som før.
+
+**Og veien tilbake: `manage.py nullstill_mfa <brukernavn> --ja`** (André: «jeg blir jo
+sjekket av railway gjennom min innlogging der uansett»). For den dagen telefonen er borte og
+ingen annen admin finnes — før var eneste vei SQL i prod. **Samme funksjon som knappen**
+(`accounts.mfa.nullstill_mfa`), så de ikke glir fra hverandre; knappen sto som inline-kode i
+viewet. Runbook §8d. MFA er **ikke** påbudt for admin (André: «mfa på prod men ikke på
+testportal»), og det kommer ingen advarsel om det.
+
+**Også:** innloggingssiden viste ikke meldinger, så «Passordet er endret. Logg inn …» etter
+reset og invitasjon dukket opp først *etter* innlogging. Sesjonshjelperne er flyttet fra
+`accounts/views.py` til `accounts/sesjoner.py` (`registrer_aktiv_sesjon`,
+`avslutt_andre_sesjoner`, `avslutt_alle_sesjoner`) — kommandoene trenger dem.
+
+**Tester:** `accounts/tests_sikkerhet_runde3.py`, 33 tester som **gjennomfører angrepet**:
+start oppsettet, tilbakestill passordet, send koden — og krev at den avvises. De var røde før
+rettingen; den første av dem viste angriperen innlogget. Reset-testene venter nå på
+utsendingstråden (`vent_paa_utsendinger`), ellers er `mail.outbox` et kappløp.
+**Mutasjoner: 25, alle drept** — avtrykket fjernet, levetiden fjernet og doblet, sjekken for
+enhet nummer to fjernet, de halvinnloggede ikke slettet, telleren fra minnet, delt konto
+låst ved 5, maskinlåsen ikke lest, bøtta per brukernavn for bilen, «Lås opp» uten
+maskinlåsene, telleren ikke nullstilt ved fullført innlogging, `last_login_at` i
+passordsteget, halve innlogginger logget som hele, filteret uten unntaket, invitasjon og
+`sett_passord` uten utlogging, `sett_passord` uten spor, reset sendt synkront,
+nullstillingen uten utlogging og uten `mfa_required`, kommandoen uten `--ja`, frosset konto
+i steget, personlig konto låst ved 6, MFA-steget uten telling og uten lås. **Én overlevde
+først:** nullstillingen kunne slutte å sette `mfa_required`, fordi testbrukeren hadde det
+fra før — fiksturen er rettet. Og testen for bøtta per brukernavn sendte 12 forsøk mot
+10/5 min, som bare dreper mutanten når vinduskanten faller riktig; nå `nok_til_a_bryte(10)`.
+
 ## 2026-09-28 — /lag er lagt til side: det som gjenstår står i TODO  `#lag` `#todo`
 
 André: «Sett de gjenstående på todo om de ikke er det så er vi inntil videre ferdig med /lag».

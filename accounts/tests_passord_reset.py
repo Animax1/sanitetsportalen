@@ -14,6 +14,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from accounts.passord_reset import (
     LEVETID_SEKUNDER, finn_bruker, kan_resettes, lag_token, les_token,
+    vent_paa_utsendinger,
 )
 from accounts.test_helpers import gi_standardtilgang
 
@@ -120,7 +121,11 @@ class ResetFlytTests(TestCase):
         gi_standardtilgang(self.bruker, 'skriver')
 
     def _be_om(self, epost='kari@eksempel.no'):
-        return Client().post(reverse('accounts:glemt_passord'), {'email': epost})
+        # E-posten sendes i en egen tråd (28. sep. 2026); vent på den, ellers
+        # er `mail.outbox` et kappløp.
+        svar = Client().post(reverse('accounts:glemt_passord'), {'email': epost})
+        vent_paa_utsendinger()
+        return svar
 
     def test_lenke_sendes_til_eksisterende_konto(self):
         svar = self._be_om()
@@ -224,6 +229,11 @@ class ResetFlytTests(TestCase):
 class ResetRateLimitTests(TestCase):
     """§6.5: egen bøtte, ellers kan hvem som helst spamme en innboks."""
 
+    def tearDown(self):
+        # Utsendingene går i egne tråder; en som blir liggende, legger e-posten
+        # sin i neste tests `mail.outbox`.
+        vent_paa_utsendinger()
+
     def setUp(self):
         cache.clear()
         CustomUser.objects.create_user(
@@ -271,6 +281,11 @@ class SidestrukturTests(TestCase):
         ('accounts:glemt_passord', ()),
         ('accounts:login', ()),
     ]
+
+    def tearDown(self):
+        # Utsendingene går i egne tråder; en som blir liggende, legger e-posten
+        # sin i neste tests `mail.outbox`.
+        vent_paa_utsendinger()
 
     def _sjekk_struktur(self, html, hvor):
         for aapen, lukk in (('<style>', '</style>'),

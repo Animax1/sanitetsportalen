@@ -45,6 +45,13 @@ def dekod(sesjon) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+#: Nøklene innloggingen legger i en sesjon som har bestått passordet, men ikke
+#: MFA ennå. Sesjonen er anonym — `_auth_user_id` finnes ikke før `login()` —
+#: og derfor usynlig for `bruker_id_i`. Navnene står her og ikke i `accounts`,
+#: fordi det er `slett_brukerens_sesjoner` som må kjenne dem.
+HALVINNLOGGET_NOKLER = ('mfa_setup_user_id', 'mfa_verify_user_id')
+
+
 def bruker_id_i(data) -> int | None:
     """Hvem sesjonen tilhører, eller `None` for anonym eller uleselig."""
     try:
@@ -53,8 +60,29 @@ def bruker_id_i(data) -> int | None:
         return None
 
 
+def gjelder_bruker(data, bruker_id) -> bool:
+    """Tilhører sesjonen brukeren — innlogget, **eller halvveis inn**?
+
+    Halvveis teller (28. sep. 2026): en sesjon som sto på MFA-oppsettet
+    overlevde passordreset, frys og «Nullstill MFA», fordi den ikke var
+    innlogget ennå. Den som hadde passordet, fullførte da oppsettet med sin
+    egen enhet etter at admin hadde byttet passordet under dem.
+    """
+    if bruker_id_i(data) == bruker_id:
+        return True
+    for nokkel in HALVINNLOGGET_NOKLER:
+        try:
+            if int(data[nokkel]) == bruker_id:
+                return True
+        except (KeyError, TypeError, ValueError):
+            continue
+    return False
+
+
 def slett_brukerens_sesjoner(bruker, *, unntatt=None) -> int:
     """Slett alle ikke-utløpte sesjoner for `bruker`, unntatt `unntatt`-nøkkelen.
+
+    **Også de halvinnloggede** — se `gjelder_bruker`.
 
     Grundig med vilje: dekoder hver sesjon i stedet for å stole på
     `current_session_key`. Brukes ved passordbytte, frys, sletting og
@@ -65,7 +93,7 @@ def slett_brukerens_sesjoner(bruker, *, unntatt=None) -> int:
     for sesjon in Session.objects.filter(expire_date__gt=timezone.now()):
         if sesjon.session_key == unntatt:
             continue
-        if bruker_id_i(dekod(sesjon)) == bruker.pk:
+        if gjelder_bruker(dekod(sesjon), bruker.pk):
             sesjon.delete()
             slettet += 1
     return slettet
