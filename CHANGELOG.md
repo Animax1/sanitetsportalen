@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — Vakta har fått sin egen side: `/portal-admin/vakt/`  `#vakt` `#admin`
+
+**Hvorfor:** André: «Hvordan avslutter jeg vakten nå da?» — og etter svaret: «Ja hvorfor er den
+der nå? Kanskje vi skal ha den på et mer logisk sted??» Knappen som avslutter *hele* portalen sto
+under **pasientsidens Innstillinger**, fordi pasientregistreringen var den eneste modulen da vakta
+ble innført. Vakta lå på tre steder: navnet i portalinnstillingene («Navn på arrangement»),
+avslutning og gjenåpning under `/pasienter/`, tidligere vakter i `/statistikk`. «Innstillinger er
+spesifikke funksjoner. /vakt er overordnet for denne vakten.»
+
+**Ny side, Administrasjon → Vakt** (`core/views_vakt.py`, `core/templates/core/vakt.html`),
+global admin, **serverrendret uten egen JS-fil** — skjemaer som videresender, og
+`data-confirm` fra `ui-actions.js` som på backupsiden. Malen escaper selv.
+- **Aktiv vakt:** navn og startet, og «Endre navn» (påkrevd og unikt, som før).
+- **Avslutt vakt:** oversikten («1 pasient arkiveres og tømmes», fanene som fryses) og sperrene i
+  rødt; feltene og knappen er av så lenge noe sperrer. Krever navn på den nye vakta **og**
+  avkrysningen «Jeg har sett oversikten over» — en port serveren håndhever, ikke bare et spørsmål
+  i nettleseren. Frekvensgrense 5/min.
+- **Tidligere vakter:** avsluttet-tidspunkt, lenke til tallene (`/statistikk/?vakt=<nøkkel>` velger
+  vakta i nedtrekket) og «Gjenåpne». **Gjenåpningen er låst når et arkiv for vakta er kollapset
+  i hvilken som helst modul** — før sjekket den bare pasientenes, og en vakt med kollapset
+  oppdragsarkiv kunne gjenåpnes.
+- **Arkiver:** alle modulenes arkiver fra arkivregisteret, med vakt, rader, status og lenke til
+  tallene — LS2026 og andre arkiver uten vakt også. Radene, signaturen og slettingen står
+  fortsatt i modulen som eier arkivet.
+
+**Fjernet:**
+- `/pasienter/api/avslutt-vakt/`, `/pasienter/api/vakter/`, `/pasienter/api/gjenaapne-vakt/` og
+  «Nullstill aktiv vakt»-kortet med vinduet; pasientsiden har et kort som peker hit.
+- **«Lagre som arkiv»** (`/pasienter/api/innstillinger/arkiv/lagre/`) og **«Arkiver oppdragene»**
+  (POST på `/oppdrag/api/arkiv/`, nå 405): «Avslutt vakt» arkiverer selv, og en knapp ved siden
+  av arkiverte samme vakt to ganger for den som trykket begge.
+- Navnefeltet i portalinnstillingene. Et `event_name` fra en gammel fane skriver ikke lenger
+  vaktas navn.
+
+**Rutene:** 207 totalt (−4 under `/pasienter/`, +4 under `/portal-admin/`). RUNBOOK_VAKT §10a
+beskriver nå ett trykk i stedet for to arkivknapper og en avslutning.
+
+**Tester:** `core/tests_vakt_side.py` (tilgang, POST-krav, portene foran avslutningen, navn,
+gjenåpning og kollapssperra i begge moduler, siden, escaping); de gamle testene av avslutning,
+gjenåpning og manuell arkivering er skrevet om til den nye inngangen eller til tjenesten.
+`core/tests_registre.py` så på vaktas navn for å bevise at en nektende modul stopper
+portalens felt — navnet står ikke der lenger, så **testen var blitt grønn uten å prøve noe**. Den
+ser nå på timeouten, og en mutant som lagrer den før valideringen er ferdig, blir rød.
+**Mutasjoner: 24, alle drept til slutt.** Én overlevde først: den tidlige sjekken av et opptatt
+navn — orkestratoren avviser det uansett, men først etter en backup av hver modul. Testen krever
+nå at det ikke tas noen. **Røyktest i Chromium:** menylenken, sperren med knappen av, avslutning
+med melding og ny aktiv vakt, «Statistikk»-lenken som velger vakta, og pasientsidens kort.
+
 ## 2026-09-28 — «Avslutt vakt» arkiverer alt, statistikken fryses, og tidligere vakter i `/statistikk`  `#vakt` `#statistikk` `#arkiv`
 
 **Hvorfor:** André: «etter hver vakt så tar admin og [...] arkiveres modulene samtlige som admin

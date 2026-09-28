@@ -2,8 +2,8 @@
 Tester for VaktArkiv-funksjonalitet.
 
 Dekker:
-  1.  test_lagre_arkiv_kun_admin — alle ikke-admin-profiler får 403
-  2.  test_lagre_arkiv_krever_arrangement_navn — tom navn → 400
+  1–2. (Knappen «Lagre som arkiv» og endepunktet er slettet 28. sep. 2026: «Avslutt
+       vakt» arkiverer. Tilgangen prøves i `core/tests_vakt_side.py`.)
   3.  test_lagre_arkiv_lager_arkivertpasient_rader — N pasienter → N rader
   4.  test_lagre_arkiv_kopierer_behandler_navn — denormalisert riktig
   5.  test_lagre_arkiv_setter_sha256 — hash populated, 64 tegn
@@ -86,63 +86,35 @@ class ArkivTestMixin:
             forstehjelper=forstehjelper,
         )
 
-    def _lagre_arkiv_post(self, navn='Testfestival', notat='', client=None):
-        c = client or self.admin_client
-        return c.post(
-            '/pasienter/api/innstillinger/arkiv/lagre/',
-            data=json.dumps({'arrangement_navn': navn, 'notat': notat}),
-            content_type='application/json',
-        )
+    def _arkiver(self, navn='Testfestival'):
+        """Arkivet slik «Avslutt vakt» lager det (`patients/vaktslutt.py`)."""
+        from patients.services import arkiver_aktiv_vakt
+        arkiv, _ = arkiver_aktiv_vakt(navn, '', self.admin)
+        return arkiv
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class LagreArkivTests(ArkivTestMixin, TestCase):
-
-    def test_lagre_arkiv_kun_admin(self):
-        """Alle ikke-admin-profiler skal få 403 ved lagring."""
-        for role_user in [self.read_write, self.lead, self.lead_view]:
-            c = Client()
-            c.force_login(role_user)
-            resp = self._lagre_arkiv_post(client=c)
-            self.assertEqual(resp.status_code, 403, f'Forventet 403 for rolle {role_user.role}')
-
-    def test_lagre_arkiv_krever_arrangement_navn(self):
-        """Tom arrangement_navn → 400."""
-        resp = self.admin_client.post(
-            '/pasienter/api/innstillinger/arkiv/lagre/',
-            data=json.dumps({'arrangement_navn': '  ', 'notat': ''}),
-            content_type='application/json',
-        )
-        self.assertEqual(resp.status_code, 400)
 
     def test_lagre_arkiv_lager_arkivertpasient_rader(self):
         """N aktive pasienter → N ArkivertPasient-rader i arkivet."""
         for i in range(1, 4):
             self._lag_pasient(i)
 
-        resp = self._lagre_arkiv_post()
-        self.assertEqual(resp.status_code, 201)
-        arkiv_id = resp.json()['id']
-
-        self.assertEqual(ArkivertPasient.objects.filter(arkiv_id=arkiv_id).count(), 3)
+        arkiv = self._arkiver()
+        self.assertEqual(ArkivertPasient.objects.filter(arkiv=arkiv).count(), 3)
 
     def test_lagre_arkiv_kopierer_forstehjelper_navn(self):
         """Førstehjelper-navn kopieres riktig til forstehjelper_navn-feltet."""
         self._lag_pasient(1, forstehjelper=self.forstehjelper)
 
-        resp = self._lagre_arkiv_post()
-        self.assertEqual(resp.status_code, 201)
-        arkiv_id = resp.json()['id']
-
-        ap = ArkivertPasient.objects.get(arkiv_id=arkiv_id, pasientnummer=1)
+        ap = ArkivertPasient.objects.get(arkiv=self._arkiver(), pasientnummer=1)
         self.assertEqual(ap.forstehjelper_navn, 'Dr. Hansen')
 
     def test_lagre_arkiv_setter_sha256(self):
         """SHA-256 skal være populated og ha 64 tegn."""
         self._lag_pasient(1)
-        resp = self._lagre_arkiv_post()
-        self.assertEqual(resp.status_code, 201)
-        arkiv = VaktArkiv.objects.get(pk=resp.json()['id'])
+        arkiv = self._arkiver()
         self.assertEqual(len(arkiv.sha256), 64)
         self.assertNotEqual(arkiv.sha256, '')
 
@@ -155,13 +127,10 @@ class LagreArkivTests(ArkivTestMixin, TestCase):
         p_inaktiv.is_active = False
         p_inaktiv.save()
 
-        resp = self._lagre_arkiv_post()
-        self.assertEqual(resp.status_code, 201)
-        data = resp.json()
+        arkiv = self._arkiver()
         # Kun 2 aktive skal være med
-        self.assertEqual(data['antall_pasienter'], 2)
-        arkiv_id = data['id']
-        self.assertEqual(ArkivertPasient.objects.filter(arkiv_id=arkiv_id).count(), 2)
+        self.assertEqual(arkiv.antall_pasienter, 2)
+        self.assertEqual(ArkivertPasient.objects.filter(arkiv=arkiv).count(), 2)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -323,9 +292,19 @@ class ArkivSlettTests(ArkivTestMixin, TestCase):
         """Pasientarkivet logget som `'backup'` til 26. sep. 2026 (E3), mens
         oppdragsarkivet og kollapsen brukte arkivets eget tabellnavn — et søk på
         «hvem slettet arkivet» fant det ene og ikke det andre."""
+        import os
+        import tempfile
+        from unittest import mock
+
         from audit.models import AuditLog
-        resp = self._lagre_arkiv_post(navn='Loggprøve')
-        ny_pk = resp.json()['id']
+        from django.core.cache import cache
+        cache.clear()
+        # Arkivet lages der det lages nå: av «Avslutt vakt» (28. sep. 2026).
+        with tempfile.TemporaryDirectory() as mappe, \
+                mock.patch.dict(os.environ, {'BACKUP_DIR': mappe}):
+            self.admin_client.post('/portal-admin/vakt/avslutt/',
+                                   {'bekreft': 'ja', 'ny_vakt_navn': 'Etter loggprøven'})
+        ny_pk = VaktArkiv.objects.filter(vakt=self.vakt).exclude(pk=self.arkiv.pk).get().pk
         self._slett_arkiv(ny_pk)
         rader = AuditLog.objects.filter(table_name='patients_vaktarkiv', record_id=ny_pk)
         self.assertEqual(sorted(rader.values_list('field_name', flat=True)),

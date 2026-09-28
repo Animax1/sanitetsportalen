@@ -22,6 +22,11 @@ from django.urls import get_resolver
 #: fordi noen har bestemt at adressen skal endres — ikke fordi en refaktorering
 #: tok den med seg.
 KARTET = {
+    # Vakta (28. sep. 2026): flyttet fra `/pasienter/api/avslutt-vakt/` m.fl.
+    'portal-admin/vakt/': 'vakt',
+    'portal-admin/vakt/navn/': 'vakt_navn',
+    'portal-admin/vakt/avslutt/': 'vakt_avslutt',
+    'portal-admin/vakt/<int:pk>/gjenaapne/': 'vakt_gjenaapne',
     'portal-admin/auditlog/': 'audit_log_list',
     'portal-admin/auditlog/eksport.csv': 'audit_log_csv_export',
     'portal-admin/backup/': 'backup_admin',
@@ -135,6 +140,8 @@ class AdminsideneRendrerTests(TestCase):
         'module_admin_edit', 'user_detail', 'user_delete',
         'admin_sessions_list', 'admin_session_kill', 'admin_session_kill_all',
         'admin_server_status_json', 'audit_log_csv_export',
+        # Skjemaene på Vakt-siden (`core/tests_vakt_side.py`); siden selv er GET.
+        'vakt_navn', 'vakt_avslutt', 'vakt_gjenaapne',
     }
 
     def setUp(self) -> None:

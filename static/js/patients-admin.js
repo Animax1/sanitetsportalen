@@ -119,130 +119,10 @@ async function deleteHelsepersonell(id) {
 }
 
 // ════════════════════════════════════════════════════════
-// AVSLUTT VAKT — arkiverer og tømmer alle modulene (core/vaktslutt.py)
+// AVSLUTT VAKT, TIDLIGERE VAKTER og gjenåpning bodde her til 28. sep. 2026.
+// De er portalens og står på /portal-admin/vakt/ (core/views_vakt.py),
+// serverrendret — uten JS.
 // ════════════════════════════════════════════════════════
-
-// Linjene i oversikten, som tekst. Egen funksjon så regelen lar seg kjøre i
-// node: hvilke linjer som står der, og at en sperre er en sperre.
-function avsluttOversiktLinjer(data) {
-  const linjer = (data.moduler || []).map(m => ({
-    tekst: m.antall
-      ? `${m.antall} ${m.antall === 1 && m.entall ? m.entall : m.etikett} arkiveres og tømmes.`
-      : `Ingen ${m.etikett} å arkivere.`,
-    sperre: false,
-  }));
-  if ((data.fryses || []).length) {
-    linjer.push({ tekst: `Statistikken fryses for: ${data.fryses.join(', ')}.`, sperre: false });
-  }
-  (data.sperrer || []).forEach(g => linjer.push({ tekst: g, sperre: true }));
-  return linjer;
-}
-
-// Knappen er av så lenge noe sperrer, og mens oversikten ikke er hentet:
-// en avslutning uten oversikt er nettopp det oversikten skal hindre.
-function avsluttKanTrykkes(data) {
-  return Boolean(data) && Array.isArray(data.sperrer) && data.sperrer.length === 0;
-}
-
-async function lastAvsluttOversikt() {
-  const el = document.getElementById('avslutt-oversikt');
-  const knapp = document.getElementById('avslutt-vakt-knapp');
-  if (!el || !knapp) return;
-  knapp.disabled = true;
-  el.textContent = 'Henter oversikten …';
-  let data = null;
-  try {
-    const res = await apiFetch('/pasienter/api/avslutt-vakt/');
-    if (res.ok) data = await res.json();
-  } catch (e) {
-    console.error('Oversikten ble ikke hentet:', e);
-  }
-  el.replaceChildren();
-  if (!data) {
-    el.textContent = 'Oversikten kunne ikke hentes. Lukk vinduet og prøv igjen.';
-    return;
-  }
-  // textContent, ikke innerHTML: sperreteksten bærer tall fra basen, og
-  // modulnavnene kommer fra registeret.
-  avsluttOversiktLinjer(data).forEach(l => {
-    const rad = document.createElement('div');
-    rad.className = l.sperre ? 'text-danger fw-semibold' : '';
-    rad.textContent = l.tekst;
-    el.appendChild(rad);
-  });
-  knapp.disabled = !avsluttKanTrykkes(data);
-}
-
-async function doAvsluttVakt() {
-  const feil = document.getElementById('avslutt-feil');
-  feil.classList.add('d-none');
-  const navn = (document.getElementById('avslutt-nytt-navn').value || '').trim();
-  if (!navn) {
-    feil.textContent = 'Den nye vakten må ha et navn.';
-    feil.classList.remove('d-none');
-    return;
-  }
-
-  await withSubmitGuard('avslutt-vakt-knapp', async () => {
-    const res = await apiFetch('/pasienter/api/avslutt-vakt/', {
-      method: 'POST',
-      body: JSON.stringify({ confirm: true, ny_vakt_navn: navn })
-    });
-    const d = await res.json();
-    if (!res.ok) {
-      // Feilen (typisk navnekollisjon) skal stå der operatøren kan rette
-      // den — ikke i en alert som lukker seg over skjemaet.
-      feil.textContent = d.error || 'Feil ved avslutning av vakten.';
-      feil.classList.remove('d-none');
-      return;
-    }
-    bootstrap.Modal.getInstance(document.getElementById('resetModal'))?.hide();
-    alert(d.melding);
-    // Vaktnavnet i headeren og lista er begge utdatert nå — full
-    // innlasting er enklere enn å flikke på begge.
-    window.location.reload();
-  });
-}
-
-
-// ── Tidligere vakter: liste med gjenåpning ──────────────
-
-async function visVakter() {
-  const el = document.getElementById('vaktliste');
-  if (!el) return;
-  const res = await apiFetch('/pasienter/api/vakter/');
-  if (!res.ok) return;
-  const vakter = (await res.json()).vakter || [];
-  el.innerHTML = vakter.map((v) => {
-    const status = v.er_aktiv ? 'aktiv'
-      : (v.kollapset ? 'avsluttet · arkiv kollapset' : 'avsluttet');
-    // Gjenåpning bytter aktiv vakt — den henter ikke slettede pasienter
-    // tilbake. Det står i bekreftelsen, ikke bare i dokumentasjonen.
-    const knapp = (!v.er_aktiv && !v.kollapset)
-      ? `<button class="btn btn-link btn-sm p-0 ms-2" data-action="gjenaapneVakt"
-                 data-id="${escHtmlValue(v.id)}">Gjenåpne</button>`
-      : '';
-    return `<div>${escapeHtml(v.navn)} <span class="text-muted">· ${escapeHtml(status)}</span>${knapp}</div>`;
-  }).join('') || '<div class="text-muted">Ingen vakter.</div>';
-}
-
-
-async function gjenaapneVakt(id) {
-  if (!confirm('Gjenåpne vakten? Den blir aktiv igjen — pasientene og oppdragene '
-    + 'som ble arkivert og tømt, hentes IKKE tilbake (de ligger i arkivene og backupen). '
-    + 'Tallene som ble frosset står; avsluttes vakta igjen, fryses et nytt sett ved siden av.')) return;
-  const res = await apiFetch('/pasienter/api/gjenaapne-vakt/', {
-    method: 'POST',
-    body: JSON.stringify({ vakt_id: id })
-  });
-  const d = await res.json();
-  if (!res.ok) {
-    alert(d.error || 'Kunne ikke gjenåpne vakten.');
-    return;
-  }
-  alert(d.melding);
-  window.location.reload();
-}
 
 // ════════════════════════════════════════════════════════
 
@@ -259,29 +139,8 @@ async function gjenaapneVakt(id) {
 
 let _aktivtArkivId = null;
 
-async function lagreVaktSomArkiv() {
-  const navn = (document.getElementById('arkiv-arrangement-navn')?.value || '').trim();
-  const notat = (document.getElementById('arkiv-notat')?.value || '').trim();
-  const feilEl = document.getElementById('arkiv-lagre-feil');
-
-  if (!navn) {
-    if (feilEl) { feilEl.textContent = 'Arrangementsnavn er påkrevd.'; feilEl.classList.remove('d-none'); }
-    return;
-  }
-  if (feilEl) feilEl.classList.add('d-none');
-
-  const res = await apiFetch('/pasienter/api/innstillinger/arkiv/lagre/', {
-    method: 'POST',
-    body: JSON.stringify({ arrangement_navn: navn, notat })
-  });
-  const d = await res.json();
-  bootstrap.Modal.getInstance(document.getElementById('arkivLagreModal'))?.hide();
-  if (res.ok) {
-    alert(`Arkiv lagret: "${d.tittel}" (${d.antall_pasienter} pasienter).`);
-  } else {
-    alert(d.error || 'Feil ved arkivering.');
-  }
-}
+// `lagreVaktSomArkiv()` («Lagre som arkiv») er slettet 28. sep. 2026:
+// «Avslutt vakt» arkiverer pasientene selv (patients/vaktslutt.py).
 
 async function loadArkivListe() {
   const container = document.getElementById('arkiv-liste-innhold');

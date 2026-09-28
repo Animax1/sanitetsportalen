@@ -10,12 +10,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render
-from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import (
-    admin_required, er_global_admin, har_tilgang, modul_kreves, nivaa_for,
+    er_global_admin, har_tilgang, modul_kreves, nivaa_for,
 )
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
@@ -25,7 +24,7 @@ from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
 from core.validators import now_local_str, validate_patient_time_fields
 from core.jsonkropp import json_body
-from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, vaktnavn_opptatt_melding
+from core.vakt import hent_aktiv_vakt
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
@@ -447,158 +446,6 @@ def patient_detail_view(request, pk):
     return JsonResponse({'ok': True, 'recycled_nr': recycled})
 
 
-# ── Reset testdata ─────────────────────────────────────────────────────────────
-
-@modul_kreves('patients', 'les', svar='json')
-@admin_required
-@require_http_methods(['GET', 'POST'])
-def avslutt_vakt_view(request):
-    """Avslutt aktiv vakt og start en ny. Kun admin.
-
-    **Én knapp for hele vakta** (28. sep. 2026, `core/vaktslutt.py`): tallene
-    fryses, pasientene *og* oppdragene arkiveres og tømmes, vakta lukkes og den
-    nye åpnes — i én transaksjon. Fram til da slettet knappen bare pasientene,
-    uten å arkivere dem, og oppdragene sto igjen til noen arkiverte dem fra
-    oppdragsmodulen.
-
-    Adressen står i pasientmodulen fordi knappen gjør det; arbeidet er
-    portalens. **GET gir oversikten** — hva som arkiveres, hvilke faner som
-    fryses, og hva som sperrer — slik at det vises *før* noen trykker.
-
-    Den nye vakta opprettes i samme flyt, slik at portalen aldri står tømt
-    uten aktiv vakt. Navnet er påkrevd og fritekst — det var beslutningen —
-    og unikt: to vakter med samme navn lar seg ikke skille i statistikken.
-
-    Krever {"confirm": true} for å unngå feilklikk. Gjenåpning av vakta (egen
-    knapp) setter den aktiv igjen, men henter ikke rader tilbake — de ligger i
-    arkivene og i `pre_reset`-backupene.
-    """
-    from core import vaktslutt
-    from core.models import Vakt
-
-    vakt = hent_aktiv_vakt()
-    if request.method == 'GET':
-        return JsonResponse(vaktslutt.oversikt(vakt))
-
-    data = json_body(request)
-    if not data.get('confirm'):
-        return JsonResponse(
-            {'error': 'Bekreftelse mangler. Send {"confirm": true} for å slette.'},
-            status=400,
-        )
-    nytt_navn = (data.get('ny_vakt_navn') or '').strip()
-    if not nytt_navn:
-        return JsonResponse(
-            {'error': 'Den nye vakta må ha et navn — det settes ved vaktstart.'},
-            status=400,
-        )
-    # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
-    # `opprett_vakt` i orkestratoren — denne sjekken er et kappløp.
-    if Vakt.objects.filter(navn=nytt_navn).exists():
-        return JsonResponse({'error': vaktnavn_opptatt_melding(nytt_navn)}, status=400)
-
-    try:
-        svar = vaktslutt.avslutt(vakt, ny_vakt_navn=nytt_navn, bruker=request.user,
-                                 request=request)
-    except vaktslutt.Sperret as sperret:
-        # Ingenting er rørt: sperrene sjekkes før backupen og transaksjonen.
-        return JsonResponse({'error': ' '.join(sperret.grunner),
-                             'sperrer': sperret.grunner}, status=409)
-    except VaktnavnOpptatt as feil:
-        # Tatt mellom sjekken over og nå. Transaksjonen er rullet tilbake:
-        # ingenting arkivert eller slettet, gammel vakt fortsatt aktiv.
-        return JsonResponse({'error': str(feil)}, status=400)
-
-    tomt = svar['tomt']
-    deler = []
-    for h in vaktslutt.all_handlers():
-        n = tomt.get(h.slug, 0)
-        deler.append(f'{n} {h.entall if n == 1 and h.entall else h.etikett}')
-    return JsonResponse({
-        'ok': True,
-        'avsluttet_vakt': svar['avsluttet_vakt'],
-        'ny_vakt': svar['ny_vakt'],
-        'antall_slettet': tomt.get('patients', 0),
-        'tomt': tomt,
-        'melding': (f'Arkivert og tømt: {", ".join(deler) or "ingenting"}. Statistikken '
-                    f'er frosset. Vakta «{svar["avsluttet_vakt"]}» er avsluttet, og '
-                    f'«{svar["ny_vakt"]}» er aktiv.'),
-    })
-
-
-@modul_kreves('patients', 'les', svar='json')
-@admin_required
-@require_http_methods(['GET'])
-def vakter_view(request):
-    """Vaktene, nyest først — grunnlaget for «Tidligere vakter»-lista.
-
-    Kun admin: lista finnes for gjenåpning, som er en admin-handling, og
-    vaktnavn fra tidligere arrangementer er ikke noe enhver leser trenger.
-    `kollapset` sendes med slik at grensesnittet kan la være å tilby en
-    gjenåpning serveren uansett ville avvist.
-    """
-    from core.models import Vakt
-
-    return JsonResponse({'vakter': [
-        {
-            'id': v.pk,
-            'navn': v.navn,
-            'year': v.year,
-            'er_aktiv': v.er_aktiv,
-            'startet': v.startet.isoformat(),
-            'avsluttet': v.avsluttet.isoformat() if v.avsluttet else None,
-            'kollapset': v.vaktarkiver.filter(
-                kollapset_at__isnull=False).exists(),
-        }
-        for v in Vakt.objects.order_by('-startet')
-    ]})
-
-
-@modul_kreves('patients', 'les', svar='json')
-@admin_required
-@require_http_methods(['POST'])
-def gjenaapne_vakt_view(request):
-    """Gjenåpne en avsluttet vakt. Kun admin.
-
-    En feilklikk-avslutning midt i en vakt skal ikke være en katastrofe uten
-    vei tilbake — det var beslutningen (§7.2). Gjenåpningen bytter aktiv
-    vakt; den henter IKKE slettede pasientrader tilbake. De ligger i
-    pre-reset-backupen, og gjenoppretting derfra er en egen, bevisst handling
-    i backup-panelet.
-
-    Døra er låst når vaktas arkiv er kollapset: da finnes ikke radnivået
-    lenger, og en «aktiv» vakt uten mulighet for rådata ville løyet.
-    """
-    from core.models import Vakt
-
-    data = json_body(request)
-    try:
-        vakt = Vakt.objects.get(pk=int(data.get('vakt_id')))
-    except (Vakt.DoesNotExist, TypeError, ValueError):
-        return JsonResponse({'error': 'Ukjent vakt.'}, status=400)
-
-    if vakt.vaktarkiver.filter(kollapset_at__isnull=False).exists():
-        return JsonResponse(
-            {'error': f'Arkivet for «{vakt.navn}» er kollapset — radnivået '
-                      f'finnes ikke lenger, og vakta kan ikke gjenåpnes.'},
-            status=400,
-        )
-
-    forrige = hent_aktiv_vakt()
-    with transaction.atomic():
-        if forrige.pk != vakt.pk:
-            forrige.er_aktiv = False
-            forrige.avsluttet = timezone.now()
-            forrige.save(update_fields=['er_aktiv', 'avsluttet'])
-        vakt.er_aktiv = True
-        vakt.avsluttet = None
-        vakt.save(update_fields=['er_aktiv', 'avsluttet'])
-        AppSetting.set('aktiv_vakt_id', vakt.pk)
-
-    return JsonResponse({
-        'ok': True,
-        'aktiv_vakt': vakt.navn,
-        'melding': f'Vakta «{vakt.navn}» er aktiv igjen.',
-    })
-
-
+# «Avslutt vakt», «Tidligere vakter» og gjenåpningen sto her til 28. sep. 2026.
+# De er portalens, ikke pasientenes, og bor nå på `/portal-admin/vakt/`
+# (`core/views_vakt.py`); arbeidet gjøres av `core/vaktslutt.py`.

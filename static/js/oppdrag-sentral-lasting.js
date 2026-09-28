@@ -247,33 +247,8 @@ async function lastArkiv() {
 }
 
 
-async function arkiverVakt() {
-  const feil = document.getElementById('arkiv-feil');
-  feil?.classList.add('d-none');
-  await withSubmitGuard('arkiv-knapp', async () => {
-    const notat = (document.getElementById('arkiv-notat')?.value || '').trim();
-    const res = await apiFetch('/oppdrag/api/arkiv/', {
-      method: 'POST',
-      body: JSON.stringify({ notat }),
-    });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.status !== 'ok') {
-      // Inline, ikke alert(): meldingen hører hjemme ved knappen som
-      // feilet, og en alert forsvinner før man rekker å lese den.
-      if (feil) {
-        feil.textContent = d.message || 'Arkivering feilet.';
-        feil.classList.remove('d-none');
-      }
-      return;
-    }
-    const notatfelt = document.getElementById('arkiv-notat');
-    if (notatfelt) notatfelt.value = '';
-    // Vakta er lukket: tavla og historikken er tomme, og nummeret starter
-    // på nytt. Alt som viser oppdrag må tegnes på nytt.
-    await lastArkiv();
-    await lastAlt();
-  });
-}
+// `arkiverVakt()` er slettet 28. sep. 2026: «Avslutt vakt» på
+// /portal-admin/vakt/ arkiverer oppdragene med resten (oppdrag/vaktslutt.py).
 
 
 function visArkivStatistikk(id) {
@@ -352,5 +327,4 @@ document.getElementById('nyttOppdragModal')
   ?.addEventListener('show.bs.modal', nullstillNyttOppdrag);
 // Vaktarkivet og historikken åpnes med data-bs-toggle: notatet fra et avvist
 // forsøk og søketeksten skal ikke stå igjen (André, 19. sep. 2026).
-nullstillModalVedLukking('arkivModal', ['arkiv-notat'], 'arkiv-feil');
 nullstillModalVedLukking('historikkModal', ['historikk-sok'], 'historikk-feil');

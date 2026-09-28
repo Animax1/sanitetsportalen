@@ -33,8 +33,10 @@ class PortalInnstillingerTests(TestCase):
     def test_admin_ser_siden(self):
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, 'name="event_name"')
         self.assertContains(resp, 'name="session_timeout_hours"')
+        # Vaktas navn flyttet til Vakt-siden 28. sep. 2026; her står en lenke.
+        self.assertNotContains(resp, 'name="event_name"')
+        self.assertContains(resp, 'href="/portal-admin/vakt/"')
 
     def test_ikke_admin_far_403(self):
         """Skriv_full på pasientmodulen gir ikke portalinnstillinger."""
@@ -42,12 +44,14 @@ class PortalInnstillingerTests(TestCase):
         c.force_login(_bruker('ps_skriver'))
         self.assertEqual(c.get(self.url).status_code, 403)
 
-    def test_lagring_skriver_begge(self):
+    def test_lagring_skriver_timeouten_og_ikke_navnet(self):
+        """Et `event_name` fra en gammel fane skal ikke lenger skrive vaktas navn —
+        det gjør Vakt-siden (28. sep. 2026)."""
+        navn = hent_aktiv_vakt().navn
         resp = self.client.post(self.url, {
             'event_name': 'Festivalen 2026', 'session_timeout_hours': '12'})
         self.assertEqual(resp.status_code, 302)
-        # Arrangementsnavnet ER vaktas navn siden deploy 2
-        self.assertEqual(hent_aktiv_vakt().navn, 'Festivalen 2026')
+        self.assertEqual(hent_aktiv_vakt().navn, navn)
         self.assertEqual(int(AppSetting.get('session_timeout_hours', 0)), 12)
 
     def test_ugyldig_timeout_avvises(self):
@@ -59,19 +63,10 @@ class PortalInnstillingerTests(TestCase):
                 self.assertEqual(resp.status_code, 200, 'skal vise skjemaet på nytt')
                 self.assertEqual(int(AppSetting.get('session_timeout_hours', 0)), 8)
 
-    def test_avvist_innsending_lagrer_ikke_halve_skjemaet(self):
-        """En timeout på 0 skal ikke ha rukket å skrive arrangementsnavnet.
-
-        Navnet skrives på vakta og timeouten i `AppSetting` — ingen
-        transaksjon binder dem, så rekkefølgen i viewet er det eneste som
-        hindrer halv lagring.
-        """
-        vakt = hent_aktiv_vakt()
-        vakt.navn = 'Uendret'
-        vakt.save(update_fields=['navn'])
-        self.client.post(self.url, {
-            'event_name': 'Skulle ikke lagres', 'session_timeout_hours': '0'})
-        self.assertEqual(hent_aktiv_vakt().navn, 'Uendret')
+    # `test_avvist_innsending_lagrer_ikke_halve_skjemaet` prøvde at en timeout på 0
+    # ikke rakk å skrive vaktas navn. Navnet står ikke her lenger (28. sep. 2026);
+    # halv lagring mellom portalens og modulenes felt prøves i
+    # `core/tests_registre.py` og `vaktliste/tests_fil.py`.
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

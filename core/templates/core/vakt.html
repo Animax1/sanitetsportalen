@@ -1,0 +1,138 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Vakt – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Alt om vakta på ett sted (28. sep. 2026, `core/views_vakt.py`). Serverrendret:
+  oversikten og sperrene er regnet ut når siden lastes, og skjemaene poster og
+  videresender. `data-confirm` er `ui-actions.js`, som på backupsiden.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2"><i class="bi bi-flag me-2"></i>Vakt</h1>
+  <p class="text-muted mb-0">
+    Vakta alle modulene registrerer på. Innstillingene for hver funksjon står under
+    <a href="{% url 'portaladmin:portal_settings' %}">Innstillinger</a>; det som gjelder
+    selve vakta, står her.
+  </p>
+</section>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><strong>Aktiv vakt</strong></div>
+      <div class="card-body">
+        <p class="mb-2"><strong>{{ vakt.navn }}</strong>
+          <span class="text-muted small">· startet {{ vakt.startet|date:"d.m.Y H:i" }}</span></p>
+        <form method="post" action="{% url 'portaladmin:vakt_navn' %}" class="d-flex gap-2 flex-wrap">
+          {% csrf_token %}
+          <label class="visually-hidden" for="vakt-navn">Navn på vakta</label>
+          <input type="text" id="vakt-navn" name="navn" class="form-control form-control-sm"
+                 style="max-width: 22rem;" value="{{ vakt.navn }}" maxlength="255" required>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Endre navn</button>
+        </form>
+        <div class="form-text">Vises i topplinjen på modulsidene. Må være unikt.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100 border-danger">
+      <div class="card-header"><strong class="text-danger">Avslutt vakt</strong></div>
+      <div class="card-body">
+        <ul class="small mb-2" id="vakt-oversikt">
+          {% for m in oversikt.moduler %}
+            <li>{% if m.antall %}{{ m.antall }} {% if m.antall == 1 %}{{ m.entall }}{% else %}{{ m.etikett }}{% endif %} arkiveres og tømmes.{% else %}Ingen {{ m.etikett }} å arkivere.{% endif %}</li>
+          {% endfor %}
+          <li>Statistikken fryses for: {{ oversikt.fryses|join:", " }}.</li>
+        </ul>
+        {% for sperre in oversikt.sperrer %}
+          <p class="text-danger fw-semibold small mb-2">{{ sperre }}</p>
+        {% endfor %}
+        <form method="post" action="{% url 'portaladmin:vakt_avslutt' %}"
+              data-confirm="Avslutte «{{ vakt.navn }}»? Radene arkiveres og tømmes, og det kan ikke angres herfra.">
+          {% csrf_token %}
+          <label class="form-label small mb-1" for="ny-vakt-navn">Navnet på den nye vakta</label>
+          <input type="text" id="ny-vakt-navn" name="ny_vakt_navn" class="form-control form-control-sm mb-2"
+                 maxlength="255" required placeholder="F.eks. «Landsskytterstevnet 2027»"
+                 {% if oversikt.sperrer %}disabled{% endif %}>
+          <div class="form-check small mb-2">
+            <input class="form-check-input" type="checkbox" id="vakt-bekreft" name="bekreft" value="ja"
+                   required {% if oversikt.sperrer %}disabled{% endif %}>
+            <label class="form-check-label" for="vakt-bekreft">Jeg har sett oversikten over</label>
+          </div>
+          <button type="submit" class="btn btn-sm btn-danger" {% if oversikt.sperrer %}disabled{% endif %}>
+            Avslutt vakt og start ny</button>
+        </form>
+        <div class="form-text">Det tas en backup av hver modul som tømmes, før noe røres.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><strong>Tidligere vakter</strong></div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Vakt</th><th>Startet</th><th>Avsluttet</th><th></th></tr></thead>
+            <tbody>
+            {% for t in tidligere %}
+              <tr>
+                <td>{{ t.vakt.navn }}</td>
+                <td class="small">{{ t.vakt.startet|date:"d.m.Y" }}</td>
+                <td class="small">{{ t.vakt.avsluttet|date:"d.m.Y H:i"|default:"–" }}</td>
+                <td class="text-end text-nowrap">
+                  {% if t.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ t.nokkel|urlencode }}">Statistikk</a>{% endif %}
+                  {% if t.kan_gjenaapnes %}
+                  <form method="post" action="{% url 'portaladmin:vakt_gjenaapne' t.vakt.pk %}" class="d-inline"
+                        data-confirm="Gjenåpne «{{ t.vakt.navn }}»? «{{ vakt.navn }}» avsluttes uten arkivering. Arkiverte rader hentes ikke tilbake — de ligger i arkivene og backupen.">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-link">Gjenåpne</button>
+                  </form>
+                  {% else %}
+                  <span class="small text-muted" title="Et arkiv for vakta er kollapset">kollapset</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-muted small">Ingen avsluttede vakter.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><strong>Arkiver</strong>
+        <span class="small text-muted ms-2">Radene, signaturen og slettingen står i modulen som eier arkivet.</span></div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Modul</th><th>Arkiv</th><th>Vakt</th><th>Arkivert</th><th>Rader</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for a in arkiver %}
+              <tr>
+                <td class="small">{{ a.modul }}</td>
+                <td>{{ a.tittel }}</td>
+                <td class="small">{{ a.vakt|default:"–" }}</td>
+                <td class="small">{{ a.importert_at|date:"d.m.Y" }}</td>
+                <td class="small">{{ a.antall|default_if_none:"–" }}</td>
+                <td class="small">{% if a.kollapset_at %}Kollapset {{ a.kollapset_at|date:"d.m.Y" }}{% else %}Radnivå{% endif %}</td>
+                <td class="text-end">{% if a.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ a.nokkel|urlencode }}">Statistikk</a>{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-muted small">Ingen arkiver.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

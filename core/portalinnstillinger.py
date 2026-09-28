@@ -16,9 +16,10 @@ Samme retningsproblem som driftsdashbordet hadde, og samme svar. Se
 2. Registrer den fra ``apps.ready()``
 3. Feltene dukker opp på siden, valideres og lagres uten at `core` endres
 
-**Alt valideres før noe lagres.** Det er ikke en detalj: navnet skrives på
-`Vakt`, timeouten og modulenes verdier i `AppSetting`, og ingen transaksjon
-binder dem. Rekkefølgen i viewet er det eneste som hindrer at en avvist
+**Alt valideres før noe lagres.** Det er ikke en detalj: timeouten og hver
+moduls verdier skrives hver for seg, og ingen transaksjon binder dem. (Vaktas
+navn sto her og ble skrevet på `Vakt` til 28. sep. 2026; det står nå på
+`/portal-admin/vakt/`.) Rekkefølgen i viewet er det eneste som hindrer at en avvist
 innsending lagrer halve skjemaet, og `valider()`/`lagre()` er delt i to
 nettopp for at en handler ikke skal kunne skrive noe før de andre har sagt ja.
 `core/tests_portal_settings.py` og `vaktliste/tests_fil.py` håndhever det fra

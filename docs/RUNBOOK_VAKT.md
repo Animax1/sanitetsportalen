@@ -822,16 +822,17 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
    opplasting fra i dag uten feil (§8b). Fila på Railway Volume er da alt utenfor Railway
 3. Verifiser at ingen 5xx-feil ligger uten forklaring (admin-dashbord → Metrikk-kort → errors_5xx)
 4. **Les av databasen** (§8a steg 3 og 4) og send tallene til Claude — **før**
-   arkiveringen under, som sletter oppdragene: da står ikke radene i tallene lenger.
-5. **Arkiver vakta — begge modulene.** Arkiveringen ligger to steder inntil de slås
-   sammen, og det er lett å ta den ene og tro man er ferdig:
-   - **Pasienter:** `/pasienter/` → Vaktarkiv → «Lagre vakt som arkiv»
-   - **Oppdrag:** `/oppdrag/` → Vaktarkiv → «Arkiver oppdragene»
-
-   Begge krever global admin. Arkivering fjerner ingenting — den fryser en kopi med
-   signatur, og pasientene slettes først når du senere velger «Avslutt vakt».
-   Kryss av begge før du går videre til 10b: gjør du det ikke, står oppdragene igjen
-   uten frosset kopi, og statistikken for vakta finnes bare så lenge radene gjør det.
+   avslutningen under, som tømmer pasientene og oppdragene: da står ikke radene i
+   tallene lenger. (Statistikkfanene fryses av avslutningen og kan leses etterpå.)
+5. **Avslutt vakta: Administrasjon → Vakt** (`/portal-admin/vakt/`, global admin).
+   Siden viser først hva som arkiveres og tømmes, hvilke statistikkfaner som fryses,
+   og hva som **sperrer** — et oppdrag som står på tavla må i historikken først.
+   Skriv navnet på den nye vakta, kryss av og trykk «Avslutt vakt og start ny».
+   Ett trykk gjør alt: backup av hver modul som tømmes, frosne tall, pasient- og
+   oppdragsarkiv, ny vakt. (Fram til 28. sep. 2026 var dette to arkivknapper og en
+   avslutning i pasientmodulen, og det var lett å ta én og tro man var ferdig.)
+6. Tallene for vakta står etterpå i `/statistikk/`, nedtrekket «Vakt» — og lenket fra
+   «Tidligere vakter» på samme side.
 
 ### 10b. Veksle tilbake til lavkostnad-modus
 

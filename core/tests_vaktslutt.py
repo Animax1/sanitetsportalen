@@ -1,7 +1,7 @@
 """«Avslutt vakt» arkiverer og tømmer alle modulene i ett (steg 2, 28. sep. 2026).
 
 `core/vaktslutt.py`, prøvd gjennom det ekte endepunktet
-`/pasienter/api/avslutt-vakt/`. Det som skal holde:
+`/portal-admin/vakt/avslutt/` (flyttet fra pasientmodulen 28. sep. 2026). Det som skal holde:
 
 - Pasientene **arkiveres** før de slettes — hullet var at de bare ble slettet.
 - Oppdragene arkiveres og tømmes med resten, og Bemanning er frosset med
@@ -12,16 +12,15 @@
 """
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from accounts.test_helpers import gi_standardtilgang
 from audit.models import AuditLog
 from core.models import Backup, VaktStatistikk
 from core.vakt import hent_aktiv_vakt
@@ -30,13 +29,15 @@ from oppdrag.models import Enhet, Lokasjon, Oppdrag, OppdragArkiv
 from patients.models import ArkivertPasient, Patient, VaktArkiv
 from patients.test_helpers import sett_aktiv_vakt
 
-URL = '/pasienter/api/avslutt-vakt/'
+URL = '/portal-admin/vakt/avslutt/'
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class AvsluttVaktTests(TestCase):
 
     def setUp(self):
+        # Frekvensgrensen på avslutningen teller per bruker-ID på tvers av testene.
+        cache.clear()
         mappe = tempfile.TemporaryDirectory()
         self.addCleanup(mappe.cleanup)
         miljo = mock.patch.dict(os.environ, {'BACKUP_DIR': mappe.name})
@@ -66,14 +67,17 @@ class AvsluttVaktTests(TestCase):
         return oppdrag
 
     def _avslutt(self, navn='Neste vakt'):
-        return self.c.post(URL, data=json.dumps({'confirm': True, 'ny_vakt_navn': navn}),
-                           content_type='application/json')
+        return self.c.post(URL, {'bekreft': 'ja', 'ny_vakt_navn': navn}, follow=True)
+
+    @staticmethod
+    def _meldinger(svar):
+        return ' '.join(str(m) for m in svar.context['messages'])
+
 
     # ── Det som skjer ─────────────────────────────────────────────────────
     def test_pasientene_arkiveres_for_de_slettes(self):
         self._pasienter(3)
-        svar = self._avslutt()
-        self.assertEqual(svar.status_code, 200, svar.content)
+        self._avslutt()
         self.assertFalse(Patient.objects.filter(vakt=self.vakt).exists())
         arkiv = VaktArkiv.objects.get(vakt=self.vakt)
         self.assertEqual((arkiv.antall_pasienter, arkiv.arrangement_navn), (3, self.vakt.navn))
@@ -83,7 +87,7 @@ class AvsluttVaktTests(TestCase):
     def test_oppdragene_arkiveres_og_tommes(self):
         self._oppdrag()
         self._oppdrag()
-        self.assertEqual(self._avslutt().status_code, 200)
+        self._avslutt()
         self.assertFalse(Oppdrag.objects.filter(vakt=self.vakt).exists())
         self.assertEqual(OppdragArkiv.objects.get(vakt=self.vakt).antall_rader, 2)
 
@@ -92,23 +96,24 @@ class AvsluttVaktTests(TestCase):
         self._oppdrag()
         self._oppdrag()
         self._oppdrag()
-        self.assertEqual(self._avslutt().status_code, 200)
+        self._avslutt()
         rad = VaktStatistikk.objects.get(vakt=self.vakt, slug='vaktliste')
         self.assertEqual(rad.data['summary']['antall_oppdrag'], 3)
 
     def test_vakta_lukkes_og_den_nye_er_aktiv(self):
-        svar = self._avslutt('Vinterfestivalen').json()
+        svar = self._meldinger(self._avslutt('Vinterfestivalen'))
         self.assertEqual(hent_aktiv_vakt().navn, 'Vinterfestivalen')
         self.vakt.refresh_from_db()
         self.assertFalse(self.vakt.er_aktiv)
-        self.assertIn('Statistikken er frosset', svar['melding'])
+        self.assertIn('Statistikken er frosset', svar)
 
     def test_meldingen_bruker_entall(self):
         self._pasienter(1)
-        self.assertIn('1 pasient,', self._avslutt().json()['melding'])
+        self.assertIn('1 pasient,', self._meldinger(self._avslutt()))
 
     def test_ingen_rader_gir_intet_arkiv(self):
-        self.assertEqual(self._avslutt().status_code, 200)
+        self._avslutt()
+        self.assertEqual(hent_aktiv_vakt().navn, 'Neste vakt')
         self.assertFalse(VaktArkiv.objects.exists())
         self.assertFalse(OppdragArkiv.objects.exists())
 
@@ -133,8 +138,7 @@ class AvsluttVaktTests(TestCase):
         self._pasienter(2)
         self._oppdrag(paa_tavla=True)
         svar = self._avslutt()
-        self.assertEqual(svar.status_code, 409)
-        self.assertIn('står fortsatt på tavla', svar.json()['error'])
+        self.assertIn('står fortsatt på tavla', self._meldinger(svar))
         self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 2)
         self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 1)
         self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
@@ -152,7 +156,7 @@ class AvsluttVaktTests(TestCase):
                 self._oppdrag(paa_tavla=True)
             return ekte(**kw)
         with mock.patch('core.backup.create_backup', side_effect=backup_og_nytt_oppdrag):
-            self.assertEqual(self._avslutt().status_code, 409)
+            self.assertIn('står fortsatt på tavla', self._meldinger(self._avslutt()))
         self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 1)
         self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
         self.assertFalse(VaktStatistikk.objects.exists())
@@ -174,19 +178,9 @@ class AvsluttVaktTests(TestCase):
     def test_oversikten_viser_antall_faner_og_sperrer(self):
         self._pasienter(2)
         self._oppdrag(paa_tavla=True)
-        data = self.c.get(URL).json()
+        data = self.c.get('/portal-admin/vakt/').context['oversikt']
         antall = {m['slug']: m['antall'] for m in data['moduler']}
         self.assertEqual(antall, {'patients': 2, 'oppdrag': 1})
         self.assertEqual(len(data['sperrer']), 1)
         self.assertIn('Lag', data['fryses'])
         self.assertEqual(data['vakt'], self.vakt.navn)
-
-    def test_bare_global_admin(self):
-        leder = CustomUser.objects.create_user(
-            username='l', password='x', role='bruker', must_change_password=False)
-        gi_standardtilgang(leder, 'leder')
-        c = Client()
-        c.force_login(leder)
-        self.assertEqual(c.get(URL).status_code, 403)
-        self.assertEqual(c.post(URL, data=json.dumps({'confirm': True, 'ny_vakt_navn': 'X'}),
-                                content_type='application/json').status_code, 403)

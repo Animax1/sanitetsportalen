@@ -258,6 +258,9 @@
           {# Admin-lenkene bodde også i en egen menyrad til 22. sep. 2026 — fire av dem sto begge steder. #}
           <li><hr class="dropdown-divider" style="border-color:var(--portal-border)"></li>
           <li><h6 class="dropdown-header">Administrasjon</h6></li>
+          <li><a class="dropdown-item{% if '/portal-admin/vakt' in request.path %} active{% endif %}" href="{% url 'portaladmin:vakt' %}">
+            <i class="bi bi-flag me-2"></i>Vakt
+          </a></li>
           <li><a class="dropdown-item{% if '/portal-admin/brukere' in request.path %} active{% endif %}" href="{% url 'portaladmin:user_list' %}">
             <i class="bi bi-people me-2"></i>Brukere
           </a></li>

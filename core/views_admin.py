@@ -23,7 +23,7 @@ from accounts.models import CustomUser
 from audit.models import AuditLog
 from core.auth_decorators import admin_required
 from core.forms import ModuleSettingsForm
-from core.models import ModuleSettings, Vakt
+from core.models import ModuleSettings
 from core.modules import get_all_modules, get_module
 from core.ratelimit import rate_limit
 from core.validators import les_iso_dato
@@ -37,12 +37,12 @@ from core.validators import les_iso_dato
 @admin_required
 @require_http_methods(['GET', 'POST'])
 def portal_settings_view(request):
-    """Arrangementsnavn og sesjonstimeout.
+    """Sesjonstimeout og modulenes egne innstillinger.
 
-    Begge lå under ``/pasienter/`` fordi pasientmodulen var den eneste som
-    fantes. Ingen av dem hører til der: arrangementsnavnet gjelder vakten, som
-    med flere moduler dekker mer enn pasientregistreringen, og
-    sesjonstimeouten gjelder innloggingen.
+    Arrangementsnavnet sto her til 28. sep. 2026. Det *er* vaktas navn, og
+    flyttet til ``/portal-admin/vakt/`` (André: «Innstillinger er spesifikke
+    funksjoner. /vakt er overordnet for denne vakten.»). Begge lå opprinnelig
+    under ``/pasienter/`` fordi pasientmodulen var den eneste som fantes.
 
     Flyttingen ble gjort sammen med rollemodellen fordi tilgangssjekkene deres
     uansett skulle skrives om — og fordi «admin-only-endepunkt inne i en
@@ -55,8 +55,6 @@ def portal_settings_view(request):
     """
     from core.models import AppSetting
     from core.portalinnstillinger import all_handlers
-    from core.vakt import hent_aktiv_vakt
-
     # **Modulenes felter kommer gjennom registeret**, ikke gjennom en import
     # av modulen (14. sep. 2026). Fram til da sto `from vaktliste import fil`
     # her, med modulens validering og lagring midt i rammeverkets view. Se
@@ -67,8 +65,8 @@ def portal_settings_view(request):
         feil = False
 
         # ── Alt valideres, ingenting lagres ──────────────────────────────
-        # Navnet skrives på `Vakt` og resten i `AppSetting`; ingen transaksjon
-        # binder dem, så denne todelingen er det eneste som hindrer at en
+        # Portalens felt og hver moduls felt skrives hver for seg, uten én
+        # transaksjon rundt; denne todelingen er det eneste som hindrer at en
         # avvist innsending lagrer halve skjemaet. Hver handler får si sitt
         # før noen skriver.
         try:
@@ -82,20 +80,6 @@ def portal_settings_view(request):
                     request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
                 feil = True
 
-        # Arrangementsnavnet ER den aktive vaktas navn siden deploy 2 — én
-        # kilde.
-        vakt = hent_aktiv_vakt()
-        nytt_navn = (request.POST.get('event_name') or '').strip()
-        if not nytt_navn:
-            messages.error(request, 'Vakta må ha et navn.')
-            feil = True
-        elif Vakt.objects.filter(navn=nytt_navn).exclude(pk=vakt.pk).exists():
-            messages.error(
-                request,
-                f'En annen vakt heter allerede «{nytt_navn}». '
-                f'Legg på en dato eller velg et annet navn.')
-            feil = True
-
         modulverdier = {}
         for handler in handlere:
             try:
@@ -106,8 +90,6 @@ def portal_settings_view(request):
 
         # ── Så lagres alt ────────────────────────────────────────────────
         if not feil:
-            vakt.navn = nytt_navn
-            vakt.save(update_fields=['navn'])
             AppSetting.set('session_timeout_hours', timer)
             for handler in handlere:
                 handler.lagre(modulverdier[handler.slug])
@@ -120,7 +102,6 @@ def portal_settings_view(request):
         timer = 8
 
     kontekst = {
-        'event_name': hent_aktiv_vakt().navn,
         'session_timeout_hours': timer,
         'innstillingsfragmenter': [h.mal for h in handlere if h.mal],
     }

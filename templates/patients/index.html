@@ -268,31 +268,22 @@
       </a>
     </div>
 
-    <div class="settings-card danger-zone">
-      <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
-      <p class="small">
-        Avslutter vakten og starter en ny. Statistikken fryses, og pasientene og
-        oppdragene arkiveres før de tømmes. Det tas en backup automatisk først.
+    <div class="settings-card">
+      <h6><i class="bi bi-flag me-2"></i>Vakt</h6>
+      <p class="small text-muted mb-2">
+        Vakta avsluttes nå under <strong>Administrasjon → Vakt</strong>, sammen med navnet,
+        tidligere vakter og arkivene — den gjelder hele portalen, ikke bare pasientene.
+        «Avslutt vakt» arkiverer pasientene selv.
       </p>
-      <div class="small text-muted mb-2">Aktiv vakt: {{ event_name }}</div>
-      <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">
-        <i class="bi bi-stop-circle me-1"></i>Avslutt vakt
-      </button>
-      <div class="mt-2">
-        <button class="btn btn-outline-secondary btn-sm" data-action="visVakter">
-          <i class="bi bi-clock-history me-1"></i>Tidligere vakter
-        </button>
-      </div>
-      <div id="vaktliste" class="small mt-2"></div>
+      <a href="{% url 'portaladmin:vakt' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Åpne vakta
+      </a>
     </div>
 
     <div class="settings-card">
       <h6><i class="bi bi-archive me-2"></i>Vaktarkiv</h6>
-      <p class="small text-muted mb-2">Lagre et låst arkiv-snapshot av nåværende aktive vakt.</p>
+      <p class="small text-muted mb-2">Pasientarkivene: radene, signaturen og sletting.</p>
       <div class="d-flex gap-2 flex-wrap mb-2">
-        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#arkivLagreModal">
-          <i class="bi bi-archive-fill me-1"></i>Lagre nåværende vakt som arkiv
-        </button>
         <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#arkivListeModal" data-action="loadArkivListe">
           <i class="bi bi-list-ul me-1"></i>Vis arkiverte vakter
         </button>
@@ -304,70 +295,7 @@
 </div>
 
 
-<!-- ══════════════════════════════════════════════════
-     RESET MODAL (Kun admin)
-══════════════════════════════════════════════════ -->
 {% if er_global_admin %}
-<div class="modal fade" id="resetModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header" style="background:#7f1d1d;color:#fff;padding:0.65rem 1rem">
-        <h5 class="modal-title fw-bold"><i class="bi bi-stop-circle me-2"></i>Avslutt vakt</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Avslutte vakten <strong>«{{ event_name }}»</strong>?</p>
-        {% comment %}
-          Oversikten hentes når vinduet åpnes (`lastAvsluttOversikt`): hva som
-          arkiveres og tømmes, hvilke faner som fryses, og hva som sperrer.
-        {% endcomment %}
-        <div id="avslutt-oversikt" class="small mb-3" aria-live="polite">Henter oversikten …</div>
-        <div class="mb-2">
-          <label class="form-label" for="avslutt-nytt-navn">Navnet på den nye vakten</label>
-          <input type="text" id="avslutt-nytt-navn" class="form-control"
-                 placeholder="F.eks. «Landsskytterstevnet 2026»">
-          <div class="form-text">Settes ved vaktstart. Må være unikt.</div>
-        </div>
-        <div id="avslutt-feil" class="text-danger small d-none"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-danger" id="avslutt-vakt-knapp"
-                data-action="doAvsluttVakt">Avslutt vakt og start ny</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Vaktarkiv: Lagre modal -->
-<div class="modal fade" id="arkivLagreModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header" style="background:#0f3460;color:#fff;padding:0.65rem 1rem">
-        <h5 class="modal-title fw-bold"><i class="bi bi-archive-fill me-2"></i>Lagre vakt som arkiv</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label small fw-bold" for="arkiv-arrangement-navn">Arrangementsnavn <span class="text-danger">*</span></label>
-          <input type="text" id="arkiv-arrangement-navn" class="form-control" placeholder="Navn på arrangementet">
-        </div>
-        <div class="mb-3">
-          <label class="form-label small fw-bold" for="arkiv-notat">Notat (valgfritt)</label>
-          <textarea id="arkiv-notat" class="form-control" rows="3" placeholder="Eventuelt notat om vakten..."></textarea>
-        </div>
-        <div id="arkiv-lagre-feil" class="text-danger small d-none"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-success" data-action="lagreVaktSomArkiv">
-          <i class="bi bi-archive-fill me-1"></i>Lagre arkiv
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Vaktarkiv: Liste modal -->
 <div class="modal fade" id="arkivListeModal" tabindex="-1">
   <div class="modal-dialog modal-lg">

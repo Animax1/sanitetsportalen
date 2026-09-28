@@ -163,6 +163,10 @@ og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. 
       oppdrag fra arkivradene før kollapsen, for KO og Lag fra radene før `purge_old_logs`
       tar dem. Bemanning bærer ingen helseopplysninger. Arkivet tar vare på hvilke
       problemstillinger som var merket da det ble laget, så et navnebytte ikke glipper.
+- [ ] **MULIGHET: arkivene helt inn på `/portal-admin/vakt/`.** Siden viser dem og lenker til
+      tallene (28. sep. 2026), men radene, signatursjekken og slettingen står fortsatt i
+      pasientmodulens og oppdragsmodulens egne vinduer. Å samle dem krever en lesing og sletting
+      gjennom `core.arkiv`-registeret, ikke to modul-API-er kalt fra `core`.
 - [ ] **5. Lagringstid for `/lag/`:** radene slettes etter 24 måneder via `core/opprydding.py`,
       som KO-loggen. Går inn i personvernpunktet under `/lag/`.
 

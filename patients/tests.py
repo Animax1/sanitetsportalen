@@ -395,151 +395,8 @@ class LeadViewTests(TestCase):
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
-# ── Reset testdata ────────────────────────────────────────────────────────────
-
-@override_settings(SECURE_SSL_REDIRECT=False)
-class ResetTests(TestCase):
-    """Tester for avslutt_vakt_view — nullstillingens arvtaker."""
-
-    def setUp(self):
-        self.vakt = sett_aktiv_vakt(2026)
-        self.admin = CustomUser.objects.create_superuser(
-            username='a', password='x', role='admin', must_change_password=False)
-        self.lead = CustomUser.objects.create_user(
-            username='l', password='x', role='bruker', must_change_password=False)
-        gi_standardtilgang(self.lead, 'leder')
-        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026))
-        Patient.objects.create(pasientnummer=2, vakt=vakt_for_year(2026))
-        Patient.objects.create(pasientnummer=3, vakt=vakt_for_year(2025))  # annen vakt
-
-    def _client(self, user):
-        c = Client()
-        c.force_login(user)
-        return c
-
-    def _avslutt(self, client, **kropp):
-        import json as _j
-        return client.post('/pasienter/api/avslutt-vakt/',
-                           data=_j.dumps(kropp),
-                           content_type='application/json')
-
-    def test_reset_krever_confirm(self):
-        """Avslutning uten confirm=true skal gi 400."""
-        c = self._client(self.admin)
-        resp = self._avslutt(c, ny_vakt_navn='Vinterfestivalen')
-        self.assertEqual(resp.status_code, 400)
-
-    def test_avslutning_krever_navn_paa_ny_vakt(self):
-        """Navnet settes ved vaktstart — uten navn, ingen ny vakt."""
-        c = self._client(self.admin)
-        resp = self._avslutt(c, confirm=True)
-        self.assertEqual(resp.status_code, 400)
-        resp = self._avslutt(c, confirm=True, ny_vakt_navn='   ')
-        self.assertEqual(resp.status_code, 400)
-
-    def test_navnet_maa_vaere_unikt(self):
-        """To vakter med samme navn lar seg ikke skille i statistikken."""
-        c = self._client(self.admin)
-        resp = self._avslutt(c, confirm=True, ny_vakt_navn=self.vakt.navn)
-        self.assertEqual(resp.status_code, 400)
-        # Ingenting slettet av det avviste forsøket
-        self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 2)
-
-    def test_reset_sletter_kun_aktivt_aar(self):
-        """Avslutning sletter kun den aktive vaktas pasienter."""
-        c = self._client(self.admin)
-        resp = self._avslutt(c, confirm=True, ny_vakt_navn='Vinterfestivalen')
-        self.assertEqual(resp.status_code, 200)
-        # Aktiv vakts pasienter slettet, den andre vaktas intakt
-        self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 0)
-        self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2025)).count(), 1)
-        # Pekeren flyttet til en ny, aktiv vakt med det oppgitte navnet
-        ny = hent_aktiv_vakt()
-        self.assertNotEqual(ny.pk, self.vakt.pk)
-        self.assertEqual(ny.navn, 'Vinterfestivalen')
-        self.vakt.refresh_from_db()
-        self.assertFalse(self.vakt.er_aktiv)
-        self.assertIsNotNone(self.vakt.avsluttet)
-
-    def test_lead_kan_ikke_resette(self):
-        """lead kan ikke avslutte vakta."""
-        c = self._client(self.lead)
-        resp = self._avslutt(c, confirm=True, ny_vakt_navn='Vinterfestivalen')
-        self.assertEqual(resp.status_code, 403)
-
-
-@override_settings(SECURE_SSL_REDIRECT=False)
-class GjenaapneVaktTests(TestCase):
-    """Gjenåpning av avsluttet vakt (§7.2) — og døra som er låst av kollaps."""
-
-    def setUp(self):
-        self.gammel = vakt_for_year(2025)
-        self.gammel.er_aktiv = False
-        self.gammel.save(update_fields=['er_aktiv'])
-        self.aktiv = sett_aktiv_vakt(2026)
-        self.admin = CustomUser.objects.create_superuser(
-            username='ga', password='x', role='admin', must_change_password=False)
-        self.lead = CustomUser.objects.create_user(
-            username='gl', password='x', role='bruker', must_change_password=False)
-        gi_standardtilgang(self.lead, 'leder')
-        self.c = Client()
-        self.c.force_login(self.admin)
-
-    def _gjenaapne(self, vakt_id, client=None):
-        import json as _j
-        return (client or self.c).post(
-            '/pasienter/api/gjenaapne-vakt/',
-            data=_j.dumps({'vakt_id': vakt_id}),
-            content_type='application/json')
-
-    def test_gjenaapning_bytter_aktiv_vakt(self):
-        resp = self._gjenaapne(self.gammel.pk)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(hent_aktiv_vakt().pk, self.gammel.pk)
-        self.gammel.refresh_from_db()
-        self.aktiv.refresh_from_db()
-        self.assertTrue(self.gammel.er_aktiv)
-        self.assertIsNone(self.gammel.avsluttet)
-        self.assertFalse(self.aktiv.er_aktiv)
-
-    def test_gjenaapning_henter_ikke_pasienter_tilbake(self):
-        """Radene ligger i pre-reset-backupen — gjenåpning rører dem ikke."""
-        self._gjenaapne(self.gammel.pk)
-        self.assertEqual(Patient.objects.filter(vakt=self.gammel).count(), 0)
-
-    def test_kollapset_arkiv_laaser_doera(self):
-        """Uten radnivå ville en «aktiv» vakt løyet — serveren avviser."""
-        from django.utils import timezone as djtz
-
-        from patients.models import VaktArkiv
-        VaktArkiv.objects.create(
-            tittel='LS25', arrangement_navn='LS25', importert_av_navn='a',
-            antall_pasienter=0, year_snapshot=2025, sha256='x',
-            vakt=self.gammel, kollapset_at=djtz.now())
-        resp = self._gjenaapne(self.gammel.pk)
-        self.assertEqual(resp.status_code, 400)
-        self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
-
-    def test_ukjent_vakt_gir_400(self):
-        self.assertEqual(self._gjenaapne(99999).status_code, 400)
-
-    def test_lead_kan_ikke_gjenaapne(self):
-        c = Client()
-        c.force_login(self.lead)
-        self.assertEqual(self._gjenaapne(self.gammel.pk, client=c).status_code, 403)
-
-    def test_vaktlista_er_kun_for_admin(self):
-        c = Client()
-        c.force_login(self.lead)
-        self.assertEqual(c.get('/pasienter/api/vakter/').status_code, 403)
-
-    def test_vaktlista_viser_kollaps_og_aktiv(self):
-        resp = self.c.get('/pasienter/api/vakter/')
-        self.assertEqual(resp.status_code, 200)
-        vakter = {v['id']: v for v in resp.json()['vakter']}
-        self.assertTrue(vakter[self.aktiv.pk]['er_aktiv'])
-        self.assertFalse(vakter[self.gammel.pk]['er_aktiv'])
-        self.assertFalse(vakter[self.gammel.pk]['kollapset'])
+# «Avslutt vakt» og gjenåpningen flyttet til /portal-admin/vakt/ 28. sep. 2026.
+# Testene står i `core/tests_vakt_side.py` og `core/tests_vaktslutt.py`.
 
 
 # ── ETag-tester for /api/behandlere/ ──────────────────────────────────────────
@@ -1891,7 +1748,7 @@ class JsModulLastingTests(TestCase):
 
         admin_navn = set(re.findall(
             r'^(?:async )?function (\w+)', jsu.read_js(jsu.ADMIN_JS), re.M))
-        self.assertIn('lagreVaktSomArkiv', admin_navn, 'testen leser feil fil')
+        self.assertIn('loadArkivListe', admin_navn, 'testen leser feil fil')
 
         alltid = [jsu.PORTAL_UTILS_JS, jsu.UTILS_JS, jsu.TABLE_JS,
                   jsu.FORMS_JS, jsu.APP_JS]

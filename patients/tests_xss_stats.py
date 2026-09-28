@@ -47,7 +47,6 @@ HTML_BUILDERS = (
     # arkivtittelen overlevde. `test_ingen_bygger_staar_utenfor_skanningen`
     # sammenligner nå lista med kilden.
     'fmtChi2Inline',
-    'visVakter',
     'loadArkivListe',
     'visArkivDetalj',
     # Oppdragsfanen (fase 6). Byggerne setter ingen verdier inn selv i dag —
@@ -116,7 +115,6 @@ REVIEWED_INTERPOLATIONS = {
     "h.is_active ? 'toggle-on' : 'toggle-off'": 'hardkodet ikonnavn',
 
     # Lagt til 26. sep. 2026 med byggerne som sto utenfor skanningen.
-    'knapp': 'visVakter(): markup bygget linja over, med escHtmlValue(v.id)',
     'rows': 'loadArkivListe(): radene bygget over, hver verdi escapet',
     'id': 'visArkivDetalj(): i URL-en til apiFetch, ikke i markup',
     'pStr': 'fmtChi2Inline(): hardkodet tekst eller toFixed() av et tall',

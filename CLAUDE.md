@@ -645,8 +645,8 @@ arbeidsdeling som i `core.arkiv`.
 er en modul av, skal kortet vise «–» og ikke forsvinne.
 
 **Portalinnstillingene validerer alt før noe lagres.** `valider()` og `lagre()` er delt i
-to nettopp fordi navnet skrives på `Vakt` og resten i `AppSetting`, uten transaksjon
-mellom seg: en modul som nekter skal stoppe hele innsendingen, også portalens egne felter.
+to nettopp fordi hver modul skriver sitt, uten transaksjon mellom seg: en modul som
+nekter skal stoppe hele innsendingen, også portalens egne felter.
 `core/tests_registre.py` prøver begge egenskapene med oppdiktede handlere.
 
 **Modul til modul går bare én vei, og den veien er navngitt.** Sentralbordet i `oppdrag`
@@ -686,7 +686,7 @@ feiler de etter en refaktorering, er det refaktoreringen som er feil.
 
 ### Avslutt vakt (core/vaktslutt.py, core/vaktstatistikk.py)
 
-**Ett trykk avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
+**Ett trykk på `/portal-admin/vakt/` avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
 hver statistikkfane (`core.VaktStatistikk`), arkiver og tøm, åpne ny vakt. Frosne tall
 regnes aldri ut på nytt — tell opp `statistikk_versjon` når formen endres.
 

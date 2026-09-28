@@ -11,11 +11,11 @@
 """
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser
@@ -91,6 +91,8 @@ class AvsluttVaktFryserTests(TestCase):
     """Gjennom den ekte inngangen — kallstedet er regelen."""
 
     def setUp(self):
+        # Frekvensgrensen på avslutningen teller per bruker-ID på tvers av testene.
+        cache.clear()
         # Avslutningen tar en pre_reset-backup; den skal ikke havne i den ekte mappa.
         mappe = tempfile.TemporaryDirectory()
         self.addCleanup(mappe.cleanup)
@@ -106,12 +108,11 @@ class AvsluttVaktFryserTests(TestCase):
         self.c.force_login(self.admin)
 
     def _avslutt(self, navn='Neste vakt'):
-        return self.c.post('/pasienter/api/avslutt-vakt/',
-                           data=json.dumps({'confirm': True, 'ny_vakt_navn': navn}),
-                           content_type='application/json')
+        return self.c.post('/portal-admin/vakt/avslutt/',
+                           {'bekreft': 'ja', 'ny_vakt_navn': navn})
 
     def test_tallene_er_fra_for_slettingen(self):
-        self.assertEqual(self._avslutt().status_code, 200)
+        self.assertEqual(self._avslutt().status_code, 302)
         self.assertFalse(Patient.objects.filter(vakt=self.vakt).exists())
         rad = VaktStatistikk.objects.get(vakt=self.vakt, slug='patients')
         self.assertEqual(rad.data['summary']['total'], 3)
@@ -133,6 +134,7 @@ class AvsluttVaktFryserTests(TestCase):
         from core.vakt import VaktnavnOpptatt
         with mock.patch('core.vakt.opprett_vakt',
                         side_effect=VaktnavnOpptatt('Neste vakt')):
-            self.assertEqual(self._avslutt().status_code, 400)
+            self._avslutt()
+        self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
         self.assertFalse(VaktStatistikk.objects.exists())
         self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 3)

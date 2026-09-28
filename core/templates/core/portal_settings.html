@@ -15,18 +15,9 @@
 <form method="post" style="max-width:560px">
   {% csrf_token %}
 
-  <div class="card mb-3">
-    <div class="card-header"><strong>Arrangement</strong></div>
-    <div class="card-body">
-      <label class="form-label" for="event_name">Navn på arrangement</label>
-      <input type="text" id="event_name" name="event_name"
-             class="form-control" value="{{ event_name }}"
-             placeholder="F.eks. Landsskytterstevnet 2026">
-      <div class="form-text">
-        Vises i topplinjen på modulsidene.
-      </div>
-    </div>
-  </div>
+  {# Arrangementsnavnet er vaktas navn, og står på Vakt-siden (28. sep. 2026). #}
+  <p class="small text-muted">Vaktas navn endres under
+    <a href="{% url 'portaladmin:vakt' %}">Administrasjon → Vakt</a>.</p>
 
   <div class="card mb-3">
     <div class="card-header"><strong>Sesjon</strong></div>

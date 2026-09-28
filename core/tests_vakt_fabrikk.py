@@ -7,6 +7,8 @@ og krever at svaret likevel er 400 — og at ingenting er halvveis gjort.
 """
 import ast
 import json
+import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -69,6 +71,11 @@ class GjennomEndepunkteneTests(TestCase):
         self.c.force_login(self.admin)
         Vakt.objects.create(navn='Tatt', year=2026, startet=timezone.now())
 
+    def _mappe(self):
+        mappe = tempfile.TemporaryDirectory()
+        self.addCleanup(mappe.cleanup)
+        return mappe.name
+
     def _post(self, url, **kropp):
         return self.c.post(url, data=json.dumps(kropp), content_type='application/json')
 
@@ -89,10 +96,12 @@ class GjennomEndepunkteneTests(TestCase):
     def test_avslutt_vakt_i_kappløp_sletter_ingenting(self):
         from patients.models import Patient
         Patient.objects.create(pasientnummer=1, vakt=self.vakt)
-        with _sjekken_sier_ledig():
-            res = self._post('/pasienter/api/avslutt-vakt/', confirm=True, ny_vakt_navn='Tatt')
-        self.assertEqual(res.status_code, 400, res.content)
-        self.assertIn('finnes allerede', res.json()['error'])
+        # `/portal-admin/vakt/avslutt/` siden 28. sep. 2026 — et skjema som
+        # videresender, så feilen står i meldingene.
+        with _sjekken_sier_ledig(), patch.dict(os.environ, {'BACKUP_DIR': self._mappe()}):
+            res = self.c.post('/portal-admin/vakt/avslutt/',
+                              {'bekreft': 'ja', 'ny_vakt_navn': 'Tatt'}, follow=True)
+        self.assertIn('finnes allerede', ' '.join(str(m) for m in res.context['messages']))
         self.assertTrue(Patient.objects.filter(vakt=self.vakt).exists(), 'ingen pasienter slettet')
         self.vakt.refresh_from_db()
         self.assertTrue(self.vakt.er_aktiv)

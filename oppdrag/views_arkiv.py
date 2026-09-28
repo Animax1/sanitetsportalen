@@ -1,9 +1,11 @@
-"""Vaktarkivet for oppdrag: arkivering, visning og sletting (fase 7).
+"""Vaktarkivet for oppdrag: visning og sletting (fase 7).
+
+Arkiveringen gjør «Avslutt vakt» (`oppdrag/vaktslutt.py`) siden 28. sep. 2026.
 
 Egen fil, ikke flere hundre linjer til i `views.py`. Skillet følger
 pasientmodulen, der arkivet ligger i `views_arkiv.py` av samme grunn.
 
-**Alle fire endepunktene krever global admin**, ikke `skriv_full`. Arkivering
+**Alle endepunktene krever global admin**, ikke `skriv_full`. Arkivering
 fryser en hel vakt og starter en 24-måneders klokke mot en irreversibel
 kollaps; sletting fjerner arkivet for godt. §3.3 i beslutningsnotatet
 reserverer det irreversible for admin — og det er samme gate som
@@ -14,8 +16,6 @@ oppdrag, ikke vaktas arkiv.
 """
 from __future__ import annotations
 
-import logging
-
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
@@ -23,13 +23,11 @@ from core.jsonkropp import json_body
 from core.arkiv import logg_arkivhendelse, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
-from core.vakt import hent_aktiv_vakt
 
-from .arkiv import OppdragArkivHandler, arkiver_vakt
-from .models import Oppdrag, OppdragArkiv
+from .arkiv import OppdragArkivHandler
+from .models import OppdragArkiv
 from .statistikk import arkiv_stats
 
-logger = logging.getLogger(__name__)
 
 
 def _antall_oppdrag(arkiv) -> int:
@@ -70,48 +68,21 @@ def _arkiv_til_dict(arkiv, *, med_stats=False):
 
 
 @modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['GET', 'POST'])
-@rate_limit(group='oppdrag:arkiv', rate='10/m', method='POST')
+@require_http_methods(['GET'])
 def arkiv_liste_view(request):
-    """Liste arkivene (GET), eller arkiver den aktive vakta (POST)."""
+    """Arkivene. Global admin.
+
+    POST — «arkiver den aktive vakta» — er slettet 28. sep. 2026: «Avslutt vakt»
+    på `/portal-admin/vakt/` arkiverer oppdragene med resten
+    (`oppdrag/vaktslutt.py`), med samme sperre mot oppdrag på tavla.
+    """
     if not er_global_admin(request.user):
         return JsonResponse(
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
-
-    if request.method == 'GET':
-        return JsonResponse({'status': 'ok', 'data': [
-            _arkiv_til_dict(a) for a in
-            OppdragArkiv.objects.select_related('importert_av')
-        ]})
-
-    vakt = hent_aktiv_vakt()
-    notat = (json_body(request).get('notat') or '').strip()
-    # Arkivering lukker vakta: tavla tømmes og nummeret starter på nytt.
-    # Da kan ingenting stå igjen på tavla — et pågående oppdrag som ble
-    # slettet halvveis ville vært en hendelse uten slutt.
-    paa_tavla = Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True).count()
-    if paa_tavla:
-        return JsonResponse({'status': 'error', 'message': (
-            f'{paa_tavla} oppdrag står fortsatt på tavla. Legg dem i historikken '
-            'eller slett dem før vakten arkiveres.')}, status=400)
-    try:
-        arkiv, antall = arkiver_vakt(vakt, notat, request.user)
-    except Exception:
-        # Samme svar som pasientarkivet: en halvferdig arkivering er rullet
-        # tilbake av transaksjonen, og detaljene hører hjemme i logg, ikke i
-        # et API-svar.
-        logger.exception('Feil ved arkivering av oppdrag for vakt %s', vakt.pk)
-        return JsonResponse(
-            {'status': 'error', 'message': 'Arkivering feilet. Se server-logg.'},
-            status=500)
-
-    # Signalet i `oppdrag/signals.py` logger feltendringer på oppdrag, ikke
-    # handlinger på et arkiv — «hvem arkiverte vakta» logges her.
-    logg_arkivhendelse(OppdragArkiv, 'arkiv_lagret',
-                       f'arkiv_id={arkiv.pk}, vakt={vakt.navn}, antall={antall}',
-                       request=request, record_id=arkiv.pk)
-    return JsonResponse(
-        {'status': 'ok', 'data': _arkiv_til_dict(arkiv)}, status=201)
+    return JsonResponse({'status': 'ok', 'data': [
+        _arkiv_til_dict(a) for a in
+        OppdragArkiv.objects.select_related('importert_av')
+    ]})
 
 
 @modul_kreves('oppdrag', 'les', svar='json')

@@ -287,16 +287,15 @@ class BackupResetIntegrationTests(TestCase):
             f.unlink(missing_ok=True)
 
     def test_reset_active_year_creates_pre_reset_backup(self):
-        """avslutt_vakt_view skal automatisk lage en pre_reset backup."""
+        """«Avslutt vakt» skal automatisk lage en pre_reset backup."""
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             c = Client()
             c.force_login(self.admin)
-            resp = c.post('/pasienter/api/avslutt-vakt/',
-                          data=json.dumps({'confirm': True,
-                                           'ny_vakt_navn': 'Neste vakt'}),
-                          content_type='application/json')
+            # `/portal-admin/vakt/avslutt/` siden 28. sep. 2026.
+            resp = c.post('/portal-admin/vakt/avslutt/',
+                          {'bekreft': 'ja', 'ny_vakt_navn': 'Neste vakt'})
 
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
         pre_reset = Backup.objects.filter(kind='pre_reset')
         self.assertTrue(pre_reset.exists(),
                         'Det skal finnes en pre_reset backup etter avslutning')

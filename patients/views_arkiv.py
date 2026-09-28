@@ -1,8 +1,7 @@
-"""Vaktarkivet: arkivering, visning og sletting.
+"""Vaktarkivet: visning og sletting. Arkiveringen gjør «Avslutt vakt» (`patients/vaktslutt.py`).
 
 Skilt ut fra ``views.py`` i N13.3.
 """
-import logging
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -11,50 +10,18 @@ from core.arkiv import get_handler, logg_arkivhendelse, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
-from .services import arkiver_aktiv_vakt, compute_arkiv_stats
+from .services import compute_arkiv_stats
 from core.jsonkropp import json_body
 
-logger = logging.getLogger(__name__)
 
 
 # ════════════════════════════════════════════════════════════════════════
 # VAKTARKIV – database-basert arkiv av vakter
 # ════════════════════════════════════════════════════════════════════════
 
-@modul_kreves('patients', 'les', svar='json')
-@require_http_methods(['POST'])
-@rate_limit(group='patients:arkiv', rate='10/m', method='POST')
-def arkiv_lagre_view(request):
-    """Lagre aktiv vakt som arkiv-snapshot. Kun admin.
-
-    Body: {arrangement_navn: str, notat: str (valgfri)}
-    Returnerer: {ok: true, id, tittel, antall_pasienter}
-    """
-    if not er_global_admin(request.user):
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
-    data = json_body(request)
-    arrangement_navn = (data.get('arrangement_navn') or '').strip()
-    if not arrangement_navn:
-        return JsonResponse({'error': 'arrangement_navn er påkrevd'}, status=400)
-
-    notat = (data.get('notat') or '').strip()
-
-    try:
-        arkiv, antall = arkiver_aktiv_vakt(arrangement_navn, notat, request.user)
-    except Exception:
-        logger.exception('Feil ved arkivering av vakt')
-        return JsonResponse({'error': 'Arkivering feilet. Se server-logg.'}, status=500)
-
-    logg_arkivhendelse(type(arkiv), 'arkiv_lagret', f'arkiv_id={arkiv.pk}, tittel={arkiv.tittel}',
-                       request=request, record_id=arkiv.pk)
-    return JsonResponse({
-        'ok': True,
-        'id': arkiv.pk,
-        'tittel': arkiv.tittel,
-        'antall_pasienter': antall,
-    }, status=201)
-
+# «Lagre som arkiv» (`arkiv_lagre_view`) er slettet 28. sep. 2026: «Avslutt vakt»
+# arkiverer pasientene selv (`patients/vaktslutt.py`), og en egen knapp ved siden
+# av arkiverte samme vakt to ganger for den som trykket begge.
 
 @modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET'])

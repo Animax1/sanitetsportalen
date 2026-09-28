@@ -78,6 +78,7 @@ def tidligere_vakter() -> list[dict]:
     for rad in VaktStatistikk.objects.order_by('-frosset_at', 'slug'):
         oppforing = sett.setdefault((rad.vakt_id, rad.frosset_at), {
             'nokkel': f'frosset:{rad.vakt_id or 0}:{rad.frosset_at.isoformat()}',
+            'vakt_id': rad.vakt_id,
             'navn': rad.vakt_navn,
             'tidspunkt': rad.frosset_at.isoformat(),
             'kilder': {},
@@ -98,6 +99,7 @@ def tidligere_vakter() -> list[dict]:
                       else f'arkiv:{handler.slug}:{arkiv.pk}')
             oppforing = arkivert.setdefault(nokkel, {
                 'nokkel': nokkel,
+                'vakt_id': arkiv.vakt_id,
                 'navn': (arkiv.vakt.navn if arkiv.vakt_id else
                          getattr(arkiv, 'arrangement_navn', '') or arkiv.tittel),
                 'tidspunkt': arkiv.importert_at.isoformat(),

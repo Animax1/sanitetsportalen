@@ -472,10 +472,10 @@ for sti, view in sorted(gaa(get_resolver())):
 
 | Prefiks | Antall | Rutet i | Innhold |
 |---|---|---|---|
-| `/pasienter/` | 17 | `patients/urls.py` | Pasient-CRUD, registre, arkiv, vaktstyring |
+| `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 32 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
 | `/vaktliste/` | 36 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/portal-admin/` | 25 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
 | `/ko/` | 43 | `ko/urls.py` | Sida, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
@@ -549,11 +549,7 @@ Verifisert mot `patients/urls.py` og dekoratørene 14. sep. 2026.
 | `/pasienter/api/forstehjelpere/<pk>/` | GET, PUT, DELETE | `patients:les` | `patients:skriv_full` |
 | `/pasienter/api/helsepersonell/` | GET, POST | `patients:les` | `patients:skriv_full` |
 | `/pasienter/api/helsepersonell/<pk>/` | GET, PUT, DELETE | `patients:les` | `patients:skriv_full` |
-| `/pasienter/api/vakter/` | GET | `patients:les` **+ global admin** | |
-| `/pasienter/api/avslutt-vakt/` | POST | `patients:les` **+ global admin** | |
-| `/pasienter/api/gjenaapne-vakt/` | POST | `patients:les` **+ global admin** | |
 | `/pasienter/api/innstillinger/arkiv/` | GET | `patients:les` | |
-| `/pasienter/api/innstillinger/arkiv/lagre/` | POST | `patients:les` | **global admin** |
 | `/pasienter/api/innstillinger/arkiv/<pk>/` | GET, DELETE | `patients:les` | **global admin** |
 | `/pasienter/api/full-stats/` | GET | videresender til `/statistikk/…` | |
 | `/pasienter/api/innstillinger/arkiv/<pk>/full-stats/` | GET | videresender | |
@@ -592,12 +588,13 @@ de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
 ### 5.5 Adminflaten (`/portal-admin/`)
 
-21 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
+25 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
 og vanlig bruker.
 
-Hovedgruppene: innstillinger, moduler, auditlog (med CSV-eksport), backup (plan, kjør,
-gjenopprett, slett), brukere (liste, ny, detalj, slett), innloggingslogg og server-status.
+Hovedgruppene: vakt (navn, avslutning, gjenåpning — §13.4), innstillinger, moduler, auditlog
+(med CSV-eksport), backup (plan, kjør, gjenopprett, slett), brukere (liste, ny, detalj, slett),
+innloggingslogg og server-status.
 
 **Navnerommet ble samlet 14. sep. 2026.** Fram til da lå rutene spredt mellom `accounts:`
 og `core:`, og en URL-snapshot som sammenlignet `pattern.name` uten navnerom meldte
@@ -1814,22 +1811,26 @@ Brukeren tvinges gjennom MFA-oppsett ved neste innlogging.
 *Dette erstattet «nullstill aktivt år» (§3.4 i vakt-notatet). Navnet betyr noe: «nullstill
 år» ville slettet for mye den dagen ett år rommer flere vakter.*
 
-`POST /pasienter/api/avslutt-vakt/` med `{"confirm": true}`, fra Innstillinger på
-pasientsiden. **Global admin.** Operasjonen gjør fire ting i rekkefølge:
+**Administrasjon → Vakt** (`/portal-admin/vakt/`, 28. sep. 2026 — flyttet fra
+pasientsiden, fordi den gjelder hele portalen). **Global admin.** Siden viser først hva som
+skjer: hvor mange rader som arkiveres og tømmes per modul, hvilke statistikkfaner som
+fryses, og hva som **sperrer** — et oppdrag som står på tavla. Så, i `core/vaktslutt.py`:
 
-1. Tar en `pre_reset`-backup
-2. Sletter vaktas pasienter
-3. Merker vakta avsluttet
-4. Oppretter en ny vakt i samme flyt, så portalen aldri står uten aktiv vakt
+1. Sperrene sjekkes; noe som sperrer, stopper alt før noe er rørt
+2. En `pre_reset`-backup av hver modul som tømmes (pasienter, oppdrag)
+3. I én transaksjon: sperrene én gang til, **frys** hver statistikkfane
+   (`core.VaktStatistikk`), **arkiver og tøm** pasientene og oppdragene, merk vakta
+   avsluttet, og opprett den nye — så portalen aldri står uten aktiv vakt
+
+Feiler noe i steg 3, rulles alt tilbake. KO-loggen og lagenes registreringer tømmes ikke:
+de er scopet på vakta og har sine egne frister.
 
 **Vaktnavnet er påkrevd, fritekst og unikt** — to vakter med samme navn lar seg ikke
-skille i statistikken.
+skille i statistikken. Navnet på den aktive vakta endres på samme side.
 
-**Oppdragene røres ikke.** De scopes bort fra alle visninger i samme øyeblikk som pekeren
-flytter, og har sin egen livssyklus (arkivering, kollaps).
-
-**Gjenåpning finnes** (`/pasienter/api/gjenaapne-vakt/`), men **den henter ikke rader
-tilbake** — den setter vakta aktiv igjen. Pasientslettingen kan bare angres via backupen.
+**Gjenåpning finnes** (samme side, «Tidligere vakter»), men **den henter ikke rader
+tilbake** — de ligger i arkivene og backupen. Den er låst når et arkiv for vakta er
+kollapset. Tallene for en avsluttet vakt vises i `/statistikk/` (nedtrekket «Vakt»).
 
 ### 13.5 Arkivering og kollaps
 

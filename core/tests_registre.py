@@ -176,18 +176,16 @@ class PortalinnstillingerValidererForLagringTests(TestCase):
             portalinnstillinger.register(h)
 
     def test_en_modul_som_nekter_stopper_portalens_egne_felter(self) -> None:
-        from core.vakt import hent_aktiv_vakt
-
-        vakt = hent_aktiv_vakt()
-        vakt.navn = 'Uendret'
-        vakt.save(update_fields=['navn'])
+        # Portalens eget felt er timeouten; vaktas navn flyttet til Vakt-siden
+        # 28. sep. 2026, og var det feltet testen så på før.
+        from core.models import AppSetting
+        AppSetting.set('session_timeout_hours', 8)
 
         portalinnstillinger.register(_NekterAlltid())
-        resp = self.client.post(self.url, {
-            'event_name': 'Skulle ikke lagres', 'session_timeout_hours': '12'})
+        resp = self.client.post(self.url, {'session_timeout_hours': '12'})
 
         self.assertEqual(resp.status_code, 200, 'skal vise skjemaet på nytt')
-        self.assertEqual(hent_aktiv_vakt().navn, 'Uendret')
+        self.assertEqual(int(AppSetting.get('session_timeout_hours', 0)), 8)
         self.assertContains(resp, 'modulen sier nei')
 
     def test_malbiten_til_en_registrert_modul_tegnes(self) -> None:

@@ -10,7 +10,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | Modul | Ansvar |
 |-------|--------|
 | `views_common.py` | `_patient_to_dict` — delt av de andre. JSON-kroppen er `core.jsonkropp` |
-| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, vaktavslutning/-gjenåpning |
+| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
 | `views_arkiv.py` | Vaktarkivet |
 
@@ -26,7 +26,7 @@ Hva som lastes når står i rota; hva filene gjør står her.
 | `patients-table.js` | Tabulator-grid og tavle |
 | `patients-forms.js` | Registrerings- og redigeringsskjema |
 | `patients-app.js` | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-admin.js` | Registeradmin, sesjonstimeout, vaktavslutning (med oversikten, `lastAvsluttOversikt`) og gjenåpning, vaktarkiv |
+| `patients-admin.js` | Registeradmin, sesjonstimeout, pasientarkivene |
 
 **Alt en ikke-admin kan nå, må ligge i en alltid-lastet fil.** `patients-admin.js` lastes
 kun for admin, men skrivetilgang uten admin-tilgang finnes — derfor bor f.eks.
@@ -34,10 +34,12 @@ kun for admin, men skrivetilgang uten admin-tilgang finnes — derfor bor f.eks.
 gjennom `_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests`
 håndhever begge deler.
 
-## «Avslutt vakt» er portalens, knappen er her
+## «Avslutt vakt» bor ikke her lenger
 
-Knappen og adressen (`/pasienter/api/avslutt-vakt/`) står i pasientmodulen av historiske
-grunner; arbeidet gjøres av `core/vaktslutt.py` (28. sep. 2026). GET gir oversikten, POST
-avslutter. **Pasientene arkiveres alltid før de slettes** (`patients/vaktslutt.py`) — før
-den dagen slettet knappen dem etter bare en backup, og en vakt uten manuelt arkiv fantes
-etterpå bare i backupfila.
+Knappen, «Tidligere vakter» og gjenåpningen sto under pasientsidens Innstillinger fordi
+pasientregistreringen var den eneste modulen da vakta ble innført. De flyttet til
+**`/portal-admin/vakt/`** 28. sep. 2026 (`core/views_vakt.py`), sammen med vaktas navn fra
+portalinnstillingene; arbeidet gjøres av `core/vaktslutt.py`. **Pasientene arkiveres alltid
+før de slettes** (`patients/vaktslutt.py`) — før den dagen slettet knappen dem etter bare en
+backup. «Lagre som arkiv» er slettet; pasientarkivene (rader, signatur, sletting) står igjen
+her.

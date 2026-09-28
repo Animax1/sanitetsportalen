@@ -206,21 +206,10 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
-        <div class="border rounded p-3 mb-3">
-          <label class="form-label" for="arkiv-notat">Arkiver vakten som går nå</label>
-          <input type="text" id="arkiv-notat" class="form-control mb-2"
-                 placeholder="Notat (valgfritt)" maxlength="500">
-          <button class="btn btn-primary" type="button" id="arkiv-knapp"
-                  data-action="arkiverVakt">
-            <i class="bi bi-archive me-1"></i>Arkiver oppdragene
-          </button>
-          <p class="form-text mb-0 mt-2">
-            Oppdragene fryses med signatur. De blir stående på tavla og i
-            historikken — arkivering fjerner ingenting. Pasientene arkiveres
-            for seg, under Pasientregistrering.
-          </p>
-          <div id="arkiv-feil" class="text-danger small mt-2 d-none"></div>
-        </div>
+        <p class="form-text mt-0">
+          Oppdragene arkiveres når vakta avsluttes, sammen med resten —
+          under Administrasjon → Vakt.
+        </p>
         <div id="arkivliste"><div class="tom-melding">Laster…</div></div>
       </div>
     </div>

@@ -19,7 +19,7 @@ from patients.js_test_utils import (STATISTIKK_BEMANNING_JS, STATISTIKK_JS, STAT
 
 HARNESS = [
     (STATISTIKK_JS, ('statistikkUrl', 'settIngenTall', 'hentStatistikk', 'loadStats',
-                     'velgVakt', '_kallOppdrag')),
+                     'velgVakt', '_kallOppdrag', 'lastVaktvalg', 'vaktvalgTekst')),
     (STATISTIKK_OPPDRAG_JS, ('loadOppdragStats',)),
     (STATISTIKK_KO_JS, ('loadKoStats',)),
     (STATISTIKK_PARK_JS, ('loadParkStats',)),
@@ -168,3 +168,37 @@ class VelgVaktTests(SimpleTestCase):
           console.log(JSON.stringify(valgtVakt));
         """, preamble=PREAMBLE)
         self.assertEqual(ut.splitlines()[0], 'null')
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class VakteneFraAdressenTests(SimpleTestCase):
+    """`/statistikk/?vakt=<nøkkel>` — lenkene fra /portal-admin/vakt/."""
+
+    def setUp(self):
+        self.harness = build_harness(HARNESS)
+
+    def _last(self, sok):
+        ut = run_node(self.harness, f"""
+          const _sel = {{ value: '', valg: [], appendChild(o) {{ this.valg.push(o); }},
+                          addEventListener() {{}} }};
+          const _hent = document.getElementById;
+          document.getElementById = id => (id === 'stat-vakt' ? _sel : _hent(id));
+          globalThis.window = {{ location: {{ search: {json.dumps(sok)} }} }};
+          globalThis.apiFetch = async () => ({{ ok: true, json: async () => ({{ vakter: [{json.dumps(VALGT)}] }}) }});
+          await lastVaktvalg();
+          console.log(JSON.stringify({{ valgt: valgtVakt && valgtVakt.navn, verdi: _sel.value,
+                                        antall: _sel.valg.length, vist: visteKilde }}));
+        """, preamble=PREAMBLE)
+        return json.loads([l for l in ut.splitlines() if l.startswith('{')][0])
+
+    def test_nokkelen_i_adressen_velger_vakta(self):
+        ut = self._last(f"?vakt={VALGT['nokkel']}")
+        self.assertEqual(ut, {'valgt': 'Sommerfest', 'verdi': VALGT['nokkel'], 'antall': 1,
+                              'vist': 'ko'})
+
+    def test_ukjent_nokkel_lar_pagaende_sta(self):
+        ut = self._last('?vakt=finnes:ikke')
+        self.assertEqual((ut['valgt'], ut['verdi']), (None, ''))
+
+    def test_uten_parameter_er_det_pagaende(self):
+        self.assertIsNone(self._last('')['valgt'])
