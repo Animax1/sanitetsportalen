@@ -647,6 +647,8 @@ class Backup(models.Model):
         ('manual',      'Manuell'),
         ('pre_restore', 'Før gjenoppretting'),
         ('pre_reset',   'Før nullstilling av år'),
+        # Hel databasebackup før en tidligere vakt slettes (`core/vaktsletting.py`).
+        ('pre_slett',   'Før sletting av vakt'),
     ]
     filename    = models.CharField(max_length=255, unique=True)
     kind        = models.CharField(max_length=20, choices=KIND_CHOICES)

@@ -1186,10 +1186,11 @@ class KlokkeOppstartTests(TestCase):
 
 class BackupConstantsTests(TestCase):
     def test_valid_kinds_complete(self) -> None:
-        self.assertEqual(
-            VALID_KINDS,
-            {KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET},
-        )
+        # Mot modellens valgliste, ikke en avskrift: `pre_slett` (28. sep. 2026)
+        # måtte inn begge steder, og det er det testen skal si fra om.
+        from core.models import Backup
+        self.assertEqual(VALID_KINDS, {verdi for verdi, _ in Backup.KIND_CHOICES})
+        self.assertTrue({KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET} <= VALID_KINDS)
 
     def test_pre_restore_is_protected(self) -> None:
         self.assertIn(KIND_PRE_RESTORE, PROTECTED_KINDS)

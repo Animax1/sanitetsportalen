@@ -31,3 +31,7 @@ class KoConfig(AppConfig):
         # kjenner ikke park; den svarer registeret i `core`.
         from . import ressursplassering
         ressursplassering.register_handlers()
+
+        # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
+        from .vaktsletting import register_handlers as register_vaktsletting
+        register_vaktsletting()

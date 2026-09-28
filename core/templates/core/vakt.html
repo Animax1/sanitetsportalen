@@ -71,68 +71,80 @@
   </div>
 
   <div class="col-12">
-    <div class="card">
-      <div class="card-header"><strong>Tidligere vakter</strong></div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
-            <thead><tr><th>Vakt</th><th>Startet</th><th>Avsluttet</th><th></th></tr></thead>
-            <tbody>
-            {% for t in tidligere %}
-              <tr>
-                <td>{{ t.vakt.navn }}</td>
-                <td class="small">{{ t.vakt.startet|date:"d.m.Y" }}</td>
-                <td class="small">{{ t.vakt.avsluttet|date:"d.m.Y H:i"|default:"–" }}</td>
-                <td class="text-end text-nowrap">
-                  {% if t.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ t.nokkel|urlencode }}">Statistikk</a>{% endif %}
-                  {% if t.kan_gjenaapnes %}
-                  <form method="post" action="{% url 'portaladmin:vakt_gjenaapne' t.vakt.pk %}" class="d-inline"
-                        data-confirm="Gjenåpne «{{ t.vakt.navn }}»? «{{ vakt.navn }}» avsluttes uten arkivering. Arkiverte rader hentes ikke tilbake — de ligger i arkivene og backupen.">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-link">Gjenåpne</button>
-                  </form>
-                  {% else %}
-                  <span class="small text-muted" title="Et arkiv for vakta er kollapset">kollapset</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="4" class="text-muted small">Ingen avsluttede vakter.</td></tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
+    {% comment %}
+      Minimeres med <details> — ingen JS, og åpen som standard. Innholdet ruller
+      innenfor en fast høyde med overskriftsraden stående (`.vakt-rull` i portal.css),
+      så lange lister ikke tar over siden.
+    {% endcomment %}
+    <details class="card vakt-liste" open>
+      <summary class="card-header"><strong>Tidligere vakter</strong>
+        <span class="small text-muted ms-1">({{ tidligere|length }})</span></summary>
+      <div class="vakt-rull">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Vakt</th><th>Startet</th><th>Avsluttet</th><th></th></tr></thead>
+          <tbody>
+          {% for t in tidligere %}
+            <tr>
+              <td>{{ t.vakt.navn }}</td>
+              <td class="small">{{ t.vakt.startet|date:"d.m.Y" }}</td>
+              <td class="small">{{ t.vakt.avsluttet|date:"d.m.Y H:i"|default:"–" }}</td>
+              <td class="text-end text-nowrap">
+                {% if t.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ t.nokkel|urlencode }}">Statistikk</a>{% endif %}
+                {% if t.kan_gjenaapnes %}
+                <form method="post" action="{% url 'portaladmin:vakt_gjenaapne' t.vakt.pk %}" class="d-inline"
+                      data-confirm="Gjenåpne «{{ t.vakt.navn }}»? «{{ vakt.navn }}» avsluttes uten arkivering. Arkiverte rader hentes ikke tilbake — de ligger i arkivene og backupen.">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-link">Gjenåpne</button>
+                </form>
+                {% else %}
+                <span class="small text-muted" title="Et arkiv for vakta er kollapset">kollapset</span>
+                {% endif %}
+                <a class="btn btn-sm btn-link text-danger" href="{% url 'portaladmin:vakt_slett' t.vakt.pk %}">Slett</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-muted small">Ingen avsluttede vakter.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
       </div>
-    </div>
+    </details>
   </div>
 
   <div class="col-12">
-    <div class="card">
-      <div class="card-header"><strong>Arkiver</strong>
-        <span class="small text-muted ms-2">Radene, signaturen og slettingen står i modulen som eier arkivet.</span></div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
-            <thead><tr><th>Modul</th><th>Arkiv</th><th>Vakt</th><th>Arkivert</th><th>Rader</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-            {% for a in arkiver %}
-              <tr>
-                <td class="small">{{ a.modul }}</td>
-                <td>{{ a.tittel }}</td>
-                <td class="small">{{ a.vakt|default:"–" }}</td>
-                <td class="small">{{ a.importert_at|date:"d.m.Y" }}</td>
-                <td class="small">{{ a.antall|default_if_none:"–" }}</td>
-                <td class="small">{% if a.kollapset_at %}Kollapset {{ a.kollapset_at|date:"d.m.Y" }}{% else %}Radnivå{% endif %}</td>
-                <td class="text-end">{% if a.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ a.nokkel|urlencode }}">Statistikk</a>{% endif %}</td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="7" class="text-muted small">Ingen arkiver.</td></tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
+    <details class="card vakt-liste" open>
+      <summary class="card-header"><strong>Arkiver</strong>
+        <span class="small text-muted ms-1">({{ arkiver|length }})</span>
+        <span class="small text-muted ms-2">Radene og signaturen står i modulen som eier arkivet.</span></summary>
+      <div class="vakt-rull">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Modul</th><th>Arkiv</th><th>Vakt</th><th>Arkivert</th><th>Rader</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for a in arkiver %}
+            <tr>
+              <td class="small">{{ a.modul }}</td>
+              <td>{{ a.tittel }}</td>
+              <td class="small">{{ a.vakt|default:"–" }}</td>
+              <td class="small">{{ a.importert_at|date:"d.m.Y" }}</td>
+              <td class="small">{{ a.antall|default_if_none:"–" }}</td>
+              <td class="small">{% if a.kollapset_at %}Kollapset {{ a.kollapset_at|date:"d.m.Y" }}{% else %}Radnivå{% endif %}</td>
+              <td class="text-end text-nowrap">
+                {% if a.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ a.nokkel|urlencode }}">Statistikk</a>{% endif %}
+                <form method="post" action="{% url 'portaladmin:vakt_arkiv_slett' a.slug a.pk %}" class="d-inline"
+                      data-confirm="Slette arkivet «{{ a.tittel }}»? Det kan ikke angres, og arkivet kan være det eneste som står igjen etter at vakta er avsluttet.">
+                  {% csrf_token %}
+                  <input type="hidden" name="bekreft" value="ja">
+                  <button type="submit" class="btn btn-sm btn-link text-danger">Slett</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="text-muted small">Ingen arkiver.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
       </div>
-    </div>
+    </details>
   </div>
 </div>
 {% endblock %}

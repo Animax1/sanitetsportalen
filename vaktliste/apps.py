@@ -42,3 +42,7 @@ class VaktlisteConfig(AppConfig):
         # blir de liggende — og jobben er fortsatt grønn.
         from .opprydding import register_handlers as register_opprydding
         register_opprydding()
+
+        # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
+        from .vaktsletting import register_handlers as register_vaktsletting
+        register_vaktsletting()

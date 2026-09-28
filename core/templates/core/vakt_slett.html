@@ -1,0 +1,44 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Slett vakt – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Bekreftelsen før en tidligere vakt slettes (28. sep. 2026, `core/vaktsletting.py`).
+  Oversikten står først, og navnet må skrives inn — serveren sjekker det.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-3">
+  <a href="{% url 'portaladmin:vakt' %}" class="small">&larr; Tilbake til Vakt</a>
+  <h1 class="mb-2 mt-2"><i class="bi bi-trash me-2"></i>Slett «{{ vakt.navn }}»</h1>
+</section>
+
+<div class="card border-danger" style="max-width: 640px;">
+  <div class="card-body">
+    {% if aktiv %}
+      <p class="text-danger fw-semibold mb-0">Dette er den aktive vakta og kan ikke slettes. Avslutt den først.</p>
+    {% else %}
+      <p class="mb-2">Dette slettes for godt:</p>
+      <ul class="mb-3" id="slett-oversikt">
+        {% for etikett, antall in oversikt %}
+          <li>{{ etikett|capfirst }}: {{ antall }}</li>
+        {% empty %}
+          <li>Ingen rader — bare selve vakta.</li>
+        {% endfor %}
+      </ul>
+      <p class="small text-muted">
+        Det tas en hel databasebackup først, og den er eneste vei tilbake.
+        Mannskap, korps, enheter og steder er ikke vaktas og står.
+      </p>
+      <form method="post" action="{% url 'portaladmin:vakt_slett' vakt.pk %}">
+        {% csrf_token %}
+        <label class="form-label small" for="slett-navn">Skriv vaktas navn for å bekrefte</label>
+        <input type="text" id="slett-navn" name="navn" class="form-control form-control-sm mb-2"
+               autocomplete="off" required placeholder="{{ vakt.navn }}">
+        <button type="submit" class="btn btn-sm btn-danger">Slett vakta og alt som hører til</button>
+        <a href="{% url 'portaladmin:vakt' %}" class="btn btn-sm btn-secondary ms-2">Avbryt</a>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

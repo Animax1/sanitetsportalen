@@ -18,10 +18,12 @@ gjøres av `core/vaktslutt.py`; denne fila kjenner ingen modul ved navn.
 from __future__ import annotations
 
 from django.contrib import messages
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import vaktslutt
 from core.auth_decorators import admin_required
@@ -61,6 +63,8 @@ def _arkiver() -> list[dict]:
         for arkiv in modell.objects.select_related('vakt'):
             rader.append({
                 'modul': modul.name if modul else handler.slug,
+                'slug': handler.slug,
+                'pk': arkiv.pk,
                 'tittel': arkiv.tittel,
                 'vakt_id': arkiv.vakt_id,
                 'vakt': arkiv.vakt.navn if arkiv.vakt_id else '',
@@ -201,4 +205,61 @@ def vakt_gjenaapne_view(request, pk):
         vakt.save(update_fields=['er_aktiv', 'avsluttet'])
         AppSetting.set('aktiv_vakt_id', vakt.pk)
     messages.success(request, f'Vakta «{vakt.navn}» er aktiv igjen.')
+    return redirect('portaladmin:vakt')
+
+
+# ── Sletting (28. sep. 2026) ─────────────────────────────────────────────────
+#
+# André: «jeg vil ha en slett knapp. Noen er test vakter som kan og skal
+# slettes.» Arbeidet gjøres av `core/vaktsletting.py`.
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='portaladmin:vakt-slett', rate='5/m', method='POST', on_limit='html')
+def vakt_slett_view(request, pk):
+    """Slett en tidligere vakt med alt som hører til.
+
+    **GET viser hva som forsvinner** — pasienter, oppdrag, KO-logg,
+    lagregistreringer, vaktlister, arkiver og frosne tall — og POST krever at
+    vaktas navn skrives inn. Et avkrysningsfelt blir klikket bort; et navn må
+    leses. Det er den irreversible handlingen på siden, og porten er deretter.
+    """
+    from core import vaktsletting
+
+    vakt = get_object_or_404(Vakt, pk=pk)
+    if request.method == 'POST':
+        if (request.POST.get('navn') or '').strip() != vakt.navn:
+            messages.error(request, 'Skriv vaktas navn nøyaktig for å slette den.')
+            return redirect('portaladmin:vakt_slett', pk=vakt.pk)
+        try:
+            slettet = vaktsletting.slett_vakt(vakt, bruker=request.user, request=request)
+        except vaktsletting.KanIkkeSlettes as feil:
+            messages.error(request, str(feil))
+            return redirect('portaladmin:vakt')
+        deler = ', '.join(f'{etikett}: {n}' for etikett, n in slettet) or 'ingen rader'
+        messages.success(request, f'«{vakt.navn}» er slettet ({deler}). En hel backup ble tatt først.')
+        return redirect('portaladmin:vakt')
+
+    return render(request, 'core/vakt_slett.html', {
+        'vakt': vakt,
+        'aktiv': vakt.pk == hent_aktiv_vakt().pk or vakt.er_aktiv,
+        'oversikt': vaktsletting.oversikt(vakt),
+    })
+
+
+@admin_required
+@require_POST
+@rate_limit(group='portaladmin:vakt-arkiv-slett', rate='20/m', method='POST', on_limit='html')
+def vakt_arkiv_slett_view(request, slug, pk):
+    """Slett ett arkiv — samme handling som modulenes egne sletteknapper."""
+    from core import vaktsletting
+
+    if request.POST.get('bekreft') != 'ja':
+        messages.error(request, 'Bekreftelse mangler.')
+        return redirect('portaladmin:vakt')
+    try:
+        tittel = vaktsletting.slett_arkiv(slug, pk, request=request)
+    except (LookupError, ObjectDoesNotExist):
+        raise Http404
+    messages.success(request, f'Arkivet «{tittel}» er slettet.')
     return redirect('portaladmin:vakt')

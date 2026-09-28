@@ -39,6 +39,9 @@ urlpatterns = [
     path('vakt/navn/', views_vakt.vakt_navn_view, name='vakt_navn'),
     path('vakt/avslutt/', views_vakt.vakt_avslutt_view, name='vakt_avslutt'),
     path('vakt/<int:pk>/gjenaapne/', views_vakt.vakt_gjenaapne_view, name='vakt_gjenaapne'),
+    path('vakt/<int:pk>/slett/', views_vakt.vakt_slett_view, name='vakt_slett'),
+    path('vakt/arkiv/<slug:slug>/<int:pk>/slett/', views_vakt.vakt_arkiv_slett_view,
+         name='vakt_arkiv_slett'),
 
     # ── Portalinnstillinger, moduler og logg ────────────────────────────────
     path('innstillinger/', views_admin.portal_settings_view,

@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **207 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **209 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -475,7 +475,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 32 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
 | `/vaktliste/` | 36 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/portal-admin/` | 25 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/portal-admin/` | 27 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
 | `/ko/` | 43 | `ko/urls.py` | Sida, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
@@ -588,11 +588,11 @@ de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
 ### 5.5 Adminflaten (`/portal-admin/`)
 
-25 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
+27 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
 og vanlig bruker.
 
-Hovedgruppene: vakt (navn, avslutning, gjenåpning — §13.4), innstillinger, moduler, auditlog
+Hovedgruppene: vakt (navn, avslutning, gjenåpning, sletting — §13.4), innstillinger, moduler, auditlog
 (med CSV-eksport), backup (plan, kjør, gjenopprett, slett), brukere (liste, ny, detalj, slett),
 innloggingslogg og server-status.
 
@@ -1831,6 +1831,12 @@ skille i statistikken. Navnet på den aktive vakta endres på samme side.
 **Gjenåpning finnes** (samme side, «Tidligere vakter»), men **den henter ikke rader
 tilbake** — de ligger i arkivene og backupen. Den er låst når et arkiv for vakta er
 kollapset. Tallene for en avsluttet vakt vises i `/statistikk/` (nedtrekket «Vakt»).
+
+**En tidligere vakt kan slettes** (samme side, «Slett») — ment for testvakter. Siden viser
+hva som forsvinner, og vaktas navn må skrives inn. Det tas en **hel databasebackup**
+(`pre_slett`, vernet mot opprydding) først, og så sletter hver modul sitt i én transaksjon
+(`core/vaktsletting.py`), sammen med vaktas arkiver og frosne tall. Den aktive vakta kan
+ikke slettes. Enkeltarkiver slettes fra lista «Arkiver» på samme side.
 
 ### 13.5 Arkivering og kollaps
 

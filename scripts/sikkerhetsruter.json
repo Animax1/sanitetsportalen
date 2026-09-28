@@ -146,6 +146,8 @@
   "/portal-admin/server-status/sessions/kill/",
   "/portal-admin/vakt/",
   "/portal-admin/vakt/1/gjenaapne/",
+  "/portal-admin/vakt/1/slett/",
+  "/portal-admin/vakt/arkiv/x/1/slett/",
   "/portal-admin/vakt/avslutt/",
   "/portal-admin/vakt/navn/",
   "/statistikk/",

@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — Vakt-siden: listene minimeres og ruller, og tidligere vakter og arkiver kan slettes  `#vakt` `#admin`
+
+**Hvorfor:** André: «jeg vil gjerne ha dem som en scroll liste og minimer på arkiver og tidligere
+vakter. Og ja jeg vil ha en slett knapp. Noen er test vakter som kan og skal slettes.»
+
+**Listene:** «Tidligere vakter» og «Arkiver» er `<details>` — minimeres med et klikk på
+overskriften, åpne som standard, uten JS — og ruller innenfor 45 % av skjermhøyden med
+overskriftsraden stående (`.vakt-rull` i `portal.css`). Antallet står i overskriften.
+
+**Slett en tidligere vakt** («Slett» i lista → `/portal-admin/vakt/<pk>/slett/`). Siden viser
+**hva som forsvinner** («Pasienter: 1, Lagregistreringer: 1526, KO-logglinjer: 4, Arkiver: 2,
+Frosne statistikkfaner: 5 …»), og **vaktas navn må skrives inn** — et avkrysningsfelt blir klikket
+bort, et navn må leses. Den aktive vakta kan ikke slettes (pekeren vinner over `er_aktiv`-flagget).
+Det tas en **hel databasebackup** først, ny type `pre_slett` (`core/0015`), **vernet mot
+opprydding** som `pre_restore` — den er eneste vei tilbake. Så, i én transaksjon, sletter hver
+modul sitt, deretter vaktas arkiver og frosne tall, så vakta. Én auditrad `vakt_slettet` med
+hva som gikk.
+
+**Hvorfor et register og ikke én `delete()`:** nesten alt som peker på en vakt har
+`on_delete=PROTECT` — det er vernet mot at en vakt forsvinner ved et uhell. Hver modul sletter
+derfor sitt eget gjennom `core/vaktsletting.py` (`park`, `patients`, `oppdrag` — gjennom
+`nullstill_vakt`, som løser opp korreksjonene — `ko` og `vaktliste`, i den rekkefølgen).
+**Dekningen er utledet:** `core/tests_vaktsletting.py` finner hver fremmednøkkel til `core.Vakt`
+som ikke er `SET_NULL`, og krever at en handler dekker den. En ny modul som glemmer det, blir rød
+i testen og ikke med `ProtectedError` den dagen noen trykker.
+
+**Slett et arkiv** («Slett» i lista «Arkiver», med bekreftelse) gjennom arkivregisteret — samme
+handling og samme auditrad som modulenes egne sletteknapper.
+
+**Tester:** 22 i `core/tests_vaktsletting.py`. **Fiksturen har rader i hver modell som slettes**, og
+en test krever det. **Mutasjoner: 25, alle drept til slutt.** Tre overlevde først, og alle tre var
+ekte hull:
+- **Vaktmodusperiodene:** fiksturen hadde ingen, så en mutant som lot dem stå, gikk grønn. Det er
+  den fjerde måten en mutant lyver på (CLAUDE.md).
+- **De frosne tallene:** de peker med `SET_NULL`, og testen så bare etter rader *med* vaktpeker.
+- **Den aktive vakta:** sperren var prøvd bare der pekeren og `er_aktiv` var enige.
+
+`BackupConstantsTests` låste lista over backuptyper for hånd; den sammenligner nå med modellens
+valgliste. **Røyktest i Chromium:** minimering, rulling, sletting av arkivet LS2026, og sletting
+av vakta «2026» — med feil navn først (avvist), så riktig.
+
 ## 2026-09-28 — Vakta har fått sin egen side: `/portal-admin/vakt/`  `#vakt` `#admin`
 
 **Hvorfor:** André: «Hvordan avslutter jeg vakten nå da?» — og etter svaret: «Ja hvorfor er den

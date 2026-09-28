@@ -19,3 +19,7 @@ class ParkConfig(AppConfig):
         # Fanen «Lag» i /statistikk/ (pulje 3). Uten registreringen finnes
         # ikke kilden, og ingen ser tallene.
         statistikk.register_handlers()
+
+        # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
+        from .vaktsletting import register_handlers as register_vaktsletting
+        register_vaktsletting()

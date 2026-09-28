@@ -619,7 +619,7 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 | `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
 | `core/endringer.py` | Endringsnummer — `registrer`, `endret`; fanen: `folgEndringer()` | `<app>/endringer.py` |
 | `core/ressursplassering.py` | Hvor en ressurs står nå — `aapen_plassering()`; park spør, KO svarer | `<app>/ressursplassering.py` |
-| `core/vaktslutt.py` | «Avslutt vakt» — `antall()`, `sperre()`, `avslutt()`: arkiver og tøm. Bare moduler som tømmer noe | `<app>/vaktslutt.py` |
+| `core/vaktslutt.py`, `core/vaktsletting.py` | Avslutt vakt (`sperre()`, `avslutt()`); slett en tidligere (`slett()`, `modeller`) | `<app>/vaktslutt.py`, `vaktsletting.py` |
 
 **Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
 Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går

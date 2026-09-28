@@ -40,12 +40,17 @@ KIND_AUTO = 'auto'
 KIND_MANUAL = 'manual'
 KIND_PRE_RESTORE = 'pre_restore'
 KIND_PRE_RESET = 'pre_reset'
+#: Hel databasebackup før en tidligere vakt slettes (28. sep. 2026,
+#: `core/vaktsletting.py`).
+KIND_PRE_SLETT = 'pre_slett'
 
-VALID_KINDS = {KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET}
+VALID_KINDS = {KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET, KIND_PRE_SLETT}
 
 # Disse skal IKKE telles mot cap, og IKKE slettes når cap håndheves.
-# pre_restore-backuper er sikkerhetsnett som må overleve uavhengig av cap.
-PROTECTED_KINDS = {KIND_PRE_RESTORE}
+# pre_restore-backuper er sikkerhetsnett som må overleve uavhengig av cap —
+# og pre_slett av samme grunn: den er eneste vei tilbake til en slettet vakt,
+# og ville ellers blitt ryddet bort av de neste automatiske backupene av `full`.
+PROTECTED_KINDS = {KIND_PRE_RESTORE, KIND_PRE_SLETT}
 
 
 # ── Modeller som har flyttet mellom apper ────────────────────────────────────

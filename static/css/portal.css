@@ -147,3 +147,10 @@ code {
 .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%);
 }
+
+/* Vakt-siden (28. sep. 2026): «Tidligere vakter» og «Arkiver» minimeres med
+   <details> og ruller innenfor en fast høyde, så lange lister ikke tar over
+   siden. Overskriftsraden står når lista ruller. */
+.vakt-liste > summary { cursor: pointer; list-style: revert; }
+.vakt-rull { max-height: 45vh; overflow-y: auto; }
+.vakt-rull thead th { position: sticky; top: 0; z-index: 1; background: var(--portal-surface-2); }
