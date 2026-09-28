@@ -507,6 +507,56 @@ class Vakt(models.Model):
         return self.navn
 
 
+class VaktStatistikk(models.Model):
+    """Tallene fra én statistikkfane for én vakt, frosset da vakta ble avsluttet.
+
+    **Hvorfor fryse i stedet for å regne ut på nytt** (28. sep. 2026): etter
+    «Avslutt vakt» finnes ikke radene lenger der fanene leser dem —
+    pasientene slettes, oppdragene arkiveres og tømmes. Bemanning regner
+    oppdragstallene sine fra `Oppdrag.objects.filter(vakt=...)` og ville vist
+    0 for en avsluttet vakt. En fane per modul, én mekanisme for alle.
+
+    **Legges til, skrives aldri over.** En vakt som gjenåpnes og avsluttes
+    igjen, får et sett til: radene fra første gang er tømt, og en ny frysing
+    over bare det som kom etterpå ville visket ut første del. `frosset_at` er
+    avslutningen settet hører til — alle fanene i ett sett deler den.
+
+    **`data` har formen handleren hadde den dagen** — `versjon` sier hvilken.
+    Visningen må tåle de eldre; tallene regnes ikke ut på nytt.
+
+    Et aggregat, ikke personopplysninger på radnivå. At små tall er med er et
+    valg global admin tar (TODO: «Avslutt vakt, arkiv og tidligere vakter»).
+    """
+
+    vakt = models.ForeignKey(
+        Vakt, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='statistikk', verbose_name='Vakt')
+    #: Frosset: vakta kan bli omdøpt eller slettet, tallene skal fortsatt kunne
+    #: si hvilken vakt de er fra. Samme mønster som arkivene.
+    vakt_navn = models.CharField(max_length=255, verbose_name='Vaktnavn')
+    slug = models.CharField(max_length=64, verbose_name='Statistikkilde')
+    versjon = models.PositiveSmallIntegerField(default=1, verbose_name='Formversjon')
+    data = models.JSONField(verbose_name='Tallene')
+    frosset_at = models.DateTimeField(db_index=True, verbose_name='Frosset')
+    frosset_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Frosset av')
+    frosset_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Frosset av (navn)')
+
+    class Meta:
+        verbose_name = 'Frosset vaktstatistikk'
+        verbose_name_plural = 'Frosset vaktstatistikk'
+        ordering = ['-frosset_at', 'slug']
+        constraints = [
+            models.UniqueConstraint(fields=['vakt', 'slug', 'frosset_at'],
+                                    name='vaktstatistikk_en_per_fane_per_avslutning'),
+        ]
+
+    def __str__(self):
+        return f'{self.vakt_navn} · {self.slug} · {self.frosset_at:%d.%m.%Y %H:%M}'
+
+
 class OffsiteKopi(models.Model):
     """Én opplasting av en backup-fil til Scaleway (13. sep. 2026).
 

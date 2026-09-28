@@ -119,8 +119,59 @@ async function deleteHelsepersonell(id) {
 }
 
 // ════════════════════════════════════════════════════════
-// NULLSTILL AKTIV VAKT
+// AVSLUTT VAKT — arkiverer og tømmer alle modulene (core/vaktslutt.py)
 // ════════════════════════════════════════════════════════
+
+// Linjene i oversikten, som tekst. Egen funksjon så regelen lar seg kjøre i
+// node: hvilke linjer som står der, og at en sperre er en sperre.
+function avsluttOversiktLinjer(data) {
+  const linjer = (data.moduler || []).map(m => ({
+    tekst: m.antall
+      ? `${m.antall} ${m.antall === 1 && m.entall ? m.entall : m.etikett} arkiveres og tømmes.`
+      : `Ingen ${m.etikett} å arkivere.`,
+    sperre: false,
+  }));
+  if ((data.fryses || []).length) {
+    linjer.push({ tekst: `Statistikken fryses for: ${data.fryses.join(', ')}.`, sperre: false });
+  }
+  (data.sperrer || []).forEach(g => linjer.push({ tekst: g, sperre: true }));
+  return linjer;
+}
+
+// Knappen er av så lenge noe sperrer, og mens oversikten ikke er hentet:
+// en avslutning uten oversikt er nettopp det oversikten skal hindre.
+function avsluttKanTrykkes(data) {
+  return Boolean(data) && Array.isArray(data.sperrer) && data.sperrer.length === 0;
+}
+
+async function lastAvsluttOversikt() {
+  const el = document.getElementById('avslutt-oversikt');
+  const knapp = document.getElementById('avslutt-vakt-knapp');
+  if (!el || !knapp) return;
+  knapp.disabled = true;
+  el.textContent = 'Henter oversikten …';
+  let data = null;
+  try {
+    const res = await apiFetch('/pasienter/api/avslutt-vakt/');
+    if (res.ok) data = await res.json();
+  } catch (e) {
+    console.error('Oversikten ble ikke hentet:', e);
+  }
+  el.replaceChildren();
+  if (!data) {
+    el.textContent = 'Oversikten kunne ikke hentes. Lukk vinduet og prøv igjen.';
+    return;
+  }
+  // textContent, ikke innerHTML: sperreteksten bærer tall fra basen, og
+  // modulnavnene kommer fra registeret.
+  avsluttOversiktLinjer(data).forEach(l => {
+    const rad = document.createElement('div');
+    rad.className = l.sperre ? 'text-danger fw-semibold' : '';
+    rad.textContent = l.tekst;
+    el.appendChild(rad);
+  });
+  knapp.disabled = !avsluttKanTrykkes(data);
+}
 
 async function doAvsluttVakt() {
   const feil = document.getElementById('avslutt-feil');
@@ -177,8 +228,9 @@ async function visVakter() {
 
 
 async function gjenaapneVakt(id) {
-  if (!confirm('Gjenåpne vakten? Den blir aktiv igjen — slettede pasienter '
-    + 'hentes IKKE tilbake (de ligger i backupen).')) return;
+  if (!confirm('Gjenåpne vakten? Den blir aktiv igjen — pasientene og oppdragene '
+    + 'som ble arkivert og tømt, hentes IKKE tilbake (de ligger i arkivene og backupen). '
+    + 'Tallene som ble frosset står; avsluttes vakta igjen, fryses et nytt sett ved siden av.')) return;
   const res = await apiFetch('/pasienter/api/gjenaapne-vakt/', {
     method: 'POST',
     body: JSON.stringify({ vakt_id: id })

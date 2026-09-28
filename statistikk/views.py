@@ -87,6 +87,10 @@ def statistikk_view(request):
         'har_ko': 'ko' in slugs,
         'har_bemanning': 'vaktliste' in slugs,
         'har_park': 'park' in slugs,
+        # Vaktvelgeren (28. sep. 2026) er global admin, som arkivene: tallene
+        # fra tidligere vakter er strengere beskyttet enn de levende.
+        'vis_vaktvelger': er_global_admin(request.user),
+        'aktiv_vakt_navn': hent_aktiv_vakt().navn,
     })
 
 
@@ -161,3 +165,50 @@ def kilde_arkiv_full_stats_view(request, slug, pk):
     if data is None:
         return JsonResponse({'error': 'Arkiv ikke funnet'}, status=404)
     return JsonResponse(data)
+
+
+# ── Tidligere vakter (steg 3, 28. sep. 2026) ─────────────────────────────────
+#
+# Samme to gates som arkivet: statistikkgaten *og* global admin (André:
+# «global admin per nå»). Kildene per vakt filtreres med samme regel som de
+# levende — en fane brukeren ikke har, finnes ikke i en tidligere vakt heller.
+
+@modul_kreves('statistikk', 'les', svar='json')
+@require_http_methods(['GET'])
+def vakter_view(request):
+    """Vaktene nedtrekket tilbyr: frosne sett og arkiver (`core.vaktstatistikk`)."""
+    if not er_global_admin(request.user):
+        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    from core.vaktstatistikk import tidligere_vakter
+
+    lesbare = {h.slug for h in lesbare_kilder(request.user)}
+    vakter = []
+    for oppforing in tidligere_vakter():
+        kilder = {slug: k for slug, k in oppforing['kilder'].items() if slug in lesbare}
+        if kilder:
+            vakter.append({**oppforing, 'kilder': kilder})
+    return JsonResponse({'vakter': vakter})
+
+
+@modul_kreves('statistikk', 'les', svar='json')
+@require_http_methods(['GET'])
+@rate_limit(group='statistikk:frosset', rate='60/m', method='GET')
+def kilde_frosset_view(request, slug, pk):
+    """De frosne tallene fra én fane for én avsluttet vakt.
+
+    `data` har formen fanen hadde da vakta ble avsluttet — `versjon` sier
+    hvilken, og står i headeren `X-Statistikk-Versjon` så klienten kan velge
+    uten at formen på svaret endres.
+    """
+    if not er_global_admin(request.user):
+        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    if _kilde_for(request.user, slug) is None:
+        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    from core.models import VaktStatistikk
+
+    rad = VaktStatistikk.objects.filter(pk=pk, slug=slug).first()
+    if rad is None:
+        return JsonResponse({'error': 'Fant ikke tallene'}, status=404)
+    svar = JsonResponse(rad.data)
+    svar['X-Statistikk-Versjon'] = str(rad.versjon)
+    return svar

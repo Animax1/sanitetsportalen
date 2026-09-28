@@ -42,14 +42,21 @@ class PortalBackupHandler(BaseBackupHandler):
     #: kjøpet; portalfila lister modellene sine ved navn. Ventet vi, ville
     #: portalinnstillingene — aktiv vakt, lydvarslene, e-postmottakerne — ligget
     #: utenfor **alle** backupfiler i mellomtiden, uten at noe sa fra.
-    apps = ['core.Vakt', 'core.ModuleSettings', 'core.AppSetting']
+    #:
+    #: `VaktStatistikk` kom 28. sep. 2026: tallene for avsluttede vakter. Her og
+    #: ikke i modulfilene, fordi de peker på vakta og ikke på noe i en modul —
+    #: og fordi radene de ble regnet fra er borte, så denne fila er eneste kopi.
+    apps = ['core.Vakt', 'core.ModuleSettings', 'core.AppSetting', 'core.VaktStatistikk']
     exclude = []
 
     #: `ModuleSettings.updated_by` er sporet av hvem som slo modulen av eller
     #: på. Med `natural_foreign` lagres den som brukernavnet, og en slettet
     #: konto ville da tatt hele gjenopprettingen med seg. Hvem som gjorde det
     #: står i audit-loggen; hva som er på og av, er det denne fila skal bære.
-    strip_fields = {'core.ModuleSettings': ['updated_by']}
+    #:
+    #: `VaktStatistikk.frosset_av` av samme grunn; navnet er frosset ved siden av.
+    strip_fields = {'core.ModuleSettings': ['updated_by'],
+                    'core.VaktStatistikk': ['frosset_av']}
 
 
 def register_handlers() -> None:

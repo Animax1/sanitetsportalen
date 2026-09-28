@@ -328,3 +328,10 @@
     height: 100%;
     border-radius: 3px;
   }
+
+/* Vaktvelgeren (28. sep. 2026). En fane uten tall for den valgte vakta skjuler
+   innholdet sitt og viser bare beskjeden — grafer tegnet over forrige vaktas
+   tall ville sett ut som tallene for denne. */
+.vakt-ingen-tall { display: none; }
+.kilde-uten-tall > .vakt-ingen-tall { display: block; color: var(--text-muted); }
+.kilde-uten-tall > :not(.vakt-ingen-tall) { display: none !important; }

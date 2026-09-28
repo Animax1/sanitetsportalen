@@ -27,3 +27,8 @@ class PatientsConfig(AppConfig):
         # `core/kontokobling.py`.
         from .kontokobling import register_handlers as register_kontokobling
         register_kontokobling()
+
+        # «Avslutt vakt» (28. sep. 2026): pasientene arkiveres før de slettes.
+        # Se `core/vaktslutt.py`.
+        from .vaktslutt import register_handlers as register_vaktslutt
+        register_vaktslutt()

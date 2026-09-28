@@ -6,9 +6,10 @@
 > her; gjelder den alle, står den i rota.
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
-(`/statistikk/api/kilde/<slug>/full-stats/` og
-`/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/`; de gamle én-kilde-stiene
-videresender).
+(`/statistikk/api/kilde/<slug>/full-stats/`,
+`/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/` og, for avsluttede vakter,
+`/statistikk/api/kilde/<slug>/frosset/<pk>/` med `/statistikk/api/vakter/`; de gamle
+én-kilde-stiene videresender).
 `/pasienter/api/stats/` ble ikke flyttet — det ble **slettet** (28. aug. 2026). Det matet
 aldri header-chipsene; de regnes ut i `patients-table.js` fra pasientlista. Endepunktet var
 en rest fra Flask-porten uten kjent konsument. `basic_stats()` i `patients.services` står
@@ -78,6 +79,29 @@ er verre enn ingen skanner.
 bygges med `innerHTML`, og en tabell med `display: block` mister bredden sin.
 `TabelleneRullerPaaTelefonTests` krever klassen på hver `tbl-*`/`xt-*`-beholder i begge
 fanene.
+
+## Tidligere vakter — vaktvelgeren (28. sep. 2026)
+
+André: «Jeg liker nedtrekk i statistikk. Men det må da gjelde for alle fanene.» Nedtrekket
+står øverst på siden, **bare for global admin** («global admin per nå») — samme to gates som
+arkivet. Valgene er `core.vaktstatistikk.tidligere_vakter()`:
+
+| Kilde | Når | Hentes fra |
+|---|---|---|
+| Frosset sett | Vakter avsluttet fra 28. sep. 2026 — én oppføring per avslutning | `…/frosset/<pk>/`, med `X-Statistikk-Versjon` |
+| Arkiv | Vakter uten frosset sett; **et arkiv uten vakt er sin egen oppføring** (LS2026, mai 2026) | `…/arkiv/<pk>/full-stats/`, det som fantes |
+
+**Alle fanene henter gjennom `hentStatistikk(slug)`** i `statistikk.js`, som spør
+`statistikkUrl()` hvor tallene står. En fane uten tall for vakta får klassen
+`kilde-uten-tall`: innholdet skjules og en beskjed står der — grafene fra forrige valg ville
+ellers sett ut som denne vaktas. `velgVakt()` nullstiller det som er mellomlagret, også
+bemanningen de to andre fanene deler (`nullstillBemanning`). `tests_vaktvelger_js.py` går
+gjennom hver fanes ekte laster: en fane som glemte velgeren, ville vist pågående vakts tall
+under en tidligere vaktas navn.
+
+**De frosne tallene har formen fanen hadde da vakta ble avsluttet.** De regnes ikke ut på
+nytt, så en renderer som får et nytt felt må tåle at det mangler — samme regel som for
+arkivene fra før 7b.
 
 ## Oppdragsfanen etter pulje 7b (21. sep. 2026)
 

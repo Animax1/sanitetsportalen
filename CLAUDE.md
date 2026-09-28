@@ -619,6 +619,7 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 | `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
 | `core/endringer.py` | Endringsnummer — `registrer`, `endret`; fanen: `folgEndringer()` | `<app>/endringer.py` |
 | `core/ressursplassering.py` | Hvor en ressurs står nå — `aapen_plassering()`; park spør, KO svarer | `<app>/ressursplassering.py` |
+| `core/vaktslutt.py` | «Avslutt vakt» — `antall()`, `sperre()`, `avslutt()`: arkiver og tøm. Bare moduler som tømmer noe | `<app>/vaktslutt.py` |
 
 **Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
 Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går
@@ -682,6 +683,12 @@ registeret — den kjenner ingen modul ved navn, og `--modul <slug>` avgrenser.
 To arkiver i dag: `patients/arkiv.py` (referanseeksempelet) og `oppdrag/arkiv.py`.
 `ArkivSignaturLaastTests` i begge moduler låser signaturene til literale hex-verdier —
 feiler de etter en refaktorering, er det refaktoreringen som er feil.
+
+### Avslutt vakt (core/vaktslutt.py, core/vaktstatistikk.py)
+
+**Ett trykk avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
+hver statistikkfane (`core.VaktStatistikk`), arkiver og tøm, åpne ny vakt. Frosne tall
+regnes aldri ut på nytt — tell opp `statistikk_versjon` når formen endres.
 
 ### Statistikk-caching (core/stats_cache.py)
 

@@ -787,12 +787,17 @@ class MigrasjonsradTests(TestCase):
 
     def test_en_ukjort_migrasjon_vises_med_navn(self):
         """Gjennom den ekte sjekken: fjern en kjørt migrasjon fra basens liste."""
+        from django.db import connection
+        from django.db.migrations.loader import MigrationLoader
         from django.db.migrations.recorder import MigrationRecorder
-        MigrationRecorder.Migration.objects.filter(
-            app='core', name='0013_modulesettings_backup_enabled_slett_kolonnen').delete()
+        # Den *siste* core-migrasjonen, funnet og ikke skrevet av: en tidligere
+        # regnes som kjørt så lenge en senere er det, og da ble testen rød av at
+        # `0014` kom (28. sep. 2026) — ikke av at sjekken sviktet.
+        (_, siste), = MigrationLoader(connection).graph.leaf_nodes('core')
+        MigrationRecorder.Migration.objects.filter(app='core', name=siste).delete()
         rad = self._rad()
         self.assertFalse(rad['ok'])
-        self.assertIn('core.0013_modulesettings_backup_enabled_slett_kolonnen', rad['verdi'])
+        self.assertIn(f'core.{siste}', rad['verdi'])
         self.assertTrue(rad['verdi'].startswith('1 ikke kjørt'))
 
     def test_ukjort_caches_ikke(self):

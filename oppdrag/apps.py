@@ -37,3 +37,8 @@ class OppdragConfig(AppConfig):
         # bare på sikkerhetsnettet hvert 30. sekund.
         from .endringer import register_handlers as register_endringer
         register_endringer()
+
+        # «Avslutt vakt» (28. sep. 2026): oppdragene arkiveres og tømmes med
+        # resten av vakta. Se `core/vaktslutt.py`.
+        from .vaktslutt import register_handlers as register_vaktslutt
+        register_vaktslutt()

@@ -91,7 +91,13 @@ class KallstedetTests(SimpleTestCase):
     def test_payloaden_loefter_trinnet(self):
         db = {'healthy': True, 'signaler': {'samlet': 'rod'}}
         rolig = {'healthy': True, 'signaler': {'samlet': 'gronn'}}
-        with mock.patch.object(admin_status, '_get_db_health', side_effect=[db, rolig]) as hent:
+        # Metrikkene er prosessglobale: en annen test som bevisst gir 500 (28. sep.
+        # 2026: `core/tests_vaktslutt.py`) la tre 5xx i vinduet, og trinnet ble rødt
+        # av det — ikke av databasen. Testen skal bare se databasens bidrag.
+        rolige_metrikker = {'p95_ms': 0, 'errors_5xx': 0, 'count': 100}
+        with mock.patch.object(admin_status, '_get_db_health', side_effect=[db, rolig]) as hent, \
+                mock.patch.object(admin_status.metrics_store, 'snapshot',
+                                  return_value=rolige_metrikker):
             p = admin_status._build_status_payload()
         self.assertEqual((p['beredskap']['nivaa'], p['beredskap'].get('grunn')), ('oransje', 'database'))
         self.assertIs(p['db_health'], db, 'kortet og banneret leser samme svar')

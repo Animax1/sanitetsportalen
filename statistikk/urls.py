@@ -35,6 +35,13 @@ urlpatterns = [
         views.kilde_arkiv_full_stats_view,
         name='api_kilde_arkiv_full_stats',
     ),
+    # Tidligere vakter (28. sep. 2026): nedtrekket og de frosne tallene.
+    path('api/vakter/', views.vakter_view, name='api_statistikk_vakter'),
+    path(
+        'api/kilde/<slug:slug>/frosset/<int:pk>/',
+        views.kilde_frosset_view,
+        name='api_kilde_frosset',
+    ),
 
     # ── Videresending fra én-kilde-tida ──────────────────────────────────
     path(

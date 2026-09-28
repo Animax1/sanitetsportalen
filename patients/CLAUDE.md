@@ -26,10 +26,18 @@ Hva som lastes når står i rota; hva filene gjør står her.
 | `patients-table.js` | Tabulator-grid og tavle |
 | `patients-forms.js` | Registrerings- og redigeringsskjema |
 | `patients-app.js` | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-admin.js` | Registeradmin, sesjonstimeout, vaktavslutning/-gjenåpning, vaktarkiv |
+| `patients-admin.js` | Registeradmin, sesjonstimeout, vaktavslutning (med oversikten, `lastAvsluttOversikt`) og gjenåpning, vaktarkiv |
 
 **Alt en ikke-admin kan nå, må ligge i en alltid-lastet fil.** `patients-admin.js` lastes
 kun for admin, men skrivetilgang uten admin-tilgang finnes — derfor bor f.eks.
 `saveEventName` i `patients-app.js`. Kall fra alltid-lastet kode inn i admin-fila går
 gjennom `_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests`
 håndhever begge deler.
+
+## «Avslutt vakt» er portalens, knappen er her
+
+Knappen og adressen (`/pasienter/api/avslutt-vakt/`) står i pasientmodulen av historiske
+grunner; arbeidet gjøres av `core/vaktslutt.py` (28. sep. 2026). GET gir oversikten, POST
+avslutter. **Pasientene arkiveres alltid før de slettes** (`patients/vaktslutt.py`) — før
+den dagen slettet knappen dem etter bare en backup, og en vakt uten manuelt arkiv fantes
+etterpå bare i backupfila.

@@ -148,6 +148,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // med feilmeldingen under (André, 19. sep. 2026). Finnes bare for admin;
   // hjelperen svarer false uten å klage når modalen ikke er på sida.
   nullstillModalVedLukking('resetModal', ['avslutt-nytt-navn'], 'avslutt-feil');
+  // Oversikten før avslutningen (28. sep. 2026): hva som arkiveres, og hva som
+  // sperrer — hentet hver gang vinduet åpnes, for tallene endrer seg.
+  document.getElementById('resetModal')
+    ?.addEventListener('show.bs.modal', () => _kall('lastAvsluttOversikt'));
   nullstillModalVedLukking('arkivLagreModal', ['arkiv-arrangement-navn', 'arkiv-notat'], 'arkiv-lagre-feil');
   initTable();
   const mineBtn = document.getElementById('btn-mine');

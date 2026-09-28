@@ -4,6 +4,70 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — «Avslutt vakt» arkiverer alt, statistikken fryses, og tidligere vakter i `/statistikk`  `#vakt` `#statistikk` `#arkiv`
+
+**Hvorfor:** André: «etter hver vakt så tar admin og [...] arkiveres modulene samtlige som admin
+trykker. Da er det ikke bare å arkivere hver eneste modul men alt blir gjort i ett. Og statistikk
+lagres og er tilgjengelig i /statistikk som tidligere vakt.» Og om nedtrekket: «det må da gjelde
+for alle fanene» — «global admin per nå». Steg 1–3 av planen i `TODO.md`.
+
+**Hullet som ble tettet:** «Avslutt vakt» **slettet pasientene etter bare en backup — uten å
+arkivere dem**. Arkivet var en egen knapp man måtte huske *før*. Glemte man den, fantes vakta
+etterpå bare i en backupfil: ingen statistikk, ingen aggregat etter 24 måneder. Oppdragene sto
+igjen til noen arkiverte dem fra oppdragsmodulen.
+
+**Steg 1 — statistikken fryses per vakt og fane** (`core/vaktstatistikk.py`, `core.VaktStatistikk`,
+`core/0014`). Når vakta avsluttes, regnes hver fane i `core/stats.py` ut *før* radene tømmes og
+lagres med `versjon` (`BaseStatistikkHandler.statistikk_versjon`). Nødvendig fordi **Bemanning
+regner oppdragstallene fra oppdragstabellen og viste 0 oppdrag for en avsluttet vakt** straks
+oppdragene var arkivert. **Settene legges til, de skrives aldri over:** en vakt som gjenåpnes og
+avsluttes igjen får et sett til — radene fra første gang er tømt, og en ny frysing ville visket
+dem ut. Med i portalbackupen (`frosset_av` strippet).
+
+**Steg 2 — ett trykk arkiverer og tømmer alt** (`core/vaktslutt.py`, nytt register;
+`patients/vaktslutt.py`, `oppdrag/vaktslutt.py`). Rekkefølgen: sperrer → `pre_reset`-backup av
+hver modul som tømmes → i én transaksjon frys, arkiver og tøm, lukk vakta, åpne den nye. **Et
+oppdrag på tavla sperrer** (409, samme regel som oppdragsarkivets knapp), og da er ingenting
+rørt — heller ingen backup. Sperrene sjekkes **én gang til inne i transaksjonen**: backupene
+tar tid, og et oppdrag lagt på tavla imens ville ellers blitt arkivert halvveis. Feiler én modul midt i, rulles alt tilbake, frysingen med. Ingen
+rader gir intet arkiv. Arkiveringen logges som `arkiv_lagret … ved avslutning`, med hvem.
+KO-loggen og lagenes registreringer tømmes ikke — de er scopet på vakta og har sine egne frister.
+**Vinduet viser oversikten før noen trykker** (GET på samme adresse): «212 pasienter arkiveres og
+tømmes», hvilke faner som fryses, og sperrene i rødt; knappen er av så lenge noe sperrer.
+Adressen er fortsatt `/pasienter/api/avslutt-vakt/`; arbeidet er portalens.
+
+**Steg 3 — vaktvelger i `/statistikk` for alle fanene**, bare global admin. «Vakt: Pågående /
+2026 (28.9.2026) / LS2026 (21.5.2026)». Valgene er frosne sett, og **arkiver fra før frysingen
+fantes** for vakter uten sett — et arkiv uten vakt (LS2026 i prod: kollapset pasientarkiv,
+vaktpekeren tom fordi `patients/0014` ikke fylte den inn) blir sin egen oppføring. Alle fem
+fanene henter gjennom `hentStatistikk(slug)`/`statistikkUrl()`; en fane uten tall for vakta
+skjules og sier «Ingen tall i denne fanen for «LS2026»». Nye ruter: `/statistikk/api/vakter/`
+og `/statistikk/api/kilde/<slug>/frosset/<pk>/` (207 totalt).
+
+**Også:** `MigrasjonsradTests` slettet posten for `core.0013` ved navn og ble rød av at `0014`
+kom — ikke av at sjekken sviktet. Den finner nå den siste migrasjonen selv.
+`KallstedetTests.test_payloaden_loefter_trinnet` (databasekortet) ble rød i hele `core`-kjøringen:
+«rod» i stedet for «oransje», fordi metrikkene er prosessglobale og de nye testene som bevisst
+gir 500 fylte vinduet. Den mocker nå metrikkene og ser bare databasens bidrag. «Gjenåpne vakt»
+sier at arkiverte pasienter *og* oppdrag ikke hentes tilbake. «1 pasient», ikke «1 pasienter».
+`ROT_TEGNGRENSE` hevet til 67 000 for registeret og regelen om `statistikk_versjon`.
+
+**Tester:** `core/tests_vaktstatistikk.py`, `core/tests_vaktslutt.py` (gjennom det ekte
+endepunktet), `patients/tests_avslutt_js.py`, `statistikk/tests_vaktvelger.py` og
+`statistikk/tests_vaktvelger_js.py` — den siste går gjennom **hver fanes ekte laster**, så en fane
+som glemte velgeren ville blitt rød. **Mutasjoner: 49, alle drept til slutt.** Steg 1: 8, én
+overlevde (`naa` ignorert — parameteren fantes bare for testen og er fjernet). Steg 2: 21, én
+overlevde (`textContent` → `innerHTML` i oversikten; ny test med markup i sperreteksten). Steg 3:
+19, tre overlevde og fikk hver sin test: to arkiver uten vakt slått sammen til én oppføring,
+admin-kravet på de frosne tallene (prøvd med en bruker som uansett manglet fanen — nå en med
+`les` på Lag og statistikk), og `velgVakt()` som ikke nullstilte bemanningen.
+**Røyktest i Chromium:** sperren vises og knappen er av; avslutningen arkiverte 1 pasient og
+2 oppdrag, frøs fem faner og åpnet den nye vakta; nedtrekket viste «2026» med tallene fra før
+tømmingen, LS2026 med pasienttallene fra aggregatet og «Ingen tall» på de andre fanene.
+
+**Ikke gjort ennå (steg 4, `TODO.md`):** de frosne settene holder vaktas tall i detalj **uten
+frist**. Sensitiv-merket og den grovere frysingen når radene slettes må dekke dem også.
+
 ## 2026-09-28 — Admin fikk opprette pasienter, men ikke redigere dem  `#pasienter` `#bug`
 
 **Meldt av André fra staging og prod:** «Du får opprette pasienter men ikke redigere når du trykker

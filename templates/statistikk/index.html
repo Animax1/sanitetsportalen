@@ -23,6 +23,19 @@
     <h1 class="h4 mb-0">
       <i class="bi bi-bar-chart-line me-2"></i>Statistikk
     </h1>
+    {% if vis_vaktvelger %}
+    {% comment %}
+      Vaktvelgeren (28. sep. 2026): pågående vakt eller en tidligere, for alle
+      fanene. Global admin, som arkivene. Valgene hentes fra
+      /statistikk/api/vakter/ og settes inn av `lastVaktvalg()` med textContent.
+    {% endcomment %}
+    <div class="d-flex align-items-center gap-2">
+      <label for="stat-vakt" class="small text-muted mb-0">Vakt</label>
+      <select id="stat-vakt" class="form-select form-select-sm" style="max-width: 22rem;">
+        <option value="">Pågående: {{ aktiv_vakt_navn }}</option>
+      </select>
+    </div>
+    {% endif %}
   </div>
 
 

@@ -271,9 +271,8 @@
     <div class="settings-card danger-zone">
       <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
       <p class="small">
-        Avslutter vakten, sletter pasientene dens permanent, og starter en ny.
-        Det tas en backup automatisk først.
-        <strong>Pasientslettingen kan ikke angres uten backupen.</strong>
+        Avslutter vakten og starter en ny. Statistikken fryses, og pasientene og
+        oppdragene arkiveres før de tømmes. Det tas en backup automatisk først.
       </p>
       <div class="small text-muted mb-2">Aktiv vakt: {{ event_name }}</div>
       <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">
@@ -317,9 +316,12 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p>Avslutte vakten <strong>«{{ event_name }}»</strong>? Alle pasientene
-        dens slettes permanent — de finnes etterpå kun i backupen som tas nå,
-        og i et eventuelt vaktarkiv.</p>
+        <p>Avslutte vakten <strong>«{{ event_name }}»</strong>?</p>
+        {% comment %}
+          Oversikten hentes når vinduet åpnes (`lastAvsluttOversikt`): hva som
+          arkiveres og tømmes, hvilke faner som fryses, og hva som sperrer.
+        {% endcomment %}
+        <div id="avslutt-oversikt" class="small mb-3" aria-live="polite">Henter oversikten …</div>
         <div class="mb-2">
           <label class="form-label" for="avslutt-nytt-navn">Navnet på den nye vakten</label>
           <input type="text" id="avslutt-nytt-navn" class="form-control"

@@ -309,6 +309,97 @@ function fmtChi2Inline(chi2) {
 }
 
 // ════════════════════════════════════════════════════════
+// VAKTVELGEREN (28. sep. 2026) — pågående vakt eller en tidligere
+//
+// Alle fanene henter gjennom `hentStatistikk(slug)`, som spør
+// `statistikkUrl()` hvor tallene står: de levende, de frosne
+// (`core.VaktStatistikk`) eller et arkiv fra før frysingen fantes. Har den
+// valgte vakta ingen tall for en fane, skjules innholdet og en beskjed står der
+// i stedet — grafene fra forrige valg ville ellers sett ut som denne vaktas.
+// ════════════════════════════════════════════════════════
+let valgtVakt = null;   // null = pågående
+let vaktvalg = [];
+
+function statistikkUrl(slug, valgt) {
+  if (!valgt) return `/statistikk/api/kilde/${slug}/full-stats/`;
+  const kilde = (valgt.kilder || {})[slug];
+  if (!kilde) return null;
+  if (kilde.type === 'frosset') return `/statistikk/api/kilde/${slug}/frosset/${kilde.id}/`;
+  if (kilde.type === 'arkiv') return `/statistikk/api/kilde/${slug}/arkiv/${kilde.id}/full-stats/`;
+  return null;
+}
+
+function settIngenTall(slug, ingen) {
+  const panel = document.getElementById('kilde-' + slug);
+  if (!panel) return;
+  let beskjed = panel.querySelector(':scope > .vakt-ingen-tall');
+  if (!beskjed) {
+    beskjed = document.createElement('div');
+    beskjed.className = 'vakt-ingen-tall py-3';
+    panel.prepend(beskjed);
+  }
+  beskjed.textContent = ingen
+    ? `Ingen tall i denne fanen for «${valgtVakt ? valgtVakt.navn : ''}».` : '';
+  panel.classList.toggle('kilde-uten-tall', ingen);
+}
+
+// Tallene for fanen, eller null. Feil (403, 429) gir null og lar forrige
+// visning stå — samme regel som fanene alltid har hatt.
+async function hentStatistikk(slug) {
+  const url = statistikkUrl(slug, valgtVakt);
+  settIngenTall(slug, !url);
+  if (!url) return null;
+  try {
+    const res = await apiFetch(url);
+    if (!res.ok) {
+      console.warn(`Statistikk (${slug}) ikke hentet, status`, res.status);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.error(`Statistikk (${slug}) feil:`, e);
+    return null;
+  }
+}
+
+function vaktvalgTekst(v) {
+  const dato = v.tidspunkt ? new Date(v.tidspunkt).toLocaleDateString('nb-NO') : '';
+  return dato ? `${v.navn} (${dato})` : v.navn;
+}
+
+async function lastVaktvalg() {
+  const sel = document.getElementById('stat-vakt');
+  if (!sel) return;
+  try {
+    const res = await apiFetch('/statistikk/api/vakter/');
+    if (!res.ok) return;
+    vaktvalg = (await res.json()).vakter || [];
+  } catch (e) {
+    console.error('Vaktene ble ikke hentet:', e);
+    return;
+  }
+  // textContent: vaktnavnene er fritekst.
+  vaktvalg.forEach(v => {
+    const valg = document.createElement('option');
+    valg.value = v.nokkel;
+    valg.textContent = vaktvalgTekst(v);
+    sel.appendChild(valg);
+  });
+  sel.addEventListener('change', () => velgVakt(sel.value));
+}
+
+function velgVakt(nokkel) {
+  valgtVakt = vaktvalg.find(v => v.nokkel === nokkel) || null;
+  // Arkivmodusen fra `?arkiv=` og fanenes mellomlager hører til forrige valg.
+  arkivStatsMode = false;
+  arkivStatsMeta = null;
+  _oppdaterArkivBanner();
+  fullStats = null;
+  _kallOppdrag('nullstillBemanning');
+  visKilde(aktivKilde());
+}
+
+// ════════════════════════════════════════════════════════
 // STATISTICS – MAIN LOADER  (calls /statistikk/api/kilde/patients/...)
 // ════════════════════════════════════════════════════════
 async function loadStats() {
@@ -322,20 +413,12 @@ async function loadStats() {
     _oppdaterArkivBanner();
     return;
   }
-  try {
-    const res = await apiFetch('/statistikk/api/kilde/patients/full-stats/');
-    if (!res.ok) {
-      // 403 = ingen statistikktilgang. 429 = hentet for ofte (S3).
-      // Begge skal la forrige visning bli stående: alternativet er å
-      // legge feilkroppen i `fullStats` og rendre tomme grafer over den.
-      console.warn('Statistikk ikke hentet, status', res.status);
-      return;
-    }
-    fullStats = await res.json();
-  } catch(e) {
-    console.error('Statistikk feil:', e);
-    return;
-  }
+  // 403 = ingen statistikktilgang. 429 = hentet for ofte (S3). Begge gir
+  // null og skal la forrige visning bli stående: alternativet er å legge
+  // feilkroppen i `fullStats` og rendre tomme grafer over den.
+  const data = await hentStatistikk('patients');
+  if (!data) return;
+  fullStats = data;
   _oppdaterArkivBanner();
   renderStatTab(activeStatTab);
 }
@@ -780,4 +863,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Kontoen kan mangle pasienttilgang — da er oppdrag den åpne fanen, og
   // `loadStats()` ville hentet noe brukeren ikke får se.
   visKilde(aktivKilde());
+  lastVaktvalg();
 });

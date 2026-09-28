@@ -25,7 +25,7 @@ from .models import Patient, Forstehjelper, Helsepersonell
 from core.models import AppSetting
 from core.validators import now_local_str, validate_patient_time_fields
 from core.jsonkropp import json_body
-from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, opprett_vakt, vaktnavn_opptatt_melding
+from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, vaktnavn_opptatt_melding
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
@@ -451,28 +451,34 @@ def patient_detail_view(request, pk):
 
 @modul_kreves('patients', 'les', svar='json')
 @admin_required
-@require_http_methods(['POST'])
+@require_http_methods(['GET', 'POST'])
 def avslutt_vakt_view(request):
     """Avslutt aktiv vakt og start en ny. Kun admin.
 
-    Operasjonen er nullstillingens arvtaker (§3.4 i vakt-notatet): backup,
-    slett vaktas pasienter, merk vakta avsluttet — men den gjelder ÉN vakt,
-    og navnet sier det. «Nullstill år» ville slettet for mye den dagen et år
-    rommer flere vakter.
+    **Én knapp for hele vakta** (28. sep. 2026, `core/vaktslutt.py`): tallene
+    fryses, pasientene *og* oppdragene arkiveres og tømmes, vakta lukkes og den
+    nye åpnes — i én transaksjon. Fram til da slettet knappen bare pasientene,
+    uten å arkivere dem, og oppdragene sto igjen til noen arkiverte dem fra
+    oppdragsmodulen.
+
+    Adressen står i pasientmodulen fordi knappen gjør det; arbeidet er
+    portalens. **GET gir oversikten** — hva som arkiveres, hvilke faner som
+    fryses, og hva som sperrer — slik at det vises *før* noen trykker.
 
     Den nye vakta opprettes i samme flyt, slik at portalen aldri står tømt
     uten aktiv vakt. Navnet er påkrevd og fritekst — det var beslutningen —
     og unikt: to vakter med samme navn lar seg ikke skille i statistikken.
 
-    Oppdragene til den avsluttede vakta røres ikke. De er scopet bort fra
-    alle visninger i samme øyeblikk som pekeren flytter, og livssyklusen
-    deres (arkivering, kollaps) er fase 7 sitt ansvar.
-
-    Krever {"confirm": true} for å unngå feilklikk. Pasientslettingen kan
-    ikke angres uten backupen — gjenåpning av vakta (egen knapp) setter den
-    aktiv igjen, men henter ikke rader tilbake.
+    Krever {"confirm": true} for å unngå feilklikk. Gjenåpning av vakta (egen
+    knapp) setter den aktiv igjen, men henter ikke rader tilbake — de ligger i
+    arkivene og i `pre_reset`-backupene.
     """
+    from core import vaktslutt
     from core.models import Vakt
+
+    vakt = hent_aktiv_vakt()
+    if request.method == 'GET':
+        return JsonResponse(vaktslutt.oversikt(vakt))
 
     data = json_body(request)
     if not data.get('confirm'):
@@ -487,41 +493,36 @@ def avslutt_vakt_view(request):
             status=400,
         )
     # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
-    # `opprett_vakt` under — denne sjekken er et kappløp.
+    # `opprett_vakt` i orkestratoren — denne sjekken er et kappløp.
     if Vakt.objects.filter(navn=nytt_navn).exists():
         return JsonResponse({'error': vaktnavn_opptatt_melding(nytt_navn)}, status=400)
 
-    vakt = hent_aktiv_vakt()
-    # Lag pre-reset backup før sletting
-    from core.backup import create_backup
-    create_backup(slug='patients', kind='pre_reset', user=request.user,
-                  note=f'Før avslutning av vakta «{vakt.navn}»')
-
     try:
-        with transaction.atomic():
-            deleted, _ = Patient.objects.filter(vakt=vakt).delete()
-            vakt.er_aktiv = False
-            vakt.avsluttet = timezone.now()
-            vakt.save(update_fields=['er_aktiv', 'avsluttet'])
-
-            from core.validators import current_local_year
-            ny = opprett_vakt(nytt_navn, year=current_local_year(), startet=timezone.now())
-            AppSetting.set('aktiv_vakt_id', ny.pk)
-            # Ny vakt har ingen tellernøkkel — next_patient_nr starter på 1 av
-            # seg selv. Den gamle vaktas nøkkel blir liggende: gjenåpnes vakta,
-            # fortsetter serien der den slapp.
+        svar = vaktslutt.avslutt(vakt, ny_vakt_navn=nytt_navn, bruker=request.user,
+                                 request=request)
+    except vaktslutt.Sperret as sperret:
+        # Ingenting er rørt: sperrene sjekkes før backupen og transaksjonen.
+        return JsonResponse({'error': ' '.join(sperret.grunner),
+                             'sperrer': sperret.grunner}, status=409)
     except VaktnavnOpptatt as feil:
         # Tatt mellom sjekken over og nå. Transaksjonen er rullet tilbake:
-        # ingen pasienter slettet, gammel vakt fortsatt aktiv.
+        # ingenting arkivert eller slettet, gammel vakt fortsatt aktiv.
         return JsonResponse({'error': str(feil)}, status=400)
 
+    tomt = svar['tomt']
+    deler = []
+    for h in vaktslutt.all_handlers():
+        n = tomt.get(h.slug, 0)
+        deler.append(f'{n} {h.entall if n == 1 and h.entall else h.etikett}')
     return JsonResponse({
         'ok': True,
-        'avsluttet_vakt': vakt.navn,
-        'ny_vakt': ny.navn,
-        'antall_slettet': deleted,
-        'melding': f'{deleted} pasienter slettet. Vakta «{vakt.navn}» er '
-                   f'avsluttet, og «{ny.navn}» er aktiv.',
+        'avsluttet_vakt': svar['avsluttet_vakt'],
+        'ny_vakt': svar['ny_vakt'],
+        'antall_slettet': tomt.get('patients', 0),
+        'tomt': tomt,
+        'melding': (f'Arkivert og tømt: {", ".join(deler) or "ingenting"}. Statistikken '
+                    f'er frosset. Vakta «{svar["avsluttet_vakt"]}» er avsluttet, og '
+                    f'«{svar["ny_vakt"]}» er aktiv.'),
     })
 
 

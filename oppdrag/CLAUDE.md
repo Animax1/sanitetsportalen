@@ -37,8 +37,11 @@ Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; ark
 fryser hele vakta med signatur, **sletter så oppdragene fra tavla og historikken og
 nullstiller telleren** (12. sep. 2026 — neste oppdrag får #1), og starter klokka mot en
 kollaps som sletter radnivået etter 24 måneder. Viewet avviser arkivering mens noe står
-på tavla. Pasientarkivet gjør *ikke* dette — der står pasientene igjen etter frysing. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
-og å fryse det i 24 måneder ville uthult unntaket.
+på tavla. Pasientarkivet gjør *ikke* dette — der står pasientene igjen etter frysing.
+**«Avslutt vakt» arkiverer også oppdragene** (28. sep. 2026, `oppdrag/vaktslutt.py`), med
+samme sperre: et oppdrag på tavla stopper hele avslutningen.
+`fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit, og å fryse det i 24
+måneder ville uthult unntaket.
 
 **Verdimengdene (12. sep. 2026):** `HASTEGRAD` har fått «Drift» (het «Teknisk» én dag) — et oppdrag uten
 pasient — og problemstillingene avhenger av hastegraden. **Problemstillinger, enhetstyper

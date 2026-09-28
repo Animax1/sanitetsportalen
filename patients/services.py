@@ -781,16 +781,19 @@ def _compute_sha256_for_arkiv(arkiv, pasienter_dicts):
     return beregn_sha256(_arkiv_handler(), arkiv, pasienter_dicts)
 
 
-def arkiver_aktiv_vakt(arrangement_navn, notat, user):
+def arkiver_aktiv_vakt(arrangement_navn, notat, user, *, vakt=None):
     """Lag VaktArkiv + ArkivertPasient-rader fra alle aktive pasienter i aktivt år.
 
     Returnerer (VaktArkiv-instance, antall_pasienter).
     Ruller tilbake hele transaksjonen ved feil.
+
+    `vakt` settes av «Avslutt vakt» (`patients/vaktslutt.py`), som allerede
+    har den i hånden; uten er det den aktive, som før.
     """
     from django.utils import timezone as djtz
 
     with transaction.atomic():
-        vakt = hent_aktiv_vakt()
+        vakt = vakt or hent_aktiv_vakt()
         pasienter = list(
             Patient.objects.filter(is_active=True, vakt=vakt)
             .select_related('forstehjelper', 'helsepersonell_ref')

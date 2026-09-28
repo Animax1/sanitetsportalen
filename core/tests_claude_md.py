@@ -78,7 +78,13 @@ ROT = Path(settings.BASE_DIR)
 #: testene krever. Pluss `core/ressursplassering.py`, et nytt register i
 #: rammeverket. Radene er kortet ned til kartet; alt annet står i
 #: `park/CLAUDE.md`.
-ROT_TEGNGRENSE = 66_500
+#:
+#: **Hevet til 67 000 den 28. sep. 2026, bevisst:** «Avslutt vakt» ble et register
+#: i rammeverket (`core/vaktslutt.py`) med frosne tall per vakt
+#: (`core/vaktstatistikk.py`). Hver statistikkhandler fryses nå ved avslutning, og
+#: `statistikk_versjon` er en regel for alle moduler — den hører hjemme i rota.
+#: Én tabellrad og fire linjer.
+ROT_TEGNGRENSE = 67_000
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer

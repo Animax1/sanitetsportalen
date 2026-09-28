@@ -20,12 +20,17 @@ let _bemanningLast = null;
 function sikreBemanning() {
   if (bemanningStats) return Promise.resolve(bemanningStats);
   if (!_bemanningLast) {
-    _bemanningLast = apiFetch('/statistikk/api/kilde/vaktliste/full-stats/')
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => { bemanningStats = data; return data; })
-      .catch(e => { console.error('Bemanningsstatistikk feil:', e); return null; });
+    // Gjennom vaktvelgeren: de levende tallene eller den valgte vaktas.
+    _bemanningLast = hentStatistikk('vaktliste')
+      .then(data => { bemanningStats = data; return data; });
   }
   return _bemanningLast;
+}
+
+// Kalles når en annen vakt velges: svaret over hører til forrige valg.
+function nullstillBemanning() {
+  bemanningStats = null;
+  _bemanningLast = null;
 }
 
 async function loadBemanningStats() {

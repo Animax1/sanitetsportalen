@@ -53,6 +53,11 @@ class BaseStatistikkHandler:
     #: «sitt eget korps» og hele bemanningen ikke er det. Registeret kjenner
     #: fortsatt ikke brukeren — det sier bare hva som skal spørres om.
     nivaa: ClassVar[str] = 'les'
+    #: Formen på `full_stats()`. Lagres med de frosne tallene
+    #: (`core.VaktStatistikk`) når en vakt avsluttes. Tell opp når formen
+    #: endres slik at gamle frosne tall må leses annerledes — de regnes ikke
+    #: ut på nytt, så visningen er den som må tåle dem.
+    statistikk_versjon: ClassVar[int] = 1
 
     def full_stats(self, vakt) -> dict:
         """Tallene for én vakt. Returner en JSON-serialiserbar dict."""

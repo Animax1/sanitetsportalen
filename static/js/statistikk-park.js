@@ -14,17 +14,11 @@
 let parkStats = null;
 
 async function loadParkStats() {
-  try {
-    const res = await apiFetch('/statistikk/api/kilde/park/full-stats/');
-    if (!res.ok) {
-      console.warn('Lag-statistikk ikke hentet, status', res.status);
-      return;
-    }
-    parkStats = await res.json();
-  } catch (e) {
-    console.error('Lag-statistikk feil:', e);
-    return;
-  }
+  // Gjennom vaktvelgeren (statistikk.js): de levende tallene, eller den
+  // valgte vaktas. null betyr feil eller ingen tall — forrige visning står.
+  const data = await hentStatistikk('park');
+  if (!data) return;
+  parkStats = data;
   renderParkStats(parkStats);
 }
 

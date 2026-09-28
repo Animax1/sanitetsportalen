@@ -19,20 +19,11 @@ let oppdragStats = null;
 
 // ── Henting ──────────────────────────────────────────────────────────────
 async function loadOppdragStats() {
-  try {
-    const res = await apiFetch('/statistikk/api/kilde/oppdrag/full-stats/');
-    if (!res.ok) {
-      // Samme regel som pasientfanen: la forrige visning bli stående. 403
-      // betyr at tilgangen er trukket tilbake mens fanen sto åpen, 429 at
-      // vi hentet for ofte — ingen av delene er noe å rendre tomme grafer på.
-      console.warn('Oppdragsstatistikk ikke hentet, status', res.status);
-      return;
-    }
-    oppdragStats = await res.json();
-  } catch (e) {
-    console.error('Oppdragsstatistikk feil:', e);
-    return;
-  }
+  // Gjennom vaktvelgeren (statistikk.js): de levende tallene, eller den
+  // valgte vaktas. null betyr feil eller ingen tall — forrige visning står.
+  const data = await hentStatistikk('oppdrag');
+  if (!data) return;
+  oppdragStats = data;
   renderOppdragStats(oppdragStats);
 }
 

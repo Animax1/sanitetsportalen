@@ -145,38 +145,24 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
-### Avslutt vakt, arkiv og tidligere vakter i statistikken — avklart 28. sep. 2026, ikke påbegynt
+### Avslutt vakt, arkiv og tidligere vakter i statistikken — steg 1–3 levert 28. sep. 2026
 
 André: «etter hver vakt [...] arkiveres modulene samtlige som admin trykker [...] og statistikk
-lagres og er tilgjengelig i /statistikk som tidligere vakt. Slik vi har det satt opp nå for
-pågående vakt er fint.» Beslutningene:
+lagres og er tilgjengelig i /statistikk som tidligere vakt.» Frysingen, den felles avslutningen
+og vaktvelgeren er levert (CHANGELOG 28. sep. 2026). Beslutningen som gjenstår å bygge:
+**sensitive problemstillinger** merkes av admin når som helst — før, under eller etter vakta —
+og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. Et merke per liste
+(pasienter, oppdrag og lag har hver sin). **Ingen automatisk skjuling av små tall**
+(«Hjertestans blir jo fort merket [...] Men det vil jeg ha kontroll på selv»).
 
-- **Ett trykk arkiverer alt.** I dag er det fire forskjellige ting: pasientenes arkiv er en egen
-  knapp, og «Avslutt vakt» (`patients/views_patients.py`, `avslutt_vakt_view`) **sletter
-  pasientene etter bare en backup — uten å arkivere**; oppdrag arkiverer og tømmer selv
-  (`oppdrag/arkiv.py`, `arkiver_vakt`); KO og Lag har ikke noe arkiv.
-- **Hvem ser tidligere vakter:** global admin, som arkivvisningen i dag
-  (`statistikk/views.py`, `kilde_arkiv_full_stats_view`).
-- **Sensitive problemstillinger:** admin merker dem når som helst — før, under eller etter
-  vakta — og de slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. Et merke
-  per liste (pasienter, oppdrag og lag har hver sin). **Ingen automatisk skjuling av små tall**
-  («Hjertestans blir jo fort merket [...] Men det vil jeg ha kontroll på selv»).
-
-- [ ] **1. Statistikken fryses per vakt og fane.** Når vakta avsluttes, lagres `full_stats(vakt)`
-      fra hver `core/stats.py`-handler, med et versjonsnummer på formen. Nødvendig før 2:
-      Bemanning (`vaktliste/statistikk.py`, `bemanning_stats`) regner oppdragstallene fra
-      `Oppdrag.objects.filter(vakt=vakt)`, og viser 0 for den gamle vakta straks oppdragene er
-      arkivert og tømt.
-- [ ] **2. Felles «Avslutt vakt».** Oversikt først («Pasienter 212, Oppdrag 48, Lag 1 340 …»),
-      så backup → frys statistikken → arkiver og tøm alle → ny vakt. Alt eller ingenting.
-- [ ] **3. Vaktvelger i `/statistikk` for alle fanene.** Lister vakter **og arkiver uten
-      vakt**: LS2026 (mai 2026) ligger i prod som et pasientarkiv med bare frosset aggregat, og
-      arkiver fra før `patients/0014` har ingen vaktpeker. En test holder et slikt arkiv i
-      nedtrekket.
-- [ ] **4. Sensitiv-merket og ny frysing når radene slettes** (`core/arkiv`, `kollaps`).
-      Arkivet tar vare på hvilke problemstillinger som var merket da det ble laget, så et
-      navnebytte ikke glipper. Pasientarkivet fryser i dag hele statistikken med krysstabellene
-      (`patients/services.py`, `bygg_aggregat`).
+- [ ] **4. Sensitiv-merket, og de frosne tallene gjøres grovere når radene slettes.** Gjelder to
+      steder, ikke ett: arkivenes aggregat (`core/arkiv`, `kollaps`; pasientarkivet fryser i dag
+      hele statistikken med krysstabellene, `patients/services.py`, `bygg_aggregat`) **og de
+      frosne settene i `core.VaktStatistikk`**, som fra 28. sep. holder vaktas tall i detalj uten
+      frist. Når radene slettes, regnes settet ut på nytt med sammenslåingen — for pasienter og
+      oppdrag fra arkivradene før kollapsen, for KO og Lag fra radene før `purge_old_logs`
+      tar dem. Bemanning bærer ingen helseopplysninger. Arkivet tar vare på hvilke
+      problemstillinger som var merket da det ble laget, så et navnebytte ikke glipper.
 - [ ] **5. Lagringstid for `/lag/`:** radene slettes etter 24 måneder via `core/opprydding.py`,
       som KO-loggen. Går inn i personvernpunktet under `/lag/`.
 
