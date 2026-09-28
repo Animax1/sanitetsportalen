@@ -184,7 +184,7 @@ async function parkHentSted() {
   if (!lag) return;
   let server = null;
   try {
-    const svar = await parkKall(`/park/r/api/sted/?lag=${encodeURIComponent(lag)}`, 'GET');
+    const svar = await parkKall(`/lag/r/api/sted/?lag=${encodeURIComponent(lag)}`, 'GET');
     if (svar.ok) server = svar.data;
   } catch (e) { server = null; }
   const valg = parkVelgSted(server, parkLes(PARK_LAGRING.sted), parkTilstand.oppsett.steder);
@@ -223,7 +223,7 @@ function parkTegnKvitteringer() {
 
 async function parkAngre(nokkel) {
   let svar;
-  try { svar = await parkKall('/park/r/api/angre/', 'POST', {idempotency_key: nokkel}); } catch (e) {
+  try { svar = await parkKall('/lag/r/api/angre/', 'POST', {idempotency_key: nokkel}); } catch (e) {
     parkMelding('Ikke angret — ingen forbindelse. Prøv igjen.');
     return;
   }
@@ -247,7 +247,7 @@ async function parkRegistrer(e) {
   parkEl('park-registrer').disabled = true;
   let svar;
   try {
-    svar = await parkKall('/park/r/api/registrer/', 'POST',
+    svar = await parkKall('/lag/r/api/registrer/', 'POST',
                           parkKropp(v, parkTilstand.forhandsvalg, parkTilstand.nokkel));
   } catch (feil) {
     svar = null;
@@ -298,7 +298,7 @@ async function parkStart() {
   }
 
   let svar;
-  try { svar = await parkKall('/park/r/api/oppsett/', 'GET'); } catch (e) {
+  try { svar = await parkKall('/lag/r/api/oppsett/', 'GET'); } catch (e) {
     parkMelding('Ingen forbindelse. Last siden på nytt når du har dekning.');
     return;
   }

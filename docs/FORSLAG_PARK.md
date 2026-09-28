@@ -1,7 +1,7 @@
-# Forslag: `/park/` — lagets utfallsregistrering
+# Forslag: `/lag/` — lagets utfallsregistrering
 
 > **Pulje 1, 2 og 3 er bygget** (27.–28. sep. 2026; statistikkfanen «Lag» som pulje 3): modellen, parksiden uten innlogging,
-> forhåndsvalget, angre, grensene, backup — og oppsettet på `/park/` med lenker, sletting,
+> forhåndsvalget, angre, grensene, backup — og oppsettet på `/lag/` med lenker, sletting,
 > verdimengdene og bryterne på portalinnstillingene. Modulens regler står i
 > `park/CLAUDE.md`, historien i `CHANGELOG.md`.
 
@@ -28,7 +28,7 @@ varm, følger en beruset til samleplassen, eller tilkaller bil. **Ingenting av d
 registrert i dag**, med mindre personen havner i `/pasienter/` — og da er det sykestua som
 registrerer, ikke laget. Statistikken ser de som kom inn, ikke de som ble tatt hånd om ute.
 
-`/park/` er **en tellemaskin på én side**, ikke et journalsystem:
+`/lag/` er **en tellemaskin på én side**, ikke et journalsystem:
 
 | Park er | Park er ikke |
 |---|---|
@@ -67,10 +67,10 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B17 | Statistikk-tilgang | **Operatørene skal ikke nødvendigvis ha `/statistikk/`**, og tilgangen der kan bli delt opp. Den *er* delt per fane allerede (§7): fanen «Lag» krever `statistikk: les` **og** `park: les`. Ledelsen får `park: les`; operatørene får det ikke |
 | B18 | Lenkens levetid | **På tvers av vakter** (spørsmål 2a). Tiltakskortet kan stå; oppetiden er grensen |
 | B19 | Forhåndsvalg av sted | **Det nyeste vinner** (tredje runde): «Om KOs plassering er nyeste er det siste, om lagets valg er nyeste brukes det» (§5.1) |
-| B20 | Feilregistreringer | `skriv_leder` og admin kan **slette** en registrering fra lista på `/park/`, med grunn, logget. Ikke rette |
+| B20 | Feilregistreringer | `skriv_leder` og admin kan **slette** en registrering fra lista på `/lag/`, med grunn, logget. Ikke rette |
 | B21 | Måling | Hver registrering lagrer hvor forhåndsvalget kom fra og om laget endret det — så B19 kan vurderes med tall etter generalprøven |
 | B22 | Risikovalg | **Alternativene står i §4.7, og det som bringer risiko kan byttes om.** Forhåndsvalget fra KO er en bryter, ikke kode som kommenteres ut |
-| B23 | Personvern | `PERSONVERN_DOKUMENTASJON.md` oppdateres **når `/park/` er ferdig**, ikke underveis — men før lansering (`TODO.md`) |
+| B23 | Personvern | `PERSONVERN_DOKUMENTASJON.md` oppdateres **når `/lag/` er ferdig**, ikke underveis — men før lansering (`TODO.md`) |
 | B24 | Steder skjult for lagene | `skriv_leder` i park kan skjule et sted fra lagenes nedtrekk; bilene ser det som før. Parks egen tabell (`SkjultSted`), ikke et felt i oppdrag. Nye steder vises til noen skjuler dem |
 | B25 | Kopier lenken | Trykk i feltet eller på knappen kopierer hele lenken, og siden sier at den ble kopiert |
 
@@ -145,7 +145,7 @@ endret seg sammen uten at noen ba om det.
 `FORSLAG_KO.md` §3.2 plasserte det her og utsatte det. Med B4 får det én virkning:
 
 > **`registrerer_i_park`** (bool, standard `False`): ressursene i gruppa står i lagnedtrekket
-> på `/park/r/`.
+> på `/lag/r/`.
 
 Bevisst **ikke** en `choices` med `oppdrag`/`park`/`ingen` — om en ressurs stempler i
 `/oppdrag/` avgjøres allerede av `Ressurs.enhet`, og to kilder for samme sannhet er uenige
@@ -171,7 +171,7 @@ i tiltakskortet da, lages en ny. Å kunne vise den igjen krever at tokenet lagre
 kan leses, og da er en lekket base en lekket lenke. Følger av B5 («best practice går
 foran») — nevnt fordi det er den delen av valget som merkes i Bliksund.
 
-**Tokenet står i fragmentet: `/park/r/#<token>`.** Alt etter `#` sendes aldri til serveren
+**Tokenet står i fragmentet: `/lag/r/#<token>`.** Alt etter `#` sendes aldri til serveren
 — det havner ikke i Railways tilgangslogg, ikke i `Referer`. Siden leser det med JS og
 sender det i headeren `X-Park-Lenke`.
 
@@ -179,15 +179,15 @@ sender det i headeren `X-Park-Lenke`.
 
 | Sti | Hvem | Hva |
 |---|---|---|
-| `/park/` | `skriv_leder`, admin | Oppsettet: lenker (lag, fjern, oppetid), problemstillinger; utfall bare for admin. Lista over registreringene med «Slett» (B20) |
+| `/lag/` | `skriv_leder`, admin | Oppsettet: lenker (lag, fjern, oppetid), problemstillinger; utfall bare for admin. Lista over registreringene med «Slett» (B20) |
 | — | `les` | Ingen egen side. `les` er det som åpner fanen «Lag» i `/statistikk/` (B17) |
-| `/park/r/` | **Ingen innlogging** | Skjemaet. Én statisk side |
-| `/park/r/api/oppsett/` | Gyldig token | Vaktnavn, lagene, stedene og verdimengdene — ikke noe annet |
-| `/park/r/api/sted/?lag=<id>` | Gyldig token | Forhåndsvalget for **ett** lag, med kilde og tid (§5.1) |
-| `/park/r/api/registrer/` | Gyldig token | Lagrer, svarer med kvittering |
-| `/park/r/api/angre/` | Gyldig token + angre-nøkkel | Sletter én rad innenfor fristen |
+| `/lag/r/` | **Ingen innlogging** | Skjemaet. Én statisk side |
+| `/lag/r/api/oppsett/` | Gyldig token | Vaktnavn, lagene, stedene og verdimengdene — ikke noe annet |
+| `/lag/r/api/sted/?lag=<id>` | Gyldig token | Forhåndsvalget for **ett** lag, med kilde og tid (§5.1) |
+| `/lag/r/api/registrer/` | Gyldig token | Lagrer, svarer med kvittering |
+| `/lag/r/api/angre/` | Gyldig token + angre-nøkkel | Sletter én rad innenfor fristen |
 
-De tre under `/park/r/` står i unntakslista i `patients/tests_modul_dekorator.py` med
+De tre under `/lag/r/` står i unntakslista i `patients/tests_modul_dekorator.py` med
 begrunnelse, som `vaktliste/sw.js`. `ModuleSettings.enabled=False` stenger dem også — det er
 nødbryteren om lenken har lekket. Utenfor oppetiden, fjernet lenke og ugyldig token gir
 **samme** svar, som `signert_lenke.les()`: forskjellen hjelper bare den som prøver seg.
@@ -241,7 +241,7 @@ avveie** — skjermbilde, videresending, nettleserloggen på en privat telefon. 
 
 | Den som har lenken kan | Alvor | Det som demper |
 |---|---|---|
-| Legge inn falske registreringer | Middels — merkes kanskje ikke før sesongrapporten | Oppetiden, fjerning av lenken, taket per lenke, og **«slett alt fra denne lenken etter kl. X»** på `/park/` |
+| Legge inn falske registreringer | Middels — merkes kanskje ikke før sesongrapporten | Oppetiden, fjerning av lenken, taket per lenke, og **«slett alt fra denne lenken etter kl. X»** på `/lag/` |
 | Stenge ute lagene ved å tømme kvoten | Høy under vakt | Grensen per telefon (§4.5) gjør at taket per lenke kan stå høyt |
 | Se hvor KO har plassert hvert lag, fortløpende | Lav til middels | **Risikovalg**, §4.7. Ett lag per kall, men alle kan hentes på under ett sekund |
 | Se lagnavn, steder og verdimengder | Lav | — |
@@ -252,7 +252,7 @@ Og fire ting som *ikke* er hull, men som må holdes slik — hver med en test:
 
 - **Tokenet fjernes fra adressefeltet** (`history.replaceState`) straks siden har lest det.
   Fragmentet holdes unna serverloggene, men *nettleserloggen* lagrer hele adressen.
-- **Viewene under `/park/r/` leser aldri `request.user`.** En portalbruker som åpner siden i
+- **Viewene under `/lag/r/` leser aldri `request.user`.** En portalbruker som åpner siden i
   samme nettleser sender innloggingen sin med; den skal ikke bety noe.
 - **Ingen fritekst inn** (B1) — ingen lagret XSS mulig. Navnene som tegnes (lag, steder) er
   satt av `skriv_leder` og escapes som ellers.
@@ -374,8 +374,8 @@ prøvd på generalprøven.
 
 | Pulje | Innhold |
 |---|---|
-| **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/park/r/` med lag husket og forhåndsvalg av sted (§5.1, registeret i `core`), angre, rate-limit, backup, modultestene |
-| **2 — Oppsettet** | `/park/` (lenker med oppetid, verdimengdene, lista med sletting og «slett alt fra lenken etter kl. X»), angrefristen og `park-ko-posisjon`-bryteren i portalinnstillingene |
+| **1 — Modellen og siden** | App, modul, de fire tabellene, rutingflagget, `/lag/r/` med lag husket og forhåndsvalg av sted (§5.1, registeret i `core`), angre, rate-limit, backup, modultestene |
+| **2 — Oppsettet** | `/lag/` (lenker med oppetid, verdimengdene, lista med sletting og «slett alt fra lenken etter kl. X»), angrefristen og `park-ko-posisjon`-bryteren i portalinnstillingene |
 | **3 — Tallene** | Statistikk-kilden «Lag» |
 
 **Anslag: 3 økter**, pluss litt for registeret i §5.1.

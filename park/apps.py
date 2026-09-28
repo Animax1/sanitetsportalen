@@ -5,7 +5,7 @@ from django.apps import AppConfig
 class ParkConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'park'
-    verbose_name = 'Park'
+    verbose_name = 'Lagregistrering'
 
     def ready(self):
         # Backup-dekning fra første lagring — i samme commit som modellen, som

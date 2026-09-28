@@ -160,7 +160,7 @@ def steder():
 
 
 def alle_steder_med_synlighet() -> list[dict]:
-    """Oppsettet på `/park/`: hver aktive lokasjon, og om lagene ser den."""
+    """Oppsettet på `/lag/`: hver aktive lokasjon, og om lagene ser den."""
     from oppdrag.models import Lokasjon
 
     return [{'id': lok.pk, 'navn': lok.navn, 'skjult': lok.skjult}

@@ -38,7 +38,7 @@ AAPNE = {
     'vaktliste/sw.js': 'service workeren; kan ikke kreve innlogging før den er installert',
     # API-et under står **ikke** her: uten tokenet i headeren svarer det 403,
     # og da prøves det som stengt av `AnonymErStengtUteTests`.
-    'park/r/': 'parksiden lagene bruker (FORSLAG_PARK.md §4) — statisk, uten data; tokenet i fragmentet er tilgangen',
+    'lag/r/': 'siden lagene registrerer på (FORSLAG_PARK.md §4) — statisk, uten data; tokenet i fragmentet er tilgangen',
 }
 
 #: Gamle adresser som sender videre. Skal aldri svare 200 — men 301 til en

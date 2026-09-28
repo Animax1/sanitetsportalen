@@ -194,7 +194,7 @@ virkeligheten, og rekkefølgen under følger av det.*
 
 - [ ] **Fastfrysing noen uker før vakta:** ingen skjemaendringer, flyttinger eller nye
       moduler — bare feilrettinger. Det som kjører på vakta skal være det generalprøven
-      prøvde. Det som skal være med på vakta — `/park/`, puss av `/ko/` og `/vaktliste/`,
+      prøvde. Det som skal være med på vakta — `/lag/`, puss av `/ko/` og `/vaktliste/`,
       en eventuell beholdning/depot-modul — må derfor være ferdig før frysingen, ikke under.
 - [ ] **Generalprøve på staging, 3–4 uker før vakta** —
       [`docs/GENERALPROVE.md`](./docs/GENERALPROVE.md). Ekte folk og telefoner, hovedvekt
@@ -847,7 +847,7 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
 
 *Pulje 3 (ressursoversikten) er levert 17. sep. 2026 — se CHANGELOG. Projeksjonen, den
 tredje kilden (`ko.Ressursstatus`) og tavla i venstre kolonne. Rutingflagget er **ikke**
-bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
+bygget; det flyttet til `/lag/`-punktet nederst, der det hører hjemme.*
 
 - [ ] **Vaktlistas stemplinger inn i loggen — vurderes nå, lag-begrepet har fått et hjem.**
       Utelatt bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
@@ -916,11 +916,11 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       i skjemaet, i datalaget og med en test — sperrer som bare dekker dagens veier, ser ikke
       en ny vei. Kan gjøres uavhengig av KO.
 
-- [ ] **`/park/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
+- [ ] **`/lag/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
       Lagenes utfallsregistrering uten innlogging, via én lenke i tiltakskortet i Bliksund.
       Avklart i fire runder (§2, B1–B23). **Alle tre puljene er levert** (27.–28. sep. 2026, se CHANGELOG);
       modulens regler står i `park/CLAUDE.md`. Igjen:
-      - [ ] **Personvern for `/park/` når modulen er ferdig — før lansering** (André, 27. sep.
+      - [ ] **Personvern for `/lag/` når modulen er ferdig — før lansering** (André, 27. sep.
             2026, B23). `PERSONVERN_DOKUMENTASJON.md` A.6 får en rad for registreringene, og
             risikobildet i `FORSLAG_PARK.md` §4.6–4.7 skrives inn: portalens første side uten
             innlogging, og at den kan vise KOs plassering av lagene så lenge

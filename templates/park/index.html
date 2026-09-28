@@ -1,7 +1,7 @@
 {% extends "core/base_portal.html" %}
 {% load static %}
 
-{% block title %}Park – Sanitetsportalen{% endblock %}
+{% block title %}Lagregistrering – Sanitetsportalen{% endblock %}
 
 {% comment %}
   Oppsettet for park (pulje 2, docs/FORSLAG_PARK.md §4.2): lenkene med oppetid,
@@ -14,7 +14,7 @@
 
 {% block content %}
 <div class="container-fluid px-3 px-md-4 py-3">
-  <h1 class="h4 mb-3"><i class="bi bi-tree me-2"></i>Park</h1>
+  <h1 class="h4 mb-3"><i class="bi bi-people me-2"></i>Lagregistrering</h1>
 
   {% if not leder %}
     {# B17: tallene står i statistikken, og fanen krever også tilgang til den. #}
@@ -112,7 +112,7 @@
       <h2 class="h6">Steder lagene ser</h2>
       <p class="small text-muted mb-2">
         Stedene kommer fra oppdragsmodulen. Et sted som er uaktuelt for lagene kan skjules her —
-        det forsvinner bare fra nedtrekket på parksiden; bilene, KO-tavla og sentralbordet ser
+        det forsvinner bare fra nedtrekket i lagregistreringen; bilene, KO-tavla og sentralbordet ser
         det som før. Nye steder vises for lagene til noen skjuler dem.
       </p>
       <div id="park-steder"></div>

@@ -1,6 +1,6 @@
 """Register for moduler som vet hvor en ressurs står nå.
 
-`/park/` forhåndsvelger stedet et lag registrerer fra (`docs/FORSLAG_PARK.md`
+`/lag/` forhåndsvelger stedet et lag registrerer fra (`docs/FORSLAG_PARK.md`
 §5.1, B19): det nyeste av KOs plassering på tavla og lagets siste
 registrering. Park kan ikke importere `ko` — KO står øverst — og KO skal ikke
 kjenne park (B15). Samme idiom som `core/kontokobling.py` og

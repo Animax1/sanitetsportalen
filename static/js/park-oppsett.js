@@ -1,4 +1,4 @@
-/* Oppsettet på /park/ — lenkene, registreringene og verdimengdene (pulje 2).
+/* Oppsettet på /lag/ — lenkene, registreringene og verdimengdene (pulje 2).
  *
  * Lastes **kun** av templates/park/index.html, for skriv_leder og admin, etter
  * portal-utils.js (apiFetch, withSubmitGuard). Se park/CLAUDE.md.
@@ -134,7 +134,7 @@ function parkTabell(koloner, rader) {
 let parkLenkene = [];
 
 async function parkHentLenker() {
-  const {ok, d} = await parkApi('/park/api/lenker/');
+  const {ok, d} = await parkApi('/lag/api/lenker/');
   if (!ok) { parkFeil(d.message || 'Kunne ikke hente lenkene.'); return; }
   parkLenkene = d.data;
   const naa = Date.now();
@@ -162,7 +162,7 @@ async function parkLagLenke(e) {
   e.preventDefault();
   await withSubmitGuard('park-lenke-knapp', async () => {
     parkFeil('');
-    const {ok, d} = await parkApi('/park/api/lenker/', 'POST', {
+    const {ok, d} = await parkApi('/lag/api/lenker/', 'POST', {
       navn: document.getElementById('park-lenke-navn').value,
       aapen_fra: document.getElementById('park-lenke-fra').value,
       aapen_til: document.getElementById('park-lenke-til').value,
@@ -202,7 +202,7 @@ async function parkLagLenke(e) {
 
 async function parkFjernLenke(lenke) {
   if (!confirm(`Fjerne «${lenke.navn}»? Den slutter å virke med en gang, også i tiltakskortet.`)) return;
-  const {ok, d} = await parkApi(`/park/api/lenker/${lenke.id}/fjern/`, 'POST', {confirm: true});
+  const {ok, d} = await parkApi(`/lag/api/lenker/${lenke.id}/fjern/`, 'POST', {confirm: true});
   if (!ok) { parkFeil(d.message || 'Kunne ikke fjerne lenken.'); return; }
   await parkHentLenker();
 }
@@ -210,7 +210,7 @@ async function parkFjernLenke(lenke) {
 /* ── Stedene lagene ser ──────────────────────────────────────────────────── */
 
 async function parkHentSteder() {
-  const {ok, d} = await parkApi('/park/api/steder/');
+  const {ok, d} = await parkApi('/lag/api/steder/');
   if (!ok) { parkFeil(d.message || 'Kunne ikke hente stedene.'); return; }
   const linjer = d.data.map((st) => parkNode('li', {
     class: `list-group-item d-flex justify-content-between align-items-center gap-2${st.skjult ? ' text-muted' : ''}`},
@@ -224,7 +224,7 @@ async function parkHentSteder() {
 }
 
 async function parkSettSkjult(id, skjult) {
-  const {ok, d} = await parkApi(`/park/api/steder/${id}/skjul/`, 'POST', {skjult});
+  const {ok, d} = await parkApi(`/lag/api/steder/${id}/skjul/`, 'POST', {skjult});
   if (!ok) { parkFeil(d.message || 'Kunne ikke endre stedet.'); return; }
   parkFeil('');
   await parkHentSteder();
@@ -238,7 +238,7 @@ const PARK_TEGN_MAKS = 200;
 let parkRegistreringene = [];
 
 async function parkHentRegistreringer() {
-  const {ok, d} = await parkApi('/park/api/registreringer/');
+  const {ok, d} = await parkApi('/lag/api/registreringer/');
   if (!ok) { parkFeil(d.message || 'Kunne ikke hente registreringene.'); return; }
   document.getElementById('park-reg-vakt').textContent =
     `— ${d.vakt}${d.data.length >= d.maks ? ` (de siste ${d.maks})` : ''}`;
@@ -283,7 +283,7 @@ function parkSettRegSkjult(skjult) {
 async function parkSlettRegistrering(r) {
   const grunn = prompt(`Slette «${r.antall} × ${r.problemstilling}» fra ${r.lag}? Skriv hvorfor:`);
   if (grunn == null) return;
-  const {ok, d} = await parkApi(`/park/api/registreringer/${r.id}/slett/`, 'POST', {grunn});
+  const {ok, d} = await parkApi(`/lag/api/registreringer/${r.id}/slett/`, 'POST', {grunn});
   if (!ok) { parkFeil(d.message || 'Kunne ikke slette.'); return; }
   parkFeil('');
   await parkHentRegistreringer();
@@ -297,10 +297,10 @@ async function parkRydd(e) {
   if (!id) { parkFeil('Velg en lenke.'); return; }
   // Første kall uten `confirm`: serveren svarer 409 med antallet, og sletter
   // ingenting. Den som rydder skal se hvor mye som går før det går.
-  let svar = await parkApi(`/park/api/lenker/${id}/slett-etter/`, 'POST', kropp);
+  let svar = await parkApi(`/lag/api/lenker/${id}/slett-etter/`, 'POST', kropp);
   if (svar.status === 409) {
     if (!confirm(`${svar.d.antall} registrering(er) fra denne lenken slettes. Fortsette?`)) return;
-    svar = await parkApi(`/park/api/lenker/${id}/slett-etter/`, 'POST', {...kropp, confirm: true});
+    svar = await parkApi(`/lag/api/lenker/${id}/slett-etter/`, 'POST', {...kropp, confirm: true});
   }
   if (!svar.ok) { parkFeil(svar.d.message || 'Kunne ikke slette.'); return; }
   parkFeil('');
@@ -311,7 +311,7 @@ async function parkRydd(e) {
 /* ── Verdimengdene (core.verdilister) ────────────────────────────────────── */
 
 async function parkHentVerdier(slug, boksId, kanRedigere) {
-  const {ok, d} = await parkApi(`/park/api/${slug}/`);
+  const {ok, d} = await parkApi(`/lag/api/${slug}/`);
   if (!ok) { parkFeil(d.message || 'Kunne ikke hente lista.'); return; }
   const rader = d.data;
   const knapp = (tekst, fn, klasse = 'btn-outline-secondary') => parkNode('button', {
@@ -338,7 +338,7 @@ async function parkHentVerdier(slug, boksId, kanRedigere) {
                     parkNode('button', {class: 'btn btn-outline-primary', type: 'submit', tekst: 'Legg til'}));
     skjema.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const svar = await parkApi(`/park/api/${slug}/`, 'POST', {navn: felt.value});
+      const svar = await parkApi(`/lag/api/${slug}/`, 'POST', {navn: felt.value});
       if (!svar.ok) { parkFeil(svar.d.message || 'Kunne ikke legge til.'); return; }
       parkFeil('');
       await parkHentVerdier(slug, boksId, kanRedigere);
@@ -348,7 +348,7 @@ async function parkHentVerdier(slug, boksId, kanRedigere) {
 }
 
 async function parkSettVerdi(slug, boksId, id, kropp) {
-  const {ok, d} = await parkApi(`/park/api/${slug}/${id}/`, 'PUT', kropp);
+  const {ok, d} = await parkApi(`/lag/api/${slug}/${id}/`, 'PUT', kropp);
   if (!ok) { parkFeil(d.message || 'Kunne ikke endre.'); return; }
   parkFeil('');
   await parkHentVerdier(slug, boksId, true);
@@ -363,14 +363,14 @@ async function parkEndre(slug, boksId, r) {
 async function parkFlytt(slug, boksId, rader, i, retning) {
   const ider = rader.map((r) => r.id);
   [ider[i], ider[i + retning]] = [ider[i + retning], ider[i]];
-  const {ok, d} = await parkApi(`/park/api/${slug}/rekkefolge/`, 'PUT', {ider});
+  const {ok, d} = await parkApi(`/lag/api/${slug}/rekkefolge/`, 'PUT', {ider});
   if (!ok) { parkFeil(d.message || 'Kunne ikke flytte.'); return; }
   await parkHentVerdier(slug, boksId, true);
 }
 
 async function parkSlettVerdi(slug, boksId, r) {
   if (!confirm(`Slette «${r.navn}»?`)) return;
-  const {ok, d} = await parkApi(`/park/api/${slug}/${r.id}/`, 'DELETE', {confirm: true});
+  const {ok, d} = await parkApi(`/lag/api/${slug}/${r.id}/`, 'DELETE', {confirm: true});
   if (!ok) { parkFeil(d.message || 'Kunne ikke slette.'); return; }
   await parkHentVerdier(slug, boksId, true);
 }

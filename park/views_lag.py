@@ -7,7 +7,7 @@ strengere enn ellers, og hver av dem har en test:
   samme nettleser sender innloggingen sin med; den skal ikke bety noe.
   `park/tests.py` leser fila og håndhever det.
 - **Tokenet kommer i headeren `X-Park-Lenke`**, aldri i stien: siden leser det
-  fra fragmentet (`/park/r/#…`), som nettleseren ikke sender til serveren og
+  fra fragmentet (`/lag/r/#…`), som nettleseren ikke sender til serveren og
   derfor aldri havner i Railways tilgangslogg.
 - **Ugyldig, fjernet, stengt lenke og ingen åpen vakt gir samme svar**
   (`services.aapen_lenke`).
@@ -71,7 +71,7 @@ def _telefon(request) -> str | None:
 
 
 def park_lenke_kreves(view):
-    """Gaten for API-et under `/park/r/`: gyldig lenke, telefon-ID, grensene.
+    """Gaten for API-et under `/lag/r/`: gyldig lenke, telefon-ID, grensene.
 
     Setter `_park_lenke_kreves`, som `park/tests.py` krever på hver slik rute —
     samme grep som `_modul_kreves`: en glemt dekoratør skal bli rød.

@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — `/park/` heter nå «Lagregistrering» på `/lag/`  `#park`
+
+**Hvorfor:** André: «Bør vi for tydelighetens skyld endre navn fra /park til /lag? Da appen skal
+kanskje brukes til andre arrangementer og?» — og etter forslaget: «Ja, Lagregistrering og /lag/,
+kjør på. Jeg fjerner linken som er. Da trenger vi ikke kode videresending.»
+
+- **Adressene:** `/park/` → **`/lag/`** (oppsettet) og `/park/r/#…` → **`/lag/r/#…`** (siden lagene
+  bruker), med API-et under. **Ingen videresending** fra de gamle — `/park/r/` gir 404, og en test
+  holder det slik.
+- **Navnet brukerne ser:** «Lagregistrering» i menyen, på dashbordet, i overskriftene, sidetitlene,
+  tilgangsmatrisen, backupoversikten og portalinnstillingene; ikonet er `people`. Knappen i
+  vaktlistas gruppeoppsett heter «Lagregistrering» / «Ikke i lagregistrering». Statistikkfanen
+  heter fortsatt «Lag».
+- **Hvorfor ikke «Lag» i menyen:** «Lag» er også ressursgruppa i vaktlista og kortene på KO-tavla,
+  og kan leses som «oversikt over lagene».
+- **Koden heter fortsatt `park`** — appen, tabellene, modul-sluggen i `ModulTilgang`, nøklene
+  `park_*` i `AppSetting`, backup-sluggen og headerne `X-Park-*`. Å gi en Django-app nytt navn rører
+  migrasjoner, tabeller, tilgangsrader og backupfilene offsite, uten at noen bruker ser forskjell.
+  Samme skille som `patients` på `/pasienter/`; skrevet ned i `park/CLAUDE.md` så det ikke leses
+  som en glipp. `vaktliste/0026` er bare hjelpeteksten på rutingflagget.
+
 ## 2026-09-28 — `/park/`: registreringslista minimeres, filtreres og tar ikke over siden  `#park`
 
 **Hvorfor:** André: «Inne i /park disse registreringene. De blir fort mellom 500-1500 går de vare

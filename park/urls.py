@@ -1,12 +1,12 @@
 """URL-konfigurasjon for park-modulen.
 
-Mountet på ``/park/`` i ``myproject/urls.py``, før ``core``. Navnene har
+Mountet på ``/lag/`` i ``myproject/urls.py``, før ``core``. Navnene har
 `park_`-prefiks fordi navnerommet er globalt, som i de andre modulene.
 
 **To slags ruter, og testen skiller dem** (`park/tests.py`):
 
-- under ``/park/`` for innloggede, gatet med ``@modul_kreves('park', …)``
-- under ``/park/r/`` uten innlogging, gatet med ``@park_lenke_kreves`` — tokenet
+- under ``/lag/`` for innloggede, gatet med ``@modul_kreves('park', …)``
+- under ``/lag/r/`` uten innlogging, gatet med ``@park_lenke_kreves`` — tokenet
   fra tiltakskortet (``docs/FORSLAG_PARK.md`` §4). Selve siden er statisk og
   står i unntakslista i ``patients/tests_modul_dekorator.py``.
 """

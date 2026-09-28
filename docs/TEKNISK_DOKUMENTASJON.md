@@ -1530,7 +1530,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 37 filer i `static/js/`, fordelt
 på ti sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
-grensesnittene under `/oppdrag/`, og de to i park: `/park/` og parksiden `/park/r/`.
+grensesnittene under `/oppdrag/`, og de to i park: `/lag/` og parksiden `/lag/r/`.
 
 | Modul | Lastes | Ansvar |
 |---|---|---|
@@ -1550,8 +1550,8 @@ grensesnittene under `/oppdrag/`, og de to i park: `/park/` og parksiden `/park/
 | `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |
 | `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
 | `ko-*.js` (fem) | **kun** `/ko/` | Rutenettet, hendelsene, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
-| `park-lag.js` | **kun** `/park/r/`, uten innlogging | Lagets registrering — se `park/CLAUDE.md` |
-| `park-oppsett.js` | **kun** `/park/`, for `skriv_leder` | Lenkene, slettingen og verdimengdene — se `park/CLAUDE.md` |
+| `park-lag.js` | **kun** `/lag/r/`, uten innlogging | Lagets registrering — se `park/CLAUDE.md` |
+| `park-oppsett.js` | **kun** `/lag/`, for `skriv_leder` | Lenkene, slettingen og verdimengdene — se `park/CLAUDE.md` |
 
 **To sider er delt i flere filer** (14. sep. 2026): `vaktliste.js` var 3 801 linjer og
 `oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt navnerom**, så

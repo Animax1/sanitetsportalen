@@ -740,7 +740,7 @@ og håndhever det.
 
 37 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, og de to under
-både `/oppdrag/` og `/park/`.
+både `/oppdrag/` og `/lag/`.
 
 **Tre av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
@@ -780,8 +780,8 @@ håndhever det på cellebredden.
 | `vaktliste-*.js` (sju) | **kun** `/vaktliste/` | `templates/vaktliste/CLAUDE.md` |
 | `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
-| `park-lag.js` | **kun** `/park/r/`, uten `portal-utils.js` | `park/CLAUDE.md` |
-| `park-oppsett.js` | **kun** `/park/`, `skriv_leder` | `park/CLAUDE.md` |
+| `park-lag.js` | **kun** `/lag/r/`, uten `portal-utils.js` | `park/CLAUDE.md` |
+| `park-oppsett.js` | **kun** `/lag/`, `skriv_leder` | `park/CLAUDE.md` |
 | `portal-status.js` | **kun** server-status | dashbordet, `core/admin_status.py` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

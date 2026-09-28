@@ -703,10 +703,10 @@ function mkGruppeRad(g) {
   // Rutingflagget (FORSLAG_PARK.md §3.4): gruppas ressurser står i
   // lagnedtrekket på parksiden. Merket viser det; knappen snur det.
   const park = g.registrerer_i_park
-    ? `<button class="btn btn-sm btn-outline-success" type="button" title="Gruppas ressurser kan velges på /park/"
-               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':0')}"><i class="bi bi-tree me-1"></i>Park</button>`
-    : `<button class="btn btn-sm btn-outline-secondary" type="button" title="Ikke med på /park/ — klikk for å ta med"
-               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':1')}"><i class="bi bi-tree me-1"></i>Ikke park</button>`;
+    ? `<button class="btn btn-sm btn-outline-success" type="button" title="Gruppas ressurser kan velges i lagregistreringen (/lag/r/)"
+               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':0')}"><i class="bi bi-people me-1"></i>Lagregistrering</button>`
+    : `<button class="btn btn-sm btn-outline-secondary" type="button" title="Ikke med i lagregistreringen — klikk for å ta med"
+               data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':1')}"><i class="bi bi-people me-1"></i>Ikke i lagregistrering</button>`;
   const dempet = g.er_aktiv ? '' : ' vl-inaktiv';
   const inaktivMerke = g.er_aktiv ? ''
     : '<span class="vl-merkelapp">inaktiv</span>';

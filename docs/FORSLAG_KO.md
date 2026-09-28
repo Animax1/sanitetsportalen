@@ -35,7 +35,7 @@ Etter omleggingen fordeler ansvaret seg slik:
 |---|---|---|
 | `/vaktliste/` | Hvem finnes, hvem er på vakt | Personlig |
 | `/oppdrag/` | Enhetens skjerm og statusmaskinen | **Delt** — og bare denne |
-| `/park/` | Lagets utfallsregistrering (eget notat senere) | Ingen — vaktnøkkel, skrive-bare |
+| `/lag/` | Lagets utfallsregistrering (eget notat senere) | Ingen — vaktnøkkel, skrive-bare |
 | `/ko/` | Situasjonsbildet, loggen, hendelsene, status for dem som ikke stempler selv | Personlig |
 | `/pasienter/` | Pasienten fra samleplass og inn | Personlig |
 
@@ -104,13 +104,13 @@ vaktliste, mens `oppdrag.Enhet` er permanent. Konsekvensen er at statistikk over
 gjennom en sesong er rett fram, mens statistikk over lag må matche på navn og gruppe, ikke
 på ID. Det er ikke et problem, men det er et sted en spørring kan gi feil svar uten å feile.
 
-### 3.2 Ruting: hvem bruker `/oppdrag/`, hvem bruker `/park/`
+### 3.2 Ruting: hvem bruker `/oppdrag/`, hvem bruker `/lag/`
 
 > **Ikke bygget i pulje 3, med vilje (17. sep. 2026).** Flagget avgjør `/oppdrag/` mot
-> `/park/`, og `/park/` finnes ikke — bygget nå er det en bryter med én stilling. Tavla
+> `/lag/`, og `/lag/` finnes ikke — bygget nå er det en bryter med én stilling. Tavla
 > trenger det heller ikke: spørsmålet *der* er «hvem stempler selv», og det utledes av
 > `Ressurs.enhet`. At de to korrelerer i dag gjør dem ikke til samme spørsmål. Flagget
-> følger `/park/`-notatet.
+> følger `/lag/`-notatet.
 
 Flagget hører hjemme på **`Ressursgruppe`**, ved siden av `flere_enheter` og `er_aktiv`.
 
@@ -348,7 +348,7 @@ FK-en relaterer.** Visningen bærer relasjonen: «Oppdrag 45 · Hendelse 12».
 
 Hierarkisk nummerering (`H12.1`) er forkastet, se §9.4.
 
-`/park/`-registreringer får **ikke** et nummer i denne familien — de sies aldri høyt, og en
+`/lag/`-registreringer får **ikke** et nummer i denne familien — de sies aldri høyt, og en
 tredje serie er en tredje ting å forveksle. En kvittering til den som registrerte holder.
 
 ## 7. Grensesnittet
@@ -468,7 +468,7 @@ Ansvarsområdet kan sette standardfilteret. Det er bare et utgangspunkt, og derf
 Både `ko` og `park` melder seg inn i kilderegisteret i `core/stats.py`, som er mønsteret.
 
 Det som ikke er rett fram: **de tre registrene teller kontakter, ikke personer.** Et lag
-finner noen og registrerer i `/park/`, tilkaller ambulanse som får et oppdrag, og pasienten
+finner noen og registrerer i `/lag/`, tilkaller ambulanse som får et oppdrag, og pasienten
 havner på samleplass. Én person, tre rader, tre registre. Summeres de, står det 340
 pasienter i sesongrapporten der det var 210 mennesker.
 
@@ -573,7 +573,7 @@ tidligere** enn før.
 Prisen skal stå: pulje 4 var «den største» og er nå også den som blokkerer. Blir den lang,
 er det ressursoversikten (pulje 3) som er levert i mellomtiden, og den er nyttig alene.
 
-`/park/` får sitt eget notat og kommer etter. Flagget i §3.2 hører til der, men er nevnt her
+`/lag/` får sitt eget notat og kommer etter. Flagget i §3.2 hører til der, men er nevnt her
 fordi det er samme valg.
 
 ## 11. Åpne spørsmål

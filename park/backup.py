@@ -21,7 +21,7 @@ from core.backup import BaseBackupHandler, register
 
 class ParkBackupHandler(BaseBackupHandler):
     slug = 'park'
-    display_name = 'Park'
+    display_name = 'Lagregistrering'
 
     apps = ['park']
     exclude = []

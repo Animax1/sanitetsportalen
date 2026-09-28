@@ -40,10 +40,10 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
             try:
                 minutter = int(str(raa).strip())
             except (TypeError, ValueError):
-                raise ValidationError('Angrefristen på parksiden må være et helt tall minutter.') from None
+                raise ValidationError('Angrefristen i lagregistreringen må være et helt tall minutter.') from None
             if not services.ANGREFRIST_MIN <= minutter <= services.ANGREFRIST_MAKS:
                 raise ValidationError(
-                    f'Angrefristen på parksiden må være mellom {services.ANGREFRIST_MIN} '
+                    f'Angrefristen i lagregistreringen må være mellom {services.ANGREFRIST_MIN} '
                     f'og {services.ANGREFRIST_MAKS} minutter.')
             ut['angrefrist'] = minutter
         return ut

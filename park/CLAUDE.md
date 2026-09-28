@@ -5,6 +5,13 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
+**Brukerne ser «Lagregistrering» på `/lag/`; koden heter `park`** (André, 28. sep. 2026:
+«Lagregistrering og /lag/»). Portalen brukes på flere arrangementer enn et med en park. Bare det
+synlige ble byttet — menyen, overskriftene, adressen. Appnavnet, tabellene, modul-sluggen i
+`ModulTilgang`, `AppSetting`-nøklene og backup-sluggen står som `park`, fordi å gi en Django-app
+nytt navn rører migrasjoner, tabeller, tilgangsrader og backupfiler offsite — uten at noen
+bruker ser forskjell. Samme skille som `patients` på `/pasienter/`. Det er ikke en glipp.
+
 Lagenes utfallsregistrering: et lag ute på området registrerer hva det har gjort —
 problemstilling × antall, sted og utfall — **uten konto**, gjennom én lenke i et
 tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
@@ -20,23 +27,23 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Hva som kan angres, og hvor lenge | `services.kan_angres()`, `angrefrist_min()` |
 | Porten uten innlogging og grensene | `views_lag.park_lenke_kreves` |
 | Sletting av feilregistreringer, én og alt fra en lenke | `services.slett_registrering()`, `slett_fra_lenke()` |
-| Hvem som setter opp hva på `/park/` | `views.py`, tabellen i docstringen |
-| Registreringslista på `/park/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
+| Hvem som setter opp hva på `/lag/` | `views.py`, tabellen i docstringen |
+| Registreringslista på `/lag/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
 | Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
 | Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
 
 ## Portalens første side uten innlogging
 
-`/park/r/` og API-et under svarer en anonym klient. **Alt under `/park/r/` bor i
+`/lag/r/` og API-et under svarer en anonym klient. **Alt under `/lag/r/` bor i
 `views_lag.py`, og den fila leser aldri `request.user`** — en portalbruker som åpner siden i
 samme nettleser sender innloggingen sin med, og den skal ikke bety noe. `RuteneTests`
 håndhever det på kilden, og at hver API-rute bærer `@park_lenke_kreves`.
 
-- **Tokenet står i fragmentet** (`/park/r/#…`) og sendes i headeren `X-Park-Lenke`. Det
+- **Tokenet står i fragmentet** (`/lag/r/#…`) og sendes i headeren `X-Park-Lenke`. Det
   havner aldri i Railways tilgangslogg. Siden fjerner det fra adressefeltet med
   `history.replaceState` — nettleserloggen lagrer ellers hele adressen.
 - **Bare hashen lagres** (`Parklenke.hemmelighet_hash`). Tokenet vises én gang, når lenken
-  lages — på `/park/` eller med `manage.py park_lenke --lag …`, som står igjen som reserve.
+  lages — på `/lag/` eller med `manage.py park_lenke --lag …`, som står igjen som reserve.
 - **Ugyldig, fjernet, stengt lenke, modulen av og ingen åpen vakt gir samme 403.**
 - **Svarene inneholder aldri registreringer** — heller ikke lagets egne. Kvitteringen er det
   klienten sendte, pluss en teller.
@@ -106,6 +113,6 @@ hvor mye som går før det går. Én auditrad for hele slettingen, ikke én per 
 
 `les` og `skriv_leder` (`module.py`). `les` gir fanen «Lag» i `/statistikk/` (sammen med
 `statistikk: les`, B17 — `park/statistikk.py`) og en
-henvisning på `/park/`; `skriv_leder` setter opp lenkene og problemstillingene og sletter.
+henvisning på `/lag/`; `skriv_leder` setter opp lenkene og problemstillingene og sletter.
 **Utfallene er global admin** (B7), og å slette en rad fra en verdimengde likeså
 (`core.verdilister`). KO gjør ingenting med registreringene (B15).

@@ -305,7 +305,7 @@ Et nytt oppdrag når bilen på 0–15 s, og beskjeden går uansett over nødnett
 Vaktlista henter **ikke** data av seg selv: en endring en annen gjør, vises når siden
 lastes på nytt.
 
-**`/park/r/` — lagenes side, uten innlogging** (27. sep. 2026)
+**`/lag/r/` — lagenes side, uten innlogging** (27. sep. 2026)
 
 | Hva | Hvor ofte | Nett | Stille når | Hvor |
 |---|---|---|---|---|

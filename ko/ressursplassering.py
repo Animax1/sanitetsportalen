@@ -1,6 +1,6 @@
 """KOs plassering av lagene, meldt inn i `core/ressursplassering.py`.
 
-`/park/` forhåndsvelger stedet et lag registrerer fra, og KOs tavle er den ene
+`/lag/` forhåndsvelger stedet et lag registrerer fra, og KOs tavle er den ene
 kilden (`docs/FORSLAG_PARK.md` §5.1). KO kjenner ikke park (B15) — den svarer
 bare registeret på hvor en ressurs står.
 

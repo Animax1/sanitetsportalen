@@ -19,13 +19,13 @@ from core.modules import Module
 
 ParkModule = Module(
     slug='park',
-    name='Park',
+    name='Lagregistrering',
     description=(
         'Lagenes registrering av hva de har gjort ute: problemstilling, '
         'sted og utfall — uten innlogging, via lenke i tiltakskortet.'
     ),
-    url='/park/',
-    icon='tree',
+    url='/lag/',
+    icon='people',
     admin_only=False,
     is_core=False,
     order=130,              # etter KO (125): lagene ute, etter kommandoplassen

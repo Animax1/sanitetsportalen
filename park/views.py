@@ -1,11 +1,11 @@
-"""De innloggede flatene i park-modulen: oppsettet på `/park/` (pulje 2).
+"""De innloggede flatene i park-modulen: oppsettet på `/lag/` (pulje 2).
 
 Siden lagene bruker, uten innlogging, står i `views_lag.py` — med vilje i en
 egen fil, så regelen «les aldri `request.user`» kan håndheves på hele fila.
 
 | Handling | Krav |
 |---|---|
-| Se `/park/` | `les` — men `les` får bare en henvisning til statistikken (B17) |
+| Se `/lag/` | `les` — men `les` får bare en henvisning til statistikken (B17) |
 | Lenkene: se, lage, fjerne | `skriv_leder` |
 | Stedene lagene ser (skjule et sted for lagene) | `skriv_leder` |
 | Problemstillingene | `skriv_leder` (B6) |
@@ -49,7 +49,7 @@ def kan_lede(user) -> bool:
 @modul_kreves('park', 'les')
 @require_http_methods(['GET'])
 def index_view(request):
-    """`/park/`. For `les` er tallene i `/statistikk/`, og siden sier det —
+    """`/lag/`. For `les` er tallene i `/statistikk/`, og siden sier det —
     en menyoppføring som fører til en vegg er verre enn ingen."""
     return render(request, 'park/index.html', {
         'leder': kan_lede(request.user),
@@ -105,7 +105,7 @@ def lenker_view(request):
     except services.Ugyldig as feil:
         return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _lenke_til_dict(lenke, naa),
-                         'adresse': request.build_absolute_uri('/park/r/') + '#' + token},
+                         'adresse': request.build_absolute_uri('/lag/r/') + '#' + token},
                         status=201)
 
 

@@ -1,6 +1,6 @@
 """Lag, list og fjern parklenker fra kommandolinja.
 
-Oppsettsiden på `/park/` er pulje 2; til da er dette veien, og etterpå er det
+Oppsettsiden på `/lag/` er pulje 2; til da er dette veien, og etterpå er det
 reserven — samme rolle som `create_admin` har for kontoene.
 
     python manage.py park_lenke --lag "Tiltakskort Bliksund" --fra 2026-10-01T08:00 --til 2026-10-04T08:00
@@ -30,7 +30,7 @@ def _tidspunkt(raa, navn):
 
 
 class Command(BaseCommand):
-    help = 'Lag, list og fjern lenkene lagene registrerer med på /park/r/.'
+    help = 'Lag, list og fjern lenkene lagene registrerer med på /lag/r/.'
 
     def add_arguments(self, parser):
         parser.add_argument('--lag', metavar='NAVN', help='Lag en ny lenke med dette navnet.')
@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 raise CommandError(str(feil)) from None
             self.stdout.write(f'Lenke {lenke.pk} «{lenke.navn}» er laget.')
             self.stdout.write('Adressen vises bare nå — legg den i tiltakskortet:')
-            self.stdout.write(f'  https://<portalens domene>/park/r/#{token}')
+            self.stdout.write(f'  https://<portalens domene>/lag/r/#{token}')
             return
         if opt['fjern'] is not None:
             lenke = Parklenke.objects.filter(pk=opt['fjern']).first()
