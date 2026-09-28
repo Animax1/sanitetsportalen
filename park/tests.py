@@ -661,6 +661,18 @@ class SlettingTests(_Oppsett):
         andre.refresh_from_db()
         self.assertEqual((forst.slettet_grunn, andre.slettet_grunn), ('feil lag', 'lekket'))
 
+    def test_lista_henter_mer_enn_500(self):
+        """«De blir fort mellom 500–1500» (André, 28. sep. 2026). Den eldste
+        feilregistreringen skal kunne finnes og slettes."""
+        rad = self._registrer()
+        Registrering.objects.bulk_create([
+            Registrering(vakt=self.vakt, lenke=self.lenke, ressurs_navn='Sandnes 2.1',
+                         problemstilling='Kramper', utfall='Gikk videre selv', lokasjon_navn='Club',
+                         idempotency_key=str(uuid.uuid4())) for _ in range(600)])
+        d = self.leder.get('/park/api/registreringer/').json()
+        self.assertEqual(len(d['data']), 601)
+        self.assertIn(rad.pk, [r['id'] for r in d['data']])
+
     def test_slett_etter_uten_tidspunkt(self):
         url = f'/park/api/lenker/{self.lenke.pk}/slett-etter/'
         self.assertEqual(self._post(self.leder, url, {'grunn': 'x'}).status_code, 400)

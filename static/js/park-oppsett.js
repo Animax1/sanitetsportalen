@@ -54,6 +54,27 @@ function parkDato(iso) {
                                     hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo'});
 }
 
+/* Registreringene som passer filteret. Hvert ord må finnes i lag, sted,
+ * problemstilling eller utfall — «sandnes kramper» finner Sandnes 2.1s
+ * kramper, ikke alt fra Sandnes og alle kramper. */
+function parkFiltrer(rader, tekst) {
+  const ord = String(tekst || '').toLocaleLowerCase('nb').split(/\s+/).filter(Boolean);
+  if (!ord.length) return rader;
+  return rader.filter((r) => {
+    const felt = [r.lag, r.sted, r.problemstilling, r.utfall].join(' ').toLocaleLowerCase('nb');
+    return ord.every((o) => felt.includes(o));
+  });
+}
+
+/* Hva telleren sier. Et filter skal aldri skjule noe stille (CLAUDE.md), og
+ * en tegnegrense heller ikke: står det ikke hvor mange som ikke vises, tror
+ * man at lista er hele vakta. */
+function parkTellertekst(vist, treff, totalt, filtrert) {
+  if (!totalt) return '';
+  if (vist < treff) return `Viser ${vist} av ${treff}${filtrert ? ` treff (${totalt} i alt)` : ''} — filtrer for å finne resten`;
+  return filtrert ? `${treff} av ${totalt}` : `${totalt} registreringer`;
+}
+
 /* Kopier til utklippstavla. Svarer 'kopiert' når det gikk, 'merket' når
  * nettleseren nektet (eldre nettleser, ikke HTTPS) og teksten i stedet er
  * merket så brukeren kan kopiere selv. Svaret styrer hva siden sier — en
@@ -211,12 +232,27 @@ async function parkSettSkjult(id, skjult) {
 
 /* ── Registreringene ─────────────────────────────────────────────────────── */
 
+/* Hvor mange rader som tegnes. Hele vakta hentes, så filteret søker i alt;
+ * men 1 500 rader i DOM-en gjør siden treg, og ingen leser dem uten å filtrere. */
+const PARK_TEGN_MAKS = 200;
+let parkRegistreringene = [];
+
 async function parkHentRegistreringer() {
   const {ok, d} = await parkApi('/park/api/registreringer/');
   if (!ok) { parkFeil(d.message || 'Kunne ikke hente registreringene.'); return; }
   document.getElementById('park-reg-vakt').textContent =
     `— ${d.vakt}${d.data.length >= d.maks ? ` (de siste ${d.maks})` : ''}`;
-  const rader = d.data.map((r) => {
+  parkRegistreringene = d.data;
+  parkTegnRegistreringer();
+}
+
+function parkTegnRegistreringer() {
+  const filter = document.getElementById('park-reg-filter').value;
+  const treff = parkFiltrer(parkRegistreringene, filter);
+  const synlige = treff.slice(0, PARK_TEGN_MAKS);
+  document.getElementById('park-reg-teller').textContent = parkTellertekst(
+    synlige.length, treff.length, parkRegistreringene.length, !!filter.trim());
+  const rader = synlige.map((r) => {
     const slett = r.slettet
       ? parkNode('span', {class: 'small text-muted', tekst: `Slettet av ${r.slettet_av}: ${r.slettet_grunn}`})
       : parkNode('button', {class: 'btn btn-sm btn-outline-danger', type: 'button', tekst: 'Slett',
@@ -227,9 +263,21 @@ async function parkHentRegistreringer() {
       parkNode('td', {tekst: String(r.antall)}), parkNode('td', {tekst: r.utfall}),
       parkNode('td', {class: 'text-end'}, slett));
   });
+  const tabell = parkTabell(['Tid', 'Lag', 'Sted', 'Problemstilling', 'Antall', 'Utfall', ''], rader);
+  // Overskriften står fast når lista rulles i sin egen boks.
+  tabell.querySelector('thead').setAttribute('style', 'position: sticky; top: 0; z-index: 1;');
+  const tom = parkRegistreringene.length ? 'Ingen treff.' : 'Ingen registreringer på denne vakta.';
   document.getElementById('park-registreringer').replaceChildren(rader.length
-    ? parkTabell(['Tid', 'Lag', 'Sted', 'Problemstilling', 'Antall', 'Utfall', ''], rader)
-    : parkNode('p', {class: 'small text-muted', tekst: 'Ingen registreringer på denne vakta.'}));
+    ? tabell : parkNode('p', {class: 'small text-muted', tekst: tom}));
+}
+
+/* Minimeringen huskes per nettleser — samme valg som KOs grupper. */
+function parkSettRegSkjult(skjult) {
+  document.getElementById('park-reg-innhold').classList.toggle('d-none', skjult);
+  const knapp = document.getElementById('park-reg-bryter');
+  knapp.textContent = skjult ? 'Vis' : 'Skjul';
+  knapp.setAttribute('aria-expanded', String(!skjult));
+  try { globalThis.localStorage.setItem('park.reg.skjult', skjult ? '1' : '0'); } catch (e) { /* uten lagring huskes det ikke */ }
 }
 
 async function parkSlettRegistrering(r) {
@@ -335,6 +383,12 @@ async function parkOppsettStart() {
   document.getElementById('park-lenke-til').value = std.til;
   document.getElementById('park-ny-lenke').addEventListener('submit', parkLagLenke);
   document.getElementById('park-rydd').addEventListener('submit', parkRydd);
+  document.getElementById('park-reg-filter').addEventListener('input', parkTegnRegistreringer);
+  let skjult = false;
+  try { skjult = globalThis.localStorage.getItem('park.reg.skjult') === '1'; } catch (e) { skjult = false; }
+  parkSettRegSkjult(skjult);
+  document.getElementById('park-reg-bryter').addEventListener('click', () => parkSettRegSkjult(
+    !document.getElementById('park-reg-innhold').classList.contains('d-none')));
   await Promise.all([
     parkHentLenker(),
     parkHentRegistreringer(),

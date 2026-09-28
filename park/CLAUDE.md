@@ -21,6 +21,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Porten uten innlogging og grensene | `views_lag.park_lenke_kreves` |
 | Sletting av feilregistreringer, én og alt fra en lenke | `services.slett_registrering()`, `slett_fra_lenke()` |
 | Hvem som setter opp hva på `/park/` | `views.py`, tabellen i docstringen |
+| Registreringslista på `/park/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
 | Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
 | Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
 

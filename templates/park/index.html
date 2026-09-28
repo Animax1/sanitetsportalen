@@ -61,7 +61,13 @@
     </section>
 
     <section class="mb-4">
-      <h2 class="h6">Registreringer <span class="text-muted small" id="park-reg-vakt"></span></h2>
+      <div class="d-flex align-items-center justify-content-between gap-2">
+        <h2 class="h6 mb-0">Registreringer <span class="text-muted small" id="park-reg-vakt"></span></h2>
+        {# Minimering (André, 28. sep. 2026): lista blir fort 500–1 500 rader. #}
+        <button class="btn btn-sm btn-outline-secondary" type="button" id="park-reg-bryter"
+                aria-expanded="true" aria-controls="park-reg-innhold">Skjul</button>
+      </div>
+      <div id="park-reg-innhold" class="mt-2">
       <p class="small text-muted mb-2">
         Laget kan angre selv i noen minutter. Etter det slettes en feilregistrering her, med en
         grunn. Raden blir stående overstreket, og statistikken utelater den.
@@ -88,7 +94,18 @@
           </div>
         </form>
       </details>
-      <div class="table-responsive"><div id="park-registreringer"></div></div>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <input class="form-control form-control-sm" style="max-width: 22rem;" type="search"
+               id="park-reg-filter" placeholder="Filtrer: lag, sted, problemstilling, utfall"
+               aria-label="Filtrer registreringene">
+        {# Et filter skal aldri skjule noe stille: antallet står hele tiden. #}
+        <span class="small text-muted" id="park-reg-teller" aria-live="polite"></span>
+      </div>
+      {# Egen rulling, så lista ikke tar over siden; overskriften står fast. #}
+      <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+        <div id="park-registreringer"></div>
+      </div>
+      </div>
     </section>
 
     <section class="mb-4">

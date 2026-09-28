@@ -35,9 +35,11 @@ from core.verdilister import Verdiliste, lag_views
 from . import services
 from .models import Parklenke, Problemstilling, Registrering, Utfall
 
-#: Hvor mange registreringer lista viser. Tallene hører hjemme i statistikken;
-#: lista er for å finne den ene feilregistreringen.
-LISTE_MAKS = 500
+#: Hvor mange registreringer lista henter. Tallene hører hjemme i statistikken;
+#: lista er for å finne den ene feilregistreringen — og den kan være hvor som
+#: helst i vakta. 500 skjulte de eldste 1 000 på en vakt med 1 500 (André,
+#: 28. sep. 2026). Nettleseren tegner bare de første treffene (`park-oppsett.js`).
+LISTE_MAKS = 5000
 
 
 def kan_lede(user) -> bool:

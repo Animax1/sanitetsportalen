@@ -118,7 +118,8 @@ class OppsettReglerTests(SimpleTestCase):
     def setUp(self):
         self.harness = build_harness(((OPPSETT_JS, (
             'parkKanSetteOppUtfall', 'parkKanSletteVerdi', 'parkLenkeStatus',
-            'parkLokalFelt', 'parkStandardOppetid', 'parkKopier')),))
+            'parkLokalFelt', 'parkStandardOppetid', 'parkKopier', 'parkFiltrer',
+            'parkTellertekst')),))
 
     def _j(self, uttrykk):
         return json.loads(run_node(self.harness, f'console.log(JSON.stringify({uttrykk}));')
@@ -138,6 +139,27 @@ class OppsettReglerTests(SimpleTestCase):
         self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-02T08:00:00Z'))"), 'Stengt')
         self.assertEqual(self._j(f"parkLenkeStatus(Object.assign({l}, {{fjernet: true}}), "
                                  f"Date.parse('2026-10-01T09:00:00Z'))"), 'Fjernet')
+
+    def test_filteret_krever_hvert_ord(self):
+        rader = json.dumps([
+            {'lag': 'Sandnes 2.1', 'sted': 'Club', 'problemstilling': 'Kramper', 'utfall': 'Tilkalt bil'},
+            {'lag': 'Sandnes 2.2', 'sted': 'Parkscene', 'problemstilling': 'Kramper', 'utfall': 'Gikk videre selv'},
+            {'lag': 'Sandnes 2.1', 'sted': 'Parkscene', 'problemstilling': 'Brannskade', 'utfall': 'Avslo hjelp'},
+        ])
+        lag = lambda uttrykk: [r['sted'] for r in self._j(uttrykk)]
+        self.assertEqual(lag(f"parkFiltrer({rader}, 'sandnes 2.1 kramper')"), ['Club'])
+        self.assertEqual(lag(f"parkFiltrer({rader}, '  PARKSCENE ')"), ['Parkscene', 'Parkscene'])
+        self.assertEqual(len(self._j(f"parkFiltrer({rader}, '')")), 3)
+        self.assertEqual(lag(f"parkFiltrer({rader}, 'avslo')"), ['Parkscene'])
+
+    def test_telleren_sier_hvor_mange_som_ikke_vises(self):
+        self.assertEqual(self._j("parkTellertekst(200, 1340, 1340, false)"),
+                         'Viser 200 av 1340 — filtrer for å finne resten')
+        self.assertEqual(self._j("parkTellertekst(200, 300, 1340, true)"),
+                         'Viser 200 av 300 treff (1340 i alt) — filtrer for å finne resten')
+        self.assertEqual(self._j("parkTellertekst(12, 12, 1340, true)"), '12 av 1340')
+        self.assertEqual(self._j("parkTellertekst(40, 40, 40, false)"), '40 registreringer')
+        self.assertEqual(self._j("parkTellertekst(0, 0, 0, false)"), '')
 
     def test_kopier_sier_bare_kopiert_naar_det_ble_kopiert(self):
         ut = run_node(self.harness, '''

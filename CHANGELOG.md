@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — `/park/`: registreringslista minimeres, filtreres og tar ikke over siden  `#park`
+
+**Hvorfor:** André: «Inne i /park disse registreringene. De blir fort mellom 500-1500 går de vare
+nedover eller har vi en minimerings knapp slik at den ikke tar over siden?» Svaret var nei — og
+verre: lista viste bare **de siste 500**, så de eldste 1 000 på en slik vakt kunne verken ses
+eller slettes.
+
+- **«Skjul» / «Vis»** ved overskriften, husket per nettleser (`park.reg.skjult`), som KOs grupper.
+- **Egen rulling:** lista tar maks halve skjermhøyden, og overskriftsraden står fast.
+- **Filter** på lag, sted, problemstilling og utfall — hvert ord må treffe, så «sandnes 2.1
+  kramper» finner Sandnes 2.1s kramper. **Telleren står hele tiden:** «Viser 200 av 1526 —
+  filtrer for å finne resten», eller «181 av 1526» når filteret er smalt nok.
+- **Hele vakta hentes** (`LISTE_MAKS` 500 → 5000), men nettleseren tegner bare de 200 første
+  treffene — 1 500 rader i DOM-en gjør siden treg, og ingen leser dem uten å filtrere.
+
+**Mutanter: 5, alle drept** — `every` → `some`, filteret uten små bokstaver, telleren som skjuler
+grensen, utfallet ikke søkbart, grensen tilbake til 500.
+
+**Prøvd i Chromium** med 1 526 registreringer: 200 tegnet, «Viser 200 av 1526»,
+«stavanger kramper» → «181 av 1526», «Skjul» står seg etter ny lasting.
+
 ## 2026-09-28 — `/park/`: steder skjult for lagene, og «Kopiert ✓» på lenken  `#park`
 
 **Hvorfor:** André: «kan vi skjule noen lokasjoner for lagenes nedtrekksvindu? Det er enkelte
