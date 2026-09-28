@@ -12,14 +12,14 @@ import secrets
 import uuid
 from datetime import timedelta
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from core.models import AppSetting, ModuleSettings
 from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
 
-from .models import Parklenke, Problemstilling, Registrering, Utfall
+from .models import Parklenke, Problemstilling, Registrering, SkjultSted, Utfall
 
 ANTALL_MAKS = 99
 
@@ -147,10 +147,43 @@ def lagene():
 
 
 def steder():
-    """Stedene i nedtrekket: oppdragsmodulens aktive lokasjoner (B10)."""
+    """Stedene i nedtrekket: oppdragsmodulens aktive lokasjoner (B10), minus
+    dem `skriv_leder` har skjult for lagene (`SkjultSted`).
+
+    **Den ene lista alt går gjennom** — nedtrekket, valideringen i
+    `registrer()` og forhåndsvalget. Derfor blir et skjult sted heller ikke
+    forhåndsvalgt fra KO-tavla, og en innsending som peker på det avvises.
+    """
     from oppdrag.models import Lokasjon
 
-    return Lokasjon.objects.filter(er_aktiv=True)
+    return Lokasjon.objects.filter(er_aktiv=True, park_skjult__isnull=True)
+
+
+def alle_steder_med_synlighet() -> list[dict]:
+    """Oppsettet på `/park/`: hver aktive lokasjon, og om lagene ser den."""
+    from oppdrag.models import Lokasjon
+
+    return [{'id': lok.pk, 'navn': lok.navn, 'skjult': lok.skjult}
+            for lok in Lokasjon.objects.filter(er_aktiv=True).annotate(
+                skjult=models.Exists(SkjultSted.objects.filter(lokasjon=models.OuterRef('pk'))))]
+
+
+def sett_skjult(lokasjon, skjult: bool, *, bruker=None, ip=None) -> bool:
+    """Skjul eller vis ett sted for lagene. Returnerer om noe ble endret.
+
+    Idempotent: to klikk på «Skjul» gir én rad og én auditrad.
+    """
+    if skjult:
+        _, ny = SkjultSted.objects.get_or_create(lokasjon=lokasjon, defaults={
+            'skjult_av': bruker if getattr(bruker, 'is_authenticated', False) else None,
+            'skjult_av_navn': _navn(bruker)})
+        endret = ny
+    else:
+        endret = SkjultSted.objects.filter(lokasjon=lokasjon).delete()[0] > 0
+    if endret:
+        _audit_rad('park_skjultsted', lokasjon.pk, 'skjult' if skjult else 'vist',
+                   lokasjon.navn, bruker, ip)
+    return endret
 
 
 def problemstillinger():

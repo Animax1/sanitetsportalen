@@ -54,6 +54,21 @@ function parkDato(iso) {
                                     hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo'});
 }
 
+/* Kopier til utklippstavla. Svarer 'kopiert' når det gikk, 'merket' når
+ * nettleseren nektet (eldre nettleser, ikke HTTPS) og teksten i stedet er
+ * merket så brukeren kan kopiere selv. Svaret styrer hva siden sier — en
+ * knapp som sier «Kopiert» uten at noe ble kopiert, er verre enn ingen. */
+async function parkKopier(tekst, utklipp, merk) {
+  try {
+    // Uten utklippstavle kaster kallet selv (TypeError), og da er svaret likt.
+    await utklipp.writeText(tekst);
+    return 'kopiert';
+  } catch (e) {
+    if (typeof merk === 'function') merk();
+    return 'merket';
+  }
+}
+
 function parkTid(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -134,18 +149,30 @@ async function parkLagLenke(e) {
     if (!ok) { parkFeil(d.message || 'Kunne ikke lage lenken.'); return; }
     // Adressen vises én gang og lagres ikke — heller ikke i nettleseren.
     const boks = document.getElementById('park-ny-adresse');
+    // Hele feltet og knappen kopierer (André, 28. sep. 2026: «trykker på
+    // feltet så kopieres hele linken … det må vises at det ble kopiert»).
     const felt = parkNode('input', {class: 'form-control form-control-sm', readonly: true,
-                                  value: d.adresse});
-    const kopier = parkNode('button', {class: 'btn btn-sm btn-outline-dark', type: 'button',
-      tekst: 'Kopier', klikk: async () => {
-        try { await navigator.clipboard.writeText(d.adresse); kopier.textContent = 'Kopiert'; } catch (err) {
-          felt.select();
-        }
-      }});
+                                    value: d.adresse, title: 'Trykk for å kopiere',
+                                    style: 'cursor: pointer;'});
+    const kopier = parkNode('button', {class: 'btn btn-sm btn-dark', type: 'button', tekst: 'Kopier'});
+    const status = parkNode('div', {class: 'small mt-1', 'aria-live': 'polite'});
+    const kopierNaa = async () => {
+      const utfall = await parkKopier(d.adresse, navigator.clipboard, () => felt.select());
+      if (utfall === 'kopiert') {
+        kopier.textContent = 'Kopiert ✓';
+        kopier.className = 'btn btn-sm btn-success';
+        felt.classList.add('is-valid');
+        status.textContent = 'Lenken er kopiert — lim den inn i tiltakskortet.';
+      } else {
+        status.textContent = 'Lenken er merket — kopier den selv (Ctrl+C, eller hold fingeren på den).';
+      }
+    };
+    felt.addEventListener('click', kopierNaa);
+    kopier.addEventListener('click', kopierNaa);
     boks.replaceChildren(
       parkNode('div', {class: 'fw-semibold mb-1',
                      tekst: `«${d.data.navn}» er laget. Legg adressen i tiltakskortet nå — den vises ikke igjen.`}),
-      parkNode('div', {class: 'input-group input-group-sm'}, felt, kopier));
+      parkNode('div', {class: 'input-group input-group-sm'}, felt, kopier), status);
     boks.classList.remove('d-none');
     document.getElementById('park-lenke-navn').value = '';
     await parkHentLenker();
@@ -157,6 +184,29 @@ async function parkFjernLenke(lenke) {
   const {ok, d} = await parkApi(`/park/api/lenker/${lenke.id}/fjern/`, 'POST', {confirm: true});
   if (!ok) { parkFeil(d.message || 'Kunne ikke fjerne lenken.'); return; }
   await parkHentLenker();
+}
+
+/* ── Stedene lagene ser ──────────────────────────────────────────────────── */
+
+async function parkHentSteder() {
+  const {ok, d} = await parkApi('/park/api/steder/');
+  if (!ok) { parkFeil(d.message || 'Kunne ikke hente stedene.'); return; }
+  const linjer = d.data.map((st) => parkNode('li', {
+    class: `list-group-item d-flex justify-content-between align-items-center gap-2${st.skjult ? ' text-muted' : ''}`},
+    parkNode('span', {tekst: st.skjult ? `${st.navn} — skjult for lagene` : st.navn}),
+    parkNode('button', {class: `btn btn-sm ${st.skjult ? 'btn-outline-success' : 'btn-outline-secondary'}`,
+                        type: 'button', tekst: st.skjult ? 'Vis for lagene' : 'Skjul for lagene',
+                        klikk: () => parkSettSkjult(st.id, !st.skjult)})));
+  document.getElementById('park-steder').replaceChildren(linjer.length
+    ? parkNode('ul', {class: 'list-group list-group-flush'}, ...linjer)
+    : parkNode('p', {class: 'small text-muted', tekst: 'Ingen aktive steder i oppdragsmodulen.'}));
+}
+
+async function parkSettSkjult(id, skjult) {
+  const {ok, d} = await parkApi(`/park/api/steder/${id}/skjul/`, 'POST', {skjult});
+  if (!ok) { parkFeil(d.message || 'Kunne ikke endre stedet.'); return; }
+  parkFeil('');
+  await parkHentSteder();
 }
 
 /* ── Registreringene ─────────────────────────────────────────────────────── */
@@ -288,6 +338,7 @@ async function parkOppsettStart() {
   await Promise.all([
     parkHentLenker(),
     parkHentRegistreringer(),
+    parkHentSteder(),
     parkHentVerdier('problemstillinger', 'park-problemstillinger', true),
     parkHentVerdier('utfall', 'park-utfall', parkKanSetteOppUtfall(window.MODUL_TILGANG)),
   ]);

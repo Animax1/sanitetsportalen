@@ -118,7 +118,7 @@ class OppsettReglerTests(SimpleTestCase):
     def setUp(self):
         self.harness = build_harness(((OPPSETT_JS, (
             'parkKanSetteOppUtfall', 'parkKanSletteVerdi', 'parkLenkeStatus',
-            'parkLokalFelt', 'parkStandardOppetid')),))
+            'parkLokalFelt', 'parkStandardOppetid', 'parkKopier')),))
 
     def _j(self, uttrykk):
         return json.loads(run_node(self.harness, f'console.log(JSON.stringify({uttrykk}));')
@@ -138,6 +138,20 @@ class OppsettReglerTests(SimpleTestCase):
         self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-02T08:00:00Z'))"), 'Stengt')
         self.assertEqual(self._j(f"parkLenkeStatus(Object.assign({l}, {{fjernet: true}}), "
                                  f"Date.parse('2026-10-01T09:00:00Z'))"), 'Fjernet')
+
+    def test_kopier_sier_bare_kopiert_naar_det_ble_kopiert(self):
+        ut = run_node(self.harness, '''
+          (async () => {
+            let merket = 0;
+            const merk = () => { merket += 1; };
+            const ok = await parkKopier('x', {writeText: async () => {}}, merk);
+            const nei = await parkKopier('x', {writeText: async () => { throw new Error('nektet'); }}, merk);
+            const ingen = await parkKopier('x', undefined, merk);
+            console.log(JSON.stringify([ok, nei, ingen, merket]));
+          })();''')
+        # Asynkront: `run_node` skriver «OK» før svaret kommer.
+        svar = next(l for l in ut.splitlines() if l.startswith('['))
+        self.assertEqual(json.loads(svar), ['kopiert', 'merket', 'merket', 2])
 
     def test_standardoppetiden_er_tre_dogn_i_lokal_tid(self):
         ut = run_node(self.harness, '''

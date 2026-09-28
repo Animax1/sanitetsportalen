@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/lenker/<int:pk>/fjern/', views.lenke_fjern_view, name='park_api_lenke_fjern'),
     path('api/lenker/<int:pk>/slett-etter/', views.lenke_slett_etter_view,
          name='park_api_lenke_slett_etter'),
+    path('api/steder/', views.steder_view, name='park_api_steder'),
+    path('api/steder/<int:pk>/skjul/', views.sted_skjul_view, name='park_api_sted_skjul'),
     path('api/registreringer/', views.registreringer_view, name='park_api_registreringer'),
     path('api/registreringer/<int:pk>/slett/', views.registrering_slett_view,
          name='park_api_registrering_slett'),

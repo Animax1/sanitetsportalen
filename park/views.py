@@ -7,6 +7,7 @@ egen fil, så regelen «les aldri `request.user`» kan håndheves på hele fila.
 |---|---|
 | Se `/park/` | `les` — men `les` får bare en henvisning til statistikken (B17) |
 | Lenkene: se, lage, fjerne | `skriv_leder` |
+| Stedene lagene ser (skjule et sted for lagene) | `skriv_leder` |
 | Problemstillingene | `skriv_leder` (B6) |
 | Utfallene | **global admin** (B7) |
 | Slette en rad fra en verdimengde | global admin (`core.verdilister`) |
@@ -145,6 +146,32 @@ def lenke_slett_etter_view(request, pk):
     except services.Ugyldig as feil:
         return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'antall': slettet})
+
+
+# ── Stedene lagene ser ───────────────────────────────────────────────────────
+
+@never_cache
+@modul_kreves('park', 'skriv_leder', svar='json')
+@require_http_methods(['GET'])
+def steder_view(request):
+    """Oppdragsmodulens aktive steder, og om lagene ser dem. Parks regel —
+    bilene, KO-tavla og sentralbordet ser alle (`SkjultSted`)."""
+    return JsonResponse({'status': 'ok', 'data': services.alle_steder_med_synlighet()})
+
+
+@modul_kreves('park', 'skriv_leder', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='park:sted-skjul', rate='60/m', method='POST')
+def sted_skjul_view(request, pk):
+    """`{"skjult": true|false}`. Bare literal `true` skjuler — en ukjent verdi
+    skal vise stedet, ikke ta det bort fra lagene."""
+    from oppdrag.models import Lokasjon
+
+    lokasjon = get_object_or_404(Lokasjon, pk=pk, er_aktiv=True)
+    skjult = json_body(request).get('skjult') is True
+    services.sett_skjult(lokasjon, skjult, bruker=request.user, ip=klient_ip(request))
+    return JsonResponse({'status': 'ok', 'data': {'id': lokasjon.pk, 'navn': lokasjon.navn,
+                                                  'skjult': skjult}})
 
 
 # ── Registreringene ──────────────────────────────────────────────────────────

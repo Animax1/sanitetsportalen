@@ -694,6 +694,70 @@ class VerdimengdeneTests(_Oppsett):
         self.assertNotIn(self.ps, services.problemstillinger())
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SkjulteStederTests(_Oppsett):
+    """«Det er enkelte lokasjoner som er uaktuelt for dem men ikke bil
+    ressurser» (André, 28. sep. 2026). Parks regel, ikke oppdragsmodulens."""
+
+    def _skjul(self, lok, verdi=True, c=None):
+        return self._post(c or self.leder, f'/park/api/steder/{lok.pk}/skjul/', {'skjult': verdi})
+
+    def test_skjult_sted_er_borte_fra_siden_og_avvises(self):
+        self.assertEqual(self._skjul(self.club).status_code, 200)
+        self.assertNotIn(self.club, services.steder())
+        self.assertIn(self.park, services.steder())
+        with self.assertRaises(services.Ugyldig):
+            self._registrer(sted=self.club.pk)
+        c = Client()
+        d = c.get(reverse('park_lag_oppsett'), HTTP_X_PARK_LENKE=self.token,
+                  HTTP_X_PARK_TELEFON=str(uuid.uuid4())).json()
+        self.assertEqual([s['navn'] for s in d['steder']], ['Parkscene'])
+
+    def test_bilene_ser_det_fortsatt(self):
+        self._skjul(self.club)
+        self.club.refresh_from_db()
+        self.assertTrue(self.club.er_aktiv, 'lokasjonen i oppdrag røres ikke')
+
+    def test_forhaandsvalget_hopper_over_et_skjult_sted(self):
+        naa = timezone.now()
+        rad = self._registrer(sted=self.park.pk)
+        Registrering.objects.filter(pk=rad.pk).update(registrert_at=naa - timedelta(hours=1))
+        skift(self.lag1)
+        tavle.plasser(self.vakt, self.lag1, bruker=None, lokasjon=self.club)
+        self.assertEqual(services.forhandsvalg(self.vakt, self.lag1.pk)['lokasjon_id'], self.club.pk)
+        self._skjul(self.club)
+        v = services.forhandsvalg(self.vakt, self.lag1.pk)
+        self.assertEqual((v['kilde'], v['lokasjon_id']), ('registrering', self.park.pk))
+
+    def test_gamle_registreringer_teller_fortsatt(self):
+        from .statistikk import park_stats
+        self._registrer(sted=self.club.pk, antall=3)
+        self._skjul(self.club)
+        self.assertEqual({s['navn']: s['kontakter'] for s in park_stats(self.vakt)['per_sted']},
+                         {'Club': 3})
+
+    def test_vis_igjen_og_idempotent_med_en_auditrad(self):
+        self._skjul(self.club)
+        self._skjul(self.club)
+        self.assertEqual(AuditLog.objects.filter(table_name='park_skjultsted', field_name='skjult').count(), 1)
+        self._skjul(self.club, False)
+        self.assertIn(self.club, services.steder())
+        self.assertEqual(AuditLog.objects.filter(table_name='park_skjultsted', field_name='vist').count(), 1)
+
+    def test_bare_literal_true_skjuler(self):
+        self._skjul(self.club, 'ja')
+        self.assertIn(self.club, services.steder())
+
+    def test_lista_og_porten(self):
+        self._skjul(self.club)
+        d = {s['navn']: s['skjult'] for s in self.leder.get('/park/api/steder/').json()['data']}
+        self.assertEqual(d, {'Parkscene': False, 'Club': True})
+        self.assertEqual(self.les.get('/park/api/steder/').status_code, 403)
+        self.assertEqual(self._skjul(self.park, c=self.les).status_code, 403)
+        Lokasjon.objects.filter(pk=self.park.pk).update(er_aktiv=False)
+        self.assertEqual(self._skjul(self.park).status_code, 404)
+
+
 class PortalinnstillingeneTests(TestCase):
 
     def setUp(self):

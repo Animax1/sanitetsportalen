@@ -183,3 +183,38 @@ class Registrering(models.Model):
 
     def __str__(self) -> str:
         return f'{self.ressurs_navn}: {self.antall} × {self.problemstilling}'
+
+
+class SkjultSted(models.Model):
+    """Et sted lagene ikke ser i nedtrekket (André, 28. sep. 2026, «B»).
+
+    «Det er enkelte lokasjoner som er uaktuelt for dem men ikke bil ressurser.»
+    **Parks egen regel, ikke et flagg på `oppdrag.Lokasjon`:** hvilke steder som
+    er aktuelle for lagene er parks spørsmål, og oppdragsmodulen skal ikke bære
+    et felt som bare betyr noe for en annen modul — samme grunn som at KO ikke
+    kjenner park.
+
+    **En rad betyr skjult; ingen rad betyr vist.** Et nytt sted vises derfor for
+    lagene til noen skjuler det. Det motsatte er farligere: et lag som ikke
+    finner stedet sitt, får ikke registrert i det hele tatt, mens et sted for
+    mye i lista bare er støy.
+
+    Registreringer som alt står på stedet, røres ikke — de bærer navnet.
+    """
+
+    lokasjon = models.OneToOneField(
+        'oppdrag.Lokasjon', on_delete=models.CASCADE, related_name='park_skjult',
+        verbose_name='Sted')
+    skjult_at = models.DateTimeField(auto_now_add=True, verbose_name='Skjult')
+    skjult_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Skjult av')
+    skjult_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Skjult av (navn)')
+
+    class Meta:
+        verbose_name = 'Skjult sted'
+        verbose_name_plural = 'Skjulte steder'
+
+    def __str__(self) -> str:
+        return f'{self.lokasjon} (skjult for lagene)'

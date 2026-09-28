@@ -71,6 +71,8 @@ pålogging. Glipper premisset («vi må kunne finne igjen han med hodeskaden»),
 | B21 | Måling | Hver registrering lagrer hvor forhåndsvalget kom fra og om laget endret det — så B19 kan vurderes med tall etter generalprøven |
 | B22 | Risikovalg | **Alternativene står i §4.7, og det som bringer risiko kan byttes om.** Forhåndsvalget fra KO er en bryter, ikke kode som kommenteres ut |
 | B23 | Personvern | `PERSONVERN_DOKUMENTASJON.md` oppdateres **når `/park/` er ferdig**, ikke underveis — men før lansering (`TODO.md`) |
+| B24 | Steder skjult for lagene | `skriv_leder` i park kan skjule et sted fra lagenes nedtrekk; bilene ser det som før. Parks egen tabell (`SkjultSted`), ikke et felt i oppdrag. Nye steder vises til noen skjuler dem |
+| B25 | Kopier lenken | Trykk i feltet eller på knappen kopierer hele lenken, og siden sier at den ble kopiert |
 
 **Hva B3 og B4 endret fra første utkast.** Utkastet foreslo én lenke per lag, med
 begrunnelsen at et nedtrekk ingen kontrollerer er en påstand. André: «det blir svært

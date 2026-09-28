@@ -14,6 +14,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 |---|---|
 | Hvilken lenke som er åpen — og at alle avslag ser like ut | `services.aapen_lenke()` |
 | Hvilke lag som kan velges | `services.lagene()` + `Ressursgruppe.registrerer_i_park` |
+| Hvilke steder lagene ser — oppdragsmodulens, minus `SkjultSted` | `services.steder()`, den ene lista nedtrekket, valideringen og forhåndsvalget går gjennom |
 | Forhåndsvalget av sted: nyeste vinner | `services.forhandsvalg()` |
 | Hva som er en gyldig registrering | `services.registrer()` |
 | Hva som kan angres, og hvor lenge | `services.kan_angres()`, `angrefrist_min()` |
@@ -80,6 +81,15 @@ merke peker til `docs/FORSLAG_PARK.md` §4.7, der alternativet står.
 `forhandsvalg_kilde` og `forhandsvalg_endret` på hver registrering svarer på om «nyeste
 vinner» treffer: endrer lagene ofte et forhåndsvalg som kom fra KO, er tavla for treg til å
 være en god kilde. `forhandsvalg_endret` er `True` bare når klienten sender literal `true`.
+
+## Steder skjult for lagene (B24)
+
+«Det er enkelte lokasjoner som er uaktuelt for dem men ikke bil ressurser» (André, 28. sep.
+2026). **Parks egen tabell, `SkjultSted`, ikke et flagg på `oppdrag.Lokasjon`** — hvilke steder
+som er aktuelle for lagene er parks spørsmål. En rad betyr skjult; **nye steder vises til noen
+skjuler dem**, fordi et lag som ikke finner stedet sitt ikke får registrert. Pekeren til
+lokasjonen strippes *ikke* i backupen — uten den er raden meningsløs — og park står alt etter
+`oppdrag` i gjenopprettingen.
 
 ## Sletting, ikke retting (B20)
 

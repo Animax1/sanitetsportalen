@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — `/park/`: steder skjult for lagene, og «Kopiert ✓» på lenken  `#park`
+
+**Hvorfor:** André: «kan vi skjule noen lokasjoner for lagenes nedtrekksvindu? Det er enkelte
+lokasjoner som er uaktuelt for dem men ikke bil ressurser.» Valgte B — parks egen liste, ikke et
+flagg i oppdrag. Og: «Når du oppretter link … du trykker på feltet så kopieres hele linken? …
+så må det vises at det ble kopiert.»
+
+- **`park.SkjultSted`** (`park/0003`): én rad per sted lagene ikke ser. Seksjonen **«Steder lagene
+  ser»** på `/park/` har «Skjul for lagene» / «Vis for lagene» per sted (`skriv_leder`). Bilene,
+  KO-tavla og sentralbordet ser stedet som før — `oppdrag.Lokasjon` røres ikke.
+- **`services.steder()` er den ene lista** nedtrekket, valideringen og forhåndsvalget går
+  gjennom. Et skjult sted blir derfor ikke forhåndsvalgt fra KO-tavla, og en innsending som
+  peker på det avvises. Registreringer som alt står på stedet teller fortsatt i statistikken.
+- **Nye steder vises for lagene til noen skjuler dem** — et lag som ikke finner stedet sitt får
+  ikke registrert; et sted for mye i lista er bare støy. Bare literal `true` skjuler.
+  Skjul og vis auditlogges, én rad per faktisk endring.
+- **Backup:** pekeren til lokasjonen strippes *ikke* for `SkjultSted` — uten den er raden
+  meningsløs — og park står alt etter `oppdrag` i gjenopprettingen.
+- **Lenken kopieres ved trykk i feltet eller på knappen.** Knappen blir grønn **«Kopiert ✓»**, feltet
+  får grønn kant, og det står «Lenken er kopiert — lim den inn i tiltakskortet.» Nekter nettleseren
+  (ikke HTTPS, eldre nettleser), merkes teksten og siden sier «kopier den selv» — den sier aldri
+  «Kopiert» uten at noe ble kopiert (`parkKopier()`).
+
+**Mutanter: 8 — 7 drept, 1 no-op.** Filteret i `steder()`, auditen ved hver gang, `bool()` for
+`is True`, begge portene senket til `les`, inaktivt sted skjulbart, og «kopiert» i feilgrenen.
+**No-op:** sjekken av utklippstavla før kallet — uten den kaster kallet selv og svaret er likt.
+Sjekken er fjernet.
+
+**Prøvd i Chromium:** Club skjult → parksidens nedtrekk viser bare «Parkscene»; trykk i
+lenkefeltet → «Kopiert ✓», og utklippstavla inneholder nøyaktig adressen. Ingen konsollfeil.
+
 ## 2026-09-28 — `/park/` pulje 3: statistikkfanen «Lag»  `#park #statistikk`
 
 **Hvorfor:** André: «Fortsett med pulje 3 så skal jeg teste imens» (B12: «skal genereres

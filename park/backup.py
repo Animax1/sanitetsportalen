@@ -34,6 +34,10 @@ class ParkBackupHandler(BaseBackupHandler):
     strip_fields = {
         'park.Parklenke': ['opprettet_av', 'fjernet_av'],
         'park.Registrering': ['ressurs', 'lokasjon', 'slettet_av'],
+        # `lokasjon` beholdes med vilje: uten den er raden meningsløs. Det
+        # binder park til oppdragsfila i gjenopprettingen, og park står alt
+        # etter `oppdrag` i rekkefølgen. Brukerpekeren strippes som de andre.
+        'park.SkjultSted': ['skjult_av'],
     }
 
 

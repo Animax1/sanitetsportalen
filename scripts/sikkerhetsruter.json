@@ -104,6 +104,8 @@
   "/park/api/problemstillinger/rekkefolge/",
   "/park/api/registreringer/",
   "/park/api/registreringer/1/slett/",
+  "/park/api/steder/",
+  "/park/api/steder/1/skjul/",
   "/park/api/utfall/",
   "/park/api/utfall/1/",
   "/park/api/utfall/rekkefolge/",
