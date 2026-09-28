@@ -949,6 +949,17 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
             innlogging, og at den kan vise KOs plassering av lagene så lenge
             `park-ko-posisjon` er på. Skrives mot det som faktisk ble bygget, ikke mot
             forslaget. **Lagringstiden er alt skrevet inn i A.9** (730 dager, 28. sep. 2026).
+      - [ ] **Lansering, når personvernet over er skrevet:** (1) `staging` → `main` — /lag er
+            ikke i produksjon, og det venter på Andrés klarsignal; (2) lag en ny lenke på
+            `/lag/` i prod og legg den inn i tiltakskortet i Bliksund. Den gamle `/park/`-lenka
+            er borte med omdøpingen, og tokenet vises bare én gang (`park-lenke-en-gang`),
+            så lenka må lages og limes inn i samme økt; (3) gi `park: skriv_leder` til den
+            som skal sette opp og rydde, og `park: les` + `statistikk: les` til dem som skal
+            se fanen «Lag».
+      - [ ] **Frosne statistikktall for Lag har ingen frist ennå.** Registreringene slettes
+            etter 730 dager, men settet i `core.VaktStatistikk` står i detalj. Løses av punkt 4
+            (sensitiv-merket) under vaktavslutningen — står her så /lag ikke regnes som ferdig
+            på personvernsiden før det er gjort.
 
 - [ ] **MULIGHET: KO-tavla viser stedet laget registrerer fra ved siden av der KO plasserte
       det** (André, 27. sep. 2026, `FORSLAG_PARK.md` B16). Står laget på Parkscene på tavla og

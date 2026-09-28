@@ -4,6 +4,14 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — /lag er lagt til side: det som gjenstår står i TODO  `#lag` `#todo`
+
+André: «Sett de gjenstående på todo om de ikke er det så er vi inntil videre ferdig med /lag».
+Personvernet (B23) og sensitiv-merket (punkt 4) sto der fra før. Nytt under `/lag/` i
+`TODO.md`: **lanseringen** — `staging` → `main`, ny lenke i tiltakskortet i Bliksund (den gamle
+`/park/`-lenka er borte, og tokenet vises bare én gang) og tilgangsradene — og en påminnelse om at
+**de frosne Lag-tallene ikke har frist** før punkt 4 er gjort. Ingen kodeendring.
+
 ## 2026-09-28 — Lagringstid for lagregistreringene: slettes etter 730 dager  `#lag` `#personvern`
 
 **Hvorfor:** André: «Punkt 2 må vi nå gjøre». Registreringene på `/lag/` sto til noen slettet
