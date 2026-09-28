@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — Lagringstid for lagregistreringene: slettes etter 730 dager  `#lag` `#personvern`
+
+**Hvorfor:** André: «Punkt 2 må vi nå gjøre». Registreringene på `/lag/` sto til noen slettet
+dem, og personvernbeskrivelsen (B23) kan ikke skrives ferdig uten en frist å vise til.
+
+**Hva:** `park.Registrering` slettes **730 dager (24 måneder) etter `registrert_at`**,
+automatisk, av `purge_old_logs` (Railway Cron) gjennom `core/opprydding.py` —
+`park/opprydding.py`, samme mønster som KO-loggen og overnattingen. Cron-loggen sier
+«Slettet N lagregistreringer eldre enn 730 dager»; `--dry-run` teller uten å slette.
+
+- **Klokka går fra `registrert_at`**, som serveren setter og ingen kan rette.
+- **Rader merket slettet (B20) følger samme frist** — grunnen er fritekst fra en leder.
+- **Konstant, ikke innstilling** (`services.OPPBEVARING_DAGER`): fristen er det dokumentet
+  lover, og et tall som kan flyttes i portalen uten deploy er et løfte dokumentet ikke holder.
+  Ulempe: å endre den krever en deploy. KO-loggens frist er justerbar; der er det fritekst
+  arrangøren kan ha egne krav til.
+- **Ingen auditrad per slettet rad** — registreringene logges ikke når de kommer inn heller.
+- Lenkene, verdimengdene og de skjulte stedene står. **Frosne tall i `core.VaktStatistikk`
+  har fortsatt ingen frist** — det er TODO-punkt 4 (sensitiv-merket).
+
+`PERSONVERN_DOKUMENTASJON.md` v1.14: ny rad i A.9.
+
+**Tester:** `park/tests_opprydding.py`, 8 tester, alle gjennom `purge_old_logs` og ikke
+gjennom hjelperen. Grensen prøves med én time på hver side av fristen.
+**Mutasjoner: 9, alle drept** — registreringen i `apps.ready()` fjernet, `__lt` → `__gt`,
+fristen ± én dag, slettede rader unntatt, `delete()` fjernet, tørrkjøringen og den skarpe
+returnerer 0, fristen satt til 365.
+
 ## 2026-09-28 — Vakt-siden: listene minimeres og ruller, og tidligere vakter og arkiver kan slettes  `#vakt` `#admin`
 
 **Hvorfor:** André: «jeg vil gjerne ha dem som en scroll liste og minimer på arkiver og tidligere

@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 26. september 2026  
-**Versjon:** 1.13  
+**Siste oppdatering:** 28. september 2026  
+**Versjon:** 1.14  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -483,6 +483,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Mannskapsregister (`Mannskap`) | Så lenge personen er aktiv frivillig; pensjoneres (`er_aktiv=False`) ved avgang og slettes manuelt når ingen vaktposter refererer | Manuell (admin) | Berettiget interesse opphører når personen slutter; historiske vaktposter (fase 2) krever PROTECT inntil arkivering |
 | Korps/kompetanse/rolle-registre (vaktliste) | Ingen fast grense | Manuell | Organisasjonsoppsett uten personopplysninger |
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
+| **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
@@ -1148,9 +1149,13 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.13 – sist oppdatert 26. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.14 – sist oppdatert 28. september 2026*
 
 **Endringslogg:**
+
+- **v1.14 (28.09.2026):** **A.9:** lagringstid for lagregistreringene på `/lag/` — 730 dager,
+  håndhevet automatisk av `purge_old_logs`. Resten av `/lag/`-beskrivelsen (A.6, B23 i
+  `FORSLAG_PARK.md`) gjenstår før lansering.
 
 - **v1.13 (26.09.2026):** **A.6, overnatting:** skiftdetaljene («Ambulanse 2, 22:00–06:00»)
   følger nå telefonen og vises bare for eget korps eller for dem som ser alle korps. En ren

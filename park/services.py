@@ -410,6 +410,45 @@ def kvittering(rad: Registrering, vakt) -> dict:
     }
 
 
+# ── Lagringstiden ────────────────────────────────────────────────────────────
+
+#: Hvor lenge en registrering står (André, 28. sep. 2026: «Punkt 2 må vi nå
+#: gjøre»). **En konstant, ikke en innstilling**: fristen er det
+#: personvernbeskrivelsen (B23) lover lagene og arrangøren, og et tall som kan
+#: flyttes i portalen uten deploy er et løfte dokumentet ikke kan holde. Samme
+#: som KO-loggens standard og offsite-backupens frist — 730 dager.
+OPPBEVARING_DAGER = 730
+
+
+def utlopte(naa=None):
+    """Registreringene som har passert lagringstiden.
+
+    Klokka går fra `registrert_at`, som settes av serveren og ikke kan rettes —
+    en frist som lar seg flytte er ingen frist. **Slettede rader (B20) følger
+    samme frist**: merkingen er en visning, raden og grunnen står til fristen
+    løper ut, og grunnen er fritekst skrevet av en leder.
+    """
+    naa = naa or timezone.now()
+    return Registrering.objects.filter(
+        registrert_at__lt=naa - timedelta(days=OPPBEVARING_DAGER))
+
+
+def slett_utlopte(naa=None) -> int:
+    """Slett det som har løpt ut. Kalles av `purge_old_logs` gjennom
+    `park/opprydding.py`; antallet står i cron-jobbens kjøringslogg.
+
+    **Ingen auditrad per rad**: registreringene logges ikke når de kommer inn
+    (de er dataene, ikke en endring av dem — FORSLAG_PARK.md §6, «Audit»), og en logg
+    over hva som ble slettet ville vært en kopi av det som skulle bort.
+    """
+    qs = utlopte(naa)
+    antall = qs.count()
+    if antall:
+        with transaction.atomic():
+            qs.delete()
+    return antall
+
+
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
 
 def tid_tekst(t) -> str:

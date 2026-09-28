@@ -167,8 +167,6 @@ og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. 
       arkivene, lenker til tallene og sletter dem (28. sep. 2026), men radene og
       signatursjekken står fortsatt i pasientmodulens og oppdragsmodulens egne vinduer. Å samle
       dem krever en visning gjennom `core.arkiv`-registeret, ikke to modul-API-er kalt fra `core`.
-- [ ] **5. Lagringstid for `/lag/`:** radene slettes etter 24 måneder via `core/opprydding.py`,
-      som KO-loggen. Går inn i personvernpunktet under `/lag/`.
 
 ### Vakt mot rate-limit-tester som ikke tåler vinduskanten — 27. sep. 2026
 
@@ -950,7 +948,7 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
             risikobildet i `FORSLAG_PARK.md` §4.6–4.7 skrives inn: portalens første side uten
             innlogging, og at den kan vise KOs plassering av lagene så lenge
             `park-ko-posisjon` er på. Skrives mot det som faktisk ble bygget, ikke mot
-            forslaget.
+            forslaget. **Lagringstiden er alt skrevet inn i A.9** (730 dager, 28. sep. 2026).
 
 - [ ] **MULIGHET: KO-tavla viser stedet laget registrerer fra ved siden av der KO plasserte
       det** (André, 27. sep. 2026, `FORSLAG_PARK.md` B16). Står laget på Parkscene på tavla og

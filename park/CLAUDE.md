@@ -27,6 +27,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Hva som kan angres, og hvor lenge | `services.kan_angres()`, `angrefrist_min()` |
 | Porten uten innlogging og grensene | `views_lag.park_lenke_kreves` |
 | Sletting av feilregistreringer, én og alt fra en lenke | `services.slett_registrering()`, `slett_fra_lenke()` |
+| Lagringstiden: 730 dager, så slettes raden | `services.utlopte()`, `slett_utlopte()`, `opprydding.py` |
 | Hvem som setter opp hva på `/lag/` | `views.py`, tabellen i docstringen |
 | Registreringslista på `/lag/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
 | Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
@@ -108,6 +109,15 @@ blir stående merket, og statistikken utelater den.
 **«Slett alt fra denne lenken etter kl. X»** er oppryddingen etter en lekket lenke (§4.6).
 Uten `confirm` svarer den **409 med antallet** og sletter ingenting — den som rydder skal se
 hvor mye som går før det går. Én auditrad for hele slettingen, ikke én per rad.
+
+## Lagringstiden
+
+Registreringene slettes **730 dager** etter `registrert_at` — `services.OPPBEVARING_DAGER`,
+håndhevet av `purge_old_logs` gjennom `park/opprydding.py` (`core/opprydding.py`). **En
+konstant, ikke en innstilling:** fristen er det personvernbeskrivelsen lover, og et tall som
+kan flyttes i portalen er et løfte dokumentet ikke kan holde. Rader merket slettet (B20)
+følger samme frist. Ingen auditrad per slettet rad — registreringene logges ikke når de kommer
+inn heller. `park/tests_opprydding.py` går gjennom kommandoen, ikke hjelperen.
 
 ## Tilgang
 
