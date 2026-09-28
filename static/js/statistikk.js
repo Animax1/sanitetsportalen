@@ -693,6 +693,10 @@ function visKilde(slug) {
     _kallOppdrag('loadBemanningStats');
     return;
   }
+  if (slug === 'park') {
+    _kallOppdrag('loadParkStats');
+    return;
+  }
   // Pasientfanen: rendres på nytt av samme grunn som ved sub-faneskift —
   // panelet var skjult da tallene kom, og Chart.js tegner ikke i et
   // display:none-element.

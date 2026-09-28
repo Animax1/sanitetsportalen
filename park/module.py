@@ -7,7 +7,7 @@ i et tiltakskort (B3); nivåene under gjelder bare de innloggede flatene.
 
 | Nivå | Hva det gir |
 |---|---|
-| `les` | Fanen «Lag» i `/statistikk/` (pulje 3). Ingen egen side |
+| `les` | Fanen «Lag» i `/statistikk/` — sammen med `statistikk: les`. Ingen egen side |
 | `skriv_leder` | Setter opp lenkene og problemstillingene, sletter feilregistreringer |
 
 Global admin har i tillegg utfallene (B7) og bryterne i portalinnstillingene.

@@ -738,7 +738,7 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-36 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
+37 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, og de to under
 både `/oppdrag/` og `/park/`.
 
@@ -773,7 +773,7 @@ håndhever det på cellebredden.
 | `patients-utils.js`, `-table.js`, `-forms.js`, `-app.js` | pasientsiden, alltid | `patients/CLAUDE.md` |
 | `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
 | `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |
-| `statistikk-oppdrag.js`, `-ko.js`, `-bemanning.js` | `/statistikk/`, **kun** med modultilgang | `statistikk/CLAUDE.md` |
+| `statistikk-oppdrag.js`, `-ko.js`, `-bemanning.js`, `-park.js` | `/statistikk/`, **kun** med modultilgang | `statistikk/CLAUDE.md` |
 | `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `templates/oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `templates/oppdrag/CLAUDE.md` |

@@ -11,8 +11,11 @@ class ParkConfig(AppConfig):
         # Backup-dekning fra første lagring — i samme commit som modellen, som
         # `backlog` og `ko`. Vaktlistemodulen sto uten backup fra den gikk i
         # prod til 13. sep. 2026, og det ble oppdaget ved en gjennomgang.
-        from . import backup, portalinnstillinger
+        from . import backup, portalinnstillinger, statistikk
 
         backup.register_handlers()
         # Angrefristen og KO-bryteren på /portal-admin/innstillinger/ (pulje 2).
         portalinnstillinger.register_handlers()
+        # Fanen «Lag» i /statistikk/ (pulje 3). Uten registreringen finnes
+        # ikke kilden, og ingen ser tallene.
+        statistikk.register_handlers()

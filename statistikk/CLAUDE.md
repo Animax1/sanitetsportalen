@@ -18,9 +18,9 @@ tallene.
 **Avhengighetsretningen er statistikk → moduler, aldri motsatt.** Modulen som eier
 dataene regner ut tallene; statistikk-appen henter, cacher og viser — og navngir ingen
 kildemodul. Registeret er `core/stats.py`, samme idiom som `core.backup` og `core.arkiv`:
-hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. Fire kilder i dag:
-`patients/statistikk.py`, `oppdrag/statistikk.py`, `ko/statistikk.py` og
-`vaktliste/statistikk.py`.
+hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. Fem kilder i dag:
+`patients/statistikk.py`, `oppdrag/statistikk.py`, `ko/statistikk.py`,
+`vaktliste/statistikk.py` og `park/statistikk.py` (fanen «Lag»).
 
 `hent_aktiv_vakt` bor i **`core.vakt`** (flyttet dit 14. sep. 2026, sammen med
 `vakt_for_year`): den er portalens scope, delt av alle moduler, og lå i pasientmodulen
@@ -59,6 +59,7 @@ Hva som lastes når står i rota; hva filene gjør står her.
 | `statistikk-oppdrag.js` | Oppdragsfanen |
 | `statistikk-ko.js` | KO-fanen (pulje 7a). Lastes kun med KO-tilgang; samme vakt |
 | `statistikk-bemanning.js` | Bemanningsfanen (pulje 7c). Kun med `les_alle` i vaktlista; de to andre fanene henter linjene sine herfra gjennom vakten |
+| `statistikk-park.js` | Fanen «Lag» (park pulje 3). Kun med `les` i park — ledelsen, ikke KO-operatørene |
 
 **Chart.js lastes kun her.** Den er tung, og ingen annen side tegner grafer.
 

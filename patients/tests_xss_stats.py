@@ -25,7 +25,7 @@ from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
     ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_BEMANNING_JS, STATISTIKK_JS, STATISTIKK_KO_JS,
-    STATISTIKK_OPPDRAG_JS,
+    STATISTIKK_OPPDRAG_JS, STATISTIKK_PARK_JS,
     build_harness, extract_function, node_available, read_js, run_node,
 )
 
@@ -33,6 +33,11 @@ from patients.js_test_utils import (
 # gjennomgangen under (REVIEWED_INTERPOLATIONS) oppdateres i samme runde.
 HTML_BUILDERS = (
     'mkStatsTable',
+    # Fanen «Lag» (park pulje 3). Sender rader til mkStatsTable(); står her
+    # av samme grunn som oppdragsbyggerne.
+    'mkParkKryssTabell',
+    'mkParkLagTabell',
+    'mkParkForhandsvalgTabell',
     'mkCrosstab',
     'mkObsTable',
     'mkInterpretation',
@@ -140,7 +145,8 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         cls.stats_src = (read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
                          + '\n' + read_js(STATISTIKK_OPPDRAG_JS)
                          + '\n' + read_js(STATISTIKK_KO_JS)
-                         + '\n' + read_js(STATISTIKK_BEMANNING_JS))
+                         + '\n' + read_js(STATISTIKK_BEMANNING_JS)
+                         + '\n' + read_js(STATISTIKK_PARK_JS))
         cls.utils_src = read_js(PORTAL_UTILS_JS)
 
     def test_ingen_bygger_staar_utenfor_skanningen(self):
@@ -241,6 +247,8 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
                             'mkKoEskaleringTabell', 'mkKoStillhetTabell',
                             'mkKoVarighetTabell', 'mkKoLagTabell', 'mkKoLoggTabell')),
         (STATISTIKK_BEMANNING_JS, ('_timerTekst', 'mkBemanningUtnyttelseTabell')),
+        (STATISTIKK_PARK_JS, ('mkParkKryssTabell', 'mkParkLagTabell',
+                              'mkParkForhandsvalgTabell', 'parkAndelPaStedet')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'
@@ -253,6 +261,18 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
     def _run_js(self, snippet):
         """Kjør snippet med byggerne i scope. Returnerer stdout."""
         return run_node(self.harness, snippet)
+
+    def test_lagfanen_viser_html_i_navn_som_tekst(self):
+        """Lag, problemstillinger og utfall er navn mennesker har satt opp."""
+        self._run_js(f'''
+const s = {{kryss: {{rader: [{self.XSS!r}], kolonner: [{self.XSS!r}], celler: [[3]]}},
+           per_lag: [{{navn: {self.XSS!r}, kontakter: 2, registreringer: 1, siste: null}}],
+           forhandsvalg: [{{navn: {self.XSS!r}, registreringer: 4, endret: 1, andel_endret: 25}}]}};
+for (const html of [mkParkKryssTabell(s), mkParkLagTabell(s), mkParkForhandsvalgTabell(s)]) {{
+  assert(!html.includes('<img'), 'et navn ble satt inn som markup: ' + html);
+  assert(html.includes('&lt;img'), 'et navn er ikke escapet: ' + html);
+}}
+''')
 
     def test_escHtmlValue_beholder_tallet_null(self):
         """0 er en gyldig celleverdi og skal vises, ikke bli tom streng.

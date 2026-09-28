@@ -86,6 +86,7 @@ def statistikk_view(request):
         'har_oppdrag': 'oppdrag' in slugs,
         'har_ko': 'ko' in slugs,
         'har_bemanning': 'vaktliste' in slugs,
+        'har_park': 'park' in slugs,
     })
 
 

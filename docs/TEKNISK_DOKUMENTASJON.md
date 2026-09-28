@@ -1528,7 +1528,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 36 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 37 filer i `static/js/`, fordelt
 på ti sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
 grensesnittene under `/oppdrag/`, og de to i park: `/park/` og parksiden `/park/r/`.
 
@@ -1544,6 +1544,7 @@ grensesnittene under `/oppdrag/`, og de to i park: `/park/` og parksiden `/park/
 | `statistikk-oppdrag.js` | `/statistikk/`, kun med oppdragstilgang | Oppdragsfanen |
 | `statistikk-ko.js` | `/statistikk/`, kun med KO-tilgang | KO-fanen |
 | `statistikk-bemanning.js` | `/statistikk/`, kun med `les_alle` i vaktlista | Bemanningsfanen |
+| `statistikk-park.js` | `/statistikk/`, kun med `les` i park | Fanen «Lag» |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer **uten** enhet | Sentralbordet |
 | `oppdrag-enhet.js` | `/oppdrag/`, **enhetskontoer** | Bilens skjerm, offline-kø, lydvarsel |
 | `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |

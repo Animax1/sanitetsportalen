@@ -1,0 +1,113 @@
+{% comment %}
+  Fanen «Lag» (park pulje 3, docs/FORSLAG_PARK.md B12). Rendres kun for kontoer
+  med `les` i park — gaten står i statistikk/views.py (B17: ledelsen, ikke
+  operatørene). Tallene fylles av statistikk-park.js; alle verdier settes med
+  textContent eller går gjennom mkStatsTable(), som escaper hver celle.
+
+  Setningen under fanenavnet er det ene som hindrer feilen fra FORSLAG_KO.md §8:
+  tre registre som teller tre ting, og som noen summerer til «pasienter».
+{% endcomment %}
+<div class="kilde-panel{% if kilder.0.slug == 'park' %} active{% endif %}" id="kilde-park">
+
+  <div class="small mb-2" style="color: var(--text-muted);">
+    Tallene teller <b>kontakter</b> lagene har registrert ute — ikke pasienter. Én
+    registrering kan gjelde flere. Den samme personen kan også stå i pasientregistreringen
+    og på et oppdrag; de tre registrene summeres ikke.
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">Kontakter</div>
+        <div class="kpi-value" id="pkpi-kontakter">0</div>
+        <div class="kpi-sub" id="pkpi-kontakter-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">Behandlet på stedet</div>
+        <div class="kpi-value" id="pkpi-stedet">0</div>
+        <div class="kpi-sub" id="pkpi-stedet-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-teal">
+        <div class="kpi-label">Lag</div>
+        <div class="kpi-value" id="pkpi-lag">0</div>
+        <div class="kpi-sub">som har registrert</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Steder</div>
+        <div class="kpi-value" id="pkpi-steder">0</div>
+        <div class="kpi-sub">med registreringer</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-red">
+        <div class="kpi-label">Slettet</div>
+        <div class="kpi-value" id="pkpi-slettet">0</div>
+        <div class="kpi-sub">feilregistreringer, ikke talt</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Problemstilling · kontakter</div>
+        <canvas id="chart-park-problemstilling" height="220"></canvas>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Utfall · kontakter</div>
+        <canvas id="chart-park-utfall" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Kontakter per klokketime</div>
+        <canvas id="chart-park-time" height="150"></canvas>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Sted · kontakter</div>
+        <canvas id="chart-park-sted" height="150"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">Problemstilling × utfall · kontakter</div>
+        <div id="tbl-park-kryss" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Per lag</div>
+        <div id="tbl-park-lag" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Forhåndsvalget av sted · hvor ofte laget byttet det</div>
+        <div id="tbl-park-forhandsvalg" class="stats-rull mt-2"></div>
+        <div class="small mt-2" style="color: var(--text-muted);">
+          Byttes stedet ofte når det kom fra KO-tavla, henger tavla etter der lagene faktisk
+          er — og da bør forhåndsvalget fra tavla vurderes (FORSLAG_PARK.md §5.1).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

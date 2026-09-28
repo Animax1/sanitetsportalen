@@ -17,9 +17,10 @@
   <h1 class="h4 mb-3"><i class="bi bi-tree me-2"></i>Park</h1>
 
   {% if not leder %}
-    {# Fanen «Lag» kommer i pulje 3 (docs/FORSLAG_PARK.md §8) — til da sier siden det. #}
-    <p>Lagenes registreringer skal vises som fanen «Lag» i
-       <a href="/statistikk/">statistikken</a>. Den fanen er ikke bygget ennå.</p>
+    {# B17: tallene står i statistikken, og fanen krever også tilgang til den. #}
+    <p>Lagenes registreringer vises som fanen «Lag» i
+       <a href="/statistikk/">statistikken</a>. Fanen krever tilgang til statistikken også —
+       mangler du den, spør en administrator.</p>
   {% else %}
     <script nonce="{{ csp_nonce }}">
       window.MODUL_TILGANG = {

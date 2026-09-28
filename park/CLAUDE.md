@@ -20,6 +20,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Porten uten innlogging og grensene | `views_lag.park_lenke_kreves` |
 | Sletting av feilregistreringer, én og alt fra en lenke | `services.slett_registrering()`, `slett_fra_lenke()` |
 | Hvem som setter opp hva på `/park/` | `views.py`, tabellen i docstringen |
+| Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
 | Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
 
 ## Portalens første side uten innlogging
@@ -92,7 +93,8 @@ hvor mye som går før det går. Én auditrad for hele slettingen, ikke én per 
 
 ## Tilgang
 
-`les` og `skriv_leder` (`module.py`). `les` gir fanen «Lag» i `/statistikk/` (pulje 3) og en
+`les` og `skriv_leder` (`module.py`). `les` gir fanen «Lag» i `/statistikk/` (sammen med
+`statistikk: les`, B17 — `park/statistikk.py`) og en
 henvisning på `/park/`; `skriv_leder` setter opp lenkene og problemstillingene og sletter.
 **Utfallene er global admin** (B7), og å slette en rad fra en verdimengde likeså
 (`core.verdilister`). KO gjør ingenting med registreringene (B15).

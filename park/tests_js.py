@@ -147,6 +147,38 @@ class OppsettReglerTests(SimpleTestCase):
                          {'fra': '2026-10-01T08:05', 'til': '2026-10-04T08:05'})
 
 
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class LagfanenTests(SimpleTestCase):
+
+    def test_andelen_behandlet_paa_stedet_leses_paa_navn(self):
+        from patients.js_test_utils import STATISTIKK_PARK_JS
+        h = build_harness(((STATISTIKK_PARK_JS, ('parkAndelPaStedet',)),))
+        ut = run_node(h, '''
+          const s = {summary: {kontakter: 8}, per_utfall: [
+            {navn: 'Tilkalt bil', kontakter: 6}, {navn: 'Behandlet på stedet', kontakter: 2}]};
+          console.log(JSON.stringify([parkAndelPaStedet(s),
+            parkAndelPaStedet({summary: {kontakter: 0}, per_utfall: []})]));''')
+        self.assertEqual(json.loads(ut.splitlines()[0]),
+                         [{'n': 2, 'prosent': 25}, {'n': 0, 'prosent': None}])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class FaneskiftetLasterLagTests(SimpleTestCase):
+    """Kallstedet, ikke bare funksjonen (CLAUDE.md, mutantenes tredje løgn):
+    `visKilde('park')` i statistikk.js er det eneste som henter tallene."""
+
+    def test_visKilde_park_kaller_loadParkStats(self):
+        from patients.js_test_utils import STATISTIKK_JS
+        h = build_harness(((STATISTIKK_JS, ('_kallOppdrag', 'visKilde')),))
+        ut = run_node(h, '''
+          globalThis.document = {querySelectorAll: () => []};
+          let kalt = 0;
+          globalThis.loadParkStats = () => { kalt += 1; };
+          visKilde('park');
+          console.log(kalt);''')
+        self.assertEqual(ut.splitlines()[0], '1')
+
+
 class ParkMarkupTests(SimpleTestCase):
 
     def test_ingen_markup_i_oppsettet_heller(self):

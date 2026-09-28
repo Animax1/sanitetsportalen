@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-28 — `/park/` pulje 3: statistikkfanen «Lag»  `#park #statistikk`
+
+**Hvorfor:** André: «Fortsett med pulje 3 så skal jeg teste imens» (B12: «skal genereres
+statistikk som heter Lag»). Pulje 2 står på `staging` som `77749bf`.
+
+- **`park/statistikk.py`** — kilde nummer fem i `core/stats.py`, `slug = 'park'`, fanen **«Lag»**:
+  kontakter, registreringer, lag og steder; **«Behandlet på stedet»** med andel; fordelingen på
+  problemstilling, utfall og sted (flest kontakter først, likt på norsk alfabet); kontakter per
+  klokketime i **norsk tid**, alle 24 timene; **problemstilling × utfall**; per lag med siste
+  registrering; og **målingen av forhåndsvalget** (B21) — hvor stedet kom fra og hvor ofte laget
+  byttet det.
+- **Kontakter, ikke pasienter.** Én registrering kan gjelde flere (`antall`), så fanen skiller
+  registreringer fra kontakter, og teksten øverst sier at pasientregistreringen, oppdragene og
+  lagene er tre registre som ikke summeres (`FORSLAG_KO.md` §8).
+- **Slettede feilregistreringer telles ikke**, men antallet står som et eget kort
+  («feilregistreringer, ikke talt»).
+- **Gaten er `statistikk: les` + `park: les`** (B17) — ingen endring i rammeverket. En
+  KO-operatør med statistikk for pasienter ser ikke fanen; `park: les` uten statistikk gir 403.
+  `/park/` sier nå til `les` at fanen krever statistikktilgang også.
+- `statistikk-park.js` lastes bare med fanen, og `visKilde('park')` går gjennom `_kallOppdrag()`.
+  Byggerne står i `patients/tests_xss_stats.py`, med en egen prøve der navn med markup vises som
+  tekst.
+
+**Mutanter: 14, deretter 1 til — alle drept.** Tallene tungt (slettede med, kontakter som
+radtelling i sammendraget, fordelingen, kryssen og per lag, stigende sortering, **timen i UTC**,
+endret-filteret, tomme kilder med), gaten (slug byttet til `ko`, `har_park` fjernet) og JS
+(**kallstedet i `visKilde` fjernet** — ingen test dekket `visKilde()` før, nå går én gjennom den
+ekte inngangen; andelen lest på posisjon i stedet for navn). **Overlevde:** «time teller rader»
+— timetesten sjekket hvilken time, ikke hvor mange. **Strammet, nå drept.**
+
+**Prøvd i Chromium** med 25 registreringer og én slettet: «Kontakter 63 · 25 registreringer»,
+«Behandlet på stedet 20 · 32 % av kontaktene», «Slettet 1». Grafene og tabellene tegnes, ingen
+konsollfeil.
+
 ## 2026-09-28 — `/park/` pulje 2: oppsettet — lenker, sletting, verdimengdene, bryterne  `#park #sikkerhet`
 
 **Hvorfor:** André: «Ja legg på staging og bare begynn med pulje 2 og legg den ut på staging
