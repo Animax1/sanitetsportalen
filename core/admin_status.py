@@ -477,7 +477,7 @@ def _get_innlogging(minutter=60):
         feilet = qs.filter(event_type=LoginEvent.EVENT_LOGIN, success=False)
         return {
             'vindu_minutter': minutter,
-            'vellykkede': qs.filter(event_type=LoginEvent.EVENT_LOGIN, success=True).count(),
+            'vellykkede': qs.filter(event_type__in=LoginEvent.FULLFORT, success=True).count(),
             'feilede': feilet.count(),
             'feilede_brukernavn': feilet.values('username_attempt').distinct().count(),
             'feilede_ip': feilet.exclude(ip=None).values('ip').distinct().count(),

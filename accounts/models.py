@@ -256,6 +256,13 @@ class LoginEvent(models.Model):
     EVENT_MFA_TRUST_COOKIE_USED = 'mfa_trust_cookie_used'
     EVENT_MFA_RESET_BY_ADMIN = 'mfa_reset_by_admin'
 
+    #: Hendelsen som skrives når en innlogging er **fullført** — nøyaktig én per
+    #: innlogging. For en MFA-konto er passordsteget `passord_ok`, og det er
+    #: MFA-hendelsen som avslutter (29. sep. 2026: tellingene så bare `login`, og
+    #: viste 0 innlogginger for hver MFA-bruker).
+    FULLFORT = (EVENT_LOGIN, EVENT_MFA_SETUP_COMPLETED, EVENT_MFA_VERIFY_SUCCESS,
+                EVENT_MFA_BACKUP_USED, EVENT_MFA_TRUST_COOKIE_USED)
+
     EVENT_TYPE_CHOICES = [
         (EVENT_LOGIN, 'Innlogging'),
         (EVENT_PASSORD_OK, 'Passord riktig, MFA gjenstår'),

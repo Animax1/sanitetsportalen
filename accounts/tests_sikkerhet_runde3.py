@@ -551,3 +551,65 @@ class StrupetIpSlaarIkkeOppKontoenTests(TestCase):
             svar = Client().post(LOGIN, {'username': 'hvem_som_helst', 'password': 'x'})
         self.assertEqual(svar.status_code, 429)
         oppslag.assert_not_called()
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class LaastDeltKontoRoperIkkePassordetTests(TestCase):
+    """Andre gjennomgang 29. sep. 2026: en låst bilkonto svarte «låst» på riktig
+    passord og «feil» på galt, så gjettingen fortsatte gjennom låsen fra så mange
+    IP-er angriperen hadde. Taket holder bare hvis svaret er det samme."""
+
+    def setUp(self):
+        cache.clear()
+        self.bil = CustomUser.objects.create_user(
+            username='bil_orakel', password=PASSORD, must_change_password=False,
+            er_delt_konto=True)
+        from accounts.kontolaas import DELT_KONTO_TAK
+        for i in range(DELT_KONTO_TAK):
+            Client(REMOTE_ADDR=f'10.2.{i // 250}.{i % 250 + 1}').post(
+                LOGIN, {'username': 'bil_orakel', 'password': 'feil'})
+        self.bil.refresh_from_db()
+        self.assertTrue(self.bil.is_locked(), 'forutsetningen: taket er nådd')
+
+    def _svar(self, passord, ip='10.9.9.9'):
+        c = Client(REMOTE_ADDR=ip)
+        return c, c.post(LOGIN, {'username': 'bil_orakel', 'password': passord})
+
+    def test_riktig_og_galt_passord_gir_samme_svar(self):
+        _, riktig = self._svar(PASSORD)
+        _, galt = self._svar('feil', ip='10.9.9.8')
+        self.assertEqual(riktig.context['error'], galt.context['error'])
+        self.assertIn('låst', galt.context['error'])
+
+    def test_og_ingen_slipper_inn(self):
+        c, _ = self._svar(PASSORD)
+        self.assertFalse(_innlogget(c))
+
+    def test_en_personlig_konto_er_uendret(self):
+        """Motprøven: den har MFA og en global bøtte, og låses ved fem."""
+        per = CustomUser.objects.create_user(
+            username='per_orakel', password=PASSORD, must_change_password=False)
+        for _ in range(5):
+            Client().post(LOGIN, {'username': 'per_orakel', 'password': 'feil'})
+        svar = Client().post(LOGIN, {'username': 'per_orakel', 'password': 'feil'})
+        self.assertEqual(svar.context['error'], 'Feil brukernavn eller passord.')
+
+
+class Ipv6TellesPerNettTests(TestCase):
+    """Andre gjennomgang 29. sep. 2026: én bøtte per /128 var ingen grense for den
+    som har et helt /64."""
+
+    def _nokkel(self, ip):
+        from django.test import RequestFactory
+        from core.klientip import ratelimit_nokkel
+        with override_settings(KLIENTIP_BAK_PROXY=False):
+            return ratelimit_nokkel('g', RequestFactory().get('/', REMOTE_ADDR=ip))
+
+    def test_samme_64_er_samme_boette(self):
+        self.assertEqual(self._nokkel('2001:db8:1:2::1'), self._nokkel('2001:db8:1:2:ffff::9'))
+
+    def test_naboens_64_er_en_annen(self):
+        self.assertNotEqual(self._nokkel('2001:db8:1:2::1'), self._nokkel('2001:db8:1:3::1'))
+
+    def test_ipv4_er_uendret(self):
+        self.assertEqual(self._nokkel('10.0.0.5'), '10.0.0.5')

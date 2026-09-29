@@ -102,6 +102,20 @@ def _pagar(nokkel):
                 logger.warning('vaktsletting: cachen svarte ikke', exc_info=True)
 
 
+def _backup_foer(slug, bruker, note):
+    """`pre_slett`-backupen. Feiler den, slettes ingenting — og brukeren får en
+    melding, ikke en 500 (andre gjennomgang 29. sep. 2026: full disk eller en
+    serialiseringsfeil ga HTML-500 også fra JSON-endepunktene)."""
+    from core.backup import create_backup, rydd_pre_slett
+    try:
+        create_backup(slug=slug, kind='pre_slett', user=bruker, note=note)
+    except Exception as feil:  # noqa: BLE001
+        logger.exception('vaktsletting: backupen før slettingen feilet')
+        raise KanIkkeSlettes('Backupen før slettingen feilet, så ingenting er slettet. '
+                             'Se backup-siden.') from feil
+    rydd_pre_slett(slug)
+
+
 def _arkiver_for(vakt):
     """(handler, arkiv) for hvert arkiv som peker på vakta, gjennom arkivregisteret."""
     from core.arkiv import all_handlers as arkivhandlere
@@ -143,7 +157,6 @@ def _aktiv_pk():
 def _slett_vakt(vakt, *, bruker, request):
     from audit.models import AuditLog
     from core.arkiv import logg_arkivhendelse
-    from core.backup import create_backup, rydd_pre_slett
     from core.klientip import klient_ip
     from core.models import Vakt, VaktStatistikk
 
@@ -153,11 +166,17 @@ def _slett_vakt(vakt, *, bruker, request):
         raise KanIkkeSlettes(f'«{vakt.navn}» er allerede slettet.')
 
     slettet = oversikt(vakt)
-    create_backup(slug='full', kind='pre_slett', user=bruker,
-                  note=f'Før sletting av vakta «{vakt.navn}»')
-    rydd_pre_slett('full')
+    _backup_foer('full', bruker, f'Før sletting av vakta «{vakt.navn}»')
 
     with transaction.atomic():
+        # **Spør igjen, under låsen** (andre gjennomgang 29. sep. 2026). Backupen
+        # over tar sekunder, og en annen admin kan ha gjenåpnet vakta imens —
+        # sjekken i `slett_vakt` gjaldt vakta slik den var før backupen.
+        from core.vakt import laas_aktiv_vakt
+        aktiv = laas_aktiv_vakt()
+        if vakt.pk == aktiv.pk or Vakt.objects.filter(pk=vakt.pk, er_aktiv=True).exists():
+            raise KanIkkeSlettes(f'«{vakt.navn}» ble gjort aktiv mens slettingen pågikk, '
+                                 f'og er ikke slettet.')
         for handler in all_handlers():
             handler.slett(vakt)
         for handler, arkiv in list(_arkiver_for(vakt)):
@@ -202,15 +221,12 @@ def slett_arkiv(slug: str, pk: int, *, bruker=None, request=None) -> str:
     har en), og én auditrad på arkivets tabell.
     """
     from core.arkiv import logg_arkivhendelse
-    from core.backup import create_backup, rydd_pre_slett
 
     with _pagar(f'arkiv:{slug}:{pk}'):
         handler, arkiv = finn_arkiv(slug, pk)
         tittel = arkiv.tittel
         backup_slug = getattr(handler, 'backup_slug', '') or 'full'
-        create_backup(slug=backup_slug, kind='pre_slett', user=bruker,
-                      note=f'Før sletting av arkivet «{tittel}»')
-        rydd_pre_slett(backup_slug)
+        _backup_foer(backup_slug, bruker, f'Før sletting av arkivet «{tittel}»')
         with transaction.atomic():
             arkiv.delete()   # CASCADE tar de arkiverte radene
             logg_arkivhendelse(type(arkiv), 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',

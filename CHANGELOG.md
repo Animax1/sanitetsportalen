@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Andre gjennomgang: låst bilkonto røpte passordet, vaktsletting under gjenåpning, og MFA-innlogginger som ikke ble talt  `#sikkerhet` `#innlogging` `#vakt`
+
+**Hvorfor:** En gjennomgang uten kontekst fra arbeidet (egen agent, 29. sep.) av `8df4f1d..acd4a97`.
+Tre funn, alle kontrollert mot koden og prøvd før rettingen.
+
+**Hva:**
+- **En låst bilkonto røpte om passordet var riktig** — og da var ikke gjettingen fra mange
+  adresser begrenset. Pulje 1 flyttet brukernavnbøtta for delte kontoer til
+  «brukernavn + IP» (André: «brukernavn + IP og behold IP-brems») og la taket
+  `DELT_KONTO_TAK` i databasen. Men en låst konto svarte «Kontoen er midlertidig låst» på
+  **riktig** passord og «Feil brukernavn eller passord» på galt, så gjettingen fortsatte
+  gjennom låsen: 80 gjett fra 80 IP-er ga null 429. Før pulje 1 var bøtta per brukernavn den
+  ene grensen som ikke hang på IP-en. Nå svarer en låst **delt** konto «låst» uansett passord
+  — at kontoen finnes er ingen hemmelighet (navnene er forutsigbare), at passordet stemmer er
+  det. Personlige kontoer er uendret (MFA, global bøtte, lås ved fem).
+- **IPv6 telles per /64 i rate-limiten** (`ratelimit_nokkel`). Én bøtte per adresse er ingen
+  grense for den som har et helt nett. Om Railway slipper IPv6 inn, er ikke kontrollert —
+  endringen er ufarlig uansett.
+- **En vakt som ble gjenåpnet mens slettingen tok backup, ble slettet** — med alt som var
+  registrert på den etterpå, og pekeren til aktiv vakt falt tilbake på en avsluttet vakt.
+  Sjekken sto før backupen, som tar sekunder. Nå spør `_slett_vakt` igjen under
+  `laas_aktiv_vakt()` inne i transaksjonen — samme lås pulje 2 ga «Avslutt vakt» og
+  gjenåpningen.
+- **«Min profil» viste 0 innlogginger for hver MFA-bruker**, og server-status talte for få.
+  Siden pulje 1 er passordsteget `passord_ok`, og innloggingen fullføres av MFA-hendelsen —
+  tellingene så bare `login`. `LoginEvent.FULLFORT` er de fem hendelsene som avslutter en
+  innlogging, nøyaktig én per innlogging.
+- **Backup som feiler før en sletting gir melding, ikke 500** (`_backup_foer`). Ingenting
+  ble slettet før heller, men JSON-endepunktene i pasient- og oppdragsarkivet svarte med en
+  HTML-500.
+
+**Ikke endret, med grunn:** park glemmer tokenet på *enhver* 403, også når modulen er slått
+av et øyeblikk — følger av at alle avslag er samme 403 med vilje, og lenken fra tiltakskortet
+virker igjen.
+
+**Tester:** `core/tests_andre_gjennomgang.py`, og `LaastDeltKontoRoperIkkePassordetTests` og
+`Ipv6TellesPerNettTests` i `accounts/tests_sikkerhet_runde3.py`. Gjenåpningen skjer gjennom
+det ekte endepunktet, midt i backupen.
+**Mutasjoner: 7, alle drept.**
+
 ## 2026-09-29 — Etter gjennomgangen av pulje 1–4: 500 på feil passord for bilen når Redis er nede, og rate-limiten før kontooppslaget  `#sikkerhet` `#innlogging`
 
 **Hvorfor:** En uavhengig gjennomgang av de fire puljene (André la den fram) fant én ekte feil

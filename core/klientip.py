@@ -53,5 +53,19 @@ def klient_ip(request):
 
 
 def ratelimit_nokkel(group, request):
-    """`key=` for `is_ratelimited`: én bøtte per klient, ikke per proxy."""
-    return klient_ip(request) or 'ukjent'
+    """`key=` for `is_ratelimited`: én bøtte per klient, ikke per proxy.
+
+    **IPv6 telles per /64** (29. sep. 2026). Et hjem eller en VPS får et helt
+    /64-nett, og med én bøtte per adresse var bremsen uten grense for den som
+    bytter adresse innenfor det.
+    """
+    ip = klient_ip(request)
+    if not ip:
+        return 'ukjent'
+    try:
+        adresse = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if adresse.version == 6 and adresse.ipv4_mapped is None:
+        return str(ipaddress.ip_network(f'{ip}/64', strict=False))
+    return ip

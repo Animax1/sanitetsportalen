@@ -27,6 +27,11 @@ Det er greit for maskinlåsen — den er en bekvemmelighet for den ekte bilen.
 Det ville ikke vært greit for taket. Cachefeil gir åpen maskinlås, samme valg
 som rate-limiten; taket står uansett.
 
+**Og en låst delt konto svarer «låst» uansett passord** (andre gjennomgang,
+29. sep. 2026; `login_view`). Svarte den «låst» bare på riktig passord, røpte
+låsen svaret, og gjettingen fortsatte gjennom den fra så mange adresser man har —
+taket var da ingen grense.
+
 En personlig konto har MFA å falle tilbake på og en eier som kan kontaktes, og
 låses fortsatt overalt ved `TERSKEL`.
 """

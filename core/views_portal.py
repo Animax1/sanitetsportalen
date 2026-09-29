@@ -126,7 +126,7 @@ def profile_view(request):
     weekly_login_count = LoginEvent.objects.filter(
         user=user,
         success=True,
-        event_type=LoginEvent.EVENT_LOGIN,
+        event_type__in=LoginEvent.FULLFORT,
         created_at__gte=one_week_ago,
     ).count()
 

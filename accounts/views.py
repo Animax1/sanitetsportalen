@@ -374,7 +374,23 @@ def login_view(request):
         # bare den som har riktig passord vite at kontoen er låst; alle andre
         # får samme svar som ved feil passord.
         user = authenticate(request, username=username, password=password)
-        if user is not None and user.is_active and kontolaas.er_laast(user, ip):
+        # **En delt konto som er låst svarer det samme uansett passord**
+        # (andre gjennomgang 29. sep. 2026). Grensen for gjetting fra mange
+        # adresser er taket (`kontolaas.DELT_KONTO_TAK`), og den holder bare hvis
+        # låsen ikke røper passordet: med «låst» for riktig og «feil» for galt
+        # kunne gjettingen fortsette gjennom låsen, fra så mange IP-er man har.
+        # Navnene er forutsigbare og kontoen har ingen MFA. At den finnes, er
+        # ingen hemmelighet — at passordet stemmer, er det.
+        delt_og_laast = (user_obj is not None and user_obj.er_delt_konto
+                         and user_obj.is_active and user_obj.is_locked())
+        if delt_og_laast and user is None:
+            error = _laast_melding(user_obj)
+            kontolaas.registrer_mislykket(user_obj, ip)
+            LoginEvent.objects.create(
+                user=user_obj, username_attempt=username, success=False,
+                ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
+            )
+        elif user is not None and user.is_active and kontolaas.er_laast(user, ip):
             error = _laast_melding(user)
             LoginEvent.objects.create(
                 user=user, username_attempt=username, success=False,
