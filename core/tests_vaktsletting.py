@@ -212,6 +212,48 @@ class SlettVaktTests(SlettingBasis):
         self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists())
         self.assertEqual(_rader(self.gammel.pk), for_)
 
+    def test_dobbel_innsending_sletter_og_tar_backup_en_gang(self):
+        """Andre trykk kom med samme vakt, lest før første slettet den: to hele dumper
+        og to auditrader (sikkerhetsgjennomgangen 28. sep. 2026)."""
+        foreldet = Vakt.objects.get(pk=self.gammel.pk)
+        vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
+        with self.assertRaises(vaktsletting.KanIkkeSlettes):
+            vaktsletting.slett_vakt(foreldet, bruker=self.admin)
+        self.assertEqual(Backup.objects.filter(kind='pre_slett').count(), 1)
+        self.assertEqual(AuditLog.objects.filter(field_name='vakt_slettet').count(), 1)
+
+    def test_samtidig_sletting_stopper_for_backupen(self):
+        """Mens den første pågår, er den andre avvist før den tar en hel dump."""
+        with vaktsletting._pagar(f'vakt:{self.gammel.pk}'):
+            with self.assertRaises(vaktsletting.KanIkkeSlettes):
+                vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
+        self.assertFalse(Backup.objects.filter(kind='pre_slett').exists())
+        self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists())
+
+    def test_sperren_slippes_etterpaa(self):
+        """Også når slettingen feilet — ellers stenger én feil døra i ti minutter."""
+        vaktliste = next(h for h in vaktsletting.all_handlers() if h.slug == 'vaktliste')
+        with mock.patch.object(type(vaktliste), 'slett', side_effect=RuntimeError('midt i')):
+            with self.assertRaises(RuntimeError):
+                vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
+        vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
+        self.assertFalse(Vakt.objects.filter(pk=self.gammel.pk).exists())
+
+    def test_pre_slett_har_sitt_eget_tak(self):
+        """Vernet mot det vanlige taket, men ikke evig: hver er en hel databasedump."""
+        from core.backup import PRE_SLETT_BEHOLD
+        eldst = timezone.now() - timezone.timedelta(days=30)
+        for i in range(PRE_SLETT_BEHOLD + 2):
+            b = Backup.objects.create(filename=f'backup-full-pre_slett-{i}.json.gz', kind='pre_slett',
+                                      module_slug='full', size_bytes=1)
+            Backup.objects.filter(pk=b.pk).update(created_at=eldst + timezone.timedelta(hours=i))
+        vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
+        igjen = Backup.objects.filter(kind='pre_slett', module_slug='full')
+        self.assertEqual(igjen.count(), PRE_SLETT_BEHOLD)
+        self.assertFalse(igjen.filter(filename='backup-full-pre_slett-0.json.gz').exists())
+        self.assertTrue(igjen.filter(created_at__gt=timezone.now() - timezone.timedelta(minutes=5)).exists(),
+                        'den nye står')
+
     def test_oversikten_teller_det_som_slettes(self):
         linjer = dict(vaktsletting.oversikt(self.gammel))
         self.assertEqual(linjer['pasienter'], 1)
@@ -264,6 +306,8 @@ class SlettSidenTests(SlettingBasis):
 
 
 class SlettArkivTests(SlettingBasis):
+    """Et arkiv kan være det eneste som står igjen av en vakt (sikkerhetsgjennomgangen
+    28. sep. 2026): tittelen skrives inn, og en backup tas først — på alle tre veiene."""
 
     def _arkiv(self):
         from patients.models import VaktArkiv
@@ -275,27 +319,69 @@ class SlettArkivTests(SlettingBasis):
     def test_sletter_og_logger(self):
         from patients.models import ArkivertPasient, VaktArkiv
         arkiv = self._arkiv()
-        self.c.post(self._url(arkiv), {'bekreft': 'ja'})
+        self.c.post(self._url(arkiv), {'tittel': arkiv.tittel})
         self.assertFalse(VaktArkiv.objects.filter(pk=arkiv.pk).exists())
         self.assertFalse(ArkivertPasient.objects.filter(arkiv_id=arkiv.pk).exists())
         rad = AuditLog.objects.get(field_name='arkiv_slettet', record_id=arkiv.pk)
         self.assertEqual((rad.table_name, rad.user), ('patients_vaktarkiv', self.admin))
         self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists(), 'vakta står')
 
-    def test_krever_bekreftelse_og_post(self):
+    def test_bekreftelsessiden_viser_arkivet(self):
         arkiv = self._arkiv()
-        self.c.post(self._url(arkiv))
-        self.assertEqual(self.c.get(self._url(arkiv)).status_code, 405)
+        svar = self.c.get(self._url(arkiv))
+        self.assertEqual(svar.status_code, 200)
+        self.assertContains(svar, arkiv.tittel)
+        self.assertContains(svar, 'name="tittel"')
+
+    def test_skjult_felt_holder_ikke_lenger(self):
+        """`bekreft=ja` var et skjult felt — bekreftelsen var bare en nettleserdialog."""
+        arkiv = self._arkiv()
+        self.c.post(self._url(arkiv), {'bekreft': 'ja'})
+        self.c.post(self._url(arkiv), {'tittel': 'feil tittel'})
         self._arkiv()
+        self.assertFalse(Backup.objects.filter(kind='pre_slett').exists())
+
+    def test_samtidig_sletting_av_samme_arkiv_avvises(self):
+        from patients.models import VaktArkiv
+        arkiv = self._arkiv()
+        with vaktsletting._pagar(f'arkiv:patients:{arkiv.pk}'):
+            self.c.post(self._url(arkiv), {'tittel': arkiv.tittel})
+        self.assertTrue(VaktArkiv.objects.filter(pk=arkiv.pk).exists())
+        self.assertFalse(Backup.objects.filter(kind='pre_slett').exists())
+
+    def test_backup_forst(self):
+        arkiv = self._arkiv()
+        self.c.post(self._url(arkiv), {'tittel': arkiv.tittel})
+        b = Backup.objects.get(kind='pre_slett')
+        self.assertEqual(b.module_slug, 'arkiv', 'arkivets egen backup, ikke hele basen')
+
+    def test_backup_ogsaa_fra_pasientmodulen(self):
+        """Modulens egen sletteknapp går gjennom samme tjeneste."""
+        arkiv = self._arkiv()
+        svar = self.c.delete(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/', data='{"confirm": true}',
+                             content_type='application/json')
+        self.assertEqual(svar.status_code, 200)
+        self.assertTrue(Backup.objects.filter(kind='pre_slett', module_slug='arkiv').exists())
+        self.assertEqual(AuditLog.objects.filter(field_name='arkiv_slettet', record_id=arkiv.pk).count(), 1)
+
+    def test_backup_ogsaa_fra_oppdragsmodulen(self):
+        from oppdrag.models import OppdragArkiv
+        arkiv = OppdragArkiv.objects.get(vakt=self.gammel)
+        svar = self.c.delete(f'/oppdrag/api/arkiv/{arkiv.pk}/', data='{"confirm": true}',
+                             content_type='application/json')
+        self.assertEqual(svar.status_code, 200)
+        self.assertFalse(OppdragArkiv.objects.filter(pk=arkiv.pk).exists())
+        self.assertTrue(Backup.objects.filter(kind='pre_slett', module_slug='oppdrag_arkiv').exists())
 
     def test_feil_modul_for_arkivet_gir_404(self):
         """Pk-en til et pasientarkiv skal ikke kunne slette et oppdragsarkiv."""
         from oppdrag.models import OppdragArkiv
         arkiv = self._arkiv()
         ukjent = max(OppdragArkiv.objects.values_list('pk', flat=True)) + 100
-        self.assertEqual(self.c.post(self._url(arkiv, 'finnesikke'), {'bekreft': 'ja'}).status_code, 404)
+        self.assertEqual(self.c.post(self._url(arkiv, 'finnesikke'),
+                                     {'tittel': arkiv.tittel}).status_code, 404)
         self.assertEqual(self.c.post(f'/portal-admin/vakt/arkiv/oppdrag/{ukjent}/slett/',
-                                     {'bekreft': 'ja'}).status_code, 404)
+                                     {'tittel': arkiv.tittel}).status_code, 404)
         self._arkiv()
 
     def test_bare_global_admin(self):
@@ -305,5 +391,6 @@ class SlettArkivTests(SlettingBasis):
         c = Client()
         c.force_login(leder)
         arkiv = self._arkiv()
-        self.assertEqual(c.post(self._url(arkiv), {'bekreft': 'ja'}).status_code, 403)
+        self.assertEqual(c.post(self._url(arkiv), {'tittel': arkiv.tittel}).status_code, 403)
+        self.assertEqual(c.get(self._url(arkiv)).status_code, 403)
         self._arkiv()

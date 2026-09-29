@@ -1,0 +1,39 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Slett arkiv – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Bekreftelsen før et arkiv slettes (sikkerhetsgjennomgangen 28. sep. 2026). Samme port
+  som vaktslettingen: arkivet vises, og tittelen må skrives inn — serveren sjekker den.
+  Før var det et skjult `bekreft=ja` bak en nettleserdialog.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-3">
+  <a href="{% url 'portaladmin:vakt' %}" class="small">&larr; Tilbake til Vakt</a>
+  <h1 class="mb-2 mt-2"><i class="bi bi-trash me-2"></i>Slett arkivet «{{ arkiv.tittel }}»</h1>
+</section>
+
+<div class="card border-danger" style="max-width: 640px;">
+  <div class="card-body">
+    <ul class="mb-3" id="arkiv-oversikt">
+      <li>Modul: {{ modul }}</li>
+      <li>Vakt: {{ arkiv.vakt.navn|default:"–" }}</li>
+      <li>Arkivert: {{ arkiv.importert_at|date:"d.m.Y H:i" }}</li>
+      <li>Rader: {{ antall|default_if_none:"–" }}{% if kollapset %} (kollapset — bare aggregatet står){% endif %}</li>
+    </ul>
+    <p class="small text-muted">
+      Arkivet kan være det eneste som står igjen av vakta: etter «Avslutt vakt» er radene
+      borte. Det tas en backup av arkivet først, og den er eneste vei tilbake.
+    </p>
+    <form method="post" action="{% url 'portaladmin:vakt_arkiv_slett' slug arkiv.pk %}">
+      {% csrf_token %}
+      <label class="form-label small" for="slett-tittel">Skriv arkivets tittel for å bekrefte</label>
+      <input type="text" id="slett-tittel" name="tittel" class="form-control form-control-sm mb-2"
+             autocomplete="off" required placeholder="{{ arkiv.tittel }}">
+      <button type="submit" class="btn btn-sm btn-danger">Slett arkivet</button>
+      <a href="{% url 'portaladmin:vakt' %}" class="btn btn-sm btn-secondary ms-2">Avbryt</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -42,7 +42,8 @@ def frys(vakt, *, bruker=None) -> list[VaktStatistikk]:
             VaktStatistikk.objects.create(
                 vakt=vakt, vakt_navn=vakt.navn, slug=handler.slug,
                 versjon=handler.statistikk_versjon,
-                data=handler.full_stats(vakt),
+                # `frys_stats`, ikke `full_stats`: fritekst fryses ikke.
+                data=handler.frys_stats(vakt),
                 frosset_at=naa, frosset_av=bruker, frosset_av_navn=navn,
             )
             for handler in all_handlers()

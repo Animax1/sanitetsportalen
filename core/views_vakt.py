@@ -29,7 +29,9 @@ from core import vaktslutt
 from core.auth_decorators import admin_required
 from core.models import AppSetting, Vakt
 from core.ratelimit import rate_limit
-from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, vaktnavn_opptatt_melding
+from core.vakt import (
+    VaktnavnOpptatt, hent_aktiv_vakt, laas_aktiv_vakt, vaktnavn_opptatt_melding,
+)
 
 
 def _kollapsede_vakter() -> set[int]:
@@ -102,7 +104,9 @@ def vakt_view(request):
     tidligere = [
         {'vakt': v, 'kan_gjenaapnes': v.pk not in kollapset,
          'nokkel': statistikk_for_vakt.get(v.pk)}
-        for v in Vakt.objects.filter(er_aktiv=False).order_by('-avsluttet', '-startet')
+        # Alle utenom den aktive — ikke `er_aktiv=False`. Pekeren er fasit
+        # (`hent_aktiv_vakt`); en vakt med feil flagg forsvant ellers fra lista.
+        for v in Vakt.objects.exclude(pk=vakt.pk).order_by('-avsluttet', '-startet')
     ]
     return render(request, 'core/vakt.html', {
         'vakt': vakt,
@@ -194,12 +198,13 @@ def vakt_gjenaapne_view(request, pk):
                                 f'ikke lenger, og vakta kan ikke gjenåpnes.')
         return redirect('portaladmin:vakt')
 
-    forrige = hent_aktiv_vakt()
     with transaction.atomic():
-        if forrige.pk != vakt.pk:
-            forrige.er_aktiv = False
-            forrige.avsluttet = timezone.now()
-            forrige.save(update_fields=['er_aktiv', 'avsluttet'])
+        # Låst, og alle andre med flagget ryddes — ikke bare den forrige
+        # (28. sep. 2026). Et kappløp kunne etterlate to aktive; dette retter
+        # opp også en slik tilstand, i stedet for å bygge videre på den.
+        laas_aktiv_vakt()
+        Vakt.objects.filter(er_aktiv=True).exclude(pk=vakt.pk).update(
+            er_aktiv=False, avsluttet=timezone.now())
         vakt.er_aktiv = True
         vakt.avsluttet = None
         vakt.save(update_fields=['er_aktiv', 'avsluttet'])
@@ -248,18 +253,43 @@ def vakt_slett_view(request, pk):
 
 
 @admin_required
-@require_POST
+@require_http_methods(['GET', 'POST'])
 @rate_limit(group='portaladmin:vakt-arkiv-slett', rate='20/m', method='POST', on_limit='html')
 def vakt_arkiv_slett_view(request, slug, pk):
-    """Slett ett arkiv — samme handling som modulenes egne sletteknapper."""
+    """Slett ett arkiv — samme tjeneste som modulenes egne sletteknapper.
+
+    **Samme port som vaktslettingen** (sikkerhetsgjennomgangen 28. sep. 2026):
+    GET viser arkivet, og POST krever at tittelen skrives inn. Før var
+    bekreftelsen et skjult `bekreft=ja` og en nettleserdialog — én rød lenke per
+    rad i en lang liste, for noe som kan være det eneste som står igjen av en
+    vakt. Backupen tas av tjenesten, `core.vaktsletting.slett_arkiv`.
+    """
     from core import vaktsletting
 
-    if request.POST.get('bekreft') != 'ja':
-        messages.error(request, 'Bekreftelse mangler.')
-        return redirect('portaladmin:vakt')
     try:
-        tittel = vaktsletting.slett_arkiv(slug, pk, request=request)
+        handler, arkiv = vaktsletting.finn_arkiv(slug, pk)
     except (LookupError, ObjectDoesNotExist):
         raise Http404
-    messages.success(request, f'Arkivet «{tittel}» er slettet.')
-    return redirect('portaladmin:vakt')
+    if request.method == 'POST':
+        if (request.POST.get('tittel') or '').strip() != arkiv.tittel:
+            messages.error(request, 'Skriv arkivets tittel nøyaktig for å slette det.')
+            return redirect('portaladmin:vakt_arkiv_slett', slug=slug, pk=pk)
+        try:
+            tittel = vaktsletting.slett_arkiv(slug, pk, bruker=request.user, request=request)
+        except vaktsletting.KanIkkeSlettes as feil:
+            messages.error(request, str(feil))
+            return redirect('portaladmin:vakt')
+        except ObjectDoesNotExist:
+            raise Http404
+        messages.success(request, f'Arkivet «{tittel}» er slettet. En backup ble tatt først.')
+        return redirect('portaladmin:vakt')
+
+    from core.modules import get_module
+    modul = get_module(handler.slug)
+    return render(request, 'core/vakt_arkiv_slett.html', {
+        'arkiv': arkiv, 'slug': slug,
+        'modul': modul.name if modul else handler.slug,
+        # Samme to navn som i `_arkiver()`.
+        'antall': getattr(arkiv, 'antall_rader', getattr(arkiv, 'antall_pasienter', None)),
+        'kollapset': bool(arkiv.kollapset_at),
+    })

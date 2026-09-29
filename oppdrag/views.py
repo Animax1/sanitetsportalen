@@ -9,7 +9,6 @@ en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt.
 """
 from __future__ import annotations
 
-import json
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -22,7 +21,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.jsonkropp import json_body
+from core.jsonkropp import json_body, les_json
 from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
@@ -932,8 +931,9 @@ def _stempling_kropp(request):
     if not request.body:
         return {}, None
     try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+        # `les_json`: `Infinity` og `1e999` er ikke tall (28. sep. 2026).
+        data = les_json(request.body)
+    except ValueError:
         return None, 'Ugyldig JSON i kroppen.'
     if not isinstance(data, dict):
         return None, 'Kroppen må være et JSON-objekt.'

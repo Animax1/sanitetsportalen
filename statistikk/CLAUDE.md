@@ -103,6 +103,15 @@ under en tidligere vaktas navn.
 nytt, så en renderer som får et nytt felt må tåle at det mangler — samme regel som for
 arkivene fra før 7b.
 
+**Og de fryses gjennom `frys_stats()`, ikke `full_stats()` — uten fritekst og uten
+personnavn** (sikkerhetsgjennomgangen 28. sep. 2026). De frosne settene har ingen frist før
+sensitiv-merket kommer, og de går offsite i 730 dager med `portal`-backupen. «Annet sted» i
+oppdrag, og tittel, siste logglinje og «lukket av» i KO-lista, gikk rett inn; begge fanene
+overstyrer nå `frys_stats` og **tømmer feltene, men beholder formen**, så visningen leser dem
+som før. Standarden er `full_stats()` — en fane med bare tall skriver ingenting. En ny fane
+med tekst fra brukerne overstyrer den. Hvilke kolonner som står tomme i en tidligere vakt, er
+altså ikke en feil.
+
 ## Oppdragsfanen etter pulje 7b (21. sep. 2026)
 
 Utregningen bor i `oppdrag/statistikk.py`; det som står her er reglene som gjør at fanen

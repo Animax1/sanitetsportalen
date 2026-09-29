@@ -185,6 +185,28 @@ class HvemLosteTests(Basis):
         self.assertEqual(liste[0]['lukket_av'], 'ko1')
         self.assertEqual(liste[0]['siste_linje'], 'Funnet av vakter')
 
+    def test_tittel_linje_og_navn_fryses_ikke(self):
+        """Fritekst og personnavn fryses ikke (sikkerhetsgjennomgangen 28. sep. 2026).
+        Loggen har sin egen lagringsfrist; en frosset kopi uten frist ville overlevd
+        den. Hendelsesnummeret står, så gjennomgangen finner raden i loggen."""
+        import json as _json
+        from core.models import VaktStatistikk
+        from core.vaktstatistikk import frys
+        h = self._hendelse('Savnet Ola Nordmann', prioritet='viktig')
+        self._linje('Funnet ved scenen av Kari', 10, h=h)
+        self._lukk(h, 17)
+        self.assertEqual(self.stats()['hvem_loste']['verken_liste'][0]['tittel'],
+                         'Savnet Ola Nordmann', 'motprøve: live har tittelen')
+
+        frys(self.vakt)
+        data = VaktStatistikk.objects.get(slug='ko').data
+        tekst = _json.dumps(data, ensure_ascii=False)
+        for ord_ in ('Nordmann', 'Kari', 'ko1'):
+            self.assertNotIn(ord_, tekst)
+        rad, = data['hvem_loste']['verken_liste']
+        self.assertEqual((rad['hendelsesnummer'], rad['prioritet'], rad['minutter']),
+                         (h.hendelsesnummer, 'viktig', 17.0))
+
     def test_fjernet_linje_er_ikke_siste_linje(self):
         h = self._hendelse(prioritet='rod')
         self._linje('Første', 1, h=h)

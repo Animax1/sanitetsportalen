@@ -6,7 +6,7 @@ Skilt ut fra ``views.py`` i N13.3.
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
-from core.arkiv import get_handler, logg_arkivhendelse, verifiser
+from core.arkiv import get_handler, verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
@@ -107,8 +107,11 @@ def arkiv_detalj_view(request, pk):
             status=400,
         )
 
-    tittel = arkiv.tittel
-    arkiv.delete()  # CASCADE sletter ArkivertPasient-rader
-    logg_arkivhendelse(VaktArkiv, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
-                       request=request, record_id=pk)
+    # Gjennom `core.vaktsletting.slett_arkiv`, som tar en backup først og
+    # skriver auditraden — samme vei som vakt-siden (28. sep. 2026).
+    from core.vaktsletting import KanIkkeSlettes, slett_arkiv
+    try:
+        slett_arkiv('patients', arkiv.pk, bruker=request.user, request=request)
+    except KanIkkeSlettes as feil:
+        return JsonResponse({'error': str(feil)}, status=409)
     return JsonResponse({'ok': True})

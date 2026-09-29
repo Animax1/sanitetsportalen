@@ -74,6 +74,22 @@ def vakt_for_year(year):
         return vakt
 
 
+def laas_aktiv_vakt():
+    """Lås pekeren til aktiv vakt og returner vakta. **Bare inne i en transaksjon.**
+
+    For de to som *bytter* aktiv vakt — «Avslutt vakt» og gjenåpning
+    (sikkerhetsgjennomgangen 28. sep. 2026). Begge leste `hent_aktiv_vakt()`
+    utenfor transaksjonen: to samtidige gjenåpninger ga to vakter med
+    `er_aktiv=True`, og to samtidige avslutninger kunne fryse samme vakt to
+    ganger — den andre gangen med tomme tall, som da ble de som ble vist.
+    Raden `aktiv_vakt_id` er det ene stedet begge skriver, så det er den som
+    låses; den andre venter og leser pekeren etter at den første er ferdig.
+    PostgreSQL låser; SQLite serialiserer skrivinger uansett.
+    """
+    AppSetting.objects.select_for_update().filter(key='aktiv_vakt_id').first()
+    return hent_aktiv_vakt()
+
+
 def hent_aktiv_vakt():
     """Vakta nye rader skal peke på. Aldri ``None``.
 

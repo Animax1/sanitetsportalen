@@ -130,12 +130,7 @@
               <td class="small">{% if a.kollapset_at %}Kollapset {{ a.kollapset_at|date:"d.m.Y" }}{% else %}Radnivå{% endif %}</td>
               <td class="text-end text-nowrap">
                 {% if a.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ a.nokkel|urlencode }}">Statistikk</a>{% endif %}
-                <form method="post" action="{% url 'portaladmin:vakt_arkiv_slett' a.slug a.pk %}" class="d-inline"
-                      data-confirm="Slette arkivet «{{ a.tittel }}»? Det kan ikke angres, og arkivet kan være det eneste som står igjen etter at vakta er avsluttet.">
-                  {% csrf_token %}
-                  <input type="hidden" name="bekreft" value="ja">
-                  <button type="submit" class="btn btn-sm btn-link text-danger">Slett</button>
-                </form>
+                <a class="btn btn-sm btn-link text-danger" href="{% url 'portaladmin:vakt_arkiv_slett' a.slug a.pk %}">Slett</a>
               </td>
             </tr>
           {% empty %}

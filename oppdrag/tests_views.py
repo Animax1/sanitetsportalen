@@ -772,6 +772,20 @@ class StemplingSkjemaTests(StemplingBasis):
         self.assertEqual(o.status, choices.VENTER)
         self.assertIn('fritekst', resp.json()['message'])
 
+    def test_tall_som_ikke_er_endelige_avvises(self):
+        """`Infinity` og `1e999` er ikke tall, heller ikke i det lukkede skjemaet
+        (sikkerhetsgjennomgangen 28. sep. 2026). **To lag holder:** `les_json`
+        avviser dem, og `klienttid` som ikke er tekst avvises uansett — derfor
+        overlever en mutant som fjerner det første. Testen holder utfallet."""
+        o = self._oppdrag()
+        for raa in ('{"klienttid": Infinity}', '{"klienttid": 1e999}', '{"klienttid": NaN}'):
+            with self.subTest(raa=raa):
+                resp = self.bil.post(f'/oppdrag/api/oppdrag/{o.pk}/status/rykker_ut/',
+                                     data=raa, content_type='application/json')
+                self.assertEqual(resp.status_code, 400)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.VENTER)
+
     def test_hver_nokkel_utenfor_skjemaet_avvises(self):
         o = self._oppdrag()
         for felt in ('status', 'problemstilling', 'hastegrad', 'enhet_id', 'x'):

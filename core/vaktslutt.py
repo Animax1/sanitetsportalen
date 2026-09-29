@@ -122,12 +122,16 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
     """
     from core.backup import create_backup
     from core.models import AppSetting
-    from core.vakt import opprett_vakt
+    from core.vakt import hent_aktiv_vakt, laas_aktiv_vakt, opprett_vakt
     from core.validators import current_local_year
     from core.vaktstatistikk import frys
 
     handlere = all_handlers()
     grunner = [g for g in (h.sperre(vakt) for h in handlere) if g]
+    if hent_aktiv_vakt().pk != vakt.pk:
+        # Tidlig, så en avsluttet vakt ikke koster backuper. Vernet er låsen i
+        # transaksjonen under — denne sjekken er et kappløp.
+        grunner.insert(0, f'«{vakt.navn}» er ikke den aktive vakta.')
     if grunner:
         raise Sperret(grunner)
 
@@ -137,6 +141,13 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
                           note=f'Før avslutning av vakta «{vakt.navn}»')
 
     with transaction.atomic():
+        # Låst, og sjekket at vakta fortsatt er den aktive (28. sep. 2026). To
+        # samtidige avslutninger med hvert sitt nye navn frøs ellers samme vakt
+        # to ganger; den andre gangen var radene tømt, og det nyeste settet —
+        # det som vises — var nuller.
+        if laas_aktiv_vakt().pk != vakt.pk:
+            raise Sperret([f'«{vakt.navn}» er ikke lenger den aktive vakta — '
+                           'den er avsluttet i mellomtiden.'])
         # En gang til: backupene tar tid, og et oppdrag lagt på tavla imens
         # ville ellers blitt arkivert og slettet halvveis.
         grunner = [g for g in (h.sperre(vakt) for h in handlere) if g]

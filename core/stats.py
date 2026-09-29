@@ -63,6 +63,22 @@ class BaseStatistikkHandler:
         """Tallene for én vakt. Returner en JSON-serialiserbar dict."""
         raise NotImplementedError
 
+    def frys_stats(self, vakt) -> dict:
+        """Tallene som fryses når vakta avsluttes (`core.vaktstatistikk.frys`).
+
+        **Ingen fritekst og ingen personnavn** (sikkerhetsgjennomgangen 28. sep.
+        2026). De frosne settene har ingen lagringsfrist før sensitiv-merket
+        kommer (TODO), og de går offsite i 730 dager med `portal`-backupen.
+        «Annet sted»-tekstene i oppdrag og tittelen, siste logglinje og hvem som
+        lukket i KO gikk rett inn — og overlevde både radene og loggens egen
+        frist. En modul med slike felter overstyrer denne og tømmer dem; formen
+        beholdes, så visningen trenger ingen ny `statistikk_versjon`.
+
+        Standarden er `full_stats()`: en modul med bare tall skal ikke måtte
+        skrive noe for å bli frosset.
+        """
+        return self.full_stats(vakt)
+
     def arkiv_full_stats(self, pk):
         """Tallene for ett arkiv, eller ``None`` hvis det ikke finnes.
 

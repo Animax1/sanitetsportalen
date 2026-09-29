@@ -458,6 +458,18 @@ class KoStatistikkHandler(BaseStatistikkHandler):
     def full_stats(self, vakt):
         return ko_stats(vakt)
 
+    def frys_stats(self, vakt):
+        """Tittelen, siste logglinje og hvem som lukket fryses ikke.
+
+        Loggen har sin egen lagringsfrist (`ko/opprydding.py`); en frosset kopi
+        uten frist ville overlevd den. Hendelsesnummeret, prioriteten og tidene
+        står, så gjennomgangen finner hendelsen i loggen så lenge den finnes.
+        """
+        data = self.full_stats(vakt)
+        for rad in data['hvem_loste']['verken_liste']:
+            rad.update(tittel='', siste_linje='', lukket_av='')
+        return data
+
 
 def register_handlers() -> None:
     """Kalles fra ``ko.apps.KoConfig.ready()``."""

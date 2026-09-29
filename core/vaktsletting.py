@@ -25,9 +25,14 @@ Rekkefølgen i `slett_vakt()`:
 """
 from __future__ import annotations
 
+import contextlib
+import logging
 from typing import ClassVar
 
+from django.core.cache import cache
 from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 
 class BaseVaktslettHandler:
@@ -68,6 +73,35 @@ class KanIkkeSlettes(Exception):
     pass
 
 
+@contextlib.contextmanager
+def _pagar(nokkel):
+    """Én sletting av samme ting om gangen — ellers er dobbeltklikket to hele dumper.
+
+    Sikkerhetsgjennomgangen 28. sep. 2026: to innsendinger av vaktslettingen tok
+    hver sin hele databasebackup *før* transaksjonen, og la to auditrader. Backupen
+    må stå utenfor transaksjonen (en fil ruller ikke tilbake), så en databaselås
+    rekker ikke; sperren står i cachen, som `add()` gjør atomisk i både
+    LocMem og Redis. Cachefeil gir åpen sperre — samme valg som rate-limiten;
+    kontrollen av at raden fortsatt finnes står uansett.
+    """
+    nokkel = f'vaktsletting:{nokkel}'
+    try:
+        fikk = cache.add(nokkel, 1, 600)
+    except Exception:  # noqa: BLE001
+        logger.warning('vaktsletting: cachen svarte ikke', exc_info=True)
+        fikk = None
+    if fikk is False:
+        raise KanIkkeSlettes('Slettingen pågår allerede. Last siden på nytt om litt.')
+    try:
+        yield
+    finally:
+        if fikk:
+            try:
+                cache.delete(nokkel)
+            except Exception:  # noqa: BLE001
+                logger.warning('vaktsletting: cachen svarte ikke', exc_info=True)
+
+
 def _arkiver_for(vakt):
     """(handler, arkiv) for hvert arkiv som peker på vakta, gjennom arkivregisteret."""
     from core.arkiv import all_handlers as arkivhandlere
@@ -94,20 +128,34 @@ def slett_vakt(vakt, *, bruker, request=None) -> list[tuple[str, int]]:
 
     Kaster `KanIkkeSlettes` for den aktive vakta — før noe er rørt.
     """
-    from audit.models import AuditLog
-    from core.arkiv import logg_arkivhendelse
-    from core.backup import create_backup
-    from core.klientip import klient_ip
-    from core.models import VaktStatistikk
-    from core.vakt import hent_aktiv_vakt
-
-    if vakt.pk == hent_aktiv_vakt().pk or vakt.er_aktiv:
+    if vakt.pk == _aktiv_pk() or vakt.er_aktiv:
         raise KanIkkeSlettes(f'«{vakt.navn}» er den aktive vakta og kan ikke slettes. '
                              f'Avslutt den først.')
+    with _pagar(f'vakt:{vakt.pk}'):
+        return _slett_vakt(vakt, bruker=bruker, request=request)
+
+
+def _aktiv_pk():
+    from core.vakt import hent_aktiv_vakt
+    return hent_aktiv_vakt().pk
+
+
+def _slett_vakt(vakt, *, bruker, request):
+    from audit.models import AuditLog
+    from core.arkiv import logg_arkivhendelse
+    from core.backup import create_backup, rydd_pre_slett
+    from core.klientip import klient_ip
+    from core.models import Vakt, VaktStatistikk
+
+    # Innenfor sperren: den andre av to innsendinger kom hit med en vakt den
+    # leste før den første slettet den.
+    if not Vakt.objects.filter(pk=vakt.pk).exists():
+        raise KanIkkeSlettes(f'«{vakt.navn}» er allerede slettet.')
 
     slettet = oversikt(vakt)
     create_backup(slug='full', kind='pre_slett', user=bruker,
                   note=f'Før sletting av vakta «{vakt.navn}»')
+    rydd_pre_slett('full')
 
     with transaction.atomic():
         for handler in all_handlers():
@@ -131,22 +179,40 @@ def slett_vakt(vakt, *, bruker, request=None) -> list[tuple[str, int]]:
     return slettet
 
 
-def slett_arkiv(slug: str, pk: int, *, request=None) -> str:
-    """Slett ett arkiv gjennom arkivregisteret. Returnerer tittelen.
-
-    Samme handling som modulenes egne sletteknapper — `delete()` med kaskade,
-    og én auditrad på arkivets tabell.
-    """
-    from core.arkiv import get_handler, logg_arkivhendelse
+def finn_arkiv(slug: str, pk: int):
+    """`(handler, arkiv)` gjennom arkivregisteret. `LookupError`/`DoesNotExist` ellers."""
+    from core.arkiv import get_handler
 
     handler = get_handler(slug)
     modell = getattr(handler, 'arkiv_model', None) if handler else None
     if modell is None:
         raise LookupError(f'Ukjent arkiv: «{slug}».')
-    arkiv = modell.objects.get(pk=pk)
-    tittel = arkiv.tittel
-    with transaction.atomic():
-        arkiv.delete()
-        logg_arkivhendelse(modell, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
-                           request=request, record_id=pk)
+    return handler, modell.objects.get(pk=pk)
+
+
+def slett_arkiv(slug: str, pk: int, *, bruker=None, request=None) -> str:
+    """Slett ett arkiv gjennom arkivregisteret. Returnerer tittelen.
+
+    **Den ene veien** (sikkerhetsgjennomgangen 28. sep. 2026): vakt-siden og
+    modulenes egne sletteknapper — pasientarkivet og oppdragsarkivet — kalte
+    hver sin `delete()`, og ingen av dem tok backup. Et arkiv er ofte det eneste
+    som står igjen av en vakt: etter «Avslutt vakt» er radene borte, og etter
+    kollaps finnes bare aggregatet. Nå tas en `pre_slett`-backup av arkivets
+    egen backupfil først (`handler.backup_slug`, den hele basen om modulen ikke
+    har en), og én auditrad på arkivets tabell.
+    """
+    from core.arkiv import logg_arkivhendelse
+    from core.backup import create_backup, rydd_pre_slett
+
+    with _pagar(f'arkiv:{slug}:{pk}'):
+        handler, arkiv = finn_arkiv(slug, pk)
+        tittel = arkiv.tittel
+        backup_slug = getattr(handler, 'backup_slug', '') or 'full'
+        create_backup(slug=backup_slug, kind='pre_slett', user=bruker,
+                      note=f'Før sletting av arkivet «{tittel}»')
+        rydd_pre_slett(backup_slug)
+        with transaction.atomic():
+            arkiv.delete()   # CASCADE tar de arkiverte radene
+            logg_arkivhendelse(type(arkiv), 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
+                               request=request, record_id=pk)
     return tittel

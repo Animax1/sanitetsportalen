@@ -343,6 +343,24 @@ class AvreistOgUtfallTests(Basis):
         self.assertEqual(a['annet_tekster'], [
             {'oppdragsnummer': p.oppdragsnummer, 'enhet': 'Ambulanse 1', 'tekst': 'Hotell Maritim'}])
 
+    def test_annet_sted_fryses_ikke_naar_vakta_avsluttes(self):
+        """Fritekst fryses ikke (sikkerhetsgjennomgangen 28. sep. 2026). `annet_tekster`
+        gikk rett inn i `core.VaktStatistikk` — uten lagringsfrist, og offsite i 730
+        dager med `portal`-backupen. Gjennom `frys()`, som «Avslutt vakt» bruker."""
+        import json as _json
+        from core.models import VaktStatistikk
+        from core.vaktstatistikk import frys
+        p = self._oppdrag()
+        self._rykk(p, 1); self._stempel(p, choices.FREMME, 3)
+        self._stempel(p, choices.AVREIST, 12, sted='annet', sted_tekst='Hjem til Storgata 5')
+        self.assertTrue(self.stats()['avreist_til']['annet_tekster'], 'motprøve: live har teksten')
+
+        frys(self.vakt)
+        data = VaktStatistikk.objects.get(slug='oppdrag').data
+        self.assertNotIn('Storgata', _json.dumps(data, ensure_ascii=False))
+        self.assertEqual(data['avreist_til']['annet_tekster'], [])
+        self.assertEqual(data['avreist_til']['per_sted']['Annet sted'], 1, 'stedet telles fortsatt')
+
     def test_utfall_per_problemstilling(self):
         a = self._oppdrag(problemstilling='Sår')
         self._rykk(a, 1); self._stempel(a, choices.FREMME, 3)

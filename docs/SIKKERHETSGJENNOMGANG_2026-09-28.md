@@ -54,22 +54,24 @@ logget ikke ut; svartiden på «glemt passord» røpet om adressen hadde konto; 
 fra hvor som helst låste en bilkonto overalt; og det fantes ingen vei tilbake uten en annen
 admin når MFA-enheten var borte.
 
-### Pulje 2 — før `staging` går til `main`
+### Pulje 2 — før `staging` går til `main` (ferdig 29. sep., se CHANGELOG)
 
-Alt her er ny kode på `staging`.
+Alt her var ny kode på `staging`.
 
-- **Fritekst fryses inn i statistikken.** `_avreist_til()` legger `annet_tekster` inn i
-  `full_stats`, og `core.vaktstatistikk.frys()` lagrer payloaden som den er i
-  `VaktStatistikk` — uten lagringsfrist, og med i `portal`-backupen, 730 dager offsite.
-  Bryter med at fritekst ikke fryses.
-- **Arkivsletting uten backup og uten reell bekreftelse.** `bekreft=ja` er et skjult felt
-  (`core/templates/core/vakt.html`), og `slett_arkiv` tar ingen `pre_slett`-backup.
-  Vaktslettingen på samme side krever begge.
-- **Gjenåpning uten lås, og dobbel vaktsletting.** `hent_aktiv_vakt()` leses utenfor
-  transaksjonen; to innsendinger av vaktslettingen gir to hele dumper.
-- **`json_body` godtar `Infinity`, `NaN` og `1e999`.** `int(float('inf'))` kaster
-  `OverflowError`, som ingen av de rundt 40 kallstedene fanger — 500 fra `/lag/r/`, uten
-  innlogging.
+- **Fritekst og personnavn ble frosset inn i statistikken.** `core.vaktstatistikk.frys()`
+  lagret `full_stats()` som den var i `VaktStatistikk` — uten lagringsfrist, og med i
+  `portal`-backupen, 730 dager offsite. To moduler bar slikt: `annet_tekster` i oppdrag, og
+  i KO lista over Rød/Viktig uten ressurs med **tittel, siste logglinje og hvem som lukket**
+  (funnet da rettingen ble gjort — ingen av gjennomgangene hadde sett den). Frysingen går nå
+  gjennom `frys_stats()`, som tømmer dem; to datamigrasjoner vasker det staging alt hadde.
+- **Arkivsletting uten backup og uten reell bekreftelse** — på **tre** veier, ikke én:
+  vakt-siden, pasientmodulen og oppdragsmodulen kalte hver sin `delete()`. Nå én tjeneste
+  med `pre_slett`-backup, og vakt-siden krever tittelen skrevet inn.
+- **Pekeren til aktiv vakt ble byttet uten lås** — ved gjenåpning, og (funnet underveis)
+  ved «Avslutt vakt», der to samtidige avslutninger med hvert sitt navn frøs samme vakt to
+  ganger, den andre gangen med nuller. Dobbel vaktsletting tok to hele dumper.
+  `pre_slett` fikk eget tak (ti per modul).
+- **`json_body` godtok `Infinity`, `NaN` og `1e999`** — 500 fra `/lag/r/` uten innlogging.
 
 ### Pulje 3 — backup og offsite
 

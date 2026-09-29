@@ -4,6 +4,74 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Sikkerhet, pulje 2: fritekst i frosne tall, arkivsletting uten backup, og aktiv vakt uten lås  `#sikkerhet` `#vakt` `#personvern`
+
+**Hvorfor:** Pulje 2 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — det som måtte på plass før
+`staging` går til `main`, fordi all koden var ny der. André: «vi har tid til å gjøre oss ferdig
+med disse puljene først og gjør jobben ryddig».
+
+**Fritekst og personnavn ble frosset inn i statistikken.** «Avslutt vakt» lagret hver fanes
+`full_stats()` som den var i `core.VaktStatistikk` — uten lagringsfrist, og med i
+`portal`-backupen, 730 dager offsite. **Oppdrag:** «Annet sted»-tekstene (`annet_tekster`),
+f.eks. «hjem til Storgata 5», mens arkivet bevisst lot dem være. **KO:** lista over Rød/Viktig
+uten ressurs bar **hendelsestittel, siste logglinje og hvem som lukket** — funnet da rettingen
+ble gjort; ingen av gjennomgangene hadde sett den. Loggen har sin egen frist, og den frosne
+kopien ville overlevd den.
+- Ny krok `BaseStatistikkHandler.frys_stats()` — standard er `full_stats()`, så en modul med
+  bare tall gjør ingenting. Oppdrag og KO overstyrer og **tømmer feltene, men beholder formen**,
+  så visningen trenger ingen ny `statistikk_versjon`. Stedet telles fortsatt; KO-lista beholder
+  hendelsesnummer, prioritet og tider, så gjennomgangen finner hendelsen i loggen.
+- `frys()` kaller `frys_stats` — det er kallstedet som bærer regelen, og det er prøvd.
+- **To datamigrasjoner vasker det staging alt har frosset**: `oppdrag/0034` og `ko/0024`, hver
+  sin form, bare `RunPython`, idempotente, logikken inline. Prod har ingen frosne sett ennå.
+- Regelen står i `statistikk/CLAUDE.md` under «Tidligere vakter», der den som skriver en ny
+  fane leser. Den sto først i rota, og `test_rota_har_ikke_vokst_tilbake` sa fra: 24 tegn igjen
+  under taket, og regelen gjelder statistikkhandlere, ikke rammeverket som helhet.
+
+**Arkivsletting uten backup — på tre veier, ikke én.** Vakt-siden, pasientmodulens og
+oppdragsmodulens sletteknapper kalte hver sin `delete()`. Et arkiv er ofte det eneste som står
+igjen av en vakt. Nå går alle tre gjennom `core.vaktsletting.slett_arkiv`, som tar en
+**`pre_slett`-backup av arkivets egen backupfil** (`arkiv`, `oppdrag_arkiv`; den hele basen om
+modulen ikke har en) og skriver auditraden. **Vakt-siden krever arkivets tittel skrevet inn**, på
+en bekreftelsesside som viser modul, vakt, dato og rader — før var det et skjult `bekreft=ja` bak
+en nettleserdialog, én rød lenke per rad i en lang liste.
+
+**Pekeren til aktiv vakt byttes bare under lås** (`core.vakt.laas_aktiv_vakt()`, som låser raden
+`aktiv_vakt_id`).
+- **Gjenåpning** leste aktiv vakt utenfor transaksjonen; to samtidige ga to vakter med
+  `er_aktiv=True`, og taperen **forsvant fra «Tidligere vakter»**, som filtrerte på flagget. Nå
+  låst, alle andre med flagget ryddes, og lista viser alle utenom den aktive.
+- **«Avslutt vakt»** hadde samme hull (funnet underveis): to samtidige avslutninger med hvert
+  sitt nye navn frøs samme vakt to ganger — den andre gangen med tømte rader, og det nyeste
+  settet, det som vises, var **nuller**. Nå sjekkes pekeren tidlig (så en avsluttet vakt ikke
+  koster backuper) og igjen under lås.
+- **Dobbel vaktsletting** tok to hele databasedumper og la to auditrader. Sperre i cachen
+  (`cache.add`, atomisk) fordi backupen må stå utenfor transaksjonen, og ny kontroll av at vakta
+  finnes innenfor sperren. Sperren slippes også når slettingen feiler.
+- **`pre_slett` har eget tak**: de ti nyeste per modul (`PRE_SLETT_BEHOLD`). Vernet mot det
+  vanlige taket gjorde dem evige — én hel dump per slettet testvakt.
+
+**`json_body` godtok `Infinity`, `NaN` og `1e999`.** `1e999` blir `inf`, og `int(inf)` kaster
+`OverflowError`, som ingen av de rundt 40 kallstedene fanger — **500 fra `/lag/r/` uten
+innlogging**. Rettet i `core/jsonkropp.py` (`parse_float`/`parse_constant`), ett sted for alle;
+`les_json` brukes også av stemplingen i oppdrag, som parset selv.
+
+**Tester:** `core/tests_sikkerhet_pulje2.py` (13), og i modulenes egne filer: frysingen gjennom
+`frys()` i `oppdrag/tests_statistikk_7b.py` og `ko/tests_statistikk.py`, `1e999` mot det ekte
+endepunktet i `park/tests.py`, stemplingen i `oppdrag/tests_views.py`, og arkiv- og vaktslettingen
+i `core/tests_vaktsletting.py` (de eksisterende arkivtestene er skrevet om: POST krever tittel,
+GET er bekreftelsessiden). Alle var røde før rettingen; park-testen viste 500.
+**Mutasjoner: 25 — 24 drept, én overlevde med vilje.** Drept: `frys` via `full_stats`, hver av
+de fire tømte feltene for seg, `parse_float` og `parse_constant` hver for seg, låsen i
+transaksjonen og den tidlige sjekken i «Avslutt vakt», gjenåpning som rydder bare den forrige,
+lista på flagget, ingen ny kontroll av vakta, sperren som ikke stopper og som ikke slippes,
+`pre_slett` uten rydding og taket av med én, arkiv uten backup, tittelen ikke sjekket, hver av de
+to modulveiene utenom tjenesten, hver av de to migrasjonene som no-op, arkivbackup alltid hel,
+arkiv uten sperre. **To overlevde først** — den tidlige sjekken (ingen test krevde at en avsluttet
+vakt ikke koster backup) og sperren på arkiv (ingen test prøvde samtidig sletting); begge fikk
+en test. **Overlevde:** stemplingen tilbake til `json.loads` — `klienttid` som ikke er tekst
+avvises uansett, så to lag holder; testen holder utfallet.
+
 ## 2026-09-28 — Sikkerhet, pulje 1: MFA-oppsettet overlevde passordreset, og seks hull til i innloggingen  `#sikkerhet` `#mfa` `#innlogging`
 
 **Hvorfor:** André bad om en kodegjennomgang med sikkerhet i fokus. Den ble gjort to ganger

@@ -773,6 +773,13 @@ class OppdragStatistikkHandler(BaseStatistikkHandler):
     display_name = 'Oppdrag'
     order = 20
 
+    def frys_stats(self, vakt):
+        """«Annet sted»-tekstene fryses ikke — samme regel som arkivet
+        (`arkiv_stats`). Stedet telles fortsatt i `per_sted`."""
+        data = self.full_stats(vakt)
+        data['avreist_til']['annet_tekster'] = []
+        return data
+
     def full_stats(self, vakt):
         return oppdrag_stats(vakt)
 

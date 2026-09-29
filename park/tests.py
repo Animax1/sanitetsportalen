@@ -7,6 +7,8 @@ går gjennom de ekte endepunktene, med headerne siden sender.
 """
 from __future__ import annotations
 
+import json
+
 import ast
 import re
 import uuid
@@ -453,6 +455,21 @@ class PortenTests(_Grunnlag):
 
     def test_ugyldig_registrering_gir_400(self):
         self.assertEqual(self._post('park_lag_registrer', self._data(antall=0)).status_code, 400)
+
+    def test_tall_som_ikke_er_endelige_gir_400_ikke_500(self):
+        """`1e999` ble `inf`, og `int(inf)` kastet `OverflowError` — 500 uten innlogging
+        (sikkerhetsgjennomgangen 28. sep. 2026). Rettet i `core.jsonkropp`, prøvd her
+        gjennom siden der det var åpent."""
+        from django.test import Client as _Client
+        for felt in ('lag', 'antall', 'problemstilling'):
+            with self.subTest(felt=felt):
+                data = json.dumps(self._data()).replace(
+                    f'"{felt}": ', f'"{felt}": 1e999, "_x": ', 1)
+                svar = _Client(raise_request_exception=False).post(
+                    reverse('park_lag_registrer'), data=data,
+                    content_type='application/json', **self._h())
+                self.assertEqual(svar.status_code, 400)
+        self.assertFalse(Registrering.objects.exists())
 
     def test_innlogget_portalbruker_uten_token_kommer_ikke_inn(self):
         admin = _bruker('adm', role='admin')

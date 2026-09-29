@@ -52,6 +52,12 @@ VALID_KINDS = {KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET, KIND_PR
 # og ville ellers blitt ryddet bort av de neste automatiske backupene av `full`.
 PROTECTED_KINDS = {KIND_PRE_RESTORE, KIND_PRE_SLETT}
 
+#: **Men `pre_slett` har sitt eget tak** (sikkerhetsgjennomgangen 28. sep. 2026).
+#: Vernet mot det vanlige taket gjorde den evig: hver slettet testvakt la igjen
+#: en hel databasedump på volumet, og ingenting ryddet dem. De ti nyeste per
+#: modul står; de eldre er også offsite (`full/` i 90 dager, modulfilene i 730).
+PRE_SLETT_BEHOLD = 10
+
 
 # ── Modeller som har flyttet mellom apper ────────────────────────────────────
 #
@@ -359,6 +365,36 @@ def create_backup(slug: str, kind: str = KIND_MANUAL,
     return backup
 
 
+def rydd_pre_slett(slug: str, behold: int = PRE_SLETT_BEHOLD) -> int:
+    """Slett de eldste `pre_slett`-filene for `slug` utover `behold`."""
+    from core.models import Backup
+
+    ider = list(Backup.objects.filter(module_slug=slug, kind=KIND_PRE_SLETT)
+                .order_by('-created_at').values_list('id', flat=True)[behold:])
+    return _slett_backuper(ider)
+
+
+def _slett_backuper(ider) -> int:
+    """Fila og raden for hver backup i `ider`. Returnerer antallet."""
+    from core.models import Backup
+
+    deleted = 0
+    backup_dir = get_backup_dir()
+    for backup in Backup.objects.filter(id__in=ider):
+        path = backup_dir / backup.filename
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError as exc:
+                logger.warning(
+                    'core.backup: kunne ikke slette %s: %s',
+                    backup.filename, exc,
+                )
+        backup.delete()
+        deleted += 1
+    return deleted
+
+
 def enforce_cap(slug: str, max_backups: int) -> int:
     """Slett eldste backuper for modulen slik at totalt antall <= max_backups.
 
@@ -381,20 +417,7 @@ def enforce_cap(slug: str, max_backups: int) -> int:
         return 0
 
     excess_ids = list(qs.values_list('id', flat=True)[max_backups:])
-    deleted = 0
-    backup_dir = get_backup_dir()
-    for backup in Backup.objects.filter(id__in=excess_ids):
-        path = backup_dir / backup.filename
-        if path.exists():
-            try:
-                path.unlink()
-            except OSError as exc:
-                logger.warning(
-                    'core.backup: kunne ikke slette %s: %s',
-                    backup.filename, exc,
-                )
-        backup.delete()
-        deleted += 1
+    deleted = _slett_backuper(excess_ids)
     if deleted:
         logger.info(
             'core.backup: cap (%d) tvang sletting av %d gamle backuper for %s',

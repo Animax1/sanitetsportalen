@@ -20,7 +20,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from core.jsonkropp import json_body
-from core.arkiv import logg_arkivhendelse, verifiser
+from core.arkiv import verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
@@ -115,8 +115,11 @@ def arkiv_detalj_view(request, pk):
              'message': 'Bekreftelse mangler. Send {"confirm": true} for å slette.'},
             status=400)
 
-    tittel = arkiv.tittel
-    arkiv.delete()   # CASCADE tar de arkiverte oppdragene
-    logg_arkivhendelse(OppdragArkiv, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}',
-                       request=request, record_id=pk)
+    # Gjennom `core.vaktsletting.slett_arkiv`, som tar en backup først og
+    # skriver auditraden — samme vei som vakt-siden (28. sep. 2026).
+    from core.vaktsletting import KanIkkeSlettes, slett_arkiv
+    try:
+        slett_arkiv('oppdrag', arkiv.pk, bruker=request.user, request=request)
+    except KanIkkeSlettes as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=409)
     return JsonResponse({'status': 'ok'})
