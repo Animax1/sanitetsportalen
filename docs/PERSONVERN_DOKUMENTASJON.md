@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 28. september 2026  
-**Versjon:** 1.14  
+**Siste oppdatering:** 29. september 2026  
+**Versjon:** 1.15  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -623,7 +623,8 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | SQL-injection-beskyttelse | Django ORM benyttes; ingen rå SQL-spørringer |
 | Audit-logging | Alle pasient-endringer logges på felt-nivå (bruker, IP, tidspunkt, tabell, felt, gammel/ny verdi). Feltlista utledes fra modellen selv, slik at et nytt felt ikke kan falle utenfor loggen stilltiende; en test feiler hvis et felt verken spores eller er eksplisitt unntatt. Innloggingsforsøk logges med IP og user-agent (LoginEvent). Backup-hendelser (opprettelse, gjenoppretting, sletting) logges — gjenopprettingen av `restore_backup` selv, slik at både nettleseren og kommandolinja etterlater nøyaktig én rad med hvem og hvorfra. «Nedlasting» sto i denne lista fram til 14. sep. 2026; funksjonen finnes ikke og skal ikke finnes. **Portalens egne innstillinger logges fra samme dato** (`core/signals.py`): endring av sesjonstimeout, e-postmottakere og av/på-bryteren for en hel modul. Tellere og cron-status er unntatt — loggen skal si hva et menneske bestemte, ikke hva maskinen talte |
 | Backup og gjenoppretting | Automatisk backup kjøres av en **klokketråd i web-prosessen** (`core/backup/klokke.py`), ikke av en cron-tjeneste: Railway-volumet kan bare henge på én tjeneste, og en cron-jobb ville skrevet fila til sitt eget flyktige filsystem og forsvunnet med den. Filene lagres gzip-komprimert på `/data/backups`. Opprydding på volumet er antallsbasert (`core.Backupplan.behold`, standard 50 per modul); offsite styres av bucketens livssyklusregler (A.9). Pre-restore-øyeblikksbilde lages før hver gjenoppretting |
-| Kryptering av sikkerhetskopier ut av Railway | Hver fil **komprimeres først og krypteres så** (AES-256-GCM, format `SPBK1` + nonce + chiffertekst) før den forlater Railway. Rekkefølgen er ikke vilkårlig: chiffertekst lar seg ikke komprimere. Nøkkelen (`OFFSITE_BACKUP_KEY`) finnes i Railway og i en passordbehandler utenfor — **ikke** hos Scaleway, som derfor bare ser chiffertekst |
+| Kryptering av sikkerhetskopier ut av Railway | Hver fil **komprimeres først og krypteres så** (AES-256-GCM, format `SPBK2` + nonce + chiffertekst, med filnavnet autentisert, fra 29. sep. 2026; `SPBK1` før det) før den forlater Railway. Rekkefølgen er ikke vilkårlig: chiffertekst lar seg ikke komprimere. Nøkkelen (`OFFSITE_BACKUP_KEY`) finnes i Railway og i en passordbehandler utenfor — **ikke** hos Scaleway, som derfor bare ser chiffertekst. Gjenopprettingen laster bare modeller fra modulen fila gir seg ut for, så en fil som er gitt nytt navn i bucketen ikke kan bringe tilbake brukerkontoer |
+| **Risikovalg: sikkerhetskopiene på Railway-volumet er ikke kryptert** | Filene på `/data/backups` er gzip-komprimert JSON i klartekst — også den hele fila, med **passord-hasher og TOTP-hemmeligheter** (A.2). Den som får lesetilgang til volumet, har dermed alt som trengs for å forsøke passordene offline og generere MFA-koder. **Hvorfor det er akseptert:** volumet nås bare gjennom Railway-kontoen (2FA), og den som har den, har også databasen og `OFFSITE_BACKUP_KEY` — kryptering på volumet med en nøkkel som ligger ved siden av, ville ikke stengt noen ute. Antallet hele filer på volumet holdes nede (`Backupplan.behold`, standard 7 for `full`), og `pre_slett`-filene har eget tak (10). **Hva som ville endret vurderingen:** at volumet fikk en tilgangsvei som ikke også gir databasen — da må filene krypteres som offsite. Registrert 29. sep. 2026 (sikkerhetsgjennomgangen) |
 | Ingen nedlasting av sikkerhetskopier | Portalen har **ingen nedlastingsfunksjon** for backupfiler, heller ikke for modulfilene. En `.json.gz` med hele pasientregisteret i en nedlastingsmappe er en spredning utenfor portalens kontroll, og den hele fila bærer i tillegg passord-hasher og TOTP-hemmeligheter. Kontroll av innhold skjer med `verifiser_backup`, som laster filene inn i en flyktig engangsbase uten å flytte dem |
 | Ingen eksterne skript- eller stilkilder | `script-src` er `'self'` + nonce, **uten vertsnavn**. Bootstrap, ikonene, Tabulator og Chart.js serveres fra portalen selv (`static/vendor/`), ikke fra CDN: med en CDN-vert i lista kunne én HTML-injeksjon lastet en vilkårlig pakke, nonce eller ei. En test håndhever at ingen mal peker på et CDN |
 | Låste avhengigheter | `requirements.txt` er generert med `pip-compile --generate-hashes`, og det er den som installeres i produksjon. Uten hasher kan en kompromittert pakke på PyPI bytte innhold under samme versjonsnummer |
@@ -1149,9 +1150,15 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.14 – sist oppdatert 28. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.15 – sist oppdatert 29. september 2026*
 
 **Endringslogg:**
+
+- **v1.15 (29.09.2026):** **Sikkerhetstiltak:** krypteringsformatet offsite er `SPBK2` med
+  filnavnet autentisert, og gjenopprettingen laster bare modulens egne modeller. Nytt
+  **risikovalg**: sikkerhetskopiene på Railway-volumet er ukryptert, også den hele fila med
+  passord-hasher og TOTP-hemmeligheter — med begrunnelse og hva som ville endret den.
+  Sikkerhetsgjennomgangen 28. sep. 2026, `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`.
 
 - **v1.14 (28.09.2026):** **A.9:** lagringstid for lagregistreringene på `/lag/` — 730 dager,
   håndhevet automatisk av `purge_old_logs`. Resten av `/lag/`-beskrivelsen (A.6, B23 i

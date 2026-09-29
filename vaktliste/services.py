@@ -1000,8 +1000,13 @@ def kan_gi_nytt_navn(user, ressurs) -> bool:
     """
     if kan_bemanne_ressurs(user, ressurs):
         return True
+    # **Ikke plasser «åpne for alle»** (28. sep. 2026, André: «nei»). Den kan
+    # hvem som helst med badge fylle — så var den nok, kunne korps-føreren fra
+    # Haugesund gi Karmøys ambulanse nytt navn, og navnet følger med til
+    # KO-tavla, besetningen og fila som sendes ut. Å fylle en plass er ikke å
+    # eie ressursen; «satt av til korpset hennes» er ordlyden over.
     return any(kan_bemanne_plass(user, ressurs, vp)
-               for vp in ressurs.vaktposter.all())
+               for vp in ressurs.vaktposter.all() if not vp.alle_korps)
 
 
 def kan_sette_vaktpost(user, ressurs, mannskap, vaktpost=None) -> bool:

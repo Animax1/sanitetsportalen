@@ -33,7 +33,9 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import admin_required
 from core.health import maal_cache, maal_db
 from core.klientip import klient_ip
-from core.sesjoner import aktive_sesjoner, bruker_id_i, dekod
+from core.sesjoner import (
+    aktive_sesjoner, bruker_id_i, dekod, finn_sesjon_med_referanse, sesjonsreferanse,
+)
 # `_scrub_secrets` står igjen som navn for de mange kallstedene her; den
 # offentlige er `core.vask.vask` (B7). Å døpe om kallstedene er E6.
 from core.vask import vask as _scrub_secrets
@@ -761,12 +763,14 @@ def _list_active_sessions():
     Loopen som dekoder sesjonstabellen bor i `core/sesjoner.py` siden
     17. sep. 2026, fordi KO-sidebaren trenger den samme (`FORSLAG_KO.md` §5.3)
     og to kopier er to kilder som glir fra hverandre. **Projeksjonen er
-    fortsatt adminflatens egen**, og det er meningen: `session_key` er
-    håndtaket `admin_session_kill` avslutter en sesjon med, og det hører bare
-    hjemme her.
+    fortsatt adminflatens egen**, og det er meningen: `ref` er håndtaket
+    `admin_session_kill` avslutter en sesjon med, og det hører bare hjemme her.
+
+    **`ref`, ikke `session_key`** (28. sep. 2026) — se `core.sesjoner.sesjonsreferanse`.
+    Nøkkelen er cookie-verdien; å sende den til nettleseren var å gi bort sesjonen.
     """
     sessions = [{
-        'session_key': rad['session_key'],
+        'ref': sesjonsreferanse(rad['session_key']),
         'user_id': bruker.id,
         'username': bruker.username,
         'role': getattr(bruker, 'role', '') or '',
@@ -814,22 +818,25 @@ def admin_sessions_list(request):
 @admin_required
 @require_http_methods(['POST'])
 def admin_session_kill(request):
-    """POST: avslutt én konkret sesjon. Body: session_key."""
-    session_key = request.POST.get('session_key', '').strip()
-    if not session_key:
-        return JsonResponse({'ok': False, 'error': 'Mangler session_key'}, status=400)
+    """POST: avslutt én konkret sesjon. Body: `ref` fra lista.
+
+    Tar referansen, ikke `session_key` (28. sep. 2026): en rå nøkkel som sendes
+    inn her, peker ikke på noe og gir 404.
+    """
+    ref = request.POST.get('ref', '').strip()
+    if not ref:
+        return JsonResponse({'ok': False, 'error': 'Mangler ref'}, status=400)
 
     # Beskytt mot å logge ut seg selv ved et uhell – admin skal bruke logout-knappen
-    if request.session.session_key == session_key:
+    if ref == sesjonsreferanse(request.session.session_key):
         return JsonResponse(
             {'ok': False, 'error': 'Kan ikke logge ut din egen sesjon her. Bruk "Logg ut" i menyen.'},
             status=400,
         )
 
     # Finn sesjonen og hent brukernavn for audit før sletting
-    try:
-        sess = Session.objects.get(session_key=session_key)
-    except Session.DoesNotExist:
+    sess = finn_sesjon_med_referanse(ref)
+    if sess is None:
         return JsonResponse({'ok': False, 'error': 'Sesjon finnes ikke (allerede utløpt)'}, status=404)
 
     username = ''

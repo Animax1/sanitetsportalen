@@ -79,6 +79,7 @@ class InnloggingValidererSkjemaetTests(TestCase):
         self.assertContains(res, 'Feil brukernavn eller passord')
         self.assertEqual(LoginEvent.objects.count(), 0)
 
+    @override_settings(KLIENTIP_BAK_PROXY=True)
     def test_innloggingsloggen_faar_proxyens_ip(self):
         """H2 på innloggingsloggen."""
         Client().post(reverse('accounts:login'), {'username': 'finnesikke', 'password': 'y'},

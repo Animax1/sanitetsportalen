@@ -40,7 +40,8 @@ class AutokoblingKreverUtdelerTests(TestCase):
         d = res.json()['data']
         self.assertEqual(d['epost'], 'kari@example.org')
         self.assertIsNone(d['user_id'])
-        self.assertTrue(d['konto_finnes'], 'merket sier at kontoen finnes — admin kobler')
+        # Merket er lederens fra 28. sep. 2026 (André, punkt D).
+        self.assertFalse(d['konto_finnes'], 'merket vises bare for den som kan lede')
 
     def test_lederen_kobler_som_foer(self):
         d = self._opprett(self.c_vl, 'Kari via leder').json()['data']
@@ -53,6 +54,74 @@ class AutokoblingKreverUtdelerTests(TestCase):
         self.assertEqual(res.status_code, 200, res.content)
         person.refresh_from_db()
         self.assertIsNone(person.user_id)
+
+
+class PlantetEpostKoblesIkkeTests(TestCase):
+    """Sikkerhetsgjennomgangen 28. sep. 2026: korps-føreren skrev en annens e-post
+    inn på sin egen rad, og neste gang en leder lagret raden for noe helt annet,
+    ble den kontoen koblet til korpset i stillhet — og arvet badgen."""
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.kari = CustomUser.objects.create_user(
+            username='kari_pl', password='x', email='kari.pl@example.org',
+            must_change_password=False)
+        self.korpsbruker = _bruker('kb_pl', 'skriv_handling')
+        self.forer = Mannskap.objects.create(navn='Fører', korps=self.korps, user=self.korpsbruker)
+        self.person = Mannskap.objects.create(navn='Tom rad', korps=self.korps)
+        self.c_kb = _klient(self.korpsbruker)
+        self.c_vl = _klient(_bruker('vl_pl', 'skriv_leder'))
+
+    def _put(self, klient, **data):
+        return klient.put(f'/vaktliste/api/mannskap/{self.person.pk}/',
+                          content_type='application/json', data=data)
+
+    def test_lederens_lagring_kobler_ikke_en_plantet_adresse(self):
+        self.assertEqual(self._put(self.c_kb, epost='kari.pl@example.org').status_code, 200)
+        # Lederens skjema sender alle feltene, e-posten med, uendret.
+        res = self._put(self.c_vl, notat='sjekket', epost='kari.pl@example.org')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.person.refresh_from_db()
+        self.assertIsNone(self.person.user_id)
+
+    def test_lederens_egen_adresse_kobles_ogsaa_senere(self):
+        """Motprøven — «e-post først, konto senere» (André, 12. sep. 2026)."""
+        CustomUser.objects.filter(pk=self.kari.pk).update(email='ny@example.org')
+        self._put(self.c_vl, epost='kari.pl@example.org')
+        self.person.refresh_from_db()
+        self.assertIsNone(self.person.user_id, 'kontoen finnes ikke ennå med adressen')
+        CustomUser.objects.filter(pk=self.kari.pk).update(email='kari.pl@example.org')
+        self._put(self.c_vl, notat='lagret igjen', epost='kari.pl@example.org')
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.user_id, self.kari.pk)
+
+    def test_lederen_som_skriver_adressen_selv_kobler(self):
+        self._put(self.c_kb, epost='annen@example.org')
+        self._put(self.c_vl, epost='kari.pl@example.org')
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.user_id, self.kari.pk)
+
+    def test_plantet_ved_opprettelse_kobles_heller_ikke(self):
+        """Samme vei, men gjennom POST: raden er født med den plantede adressen."""
+        res = self.c_kb.post('/vaktliste/api/mannskap/', content_type='application/json',
+                             data={'navn': 'Ny rad', 'korps_id': self.korps.pk,
+                                   'epost': 'kari.pl@example.org'})
+        self.assertIn(res.status_code, (200, 201), res.content)
+        ny = Mannskap.objects.get(navn='Ny rad')
+        self.assertIsNone(ny.user_id)
+        res = self.c_vl.put(f'/vaktliste/api/mannskap/{ny.pk}/', content_type='application/json',
+                            data={'notat': 'sjekket', 'epost': 'kari.pl@example.org'})
+        self.assertEqual(res.status_code, 200, res.content)
+        ny.refresh_from_db()
+        self.assertIsNone(ny.user_id)
+
+    def test_korpsforeren_ser_ikke_om_adressen_har_konto(self):
+        d = self._put(self.c_kb, epost='kari.pl@example.org').json()['data']
+        self.assertFalse(d['konto_finnes'])
+        liste = self.c_kb.get('/vaktliste/api/mannskap/').json()['data']['mannskap']
+        self.assertFalse(any(m['konto_finnes'] for m in liste))
+        d = self._put(self.c_vl, notat='x').json()['data']
+        self.assertTrue(d['konto_finnes'], 'lederen ser merket')
 
 
 class JsonKroppTests(SimpleTestCase):

@@ -34,6 +34,7 @@ from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
     bytte_til_dict, delte_linjer_for_liste, endring_til_dict, er_enhetskonto, etag_for_svar,
+    ikke_for_enhetskonto,
     hendelse_til_dict, kan_lede,
     melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
@@ -204,6 +205,7 @@ def enheter_view(request):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['PUT'])
 @rate_limit(group='oppdrag:enhet-skriv', rate='60/m', method='PUT')
 def enhet_detalj_view(request, pk):
@@ -234,6 +236,7 @@ def enhet_detalj_view(request, pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:vaktmodus', rate='60/m', method='POST')
 def enhet_vaktmodus_view(request, pk):
@@ -263,6 +266,7 @@ def enhet_vaktmodus_view(request, pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:avvent', rate='60/m', method='POST')
 def avvent_view(request, pk, enhet_pk):
@@ -293,6 +297,7 @@ def avvent_view(request, pk, enhet_pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:kvitter', rate='60/m', method='POST')
 def kvitter_avbrutt_view(request, pk):
@@ -315,6 +320,7 @@ def kvitter_avbrutt_view(request, pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:vakt', rate='60/m', method='POST')
 def enhet_vakt_view(request, pk):
@@ -434,8 +440,9 @@ def oppdrag_liste_view(request):
         svar['ETag'] = etag
         return svar
 
-    # POST — kun sentralbordet oppretter oppdrag.
-    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
+    # POST — kun sentralbordet oppretter oppdrag. Ikke en enhetskonto, uansett
+    # nivå (28. sep. 2026, `ikke_for_enhetskonto`).
+    if not har_tilgang(request.user, 'oppdrag', 'skriv_full') or er_enhetskonto(request.user):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     data = json_body(request)
@@ -685,7 +692,8 @@ def oppdrag_detalj_view(request, pk):
         services.slett_oppdrag(oppdrag)
         return JsonResponse({'status': 'ok'})
 
-    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
+    # Redigering er sentralbordets — ikke en enhetskonto, uansett nivå (28. sep. 2026).
+    if not har_tilgang(request.user, 'oppdrag', 'skriv_full') or er_enhetskonto(request.user):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     data = json_body(request)
@@ -749,6 +757,7 @@ def oppdrag_detalj_view(request, pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:flytt', rate='60/m', method='POST')
 def flytt_view(request, pk):
@@ -822,6 +831,7 @@ def _oppdrag_og_enhet(request, pk, enhet_pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST', 'DELETE'])
 @rate_limit(group='oppdrag:oppdragsenhet', rate='60/m', method=['POST', 'DELETE'])
 def oppdragsenhet_view(request, pk, enhet_pk):
@@ -851,6 +861,7 @@ def oppdragsenhet_view(request, pk, enhet_pk):
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:foering', rate='60/m', method='POST')
 def foering_view(request, pk, enhet_pk, overgang, sted=None):
@@ -1223,6 +1234,7 @@ def stempling_view(request, pk, overgang, sted=None):
 # §3.3 reserverer admin for det irreversible.
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST', 'DELETE'])
 @rate_limit(group='oppdrag:historikk', rate='60/m', method=['POST', 'DELETE'])
 def historikk_view(request, pk):
@@ -1332,6 +1344,7 @@ def historikk_liste_view(request):
 # ── Korreksjoner ─────────────────────────────────────────────────────────────
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
+@ikke_for_enhetskonto
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:korriger', rate='60/m', method='POST')
 def korriger_view(request, pk):

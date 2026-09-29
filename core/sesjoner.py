@@ -52,6 +52,35 @@ def dekod(sesjon) -> dict:
 HALVINNLOGGET_NOKLER = ('mfa_setup_user_id', 'mfa_verify_user_id')
 
 
+def sesjonsreferanse(session_key: str) -> str:
+    """Et håndtak på en sesjon som ikke *er* sesjonen (28. sep. 2026).
+
+    Adminlista på server-status sendte `session_key` — cookie-verdien selv. En
+    admin, eller et XSS i adminflaten, kunne da overta hvem som helst sin
+    sesjon, forbi MFA-en, og handle i vedkommendes navn. En HMAC med portalens
+    hemmelighet peker ut samme sesjon for `admin_session_kill`, og kan ikke
+    brukes som cookie.
+    """
+    from django.utils.crypto import salted_hmac
+    return salted_hmac('core.sesjoner.referanse', session_key or '').hexdigest()[:40]
+
+
+def finn_sesjon_med_referanse(referanse: str):
+    """Den aktive sesjonen `referanse` peker på, eller `None`.
+
+    Leser alle aktive sesjoner — det finnes ingen indeks fra en HMAC tilbake til
+    nøkkelen. Det er en adminhandling, sjelden, og lista over sesjoner er det
+    samme gjennomløpet.
+    """
+    from django.utils.crypto import constant_time_compare
+    if not referanse:
+        return None
+    for sesjon in Session.objects.filter(expire_date__gt=timezone.now()):
+        if constant_time_compare(sesjonsreferanse(sesjon.session_key), referanse):
+            return sesjon
+    return None
+
+
 def bruker_id_i(data) -> int | None:
     """Hvem sesjonen tilhører, eller `None` for anonym eller uleselig."""
     try:

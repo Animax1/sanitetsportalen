@@ -5,7 +5,17 @@ function trFmt(cell) {
   const v = cell.getValue();
   const map = { 'Grønn': 'tb-gronn', 'Gul': 'tb-gul', 'Rød': 'tb-rod' };
   if (!v) return '<span class="triage-badge tb-ingen">–</span>';
-  return `<span class="triage-badge ${map[v] || 'tb-ingen'}">${v}</span>`;
+  return `<span class="triage-badge ${map[v] || 'tb-ingen'}">${escapeHtml(v)}</span>`;
+}
+
+// Navnet på førstehjelperen eller helsepersonellet i en celle — escapet
+// (sikkerhetsgjennomgangen 28. sep. 2026). En streng fra en formatter settes
+// inn med `innerHTML` av Tabulator; standardformatteren escaper, en egen gjør
+// det ikke. Alle andre steder navnene vises, escapes de eller settes som tekst.
+function personFmt(cell) {
+  const v = cell.getValue();
+  if (!v) return '';
+  return escapeHtml(typeof v === 'object' ? (v.name || '') : v);
 }
 
 function totalFmt(cell) {
@@ -27,8 +37,8 @@ const COLS = [
   { title:'Inntid',         field:'inntid',          width:135 },
   { title:'Påbegynt',       field:'pabegynt',        width:135 },
   { title:'Plassering',     field:'plassering',      width:125 },
-  { title:'Førstehjelper',  field:'forstehjelper',   width:115, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || v) : ''; } },
-  { title:'Helsepersonell', field:'helsepersonell_ref', width:130, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || '') : ''; } },
+  { title:'Førstehjelper',  field:'forstehjelper',   width:115, formatter:personFmt },
+  { title:'Helsepersonell', field:'helsepersonell_ref', width:130, formatter:personFmt },
   { title:'Inn-Obs',        field:'inn_obspost',     width:135 },
   { title:'UT-Obs',         field:'ut_obspost',      width:135 },
   { title:'Utskrevet',      field:'utskrevet',       width:135 },

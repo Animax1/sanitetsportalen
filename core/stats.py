@@ -63,6 +63,17 @@ class BaseStatistikkHandler:
         """Tallene for én vakt. Returner en JSON-serialiserbar dict."""
         raise NotImplementedError
 
+    def kan_lese(self, user) -> bool:
+        """Får `user` se denne fanen? Standard: `nivaa` i kildemodulen.
+
+        En modul overstyrer når nivået ikke er hele svaret (28. sep. 2026):
+        en bilkonto har `oppdrag:les`, men ser bare sine egne oppdrag i
+        `/oppdrag/` — fanen ville gitt den hele vakta. Statistikkappen spør
+        denne og kjenner ingen modul ved navn.
+        """
+        from core.auth_decorators import har_tilgang
+        return har_tilgang(user, self.slug, self.nivaa)
+
     def frys_stats(self, vakt) -> dict:
         """Tallene som fryses når vakta avsluttes (`core.vaktstatistikk.frys`).
 

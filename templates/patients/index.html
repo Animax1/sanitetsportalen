@@ -27,7 +27,6 @@
     patients: "{{ modul_nivaa }}",
     admin: {{ er_global_admin|yesno:"true,false" }}
   };
-  window.USER_NAME = "{{ request.user.username }}";
   window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
   window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};
 </script>

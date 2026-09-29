@@ -145,21 +145,13 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
-### Sikkerhetsgjennomgangen 28. sep. 2026 — pulje 2–4, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
+### Sikkerhetsgjennomgangen 28. sep. 2026 — alle fire puljer levert, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
 
-Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`) og 3 (backup og offsite) er levert,
-se CHANGELOG 28.–29. sep. 2026. Beslutningene står i dokumentet. Hver pulje går på egen gren med tester som
+Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`), 3 (backup og offsite) og 4
+(opprydding og drift) er levert, se CHANGELOG 28.–29. sep. 2026. Beslutningene står i dokumentet. Hver pulje går på egen gren med tester som
 gjennomfører angrepet, og mutasjoner på nivået i `CLAUDE.md`. Puljene gjøres ferdig før
 `staging` går til `main` (André: «vi har tid til å gjøre oss ferdig med disse puljene først»).
 
-- [ ] **Pulje 4 — opprydding og drift.** Escaping i `patients-table.js` (førstehjelper,
-      helsepersonell); slett `window.USER_NAME`, `RegexValidator` på brukernavn, `_csv_trygg`
-      på brukernavnkolonna. Vaktliste: navnebytte følger ikke plasser «åpne for alle»,
-      `konto_finnes` bare for `kan_lede`, e-post plantet på egen mannskapsrad kobles ikke
-      stille. Park: slett tokenet ved 403, advarsel over 7 dagers oppetid. HMAC-referanse i
-      stedet for rå `session_key` i adminlista. Enhetskontoer avvises på `skriv_full` i
-      oppdrag og i statistikkens oppdragskilde. `pip-audit` i CI. `X-Forwarded-For` bare når
-      `RAILWAY_ENVIRONMENT` er satt. Ukryptert hel backup på volumet i risikoregisteret.
 - [ ] **Etter deploy til `main`: kjør `verifiser_backup` i prod** (runbook §8b). Sperrene i
       gjenopprettingen fra pulje 3 er skrevet for å slippe gjennom hver ekte fil, også de
       eldre; prøven på det er filene som faktisk ligger på prod-volumet. Og se at

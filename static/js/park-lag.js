@@ -156,6 +156,15 @@ function parkMelding(tekst) {
   el.classList.toggle('d-none', !tekst);
 }
 
+/* Glem tokenet når serveren sier nei (sikkerhetsgjennomgangen 28. sep. 2026).
+   Lenker brukes på tvers av vakter (B18): uten dette fikk en telefon fra i fjor
+   tilgang igjen den dagen samme lenke ble åpnet på nytt. Serveren gir med vilje
+   samme 403 for alle avslag — også «ikke åpnet ennå» — så en telefon som kommer
+   for tidlig, må åpne lenken fra tiltakskortet igjen. Det er den vanlige veien inn. */
+function parkSkalGlemmeTokenet(status) {
+  return status === 403;
+}
+
 async function parkKall(sti, metode, kropp) {
   const svar = await fetch(sti, {
     method: metode,
@@ -167,6 +176,7 @@ async function parkKall(sti, metode, kropp) {
   });
   let data = {};
   try { data = await svar.json(); } catch (e) { data = {}; }
+  if (parkSkalGlemmeTokenet(svar.status)) parkSkriv(PARK_LAGRING.token, null);
   return {ok: svar.ok, status: svar.status, data};
 }
 

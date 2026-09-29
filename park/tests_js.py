@@ -36,6 +36,34 @@ class ParkReglerTests(SimpleTestCase):
         return json.loads(run_node(self.harness, f'console.log(JSON.stringify({uttrykk}));')
                           .splitlines()[0])
 
+    def test_tokenet_glemmes_naar_serveren_sier_nei(self):
+        """Gjennom `parkKall`, den ekte inngangen — ikke bare regelen for seg
+        (sikkerhetsgjennomgangen 28. sep. 2026)."""
+        harness = build_harness(((PARK_JS, ('parkLes', 'parkSkriv', 'parkSkalGlemmeTokenet',
+                                            'parkKall')),))
+        preamble = (
+            "const PARK_LAGRING = {token: 'park.token'};\n"
+            "const parkTilstand = {token: 't', telefon: 'f'};\n"
+            "const lager = {};\n"
+            "globalThis.localStorage = {getItem: (k) => (k in lager ? lager[k] : null),"
+            " setItem: (k, v) => { lager[k] = String(v); }, removeItem: (k) => { delete lager[k]; }};\n"
+            "let neste = 200;\n"
+            "globalThis.fetch = async () => ({ok: neste < 400, status: neste,"
+            " json: async () => ({})});\n")
+        ut = run_node(harness, '''
+          (async () => {
+            const svar = [];
+            for (const status of [200, 429, 500, 403]) {
+              lager['park.token'] = 'hemmelig';
+              neste = status;
+              await parkKall('/lag/r/api/oppsett/', 'GET');
+              svar.push([status, 'park.token' in lager]);
+            }
+            console.log(JSON.stringify(svar));
+          })();''', preamble=preamble)
+        linje = next(l for l in ut.splitlines() if l.startswith('['))
+        self.assertEqual(json.loads(linje), [[200, True], [429, True], [500, True], [403, False]])
+
     def test_fragmentet_vinner_over_det_lagrede(self):
         self.assertEqual(self._j("parkLesToken('#ny', 'gammel')"), 'ny')
         self.assertEqual(self._j("parkLesToken('', 'gammel')"), 'gammel')
@@ -119,7 +147,8 @@ class OppsettReglerTests(SimpleTestCase):
         self.harness = build_harness(((OPPSETT_JS, (
             'parkKanSetteOppUtfall', 'parkKanSletteVerdi', 'parkLenkeStatus',
             'parkLokalFelt', 'parkStandardOppetid', 'parkKopier', 'parkFiltrer',
-            'parkTellertekst')),))
+            'parkTellertekst', 'parkLangOppetid')),))
+        self.harness = 'const PARK_LANG_OPPETID_DAGER = 7;\n' + self.harness
 
     def _j(self, uttrykk):
         return json.loads(run_node(self.harness, f'console.log(JSON.stringify({uttrykk}));')
@@ -139,6 +168,14 @@ class OppsettReglerTests(SimpleTestCase):
         self.assertEqual(self._j(f"parkLenkeStatus({l}, Date.parse('2026-10-02T08:00:00Z'))"), 'Stengt')
         self.assertEqual(self._j(f"parkLenkeStatus(Object.assign({l}, {{fjernet: true}}), "
                                  f"Date.parse('2026-10-01T09:00:00Z'))"), 'Fjernet')
+
+    def test_advarsel_over_sju_dager(self):
+        """André, 28. sep. 2026: «advarsel over 7 dager» — ikke et tak."""
+        fra = "'2026-10-01T08:00:00Z'"
+        self.assertEqual(self._j(f"parkLangOppetid({fra}, '2026-10-08T08:00:00Z')"), '')
+        self.assertIn('8 dager', self._j(f"parkLangOppetid({fra}, '2026-10-08T08:01:00Z')"))
+        self.assertIn('Står åpen', self._j(f"parkLangOppetid({fra}, '2026-11-01T08:00:00Z')"))
+        self.assertEqual(self._j(f"parkLangOppetid({fra}, 'tull')"), '')
 
     def test_filteret_krever_hvert_ord(self):
         rader = json.dumps([

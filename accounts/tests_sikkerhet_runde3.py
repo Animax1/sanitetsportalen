@@ -468,3 +468,30 @@ class NullstillMfaKommandoTests(TestCase):
             admin.post(f'/portal-admin/brukere/{self.bruker.pk}/', {'action': 'reset_mfa'})
             self._kjor(self.bruker.username, '--ja')
         self.assertEqual(tjeneste.call_count, 2)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class BrukernavnetsTegnTests(TestCase):
+    """Pulje 4: `CustomUser` arver `AbstractBaseUser` og hadde ingen tegnregel. Et
+    brukernavn med `"` brøt skriptblokka på pasientsiden, og ett som begynte med `=`
+    var en formel i auditeksporten."""
+
+    def setUp(self):
+        _, self.admin = _admin()
+
+    def _opprett(self, navn):
+        return self.admin.post(reverse('portaladmin:user_create'), {
+            'kontotype': 'person', 'username': navn, 'email': '', 'role': 'bruker'})
+
+    def test_farlige_tegn_avvises(self):
+        for navn in ('a"b', 'x\\y', '<b>', '=cmd', '+1', '-a', '@a', 'bil 3', '_skjult'):
+            with self.subTest(navn=navn):
+                self._opprett(navn)
+                self.assertFalse(CustomUser.objects.filter(username=navn.lower()).exists())
+
+    def test_vanlige_navn_godtas(self):
+        """Motprøven — æøå, sifre og punktum."""
+        for navn in ('bjørn.rød', 'karmøy56', 'ola@x.no', 'bil_3'):
+            with self.subTest(navn=navn):
+                self._opprett(navn)
+                self.assertTrue(CustomUser.objects.filter(username=navn).exists())

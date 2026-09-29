@@ -327,10 +327,12 @@ def audit_log_csv_export_view(request):
             row.table_name,
             row.record_id,
             row.action,
-            row.field_name or '',
+            # Feltnavnet kan være en innstillingsnøkkel, og brukernavnet hadde
+            # ingen tegnregel før 28. sep. 2026 — eldre kontoer kan ha hva som helst.
+            _csv_trygg(row.field_name),
             _csv_trygg(row.old_value),
             _csv_trygg(row.new_value),
-            row.user.username if row.user else '',
+            _csv_trygg(row.user.username if row.user else ''),
             row.ip or '',
         ])
 

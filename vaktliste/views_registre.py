@@ -353,6 +353,10 @@ def _koble_paa_epost(request, person):
     # kobling») — den som setter opp vakta, ikke den som bemanner den.
     if not services.kan_lede(request.user):
         return False
+    # Og e-posten må være lagt inn av en leder (28. sep. 2026) — ellers kunne
+    # korps-føreren plante en adresse og la lederens neste lagring koble den.
+    if not person.epost_fra_leder:
+        return False
     konto = (_koblbare_kontoer(CustomUser)
              .filter(email__iexact=person.epost, mannskap__isnull=True)
              .first())
@@ -362,7 +366,7 @@ def _koble_paa_epost(request, person):
     return True
 
 
-def _mannskap_til_dict(m, foreldre=None, kjente_eposter=None):
+def _mannskap_til_dict(m, foreldre=None, kjente_eposter=None, *, vis_konto=True):
     """Én person som JSON.
 
     `kompetanser` er de **synlige** — har hun AFØR, er VFØR implisert og
@@ -389,7 +393,12 @@ def _mannskap_til_dict(m, foreldre=None, kjente_eposter=None):
         'issi': m.issi,
         # Finnes det en portalbruker med denne e-posten? Vises som et merke
         # ved adressen, så den som legger inn folk ser at koblingen kan skje.
-        'konto_finnes': bool(m.epost) and (
+        #
+        # **Bare for den som kan lede** (28. sep. 2026, André). For en
+        # korps-fører var merket et oppslag: skriv en adresse inn på egen rad,
+        # og svaret sa om vedkommende har konto — nettopp det glemt passord
+        # skjuler (§6.7). Lederen trenger det; det er hun som kobler.
+        'konto_finnes': vis_konto and bool(m.epost) and (
             m.user_id is not None
             or (m.epost.lower() in kjente_eposter if kjente_eposter is not None
                 else _kjente_eposter().__contains__(m.epost.lower()))),
@@ -453,9 +462,11 @@ def mannskap_view(request):
             .order_by(*Mannskap._meta.ordering),
             request.user)
         foreldre = services.foreldrekart()
-        kjente = _kjente_eposter()
+        leder = services.kan_lede(request.user)
+        kjente = _kjente_eposter() if leder else set()
         return JsonResponse({'status': 'ok', 'data': {
-            'mannskap': [_mannskap_til_dict(m, foreldre, kjente) for m in folk],
+            'mannskap': [_mannskap_til_dict(m, foreldre, kjente, vis_konto=leder)
+                         for m in folk],
             **{
                 nokkel: [verdi_til_dict(modell, r, **kw)
                          for r in modell.objects.all()]
@@ -502,6 +513,7 @@ def mannskap_view(request):
                 korps=korps,
                 telefon=(data.get('telefon') or '').strip(),
                 epost=epost,
+                epost_fra_leder=services.kan_lede(request.user),
                 issi=(data.get('issi') or '').strip(),
                 user_id=_int(data.get('user_id')) if admin else None,
                 notat=(data.get('notat') or '').strip(),
@@ -516,7 +528,8 @@ def mannskap_view(request):
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))
     return JsonResponse(
-        {'status': 'ok', 'data': _mannskap_til_dict(person, services.foreldrekart())},
+        {'status': 'ok', 'data': _mannskap_til_dict(
+            person, services.foreldrekart(), vis_konto=services.kan_lede(request.user))},
         status=201)
 
 
@@ -576,9 +589,13 @@ def mannskap_detalj_view(request, pk):
         person.telefon = (data.get('telefon') or '').strip()
     if 'epost' in data:
         try:
-            person.epost = _normaliser_epost(data.get('epost'))
+            ny_epost = _normaliser_epost(data.get('epost'))
         except ValidationError:
             return json_feil('E-postadressen ser ikke riktig ut.')
+        if ny_epost != person.epost:
+            # Bare en endring flytter merket — skjemaet sender feltet hver gang.
+            person.epost_fra_leder = services.kan_lede(request.user)
+        person.epost = ny_epost
     if 'issi' in data:
         person.issi = (data.get('issi') or '').strip()
     if 'notat' in data:
@@ -606,4 +623,5 @@ def mannskap_detalj_view(request, pk):
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))
     return JsonResponse(
-        {'status': 'ok', 'data': _mannskap_til_dict(person, services.foreldrekart())})
+        {'status': 'ok', 'data': _mannskap_til_dict(
+            person, services.foreldrekart(), vis_konto=services.kan_lede(request.user))})

@@ -434,8 +434,13 @@ class AdminSessionsListTests(TestCase):
         self.assertIn('adm', usernames)
         # Verifiser felt
         for s in data['sessions']:
-            self.assertIn('session_key', s)
+            # `ref`, aldri `session_key` — nøkkelen er cookie-verdien (28. sep. 2026).
+            self.assertIn('ref', s)
+            self.assertNotIn('session_key', s)
             self.assertIn('role', s)
+        nokler = set(Session.objects.values_list('session_key', flat=True))
+        self.assertFalse(any(k in resp.content.decode() for k in nokler),
+                         'en sesjonsnøkkel står i svaret')
 
     def test_anonym_sesjon_uten_bruker_filtreres_bort(self):
         # Be om en side som setter en sesjon-cookie uten å logge inn
@@ -471,9 +476,23 @@ class AdminSessionKillTests(TestCase):
         c.login(username=username, password=password)
         return c.session.session_key
 
+    def _kill(self, session_key):
+        from core.sesjoner import sesjonsreferanse
+        return self.client.post('/portal-admin/server-status/sessions/kill/',
+                                {'ref': sesjonsreferanse(session_key)})
+
+    def test_raa_sesjonsnokkel_virker_ikke_som_haandtak(self):
+        """Den gamle formen: en nøkkel sendt inn peker ikke på noe."""
+        lead_key = self._get_session_key('lederen', 'testpass123')
+        self.client.force_login(self.admin)
+        for felt in ('ref', 'session_key'):
+            resp = self.client.post('/portal-admin/server-status/sessions/kill/', {felt: lead_key})
+            self.assertIn(resp.status_code, (400, 404), felt)
+        self.assertTrue(Session.objects.filter(session_key=lead_key).exists())
+
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/', {'session_key': 'x'})
+        resp = self.client.post('/portal-admin/server-status/sessions/kill/', {'ref': 'x'})
         self.assertEqual(resp.status_code, 403)
 
     def test_mangler_session_key_gir_400(self):
@@ -484,14 +503,13 @@ class AdminSessionKillTests(TestCase):
     def test_ukjent_session_key_gir_404(self):
         self.client.force_login(self.admin)
         resp = self.client.post('/portal-admin/server-status/sessions/kill/',
-                                {'session_key': 'finnesikke'})
+                                {'ref': 'finnesikke'})
         self.assertEqual(resp.status_code, 404)
 
     def test_admin_kan_ikke_logge_ut_seg_selv(self):
         self.client.force_login(self.admin)
         my_key = self.client.session.session_key
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/',
-                                {'session_key': my_key})
+        resp = self._kill(my_key)
         self.assertEqual(resp.status_code, 400)
         # Min sesjon skal fortsatt finnes
         self.assertTrue(Session.objects.filter(session_key=my_key).exists())
@@ -501,8 +519,7 @@ class AdminSessionKillTests(TestCase):
         self.assertTrue(Session.objects.filter(session_key=lead_key).exists())
 
         self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/',
-                                {'session_key': lead_key})
+        resp = self._kill(lead_key)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertTrue(data['ok'])
@@ -516,8 +533,7 @@ class AdminSessionKillTests(TestCase):
         at suksess-respons har Content-Type=application/json og parser-bar JSON."""
         lead_key = self._get_session_key('lederen', 'testpass123')
         self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/',
-                                {'session_key': lead_key})
+        resp = self._kill(lead_key)
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/json', resp['Content-Type'])
         # Skal være gyldig JSON, ikke HTML
@@ -531,8 +547,7 @@ class AdminSessionKillTests(TestCase):
         lead_key = self._get_session_key('lederen', 'testpass123')
         self.client.force_login(self.admin)
         AuditLog.objects.all().delete()
-        self.client.post('/portal-admin/server-status/sessions/kill/',
-                         {'session_key': lead_key})
+        self._kill(lead_key)
         log = AuditLog.objects.filter(field_name='force_logout').first()
         self.assertIsNotNone(log)
         self.assertEqual(log.user, self.admin)

@@ -45,6 +45,30 @@ def etag_for_svar(data, ekstra=None) -> str:
     return '"v2:' + hashlib.sha256(raa.encode('utf-8')).hexdigest()[:16] + '"'
 
 
+def ikke_for_enhetskonto(view):
+    """403 for en enhetskonto, uansett nivå (sikkerhetsgjennomgangen 28. sep. 2026).
+
+    **Regelen i modulen er «enhetskontoer 403 uansett nivå»** på det sentralbordet
+    gjør — men den sto som en `if` i noen views og manglet i sju andre. Ingenting
+    i matrisen hindrer at en bilkonto får `skriv_full` ved en feil, og da kunne den
+    ta andre biler av vakt, sette dem passive og opprette oppdrag for hvem som
+    helst. Dekoratøren står **under** `@modul_kreves`, og `OppdragFullSperrerBilen`
+    krever den på hvert `skriv_full`-view.
+    """
+    from functools import wraps
+
+    from django.http import JsonResponse
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if er_enhetskonto(request.user):
+            return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+        return view(request, *args, **kwargs)
+
+    wrapper._ikke_for_enhetskonto = True
+    return wrapper
+
+
 def er_enhetskonto(user) -> bool:
     """True hvis kontoen er knyttet til en `Enhet`.
 

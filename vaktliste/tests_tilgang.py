@@ -1699,6 +1699,19 @@ class RessursnavnetErHennesTests(TilgangsBasis):
         self.res_fri.refresh_from_db()
         self.assertEqual(self.res_fri.navn, 'Samleplass nord')
 
+    def test_en_plass_aapen_for_alle_gir_ikke_navneretten(self):
+        """Sikkerhetsgjennomgangen 28. sep. 2026 (André: «nei»): å kunne *fylle*
+        en plass som er åpen for alle, er ikke å eie ressursen. Karmøys lag skal
+        ikke få nytt navn av Haugesunds korps-fører — navnet følger med til
+        KO-tavla, besetningen og fila som sendes ut."""
+        Vaktpost.objects.create(
+            ressurs=self.res_karmoy, alle_korps=True,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        res = self._put(self.c_kb, self.res_karmoy, navn='Min nå')
+        self.assertEqual(res.status_code, 403, res.content)
+        self.res_karmoy.refresh_from_db()
+        self.assertEqual(self.res_karmoy.navn, 'Lag Karmøy')
+
     def test_men_hun_deler_den_fortsatt_ikke_ut(self):
         """Navneretten er bredere enn før; den skal ikke dra oppsettet med seg."""
         Vaktpost.objects.create(

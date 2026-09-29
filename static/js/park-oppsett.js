@@ -33,6 +33,17 @@ function parkLenkeStatus(lenke, naaMs) {
 
 /* Verdien et `datetime-local`-felt skal ha for et tidspunkt: lokal tid, uten
  * sone. Serveren leser en slik streng som norsk tid (`make_aware`). */
+/* En lenke som står åpen lenge (André, 28. sep. 2026: «advarsel over 7 dager»).
+   Oppetiden er grensen i designet (B18), så en lenke som står åpen i ukevis er en
+   lenke som virker for den som fikk den i fjor også. Advarsel, ikke tak. */
+const PARK_LANG_OPPETID_DAGER = 7;
+function parkLangOppetid(fra, til) {
+  const ms = Date.parse(til) - Date.parse(fra);
+  if (!(ms > PARK_LANG_OPPETID_DAGER * 86400000)) return '';
+  return `Står åpen i ${Math.ceil(ms / 86400000)} dager. Over ${PARK_LANG_OPPETID_DAGER} dager `
+    + 'virker lenken for alle som noen gang har fått den — sett en kortere oppetid om du kan.';
+}
+
 function parkLokalFelt(ms) {
   const d = new Date(ms);
   const to = (n) => String(n).padStart(2, '0');
@@ -144,7 +155,9 @@ async function parkHentLenker() {
       klikk: () => parkFjernLenke(l)});
     return parkNode('tr', {class: l.fjernet ? 'text-decoration-line-through' : null},
       parkNode('td', {tekst: l.navn}),
-      parkNode('td', {tekst: `${parkDato(l.aapen_fra)} – ${parkDato(l.aapen_til)}`}),
+      parkNode('td', {tekst: `${parkDato(l.aapen_fra)} – ${parkDato(l.aapen_til)}`
+        + (!l.fjernet && parkLangOppetid(l.aapen_fra, l.aapen_til) ? ' ⚠ over 7 dager' : ''),
+        title: l.fjernet ? null : (parkLangOppetid(l.aapen_fra, l.aapen_til) || null)}),
       parkNode('td', {tekst: parkLenkeStatus(l, naa)}),
       parkNode('td', {tekst: String(l.antall)}),
       parkNode('td', {tekst: l.sist_brukt_at ? parkTid(l.sist_brukt_at) : 'Aldri'}),
@@ -190,10 +203,12 @@ async function parkLagLenke(e) {
     };
     felt.addEventListener('click', kopierNaa);
     kopier.addEventListener('click', kopierNaa);
+    const lang = parkLangOppetid(d.data.aapen_fra, d.data.aapen_til);
     boks.replaceChildren(
       parkNode('div', {class: 'fw-semibold mb-1',
                      tekst: `«${d.data.navn}» er laget. Legg adressen i tiltakskortet nå — den vises ikke igjen.`}),
-      parkNode('div', {class: 'input-group input-group-sm'}, felt, kopier), status);
+      parkNode('div', {class: 'input-group input-group-sm'}, felt, kopier), status,
+      ...(lang ? [parkNode('div', {class: 'small text-warning mt-1', tekst: lang})] : []));
     boks.classList.remove('d-none');
     document.getElementById('park-lenke-navn').value = '';
     await parkHentLenker();

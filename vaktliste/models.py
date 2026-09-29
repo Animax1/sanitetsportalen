@@ -350,6 +350,19 @@ class Mannskap(BaseTimeStampedModel):
         help_text='Valgfritt. Finnes en portalbruker med samme e-post, '
                   'kobles kontoen automatisk.',
     )
+    # **Hvem satte e-posten** (sikkerhetsgjennomgangen 28. sep. 2026). Koblingen
+    # flytter en badge, og bare en leder skal kunne utløse den — men en
+    # korps-fører kunne skrive en annens e-post inn på sin egen rad, og neste
+    # gang en leder lagret raden for noe helt annet, ble den kontoen koblet til
+    # korpset i stillhet. Settes av `views_registre` når e-posten *endres*:
+    # sann når en leder gjorde det, usann ellers. Uendret e-post rører den ikke,
+    # så «e-post først, konto senere» virker for det lederen selv la inn.
+    # Standard sann: rader fra før feltet, og eldre backupfiler, beholder
+    # oppførselen de hadde. Den eneste veien som oppretter mannskap setter den.
+    epost_fra_leder = models.BooleanField(
+        default=True,
+        verbose_name='E-posten er lagt inn av en leder',
+    )
     # ISSI (André, 12. sep. 2026): nødnettsterminalens nummer — «da vet vi
     # hvilken nødnett vi skal ringe». Tekst, ikke tall: et ISSI kan ha
     # ledende nuller, og ingen regner med det.

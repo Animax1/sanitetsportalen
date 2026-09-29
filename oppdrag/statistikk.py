@@ -773,6 +773,14 @@ class OppdragStatistikkHandler(BaseStatistikkHandler):
     display_name = 'Oppdrag'
     order = 20
 
+    def kan_lese(self, user):
+        """Ikke en bilkonto (28. sep. 2026). Den har `oppdrag:les`, men
+        `/oppdrag/` viser den bare sine egne oppdrag, og fritekst skjult etter
+        «Ledig». Fanen viser hele vakta — oppdragsnumre, problemstillinger og
+        reaksjonstid per enhet — om noen gir kontoen `statistikk:les` ved en feil."""
+        from .views_common import er_enhetskonto
+        return super().kan_lese(user) and not er_enhetskonto(user)
+
     def frys_stats(self, vakt):
         """«Annet sted»-tekstene fryses ikke — samme regel som arkivet
         (`arkiv_stats`). Stedet telles fortsatt i `per_sted`."""

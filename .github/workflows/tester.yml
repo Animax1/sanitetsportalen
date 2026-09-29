@@ -79,3 +79,15 @@ jobs:
 
       - name: Migrasjonsprøvene mot PostgreSQL
         run: python manage.py verifiser_migrasjoner
+
+      # Kjente sårbarheter i de låste avhengighetene (sikkerhetsgjennomgangen
+      # 28. sep. 2026). Sist, så en ny CVE ikke skjuler testresultatene — og rød,
+      # fordi det er poenget: en sårbarhet skal oppdages ved neste push, ikke ved
+      # neste gjennomgang. Revisjonen leser `requirements.txt` med hashene, altså
+      # nøyaktig det Railway installerer, ikke CI-miljøet med verktøyene i.
+      # pip-audit selv installeres uten hasher: den er et CI-verktøy med et stort
+      # avhengighetstre, den kjøres ikke i prod, og versjonen er festet.
+      - name: Kjente sårbarheter (pip-audit)
+        run: |
+          pip install pip-audit==2.10.1
+          pip-audit -r requirements.txt --require-hashes --disable-pip --progress-spinner off

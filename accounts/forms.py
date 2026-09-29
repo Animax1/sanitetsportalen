@@ -1,4 +1,6 @@
 """Skjemaer for brukerkontoer."""
+import re
+
 from django import forms
 from django.contrib.auth import password_validation
 
@@ -14,6 +16,10 @@ ROLLE_HJELP = (
     'Administrator har tilgang til alt og står utenfor modulmatrisen. '
     'Bruker får kun det matrisen gir — uten en rad der ser kontoen ingen moduler.'
 )
+
+
+#: Tegnene et nytt brukernavn kan ha. `\w` er Unicode, så æøå er med.
+BRUKERNAVN_TEGN = re.compile(r'^[^\W_][\w.@+-]*\Z')
 
 
 class LoginForm(forms.Form):
@@ -266,8 +272,21 @@ class AdminUserCreateForm(forms.ModelForm):
         **Normaliseres også som Unicode.** Uten det kunne `kåre` lagres i én
         normalform og skrives inn i en annen ved innlogging — to strenger som
         ser identiske ut, men ikke er det. Se `accounts/brukernavn.py`.
+
+        **Og tegnene er begrenset** (sikkerhetsgjennomgangen 28. sep. 2026):
+        bokstaver — æøå med — sifre og `. _ - + @`, og første tegn en bokstav
+        eller et siffer. `CustomUser` arver `AbstractBaseUser`, ikke
+        `AbstractUser`, og hadde ingen validator: et brukernavn med `"` eller
+        `\\` brøt skriptblokka det ble satt inn i, og ett som begynte med `=`
+        var en formel i auditeksporten. Bare her, ved opprettelse — navnet kan
+        ikke endres etterpå, og eksisterende kontoer skal ikke låses.
         """
-        return oppslagsnokkel(self.cleaned_data.get('username'))
+        navn = oppslagsnokkel(self.cleaned_data.get('username'))
+        if not BRUKERNAVN_TEGN.match(navn):
+            raise forms.ValidationError(
+                'Brukernavnet kan bare ha bokstaver, sifre og . _ - + @, og må '
+                'begynne med en bokstav eller et siffer.')
+        return navn
 
     def clean(self):
         data = super().clean()

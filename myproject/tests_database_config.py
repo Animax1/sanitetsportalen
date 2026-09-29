@@ -105,3 +105,36 @@ class DatabaseFallbackTests(SimpleTestCase):
             DATABASE_URL='sqlite:///tmp/offline.sqlite3')
         self.assertIn('sqlite', lastet.DATABASES['default']['ENGINE'])
         self.assertFalse(lastet.DEBUG, 'testen kjørte ikke i den formen den beskriver')
+
+
+class KlientIpBakProxyStandardTests(SimpleTestCase):
+    """Sikkerhetsgjennomgangen 28. sep. 2026, pulje 4: `X-Forwarded-For` leses
+    bare bak Railways proxy. Standarden følger `RAILWAY_ENVIRONMENT` — uten den
+    er headeren klientens egen påstand, og hvem som helst kunne valgt IP-en sin
+    i innloggingsloggen og rate-limit-bøttene.
+    """
+
+    def setUp(self):
+        from myproject import settings as settings_module
+        self.settings_module = settings_module
+        self.addCleanup(lambda: importlib.reload(settings_module))
+
+    def _last_uten(self, *fjern, **env):
+        miljo = {k: v for k, v in os.environ.items() if k not in fjern}
+        miljo.update(env)
+        with mock.patch.dict(os.environ, miljo, clear=True):
+            return importlib.reload(self.settings_module)
+
+    def test_utenfor_railway_leses_ikke_headeren(self):
+        s = self._last_uten('KLIENTIP_BAK_PROXY', 'RAILWAY_ENVIRONMENT')
+        self.assertFalse(s.KLIENTIP_BAK_PROXY)
+
+    def test_paa_railway_leses_den(self):
+        s = self._last_uten('KLIENTIP_BAK_PROXY', RAILWAY_ENVIRONMENT='staging',
+                            DATABASE_URL='postgres://u:p@localhost/db')
+        self.assertTrue(s.KLIENTIP_BAK_PROXY)
+
+    def test_variabelen_overstyrer(self):
+        s = self._last_uten(RAILWAY_ENVIRONMENT='staging', KLIENTIP_BAK_PROXY='false',
+                            DATABASE_URL='postgres://u:p@localhost/db')
+        self.assertFalse(s.KLIENTIP_BAK_PROXY)

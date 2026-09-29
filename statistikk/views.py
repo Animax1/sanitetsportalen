@@ -23,7 +23,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
+from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 from core.stats import all_handlers, get_handler
 from core.stats_cache import cached_stats_response
@@ -43,11 +43,11 @@ from core.vakt import hent_aktiv_vakt
 def lesbare_kilder(user):
     """Handlerne brukeren har lesetilgang til kildemodulen for.
 
-    ``har_tilgang`` svarer også nei for en modul som er slått av i
+    ``kan_lese`` (standard: ``har_tilgang``) svarer også nei for en modul som er slått av i
     ``ModuleSettings`` — en deaktivert modul skal ikke lyse gjennom
     statistikken.
     """
-    return [h for h in all_handlers() if har_tilgang(user, h.slug, h.nivaa)]
+    return [h for h in all_handlers() if h.kan_lese(user)]
 
 
 def _kilde_for(user, slug):
@@ -55,7 +55,7 @@ def _kilde_for(user, slug):
     handler = get_handler(slug)
     if handler is None:
         return None
-    if not har_tilgang(user, handler.slug, handler.nivaa):
+    if not handler.kan_lese(user):
         return None
     return handler
 

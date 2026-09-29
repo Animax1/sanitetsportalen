@@ -4,6 +4,69 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Sikkerhet, pulje 4: escaping i pasienttabellen, plantet e-post i vaktlista, bilkontoen på sentralbordets endepunkter, og `pip-audit` i CI  `#sikkerhet` `#vaktliste` `#oppdrag` `#park` `#ci`
+
+**Hvorfor:** Pulje 4 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — siste pulje før
+`staging` kan gå til `main`. Ingen av funnene er kritiske alene; flere er stille, og de er
+samlet her fordi hver av dem er liten.
+
+**Hva:**
+- **Pasienttabellen escaper førstehjelper- og helsepersonellnavn** (`personFmt`,
+  `trFmt` i `patients-table.js`). Tabulator skriver formatter-strengen som `innerHTML`, så et
+  navn som `<img src=x onerror=…>` kjørte hos alle som åpnet pasientlista. Testen kjører
+  formatterne gjennom `COLS` i node, ikke hjelperen alene.
+- **`window.USER_NAME` er slettet** — satt uten `escapejs`, og ingen leste den.
+- **Brukernavn må starte med bokstav/tall og bare ha `\w.@+-`** (`BRUKERNAVN_TEGN` i
+  `accounts/forms.py`). Og **`_csv_trygg` på brukernavn- og feltkolonna** i auditeksporten
+  — `=HYPERLINK(…)` som brukernavn var en formel i Excel.
+- **Vaktlista: en e-post plantet på egen mannskapsrad kobles ikke lenger stille til en konto.**
+  Symptom: korps-føreren skrev en annens e-post på en rad, og neste gang en leder lagret
+  raden *for noe helt annet*, ble kontoen koblet til korpset og arvet badgen. Nytt felt
+  `Mannskap.epost_fra_leder` (migrasjon `vaktliste/0027`, standard `True` så eksisterende
+  rader virker som før): settes av hvem som **endret** adressen, og `_koble_paa_epost` kobler
+  bare når en leder skrev den. Gjelder både PUT og POST.
+- **`konto_finnes` sendes bare til `kan_lede`** — ellers kunne en korps-fører prøve
+  e-postadresser mot merket og lære hvem som har konto.
+- **Navnebytte følger ikke plasser «åpne for alle»** (`kan_gi_nytt_navn`): en korps-fører
+  som sto på en slik plass kunne gi en annen korps' ressurs nytt navn.
+- **Park: tokenet glemmes ved 403** (`parkSkalGlemmeTokenet`) — ellers prøvde telefonen en
+  fjernet lenke til evig tid. **Advarsel når en lenke står åpen over 7 dager**
+  (`parkLangOppetid`, «⚠ over 7 dager») i lista og ved opprettelse (André: «advarsel over 7
+  dager»).
+- **Adminlista over sesjoner sender en HMAC-referanse, ikke rå `session_key`**
+  (`core.sesjoner.sesjonsreferanse`). Nøkkelen *er* sesjonen: den som så lista — eller en
+  skjermdump av den — kunne logget inn som hvem som helst på den.
+- **Bilkontoen avvises på sentralbordets endepunkter uansett nivå** (`ikke_for_enhetskonto`
+  på alle `skriv_full`-views i `oppdrag/views.py`, og i POST/PUT inne i liste- og
+  detaljviewet). Regelen sto som en `if` i noen views og manglet i sju: en bilkonto som ved
+  en feil fikk `skriv_full` kunne ta andre biler av vakt, opprette og redigere oppdrag.
+  `OppdragFullSperrerBilen` går gjennom URL-ene og krever dekoratøren på hvert slikt view.
+- **Statistikkens oppdragsfane er ikke bilens** — `BaseStatistikkHandler.kan_lese()` er ny,
+  statistikkviewene spør den i stedet for nivået direkte, og oppdragskilden sier nei til en
+  enhetskonto.
+- **`pip-audit` i CI** (siste steg i `tester.yml`, låst til 2.10.1, `--require-hashes`).
+  Lokalt 29. sep.: «No known vulnerabilities found».
+- **`X-Forwarded-For` leses bare bak Railways proxy** — `KLIENTIP_BAK_PROXY`, standard
+  sann når `RAILWAY_ENVIRONMENT` er satt. Utenfor Railway var headeren klientens egen
+  påstand: hvem som helst kunne valgt IP-en sin i innloggingsloggen og rate-limit-bøttene.
+- **Risikoregisteret** (`PERSONVERN_DOKUMENTASJON.md` v1.15): sikkerhetskopiene på
+  Railway-volumet er ikke kryptert, og den hele bærer passordhasher og TOTP-hemmeligheter.
+  Bevisst valg — volumet er like godt beskyttet som databasen selv — men nå skrevet ned.
+  `SPBK2`-raden oppdatert.
+
+**Tester endret, med grunn:** to eldre vaktlistetester forventet `konto_finnes` for en
+bruker som ikke er leder; de krever nå `False`. `KLIENTIP_BAK_PROXY` overstyres i testene
+for IP-en, og en ny test viser at headeren ikke leses uten.
+
+**Tester:** `patients/tests_sikkerhet_pulje4.py`, `core/tests_sikkerhet_pulje4.py`,
+`oppdrag/tests_sikkerhet_pulje4.py`, nye klasser i `accounts/tests_sikkerhet_runde3.py`,
+`vaktliste/tests_sikkerhet_runde1.py`, `park/tests_js.py`, `core/tests_admin_status.py` og
+`myproject/tests_database_config.py`.
+**Mutasjoner: 28, alle drept.** Tre overlevde først: at en *opprettet* rad alltid regnes som
+lederens (testene gikk bare gjennom PUT — ny test gjennom POST), standarden for
+`KLIENTIP_BAK_PROXY` (ingen test lastet settings med og uten `RAILWAY_ENVIRONMENT`), og én med
+tvetydig mønster (to treff, felle 1 i `CLAUDE.md`) som ble gjort entydig og så drept.
+
 ## 2026-09-29 — Sikkerhet, pulje 3: offsite-filene bundet til navnet, og gjenopprettingen laster bare det fila gir seg ut for  `#sikkerhet` `#backup` `#offsite`
 
 **Hvorfor:** Pulje 3 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`. André: «vær forsiktig» — dette

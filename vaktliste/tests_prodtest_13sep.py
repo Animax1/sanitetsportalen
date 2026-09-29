@@ -65,7 +65,9 @@ class KoblingBareForLederTests(TestCase):
         d = self._opprett(_klient(_bruker('vl', 'skriv_full'))).json()['data']
         self.assertEqual(d['epost'], 'kari@example.org')
         self.assertIsNone(d['user_id'])
-        self.assertTrue(d['konto_finnes'], 'merket sier at kontoen finnes — lederen kobler')
+        # Merket er lederens fra 28. sep. 2026 (André, punkt D): for alle andre var
+        # det et oppslag på om en adresse har konto.
+        self.assertFalse(d['konto_finnes'], 'merket vises bare for den som kan lede')
 
     def test_leder_og_admin_kobler(self):
         for navn, nivaa, admin in (('led', 'skriv_leder', False), ('adm', None, True)):

@@ -451,6 +451,13 @@ AHASEND_ACCOUNT_ID = os.environ.get('AHASEND_ACCOUNT_ID', '')
 # Inert uten bucket, nøkler og OFFSITE_BACKUP_KEY — bare prod har dem. Se
 # core/offsite.py. OFFSITE_BACKUP_KEY må også ligge i en passordbehandler:
 # uten den er bucketen uleselig, og det er meningen.
+# **Står portalen bak Railways proxy?** (sikkerhetsgjennomgangen 28. sep. 2026).
+# Da er siste ledd i `X-Forwarded-For` klientens IP (`core/klientip.py`). Ellers —
+# lokalt, eller en container som nås direkte — kan hvem som helst sette headeren,
+# og IP-en i rate-limit-bøttene og auditsporet er deres påstand. Følger
+# `RAILWAY_ENVIRONMENT`; settes eksplisitt om portalen flyttes bak en annen proxy.
+KLIENTIP_BAK_PROXY = _env_bool('KLIENTIP_BAK_PROXY', bool(os.environ.get('RAILWAY_ENVIRONMENT')))
+
 OFFSITE_S3_BUCKET = os.environ.get('OFFSITE_S3_BUCKET', '')
 OFFSITE_S3_REGION = os.environ.get('OFFSITE_S3_REGION', 'nl-ams')
 OFFSITE_S3_ENDPOINT = os.environ.get('OFFSITE_S3_ENDPOINT', 'https://s3.nl-ams.scw.cloud')

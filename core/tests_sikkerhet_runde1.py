@@ -17,8 +17,15 @@ from core.jsdata import js_json
 from core.klientip import klient_ip, ratelimit_nokkel
 
 
+@override_settings(KLIENTIP_BAK_PROXY=True)
 class KlientIpTests(SimpleTestCase):
-    """H2: siste ledd i X-Forwarded-For, validert, ellers REMOTE_ADDR."""
+    """H2: siste ledd i X-Forwarded-For, validert, ellers REMOTE_ADDR — bak proxyen."""
+
+    @override_settings(KLIENTIP_BAK_PROXY=False)
+    def test_uten_proxy_er_headeren_klientens_paastand(self):
+        """28. sep. 2026: uten Railway foran leses ikke headeren i det hele tatt."""
+        self.assertEqual(klient_ip(self._req('1.2.3.4, 5.6.7.8')), '10.0.0.9')
+        self.assertEqual(ratelimit_nokkel('login:ip', self._req('5.6.7.8')), '10.0.0.9')
 
     def _req(self, xff=None, remote='10.0.0.9'):
         r = RequestFactory().get('/')
@@ -52,7 +59,7 @@ class KlientIpTests(SimpleTestCase):
         self.assertEqual(ratelimit_nokkel('login:ip', self._req(remote='')), 'ukjent')
 
 
-@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False, KLIENTIP_BAK_PROXY=True)
 class AuditIpTests(TestCase):
     """H2: auditsporet bruker samme regel — ikke klientens påstand."""
 

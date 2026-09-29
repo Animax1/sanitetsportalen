@@ -35,9 +35,16 @@ def _gyldig(verdi):
 
 
 def klient_ip(request):
-    """IP-en handlingen kom fra, eller None når ingen kan bekreftes."""
+    """IP-en handlingen kom fra, eller None når ingen kan bekreftes.
+
+    **Headeren leses bare bak proxyen** (`settings.KLIENTIP_BAK_PROXY`, 28. sep.
+    2026). Uten en proxy foran er siste ledd like mye klientens påstand som det
+    første, og da er `REMOTE_ADDR` svaret.
+    """
+    from django.conf import settings
     meta = getattr(request, 'META', None) or {}
-    videresendt = meta.get('HTTP_X_FORWARDED_FOR', '')
+    videresendt = meta.get('HTTP_X_FORWARDED_FOR', '') if getattr(
+        settings, 'KLIENTIP_BAK_PROXY', False) else ''
     if videresendt:
         ip = _gyldig(videresendt.split(',')[-1])
         if ip:

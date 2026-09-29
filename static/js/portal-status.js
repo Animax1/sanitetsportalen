@@ -396,8 +396,8 @@ function renderEpost(e) {
 
 // ── Sesjonshåndtering ─────────────────────────────────────────
 
-// Vi sender ikke session_key fra server til klient som identifierer min sesjon,
-// men vi kan be backend avvise self-kill. UI gjenkjenner egen sesjon ved at
+// Serveren sender en referanse (`ref`), aldri `session_key` — nøkkelen er
+// cookie-verdien (28. sep. 2026). Backend avviser self-kill. UI gjenkjenner egen sesjon ved at
 // backend returnerer 400 dersom man prøver å logge ut seg selv.
 let lastSessions = [];
 
@@ -415,13 +415,13 @@ async function refreshSessionsList() {
       return;
     }
     list.innerHTML = lastSessions.map(s => `
-      <div class="session-item" data-key="${escHtmlValue(s.session_key)}">
+      <div class="session-item" data-key="${escHtmlValue(s.ref)}">
         <div class="who">
           <span class="username">${escHtmlValue(s.username)}</span>
           <span class="role">${escHtmlValue(s.role || 'bruker')}</span>
         </div>
         <span class="aktivitet ${escHtmlValue(aktivitetsklasse(s.inaktiv_s))}">${escHtmlValue(aktivitetstekst(s.inaktiv_s))}</span>
-        <button class="btn-kill" data-key="${escHtmlValue(s.session_key)}" data-username="${escHtmlValue(s.username)}" type="button">Logg ut</button>
+        <button class="btn-kill" data-key="${escHtmlValue(s.ref)}" data-username="${escHtmlValue(s.username)}" type="button">Logg ut</button>
       </div>
     `).join('');
     // **Begge tallene.** «Pålogget» er ikke «til stede», og André trenger å
@@ -462,7 +462,7 @@ async function killSession(sessionKey, username, btn) {
   btn.textContent = 'Logger ut…';
   try {
     const fd = new FormData();
-    fd.append('session_key', sessionKey);
+    fd.append('ref', sessionKey);
     const res = await apiFetch(STATUS_URLS.kill, {method: 'POST', body: fd});
     const data = await res.json();
     if (!res.ok || !data.ok) {

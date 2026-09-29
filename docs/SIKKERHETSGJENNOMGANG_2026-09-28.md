@@ -95,7 +95,7 @@ Alt her var ny kode på `staging`.
   volumet og offsite der ingen fra portalen kan slette det. Auditraden for gjenopprettingen
   navngir nå det bildet.
 
-### Pulje 4 — opprydding og drift
+### Pulje 4 — opprydding og drift (ferdig 29. sep., se CHANGELOG)
 
 - Pasienttabellen setter førstehjelper- og helsepersonellnavn inn uten escaping (Tabulator
   skriver formatter-strengen som `innerHTML`). `window.USER_NAME` uten `escapejs`, og
