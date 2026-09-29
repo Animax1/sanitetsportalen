@@ -381,8 +381,13 @@ def login_view(request):
         # kunne gjettingen fortsette gjennom låsen, fra så mange IP-er man har.
         # Navnene er forutsigbare og kontoen har ingen MFA. At den finnes, er
         # ingen hemmelighet — at passordet stemmer, er det.
+        #
+        # **Maskinlåsen også** (siste runde, 29. sep.): den sto bare i grenen
+        # for riktig passord, så en IP som var låst gjettet videre — og ett
+        # sted kunne bruke hele taket og låse bilen overalt. Nå stenger den
+        # den som gjetter, slik modulen lover.
         delt_og_laast = (user_obj is not None and user_obj.er_delt_konto
-                         and user_obj.is_active and user_obj.is_locked())
+                         and user_obj.is_active and kontolaas.er_laast(user_obj, ip))
         if delt_og_laast and user is None:
             # **Og ingenting telles mens den er låst** (tredje gjennomgang, 29.
             # sep.). Talte galt passord og ikke riktig, flyttet hvert femtiende

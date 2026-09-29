@@ -87,10 +87,17 @@ def finn_konto(username):
     """Den ene kontoen brukernavnet peker på, eller ``None``.
 
     Brukes av `login_view` til kontolås og telling av feilede forsøk. Er den
-    tvetydig, returneres ``None`` — samme forsiktighet som i `authenticate`.
+    tvetydig, gjelder nøyaktig treff — samme regel som i `authenticate`.
     """
     treff = finn_kandidater(username)
-    return treff[0] if len(treff) == 1 else None
+    if len(treff) == 1:
+        return treff[0]
+    if len(treff) > 1:
+        # **Samme regel som `authenticate`** (siste runde, 29. sep.): er navnet
+        # tvetydig, gjelder nøyaktig treff. Ga vi `None`, ble kontoen som
+        # `authenticate` slapp inn aldri talt eller låst.
+        return CustomUser.objects.filter(username=username).first()
+    return None
 
 
 class CaseInsensitiveModelBackend(ModelBackend):

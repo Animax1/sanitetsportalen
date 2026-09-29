@@ -646,3 +646,63 @@ class LaastDeltKontoTellerIkkeTests(TestCase):
         etter_galt = self._prov('feil')
         self.assertEqual(etter_riktig, etter_galt)
         self.assertIn('5 minutt', etter_galt)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class MaskinlaasenStengerDenSomGjetterTests(TestCase):
+    """Siste runde 29. sep. 2026: maskinlåsen sto bare i grenen for riktig passord.
+    En låst IP gjettet videre, ble talt, og kunne bruke hele taket alene."""
+
+    def setUp(self):
+        cache.clear()
+        self.bil = CustomUser.objects.create_user(
+            username='bil_maskin', password=PASSORD, must_change_password=False,
+            er_delt_konto=True)
+        for _ in range(5):
+            self._prov('feil')
+
+    def _prov(self, passord, ip='10.4.4.4'):
+        c = Client(REMOTE_ADDR=ip)
+        return c, c.post(LOGIN, {'username': 'bil_maskin', 'password': passord})
+
+    def test_laast_ip_blir_ikke_talt_videre(self):
+        self._prov('feil')
+        self._prov('feil')
+        self.bil.refresh_from_db()
+        self.assertEqual(self.bil.failed_login_attempts, 5)
+
+    def test_riktig_og_galt_fra_laast_ip_svarer_likt(self):
+        c, riktig = self._prov(PASSORD)
+        _, galt = self._prov('feil')
+        self.assertFalse(_innlogget(c))
+        self.assertEqual(riktig.context['error'], galt.context['error'])
+
+    def test_bilen_kommer_inn_fra_en_annen_ip(self):
+        """Motprøven."""
+        c, _ = self._prov(PASSORD, ip='10.4.4.5')
+        self.assertTrue(_innlogget(c))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class TvetydigBrukernavnTellesTests(TestCase):
+    """Siste runde 29. sep. 2026: to kontoer som skilte seg bare på skrivemåte ga
+    `finn_konto() → None`, og kontoen `authenticate` slapp inn ble aldri talt."""
+
+    def setUp(self):
+        cache.clear()
+        self.bil = CustomUser.objects.create_user(
+            username='bil-7', password=PASSORD, must_change_password=False,
+            er_delt_konto=True)
+        CustomUser.objects.create_user(
+            username='BIL-7', password='noe annet', must_change_password=False)
+
+    def test_feil_passord_mot_det_noyaktige_navnet_telles(self):
+        Client(REMOTE_ADDR='10.5.5.5').post(LOGIN, {'username': 'bil-7', 'password': 'feil'})
+        self.bil.refresh_from_db()
+        self.assertEqual(self.bil.failed_login_attempts, 1)
+
+    def test_eieren_kommer_fortsatt_inn(self):
+        """Motprøven."""
+        c = Client(REMOTE_ADDR='10.5.5.6')
+        c.post(LOGIN, {'username': 'bil-7', 'password': PASSORD})
+        self.assertTrue(_innlogget(c))

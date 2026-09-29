@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Siste runde, bilkontoenes innlogging: maskinlåsen stengte ikke den som gjettet, og et tvetydig brukernavn ble aldri låst  `#sikkerhet` `#innlogging`
+
+**Hvorfor:** André ba om en siste runde. En agent uten kontekst prøvde å bryte én egenskap: at
+den som kjenner en bilkontos navn ikke kan prøve passord uten grense, hvor mange IP-er hun enn
+har. **Konklusjon: taket holder** — rundt `DELT_KONTO_TAK` (50) vurderte gjett per låseperiode,
+og riktig og galt passord mot en låst konto gir likt svar (status, kropp, cookies, sesjon). To
+unntak, begge rettet:
+
+- **Maskinlåsen stengte bare riktig passord, ikke den som gjettet.** Den sto i grenen der
+  passordet var riktig. En IP med fem feil gjettet videre, fikk «Feil brukernavn eller
+  passord», og ble talt — så én adresse kunne bruke hele taket og låse bilen overalt, og
+  modulens løfte «den som gjetter stenger seg selv ute, ikke bilen» var ikke sant. Nå sjekkes
+  maskinlåsen før noe vurderes, som databaselåsen: «låst» uansett passord, og ingenting telles.
+  Én IP får fem gjett per kvarter.
+- **Et tvetydig brukernavn ble aldri talt eller låst.** Skilte to kontoer seg bare på
+  skrivemåte (`bil-7`/`BIL-7`), ga `finn_konto()` `None`, mens `authenticate` slapp inn på
+  nøyaktig treff. 200 gale gjett fra 200 IP-er lot kontoen stå ulåst. Nå bruker `finn_konto`
+  samme regel som `authenticate`. Krever gamle data — skjemaet lager ikke slike par —
+  `sjekk_brukernavn` finner dem.
+
+**Ikke endret, med grunn:** et riktig gjett som allerede er underveis i det låsen settes,
+slipper inn (`user_obj` er lest før hasheren). Taket er da i praksis 50 + antall samtidige
+tråder (3); ikke verdt en ekstra spørring på hver innlogging.
+
+**Tester:** `MaskinlaasenStengerDenSomGjetterTests`, `TvetydigBrukernavnTellesTests`.
+**Mutasjoner: 2, begge drept.**
+
 ## 2026-09-29 — Tredje gjennomgang: minuttene i låsemeldingen røpte passordet, navneknappen som førte til en vegg, og tre kappløp som ga 500  `#sikkerhet` `#innlogging` `#vaktliste`
 
 **Hvorfor:** En tredje gjennomgang uten kontekst (egen agent, 29. sep.) av `8df4f1d..0adefda`, bedt
