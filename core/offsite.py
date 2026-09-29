@@ -18,10 +18,26 @@ Tre regler:
   gjør `meld_ny_backup` ingenting — staging og lokal utvikling har ingen
   offsite-backup, med vilje.
 
+Fila komprimeres før den krypteres — chiffertekst lar seg ikke komprimere, mens
+gzip på dumpdata-JSON gir 5–15 % av rå størrelse.
+
 Kryptering: AES-256-GCM med nøkkel avledet av `OFFSITE_BACKUP_KEY` (SHA-256).
-Formatet er `SPBK1` + 12 byte nonce + chiffertekst med tag. Nøkkelen må
-finnes *utenfor* Railway også (passordbehandler): uten den er bucketen
-uleselig, og det er hele poenget.
+Formatet er `SPBK2` + 12 byte nonce + chiffertekst med tag, og **objektnavnet
+er autentisert sammen med innholdet** (29. sep. 2026). Nøkkelen må finnes
+*utenfor* Railway også (passordbehandler): uten den er bucketen uleselig, og
+det er hele poenget.
+
+**Hvorfor navnet må være med** (sikkerhetsgjennomgangen 28. sep. 2026): i
+`SPBK1` var den autentiserte tilleggsdataen bare `SPBK1`. Den som hadde
+skrivenøkkelen til bucketen — men ikke `OFFSITE_BACKUP_KEY` — kunne kopiere en
+gammel hel dump til `backups/backup-patients-…`, og den dekrypterte feilfritt.
+Med navnet i tilleggsdataen avvises en fil som er flyttet.
+
+**`SPBK1` leses fortsatt**, fordi filene ligger 730 dager, og kan dermed
+fortsatt gis nytt navn. Det egentlige vernet er derfor sperrene i
+`core.backup.service.restore_backup` — en modulfil laster bare modulens
+modeller, og en «hel database» må ha brukere — mens `SPBK2` gjør at nye filer
+ikke engang kommer så langt.
 
 Gjenoppretting: `python manage.py hent_offsite --list` og
 `python manage.py hent_offsite <objektnavn>` henter, dekrypterer og legger
@@ -42,8 +58,18 @@ from core.vask import vask
 
 logger = logging.getLogger(__name__)
 
-MAGI = b'SPBK1'
+MAGI = b'SPBK2'
+#: Formatet fra 13. til 29. sep. 2026. Leses, skrives aldri. Se modulens docstring.
+MAGI_V1 = b'SPBK1'
 SUFFIKS = '.enc'
+
+#: Under dette er nøkkelen en passfrase, og en bucket med helseopplysninger lar
+#: seg knekke offline — `_avledet_nokkel` er én runde SHA-256. En hard sjekk i
+#: `settings.py` kunne stoppet deployen på en nøkkel ingen vet lengden på, så det
+#: vises som et avvik på /portal-admin/backup/ i stedet. Å bytte nøkkel gjør de
+#: gamle filene uleselige med den nye: den gamle må da ligge i passordbehandleren
+#: i 730 dager.
+NOKKEL_MINSTE_LENGDE = 32
 
 #: **Ett prefiks per oppbevaringstid** (13. sep. 2026). Fristene kan bare
 #: skilles i bucketen hvis filene ligger på hver sin sti, og livssyklusreglene
@@ -97,21 +123,46 @@ def _avledet_nokkel(hemmelighet: str) -> bytes:
     return hashlib.sha256(hemmelighet.encode('utf-8')).digest()
 
 
-def krypter(data: bytes, hemmelighet: str) -> bytes:
+def nokkel_advarsel() -> str:
+    """Tekst til oversikten når nøkkelen er satt, men for kort. Ellers tom."""
+    nokkel = konfig()['nokkel']
+    if nokkel and len(nokkel) < NOKKEL_MINSTE_LENGDE:
+        return (f'OFFSITE_BACKUP_KEY er {len(nokkel)} tegn. Bruk minst '
+                f'{NOKKEL_MINSTE_LENGDE} tilfeldige tegn — en kortere nøkkel lar '
+                f'seg knekke offline av den som får tak i bucketen.')
+    return ''
+
+
+def _tillegg(magi: bytes, objekt: str) -> bytes:
+    """Den autentiserte tilleggsdataen: formatet, og for `SPBK2` navnet."""
+    if magi == MAGI_V1:
+        return MAGI_V1
+    if not objekt:
+        raise ValueError('Objektnavnet mangler — det er en del av signaturen.')
+    return MAGI + objekt.encode('utf-8')
+
+
+def krypter(data: bytes, hemmelighet: str, *, objekt: str) -> bytes:
+    """`SPBK2` for objektet `objekt` — navnet det skal ligge under i bucketen."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    tillegg = _tillegg(MAGI, objekt)
     nonce = secrets.token_bytes(12)
-    return MAGI + nonce + AESGCM(_avledet_nokkel(hemmelighet)).encrypt(nonce, data, MAGI)
+    return MAGI + nonce + AESGCM(_avledet_nokkel(hemmelighet)).encrypt(nonce, data, tillegg)
 
 
-def dekrypter(blob: bytes, hemmelighet: str) -> bytes:
+def dekrypter(blob: bytes, hemmelighet: str, *, objekt: str) -> bytes:
+    """Klarteksten, eller `ValueError`. `SPBK2` avvises under et annet navn."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    if not blob.startswith(MAGI) or len(blob) < len(MAGI) + 12 + 16:
+    magi = next((m for m in (MAGI, MAGI_V1) if blob.startswith(m)), None)
+    if magi is None or len(blob) < len(magi) + 12 + 16:
         raise ValueError('Fila er ikke en kryptert backup fra portalen.')
-    nonce = blob[len(MAGI):len(MAGI) + 12]
+    tillegg = _tillegg(magi, objekt)
+    nonce = blob[len(magi):len(magi) + 12]
     try:
-        return AESGCM(_avledet_nokkel(hemmelighet)).decrypt(nonce, blob[len(MAGI) + 12:], MAGI)
-    except Exception as exc:   # InvalidTag — feil nøkkel eller tuklet fil
-        raise ValueError('Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY, eller fila er endret.') from exc
+        return AESGCM(_avledet_nokkel(hemmelighet)).decrypt(nonce, blob[len(magi) + 12:], tillegg)
+    except Exception as exc:   # InvalidTag — feil nøkkel, tuklet fil, eller flyttet fil
+        raise ValueError('Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY, eller fila er '
+                         'endret eller flyttet til et annet navn.') from exc
 
 
 # ── S3 ───────────────────────────────────────────────────────────────────────
@@ -143,7 +194,7 @@ def last_opp(backup, sti) -> 'OffsiteKopi':
                       objektnavn=objektnavn(backup.filename, backup.module_slug))
     try:
         raa = open(sti, 'rb').read()
-        blob = krypter(raa, k['nokkel'])
+        blob = krypter(raa, k['nokkel'], objekt=rad.objektnavn)
         rad.bytes = len(blob)
         _klient().put_object(
             Bucket=k['bucket'], Key=rad.objektnavn, Body=blob,
@@ -194,8 +245,15 @@ def list_objekter() -> list[dict]:
 def hent(objekt: str):
     """Hent, dekrypter og legg fila der `restore_backup` finner den. Lager en
     `Backup`-rad hvis den mangler (fila kan komme fra en annen Railway-base).
-    Returnerer (Backup, sti)."""
-    from core.backup import get_backup_dir
+    Returnerer (Backup, sti).
+
+    **Modulen og typen leses av filnavnet, ikke av S3-metadata** (29. sep.
+    2026): metadataen settes av den som laster opp, og ingenting sjekket den.
+    Navnet er autentisert i `SPBK2`. Og en fil som finnes på volumet med et
+    annet innhold, **skrives ikke over** — den kan være den eneste kopien.
+    """
+    from core.backup import get_backup_dir, get_handler
+    from core.backup.service import kind_fra_filnavn
     from core.models import Backup
     k = konfig()
     # Filnavnet alene holder: prefikset utledes av slugen i navnet, så
@@ -211,18 +269,34 @@ def hent(objekt: str):
     # kompromittert bucket skal ikke være en vei ut av BACKUP_DIR.
     if not filnavn or '/' in filnavn or '\\' in filnavn or filnavn != Path(filnavn).name:
         raise ValueError(f'Objektnavnet «{objekt}» er ikke et filnavn.')
+    slug, kind = _slug_fra_filnavn(filnavn), kind_fra_filnavn(filnavn)
+    if not slug or not kind or get_handler(slug) is None:
+        raise ValueError(f'«{filnavn}» er ikke navnet på en backupfil fra portalen — '
+                         f'modulen og typen kan ikke leses av det.')
+    if prefiks_for(slug) != brukt_prefiks:
+        raise ValueError(f'«{objekt}» ligger under feil prefiks for modulen «{slug}».')
     svar = _klient().get_object(Bucket=k['bucket'], Key=objekt)
     blob = svar['Body'].read()
-    raa = dekrypter(blob, k['nokkel'])
-    sti = get_backup_dir() / filnavn
-    with open(sti, 'wb') as f:
-        f.write(raa)
+    gammelt = blob.startswith(MAGI_V1)
+    raa = dekrypter(blob, k['nokkel'], objekt=objekt)
     meta = svar.get('Metadata') or {}
+    if meta.get('modul') and meta.get('modul') != slug:
+        logger.warning('core.offsite: %s har metadata modul=%r, men navnet sier %r — '
+                       'navnet gjelder', objekt, meta.get('modul'), slug)
+    sti = get_backup_dir() / filnavn
+    if sti.exists():
+        if sti.read_bytes() != raa:
+            raise ValueError(f'{filnavn} finnes allerede på volumet med et annet innhold, '
+                             f'og skrives ikke over. Flytt eller slett den lokale fila først.')
+    else:
+        with open(sti, 'wb') as f:
+            f.write(raa)
+    note = f'Hentet fra offsite {timezone.localtime():%d.%m.%Y %H:%M}'
+    if gammelt:
+        note += ' — SPBK1: navnet er ikke autentisert i dette formatet'
     backup, _ = Backup.objects.get_or_create(
         filename=filnavn,
-        defaults={'kind': meta.get('kind') or 'manual', 'size_bytes': len(raa),
-                  'module_slug': meta.get('modul') or _slug_fra_filnavn(filnavn),
-                  'note': f'Hentet fra offsite {timezone.localtime():%d.%m.%Y %H:%M}'})
+        defaults={'kind': kind, 'size_bytes': len(raa), 'module_slug': slug, 'note': note})
     return backup, sti
 
 
@@ -333,6 +407,11 @@ def _les_livssyklus() -> dict:
             'avvik': _avvik(regler)}
 
 
+def vask_feil(melding: str, maks: int = 300) -> str:
+    """Offentlig: feiltekst fra backup og offsite uten nøkler, til nettleseren."""
+    return _vask(melding, maks)
+
+
 def _vask(melding: str, maks: int) -> str:
     """Feilteksten uten nøkler og URL-legitimasjon. Den vises i nettleseren."""
     k = konfig()
@@ -404,6 +483,7 @@ def status() -> dict:
         'mangler': mangler(),
         'bucket': konfig()['bucket'],
         'antall': OffsiteKopi.objects.filter(feil='').count(),
+        'nokkel_advarsel': nokkel_advarsel(),
         'siste_ok': siste_ok,
         'siste_feil': siste if siste is not None and siste.feil else None,
         'livssyklus': livssyklus(),

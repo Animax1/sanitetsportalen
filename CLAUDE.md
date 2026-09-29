@@ -399,7 +399,7 @@ er en feltendring logges der den skjer** — «aldri manuell audit-kode» sto he
 B2 og B3. Arkiv: `core.arkiv.logg_arkivhendelse`.
 
 **Portalens egne tabeller logges av `core/signals.py`** (14. sep. 2026):
-`AppSetting`, `ModuleSettings` og `Vakt`. De sto uten audit i det hele tatt fram til da —
+`AppSetting`, `ModuleSettings`, `Vakt` og `Backupplan`. De sto uten audit i det hele tatt fram til da —
 å slå av en modul for *alle*, eller flytte sesjonstimeouten, etterlot ingenting, mens hvert
 feltbytte på en pasient ble logget minutiøst. Feil vei rundt: jo mer inngripende
 handlingen var, jo mindre spor satte den.
@@ -523,8 +523,8 @@ kaller `offsite.meld_ny_backup(backup, path)` etter at fila er skrevet — inert
 uten `OFFSITE_S3_BUCKET`/nøklene/`OFFSITE_BACKUP_KEY`, og **kaster aldri**:
 volumet er første nett, og feilen står i `OffsiteKopi.feil` og på
 `/portal-admin/backup/`. Fila **komprimeres først, krypteres så** — chiffertekst
-lar seg ikke komprimere, mens gzip på dumpdata-JSON gir 5–15 % av rå størrelse.
-AES-256-GCM, format `SPBK1`+nonce+chiffer. **To prefikser, ett per
+lar seg ikke komprimere. AES-256-GCM, format `SPBK2`+nonce+chiffer med
+objektnavnet i AAD (`SPBK1` leses fortsatt). **To prefikser, ett per
 oppbevaringstid:** `backups/` for modulfilene (730 dager) og `full/` for den
 hele (90 dager) — fristene kan bare skilles i bucketen hvis filene ligger på
 hver sin sti, fordi livssyklusreglene filtrerer på prefiks. **Fristene håndheves

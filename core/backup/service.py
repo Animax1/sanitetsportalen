@@ -293,6 +293,101 @@ def slug_fra_filnavn(filnavn: str) -> str:
     return ''
 
 
+def kind_fra_filnavn(filnavn: str) -> str:
+    """Typen en backupfil ble tatt som, lest av navnet. Tom hvis den ikke finnes."""
+    deler = filnavn.removeprefix('backup-').split('-')
+    for i in range(len(deler) - 1, 0, -1):
+        if deler[i] in VALID_KINDS:
+            return deler[i]
+    return ''
+
+
+# ── Hva en fil får laste ─────────────────────────────────────────────────────
+#
+# **En modulfil laster bare modulens modeller** (sikkerhetsgjennomgangen 28. sep.
+# 2026). `restore_backup` advarte om modeller utenfor handleren, men lastet dem —
+# og da ga en gammel hel dump lagt ut som «pasientfil» tilbake brukertabellen med
+# gamle passordhasher og TOTP-hemmeligheter, uten `--full`-sperra.
+#
+# **Grensen går på appen, ikke på dagens liste**, og det er med vilje. Filene
+# ligger 730 dager, og hva en modul har dumpet har endret seg: KO-filene fra
+# 17.–27. sep. bærer modeller som siden er utelatt (`Ansvarsmerke`,
+# `Linjedeling`, `HendelseLest`), og pasientfilene fra før 14. sep. bærer
+# `patients.appsetting`, som nå heter `core.appsetting`. En sperre på dagens
+# liste ville avvist ekte backuper. Prisen er at et arkiv kan lastes inn som
+# pasientfil — samme app — og det er liten: brukere, MFA, logg og portalen er i
+# andre apper, og det er dem sperra finnes for.
+
+
+def _i_omfang(handler, etikett: str) -> bool:
+    etikett = etikett.lower()
+    app = etikett.split('.', 1)[0]
+    for oppforing in handler.collect_apps():
+        oppforing = oppforing.lower()
+        if oppforing == etikett or ('.' not in oppforing and oppforing == app):
+            return True
+    return False
+
+
+def modeller_utenfor(handler, etiketter) -> list[str]:
+    """Modellene i `etiketter` som en fil fra `handler` ikke får laste, sortert.
+
+    Tillatt: modeller i en app handleren dumper hele, modeller den dumper
+    enkeltvis, og modeller som er flyttet *fra* noe av det (`GAMLE_MODELLNAVN`
+    — etikettene er alt oversatt når dette kalles).
+    """
+    flyttet_hit = {}
+    for gammel, ny in GAMLE_MODELLNAVN.items():
+        flyttet_hit.setdefault(ny, []).append(gammel)
+    ut = set()
+    for etikett in etiketter:
+        etikett = str(etikett).lower()
+        if _i_omfang(handler, etikett):
+            continue
+        if any(_i_omfang(handler, gammel) for gammel in flyttet_hit.get(etikett, ())):
+            continue
+        ut.add(etikett)
+    return sorted(ut)
+
+
+def _kontroller_innhold(handler, backup, raw: bytes) -> None:
+    """Avvis en fil som ikke er det den gir seg ut for. Før noe er rørt.
+
+    - **Navnet og raden må si samme modul.** Raden kan være laget av noen
+      andre enn `create_backup` (offsite, `gjenopprett`).
+    - **En modulfil laster bare modulens modeller** — se over.
+    - **En hel database har brukere.** Ellers er det en modulfil med nytt navn,
+      og en gjenoppretting som hel base ville tømt alle tabellene og lastet én
+      modul.
+    """
+    fra_navnet = slug_fra_filnavn(backup.filename)
+    if fra_navnet and fra_navnet != backup.module_slug:
+        raise ValueError(
+            f'{backup.filename} er en fil for «{fra_navnet}», men står registrert '
+            f'som «{backup.module_slug}». Gjenopprettes ikke.')
+    try:
+        objekter = json.loads(raw.decode('utf-8'))
+    except Exception as feil:   # noqa: BLE001
+        raise ValueError(f'{backup.filename} lar seg ikke lese som JSON: {feil}') from feil
+    if not isinstance(objekter, list):
+        raise ValueError(f'{backup.filename} er ikke en backupfil fra portalen.')
+    etiketter = {str(o.get('model', '')).lower() for o in objekter if isinstance(o, dict)}
+
+    if handler.slug == 'full':
+        if 'accounts.customuser' not in etiketter:
+            raise ValueError(
+                f'{backup.filename} har ingen brukere, så den er ikke en hel database. '
+                f'Gjenopprettet som hel base ville den tømt alle tabellene. Er det en '
+                f'modulfil med nytt navn?')
+        return
+    utenfor = modeller_utenfor(handler, etiketter)
+    if utenfor:
+        raise ValueError(
+            f'{backup.filename} skal være en fil for «{handler.slug}», men inneholder '
+            f'{", ".join(utenfor)}. Gjenopprettes ikke — en modulfil laster bare '
+            f'modulens egne modeller.')
+
+
 def create_backup(slug: str, kind: str = KIND_MANUAL,
                   user=None, note: str = '', hopp_over_like: bool | None = None):
     """Lag en backup for modulen ``slug``.
@@ -445,7 +540,7 @@ def _inspect_payload(handler, raw: bytes, filename: str) -> list[str]:
         return []
 
 
-def _logg_gjenoppretting(backup, user, kilde: str) -> None:
+def _logg_gjenoppretting(backup, user, kilde: str, for_bilde=None) -> None:
     """Én auditrad per gjenoppretting: hvem, hvilken fil, og hvor fra.
 
     Ligger i tjenesten og ikke i viewet (13. sep. 2026) fordi gjenoppretting
@@ -466,7 +561,11 @@ def _logg_gjenoppretting(backup, user, kilde: str) -> None:
             user=user,
             app_label='core',
             field_name='restore',
-            old_value=kilde,
+            # **Før-bildet står i raden** (29. sep. 2026). En hel gjenoppretting
+            # erstatter også audit-loggen; det som sto der før, finnes i dette
+            # bildet — på volumet, og offsite der ingen fra portalen kan slette det.
+            old_value=(f'{kilde}; før-bilde: {for_bilde.filename}' if for_bilde is not None
+                       else kilde),
             new_value=backup.filename,
         )
     except Exception:   # noqa: BLE001 — en logg som tar ned gjenopprettingen
@@ -502,14 +601,6 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     if not path.exists():
         raise FileNotFoundError(f'Backup-fil mangler: {backup.filename}')
 
-    # 1) Sikkerhetsnett — pre_restore-snapshot FØR vi rører noe.
-    create_backup(
-        slug=backup.module_slug,
-        kind=KIND_PRE_RESTORE,
-        user=user,
-        note=f'Før gjenoppretting av {backup.filename}',
-    )
-
     with gzip.open(path, 'rb') as f:
         raw = f.read()
 
@@ -518,6 +609,18 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     # kontrollen under ser dagens modellnavn — ellers måtte den kjenne begge.
     raw = oversett_modellnavn(raw)
     raw = fjern_utgaatte(raw)
+
+    # Er fila det den gir seg ut for? Før sikkerhetsnettet: en fil som avvises,
+    # skal ikke koste et øyeblikksbilde, og ingenting er rørt (28. sep. 2026).
+    _kontroller_innhold(handler, backup, raw)
+
+    # 1) Sikkerhetsnett — pre_restore-snapshot FØR vi rører noe.
+    for_bilde = create_backup(
+        slug=backup.module_slug,
+        kind=KIND_PRE_RESTORE,
+        user=user,
+        note=f'Før gjenoppretting av {backup.filename}',
+    )
 
     # Se over innholdet før det lastes. loaddata går utenom all
     # applikasjonsvalidering, så dette er eneste stedet vi får sjekket hva
@@ -544,7 +647,7 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
             if tmp_path.exists():
                 tmp_path.unlink()
 
-    _logg_gjenoppretting(backup, user, kilde)
+    _logg_gjenoppretting(backup, user, kilde, for_bilde)
     logger.info(
         'core.backup: restored modul=%s fra %s av bruker=%s',
         backup.module_slug, backup.filename,

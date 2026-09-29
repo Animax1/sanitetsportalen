@@ -653,7 +653,23 @@ og de hele under `full/`. Den andre henter fila, dekrypterer den med
 opp på `/portal-admin/backup/`. Kommandoen rører ikke basen.
 
 Svarer den «Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY», er nøkkelen i Railway en
-annen enn den fila ble kryptert med. Sjekk mot passordbehandleren.
+annen enn den fila ble kryptert med. Sjekk mot passordbehandleren. **Fra 29. sep. 2026 kan
+det også bety at fila er flyttet**: navnet er en del av signaturen, og en fil som ligger
+under et annet navn enn den ble lastet opp med, avvises. Det er meningen — se under.
+
+**Tre sperrer du kan møte, og hvorfor de står der** (sikkerhetsgjennomgangen 28. sep.
+2026). Den som får skrivenøkkelen til bucketen, men ikke `OFFSITE_BACKUP_KEY`, kan ikke
+lese filene — men kunne flytte og gi dem nytt navn.
+
+| Melding | Betyr |
+|---|---|
+| «… finnes allerede på volumet med et annet innhold» | Hentingen skriver ikke over en lokal fil. Flytt den lokale bort først om du vil ha bucketens |
+| «… inneholder accounts.customuser …» ved gjenoppretting | En modulfil med andre modeller enn modulens egne. Den lastes ikke: det er slik en hel dump ser ut når den er lagt ut som modulfil |
+| «… har ingen brukere, så den er ikke en hel database» | En fil med navnet `backup-full-…` uten brukere. Gjenopprettet som hel base ville den tømt alle tabellene |
+
+En fil i det gamle formatet (`SPBK1`, lastet opp før 29. sep.) får «SPBK1: navnet er ikke
+autentisert» i notatet på `/portal-admin/backup/`. Den gjenopprettes som før; sperrene
+over er det som holder for den.
 
 ### Er backupen ekte? (`verifiser_backup`)
 
@@ -677,6 +693,12 @@ så ble fila tatt før dataene fantes. En tom fil er ikke en bestått prøve.
 
 Kjør den **etter første backup i en ny vakt**, og gjerne som en del av
 kontrollen under. Den tar noen sekunder.
+
+**Kjør den også etter en deploy som rører gjenopprettingen** — første gang 29. sep. 2026,
+da sperrene over kom. De er skrevet for å slippe gjennom hver ekte fil, også de eldre;
+`verifiser_backup` er prøven på at de gjør det med filene som faktisk ligger der. Den
+laster ingenting opp til bucketen (fra 29. sep. — før lastet den opp bildene av
+engangsbasen).
 
 ### Gjenoppretting fra kommandolinja
 

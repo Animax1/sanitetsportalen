@@ -55,6 +55,12 @@ class GjenopprettKommandoTests(TestCase):
         return ut.getvalue()
 
     def _lag_fil(self, slug='patients'):
+        if slug == 'full':
+            # En hel base har alltid brukere — bootstrap-kontoen, minst — og
+            # `restore_backup` avviser en «hel» fil uten (29. sep. 2026): da er
+            # den en modulfil med nytt navn. Fiksturen skal ha prod-formen.
+            from accounts.models import CustomUser
+            CustomUser.objects.get_or_create(username='bootstrap', defaults={'role': 'admin'})
         with self.miljo:
             return create_backup(slug=slug, kind=KIND_MANUAL)
 
@@ -177,7 +183,9 @@ class GjenopprettKommandoTests(TestCase):
         rader = AuditLog.objects.filter(field_name='restore').order_by('-created_at')
         self.assertEqual(rader.count(), for_ + 1)
         rad = rader.first()
-        self.assertEqual(rad.old_value, 'kommandolinja')
+        # Kilden først, så før-bildet (29. sep. 2026).
+        self.assertTrue(rad.old_value.startswith('kommandolinja; før-bilde: backup-patients-pre_restore-'),
+                        rad.old_value)
         self.assertEqual(rad.new_value, backup.filename)
         self.assertIsNone(rad.user, 'Kommandolinja har ingen innlogget bruker.')
 
@@ -203,8 +211,8 @@ class GjenopprettKommandoTests(TestCase):
 
         rader = AuditLog.objects.filter(field_name='restore')
         self.assertEqual(rader.count(), for_ + 1)
-        self.assertEqual(rader.order_by('-created_at').first().old_value,
-                         'grensesnittet')
+        self.assertTrue(rader.order_by('-created_at').first().old_value.startswith(
+            'grensesnittet; før-bilde: '))
 
     def test_bekreftelsen_sier_hva_som_slettes(self) -> None:
         from patients.models import Patient

@@ -73,20 +73,27 @@ Alt her var ny kode på `staging`.
   `pre_slett` fikk eget tak (ti per modul).
 - **`json_body` godtok `Infinity`, `NaN` og `1e999`** — 500 fra `/lag/r/` uten innlogging.
 
-### Pulje 3 — backup og offsite
+### Pulje 3 — backup og offsite (ferdig 29. sep., se CHANGELOG)
 
-- **Chifferteksten er ikke bundet til navnet sitt.** AES-GCM har bare `SPBK1` som AAD, og
-  modul-slugen leses fra S3-metadata. Med bucketens skrivenøkkel (men ikke
-  krypteringsnøkkelen) kan en gammel `full`-fil legges ut som en modulfil, og
-  `restore_backup` laster den — den *advarer* om modeller utenfor handleren, men stopper
-  ikke. Da kommer gamle passordhasher og TOTP-hemmeligheter tilbake, uten `--full`-sperra.
-  Nytt format `SPBK2` med objektnavnet som AAD; `SPBK1` beholdes som lesesti, prøvd mot en
-  ekte blob.
-- Full gjenoppretting tømmer `AuditLog` og `LoginEvent`.
-- `verifiser_backup` arver `OFFSITE_*` og laster engangsbasens pre-restore-filer opp til
-  den ekte bucketen.
-- `OFFSITE_BACKUP_KEY` har ingen lengdekrav og avledes med én runde SHA-256.
-- `Backupplan` har ingen audit. Feiltekstene i backup-viewene vises uvasket.
+- **Chifferteksten var ikke bundet til navnet sitt.** AES-GCM hadde bare `SPBK1` som AAD,
+  modul-slugen ble lest av S3-metadata, og `restore_backup` *advarte* om modeller utenfor
+  handleren, men lastet dem. Med bucketens skrivenøkkel (men ikke krypteringsnøkkelen) kunne
+  en gammel `full`-fil legges ut som modulfil og gi tilbake passordhasher og
+  TOTP-hemmeligheter. Nytt format `SPBK2` med objektnavnet i AAD; slug og type leses av
+  navnet; `hent()` skriver ikke over.
+- **`SPBK1` må leses i 730 dager, og kan fortsatt gis nytt navn**, så det egentlige vernet
+  er to sperrer i gjenopprettingen: en modulfil laster bare modeller fra modulens apper (og
+  modeller flyttet fra dem — ellers ville ekte eldre filer blitt avvist), og en «hel
+  database» må ha brukere. Den siste ble funnet under arbeidet: en modulfil med navnet
+  `backup-full-…` ville tømt alle tabellene.
+- `verifiser_backup` nuller `OFFSITE_*`. `Backupplan` har audit. Feiltekstene vaskes.
+  Advarsel på backup-siden når `OFFSITE_BACKUP_KEY` er kortere enn 32 tegn — ikke en hard
+  sjekk, fordi den kunne stoppet deployen på en nøkkel ingen vet lengden på.
+- **Endret fra planen: audit-loggen står *ikke* urørt ved full gjenoppretting.** Det ville
+  krevd at brukertabellen ble slettet uten at Django nullet brukerfeltet på hver audit-rad —
+  kirurgi midt i katastrofeveien, for et spor som allerede finnes: pre-restore-bildet, på
+  volumet og offsite der ingen fra portalen kan slette det. Auditraden for gjenopprettingen
+  navngir nå det bildet.
 
 ### Pulje 4 — opprydding og drift
 

@@ -4,6 +4,81 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Sikkerhet, pulje 3: offsite-filene bundet til navnet, og gjenopprettingen laster bare det fila gir seg ut for  `#sikkerhet` `#backup` `#offsite`
+
+**Hvorfor:** Pulje 3 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`. André: «vær forsiktig» — dette
+er katastrofeveien, og en feil her viser seg den dagen backupen trengs.
+
+**Trusselen:** en som får skrivenøkkelen til bucketen, men ikke `OFFSITE_BACKUP_KEY`. Hun kan
+ikke lese eller lage en backup, men hun kunne flytte og gi nytt navn til dem som ligger der.
+AES-GCM hadde bare `SPBK1` som autentisert tilleggsdata, modulen ble lest av S3-metadata hun
+setter selv, og `restore_backup` **advarte** om modeller utenfor modulen, men **lastet dem**.
+En gammel hel dump lagt ut som `backup-patients-…` ga da tilbake **gamle passordhasher og
+TOTP-hemmeligheter**, uten `--full`-sperra.
+
+**Og motsatt vei, funnet underveis:** en modulfil med navnet `backup-full-…`, gjenopprettet som
+hel database, ville **tømt alle tabellene og lastet én modul**. Den første versjonen av testen
+kom helt fram til `loaddata` etter at alt var tømt — reddet bare av at fiksturen var ugyldig
+og transaksjonen rullet tilbake.
+
+**Hva:**
+- **`SPBK2`**: objektnavnet er med i den autentiserte tilleggsdataen. En fil som er flyttet,
+  dekrypterer ikke. `krypter`/`dekrypter` krever navnet, og tomt navn avvises.
+- **`SPBK1` leses fortsatt** — filene ligger 730 dager. De kan fortsatt gis nytt navn, så
+  `SPBK2` alene lukker ikke hullet; det gjør sperrene under. En hentet `SPBK1`-fil får
+  «SPBK1: navnet er ikke autentisert» i notatet. **Testen bruker en ekte `SPBK1`-blob laget
+  med koden fra før**, lagret som hex — ikke en som lages på nytt med dagens kode.
+- **`hent()`**: modul og type leses av **filnavnet**, ikke av metadata (avvik logges);
+  navnet må være et portalnavn med en kjent modul, under riktig prefiks; og en fil som
+  finnes på volumet med annet innhold **skrives ikke over**.
+- **To sperrer i `restore_backup`, før pre-restore-bildet og før noe er rørt**
+  (`_kontroller_innhold`):
+  - **En modulfil laster bare modeller fra modulens apper** (`modeller_utenfor`). Grensen
+    går på **appen, ikke på dagens liste**, med vilje: KO-filene fra 17.–27. sep. bærer
+    modeller som siden er utelatt, og pasientfilene fra før 14. sep. bærer
+    `patients.appsetting`, som nå heter `core.appsetting` — de godtas gjennom
+    `GAMLE_MODELLNAVN`. Historikken ble gått gjennom i git for hver handler før grensen ble
+    satt. Prisen: et arkiv kan lastes som pasientfil (samme app); brukere, MFA, logg og
+    portalen er i andre apper, og det er dem sperra finnes for.
+  - **En «hel database» må ha brukere.** Og raden og filnavnet må si samme modul.
+- **Auditraden for en gjenoppretting navngir pre-restore-bildet** («kommandolinja; før-bilde:
+  backup-…»).
+- `verifiser_backup` **nuller `OFFSITE_*`** i underprosessen (`Command.engangsmiljo`). Før
+  lastet hver prøvekjøring opp bildene av engangsbasen til den ekte bucketen, 730 dager.
+- **Audit på `Backupplan`** (`core/signals.py`): det et menneske bestemmer — modus, intervall,
+  «behold», om den følger standarden. Ikke klokkas felter, og ikke opprettelsen.
+- **Feiltekstene i backup-viewene vaskes** (`offsite.vask_feil`): DSN og nøkler.
+- **Advarsel på `/portal-admin/backup/` når `OFFSITE_BACKUP_KEY` er under 32 tegn.** Ikke en
+  hard sjekk i `settings.py` — den kunne stoppet deployen på en nøkkel ingen vet lengden på.
+
+**Endret fra planen — og hvorfor:** audit-loggen står **ikke** urørt ved full gjenoppretting.
+Det krever at brukertabellen slettes uten at Django nuller brukerfeltet på *hver* audit-rad
+(`SET_NULL`), altså kirurgi i katastrofeveien — for et spor som allerede finnes i
+pre-restore-bildet, offsite der ingen fra portalen kan slette det. Auditraden peker nå dit.
+
+**Tester endret, med grunn:** fire eksisterende tester tok en «hel backup» av en base **uten en
+eneste bruker** og ble avvist av den nye sperra. Prosjektets egen regel er «en gjenoppretting
+man ikke kan logge inn etter, er ingen gjenoppretting»; fiksturen fikk en bruker, slik prod
+alltid har. `test_uten_tabellen_feiler_den_samme_fila` feiler nå tidligere, i sperra, med
+modellnavnet i meldingen. `test_ukjent_objekt` bruker et gyldig backupnavn. Auditrad-testene
+krever kilden **og** før-bildet.
+
+**Og `verifiser_backup` prøvde aldri KO, lag eller backlog** — funnet da kommandoen ble
+kjørt ende til ende mot ekte filer fra alle modulene. Den hadde sin egen liste over
+rekkefølgen, en femte kopi av den `CLAUDE.md` sier er skrevet ut for mange ganger, og meldte
+«verifisert» om seks av ni moduler. Den leser nå `GJENOPPRETTINGSREKKEFOLGE` og
+`UTEN_BINDING`; kjørt lokalt kom alle ni tilbake med samme antall rader, gjennom de nye
+sperrene, og den hele fila likeså.
+
+**Tester:** `core/tests_sikkerhet_pulje3.py` (24). Røde før rettingen.
+**Mutasjoner: 23, alle drept.** To overlevde først, begge fordi testen traff et annet lag enn
+det den skulle prøve: «navnet kan mangle» (testen dekrypterte med tomt navn en blob kryptert
+*med* navn — den feiler uansett) og «ukjent modul slippes gjennom» (testen brukte en blob som
+ikke var en backup). Begge testene prøver nå sin egen sperre.
+
+**Etter deploy til `main`: kjør `verifiser_backup` i prod** (runbook §8b) — prøven på at
+sperrene slipper gjennom filene som faktisk ligger der. Står i `TODO.md`.
+
 ## 2026-09-29 — Sikkerhet, pulje 2: fritekst i frosne tall, arkivsletting uten backup, og aktiv vakt uten lås  `#sikkerhet` `#vakt` `#personvern`
 
 **Hvorfor:** Pulje 2 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — det som måtte på plass før

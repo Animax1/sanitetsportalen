@@ -1,4 +1,4 @@
-"""Audit-logging for portalens egne tabeller: `AppSetting`, `ModuleSettings`, `Vakt`.
+"""Audit-logging for portalens egne tabeller: `AppSetting`, `ModuleSettings`, `Backupplan`, `Vakt`.
 
 **Hullet dette lukker** (14. sep. 2026, meldt av André ved staging-verifisering:
 «logges ingenting fra core?»). Svaret var nesten nei, og det var ikke nytt av
@@ -50,7 +50,7 @@ from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 from core.klientip import klient_ip
 
-from .models import AppSetting, ModuleSettings, Vakt
+from .models import AppSetting, Backupplan, ModuleSettings, Vakt
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +205,47 @@ def modulesettings_pre_save(sender, instance, **kwargs):
             continue
         AuditLog.objects.create(
             table_name=MODULESETTINGS_TABELL,
+            record_id=instance.pk,
+            action='UPDATE',
+            field_name=felt,
+            old_value=gammel_verdi,
+            new_value=ny_verdi,
+            user=bruker,
+            ip=ip,
+        )
+
+
+# ── Backupplan ───────────────────────────────────────────────────────────────
+#
+# **Å slå av pasientbackupen satte ingen spor** (sikkerhetsgjennomgangen 28. sep.
+# 2026). Planen styrer om en modul tas backup av, hvor ofte og hvor mange filer
+# volumet beholder — `modus=av` eller `behold=1` er stille måter å ta bort
+# sikkerhetsnettet på. Samme regel som `AppSetting`: **logg det et menneske har
+# bestemt, ikke det maskinen har talt.** Klokka skriver `sist_sjekket_at`,
+# `sist_fil_at` og `sist_resultat` ved hver vurdering; de logges ikke.
+# Opprettelsen logges heller ikke — `Backupplan.hent()` lager raden med
+# standardverdier første gang klokka ser en modul, uten at noen har bestemt noe.
+
+BACKUPPLAN_FELTER = ('folger_standard', 'modus', 'intervall_verdi', 'intervall_enhet', 'behold')
+BACKUPPLAN_TABELL = 'core_backupplan'
+
+
+@receiver(pre_save, sender=Backupplan)
+@ikke_under_loaddata
+def backupplan_pre_save(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+    gammel = Backupplan.objects.filter(pk=instance.pk).first()
+    if gammel is None:
+        return
+    bruker, ip = _bruker_og_ip()
+    for felt in BACKUPPLAN_FELTER:
+        gammel_verdi = _verdi(getattr(gammel, felt, None))
+        ny_verdi = _verdi(getattr(instance, felt, None))
+        if gammel_verdi == ny_verdi:
+            continue
+        AuditLog.objects.create(
+            table_name=BACKUPPLAN_TABELL,
             record_id=instance.pk,
             action='UPDATE',
             field_name=felt,

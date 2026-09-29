@@ -49,24 +49,26 @@ class FalskS3:
 class KrypteringTests(SimpleTestCase):
     def test_rundtur_og_feil_nokkel(self):
         data = b'{"pasient": "Kari"}' * 50
-        blob = offsite.krypter(data, 'n1')
+        o = 'backups/a.json.gz.enc'
+        blob = offsite.krypter(data, 'n1', objekt=o)
         self.assertTrue(blob.startswith(offsite.MAGI))
         self.assertNotIn(b'Kari', blob)
-        self.assertEqual(offsite.dekrypter(blob, 'n1'), data)
+        self.assertEqual(offsite.dekrypter(blob, 'n1', objekt=o), data)
         with self.assertRaises(ValueError):
-            offsite.dekrypter(blob, 'n2')
+            offsite.dekrypter(blob, 'n2', objekt=o)
         with self.assertRaises(ValueError):
-            offsite.dekrypter(blob[:-1] + bytes([blob[-1] ^ 1]), 'n1')
+            offsite.dekrypter(blob[:-1] + bytes([blob[-1] ^ 1]), 'n1', objekt=o)
         with self.assertRaises(ValueError):
-            offsite.dekrypter(b'ikke en backup', 'n1')
+            offsite.dekrypter(b'ikke en backup', 'n1', objekt=o)
 
     def test_to_krypteringer_av_samme_data_er_ulike(self):
         """Nonce per fil — ellers kunne to like backuper sammenlignes utenfra."""
-        self.assertNotEqual(offsite.krypter(b'x', 'n'), offsite.krypter(b'x', 'n'))
+        self.assertNotEqual(offsite.krypter(b'x', 'n', objekt='o'),
+                            offsite.krypter(b'x', 'n', objekt='o'))
 
     def test_uten_nokkel(self):
         with self.assertRaises(ValueError):
-            offsite.krypter(b'x', '')
+            offsite.krypter(b'x', '', objekt='o')
 
     def test_slug_fra_filnavn(self):
         self.assertEqual(offsite._slug_fra_filnavn('backup-patients-auto-20260913-101500-123456.json.gz'), 'patients')
@@ -118,7 +120,8 @@ class OpplastingTests(_MedBackupDir):
         self.assertEqual(o['Metadata']['modul'], 'patients')
         self.assertEqual(o['Metadata']['kind'], 'manual')
         self.assertTrue(o['Body'].startswith(offsite.MAGI))
-        klartekst = offsite.dekrypter(o['Body'], KONFIG['OFFSITE_BACKUP_KEY'])
+        klartekst = offsite.dekrypter(o['Body'], KONFIG['OFFSITE_BACKUP_KEY'],
+                                      objekt=rad.objektnavn)
         self.assertEqual(klartekst, (get_backup_dir() / backup.filename).read_bytes())
         self.assertIn(b'"model"', gzip.decompress(klartekst))
 
@@ -203,7 +206,8 @@ class HentingTests(_MedBackupDir):
 
     def test_ukjent_objekt(self):
         with self.assertRaises(CommandError) as cm:
-            call_command('hent_offsite', 'finnes-ikke.json.gz', stdout=StringIO())
+            call_command('hent_offsite', 'backup-patients-manual-20990101-000000-000000.json.gz',
+                         stdout=StringIO())
         self.assertIn('Henting feilet', str(cm.exception))
 
 

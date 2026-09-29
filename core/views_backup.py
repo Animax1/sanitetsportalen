@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from core.auth_decorators import admin_required
 from core.klientip import klient_ip
+from core.offsite import vask_feil
 from core.ratelimit import rate_limit
 
 
@@ -102,7 +103,9 @@ def backup_admin_run_view(request, slug: str = ''):
             if backup is not None:
                 laget.append(s)
         except Exception as exc:   # noqa: BLE001 — vises i UI
-            feilet.append(f'{s}: {exc}')
+            # Vasket: en `OperationalError` kan bære DSN-en, og en offsite-feil
+            # nøklene (29. sep. 2026). Teksten havner i skjermbilder.
+            feilet.append(f'{s}: {vask_feil(str(exc))}')
 
     if laget:
         messages.success(
@@ -141,7 +144,7 @@ def backup_admin_restore_view(request, slug: str, pk: int):
                 restore_backup(backup, user=request.user,
                                kilde='grensesnittet')
             except Exception as exc:  # noqa: BLE001
-                messages.error(request, f'Gjenoppretting feilet: {exc}')
+                messages.error(request, f'Gjenoppretting feilet: {vask_feil(str(exc))}')
                 return redirect('portaladmin:backup_admin')
             messages.success(
                 request,

@@ -208,11 +208,13 @@ class GammelFilLastesTests(TestCase):
         with gzip.open(sti, 'wb') as f:
             f.write(json.dumps(objekter).encode('utf-8'))
 
+        # Sperren i `restore_backup` (29. sep. 2026) tar den før `loaddata`: en
+        # ukjent modell er utenfor modulen. Samme utfall, tidligere — og med
+        # navnet på modellen i meldingen, som før.
         with self.miljo, patch.dict(GAMLE_MODELLNAVN, {}, clear=True):
-            with self.assertRaises(DeserializationError) as ctx:
+            with self.assertRaises((DeserializationError, ValueError)) as ctx:
                 restore_backup(backup)
-        self.assertIn('Invalid model identifier: gammelapp.patient',
-                      str(ctx.exception))
+        self.assertIn('gammelapp.patient', str(ctx.exception))
 
         # Og gjenopprettingen er rullet tilbake — pasienten står som før.
         self.assertEqual(Patient.objects.get().pasientnummer, 42)

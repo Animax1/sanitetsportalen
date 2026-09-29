@@ -45,9 +45,15 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-#: Bindende: alt peker på vakta, og `portal` bærer den.
-REKKEFOLGE = ['portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
-              'vaktliste']
+def rekkefolge() -> list[str]:
+    """Modulfilene i den rekkefølgen de lastes: fasiten i `core.backup`, så de uten binding.
+
+    **Var en liste skrevet her** til 29. sep. 2026, uten `ko`, `park` og `backlog` —
+    en femte kopi av rekkefølgen `CLAUDE.md` sier er skrevet ut for mange ganger. Prøven
+    meldte «verifisert» uten å ha lastet tre av modulene.
+    """
+    from core.backup.rekkefolge import GJENOPPRETTINGSREKKEFOLGE, UTEN_BINDING
+    return list(GJENOPPRETTINGSREKKEFOLGE) + list(UTEN_BINDING)
 
 #: Modeller gjenopprettingen **selv** skriver til etter at fila er lastet.
 #:
@@ -114,7 +120,7 @@ class Command(BaseCommand):
                 raise CommandError(f'Ingen backup-handler for «{valg["modul"]}».')
             slugger = [valg['modul']]
         else:
-            slugger = [s for s in REKKEFOLGE if get_handler(s) is not None]
+            slugger = [s for s in rekkefolge() if get_handler(s) is not None]
 
         ut, mangler = [], []
         for slug in slugger:
@@ -147,15 +153,7 @@ class Command(BaseCommand):
         for _, sti in filer:
             shutil.copy2(sti, backup_dir / sti.name)
 
-        miljo = dict(
-            os.environ,
-            DATABASE_URL=f'sqlite:///{basefil}',
-            BACKUP_DIR=str(backup_dir),
-            # Se `settings.py`: dette er den ene, navngitte åpningen for at en
-            # flyktig SQLite-fil er lov også inne i prod-containeren.
-            PORTAL_ENGANGSBASE='1',
-            BACKUP_KLOKKE='av',
-        )
+        miljo = self.engangsmiljo(os.environ, basefil=basefil, backup_dir=backup_dir)
 
         self.stdout.write(f'Engangsbase: {basefil}')
         self._underprosess(miljo, ['migrate', '--noinput', '-v', '0'],
@@ -181,6 +179,32 @@ class Command(BaseCommand):
         self._rapporter(forventet, faktisk, filer, tomme)
 
     # ── Hjelpere ─────────────────────────────────────────────────────────────
+
+    #: Tømmes i underprosessen: uten dem er offsite inert (`core.offsite`).
+    OFFSITE_VARIABLER = ('OFFSITE_S3_BUCKET', 'OFFSITE_S3_ACCESS_KEY',
+                         'OFFSITE_S3_SECRET_KEY', 'OFFSITE_BACKUP_KEY')
+
+    @classmethod
+    def engangsmiljo(cls, miljo, *, basefil, backup_dir) -> dict:
+        """Miljøet underprosessene kjører med: engangsbasen, og **ingen offsite**.
+
+        `OFFSITE_*` ble arvet fra `os.environ` fram til 29. sep. 2026. Hver
+        `gjenopprett` i engangsbasen tar et pre-restore-bilde, og `create_backup`
+        meldte det til `core.offsite` — så bildene av engangsbasen ble lastet opp
+        til den ekte bucketen, og lå der i 730 dager. Tomme variabler gjør offsite
+        inert, og de ekte settes ikke engang inn i prosessen.
+        """
+        ut = dict(miljo)
+        ut.update(
+            DATABASE_URL=f'sqlite:///{basefil}',
+            BACKUP_DIR=str(backup_dir),
+            # Se `settings.py`: dette er den ene, navngitte åpningen for at en
+            # flyktig SQLite-fil er lov også inne i prod-containeren.
+            PORTAL_ENGANGSBASE='1',
+            BACKUP_KLOKKE='av',
+        )
+        ut.update({navn: '' for navn in cls.OFFSITE_VARIABLER})
+        return ut
 
     @staticmethod
     def _modeller_i(sti: Path) -> Counter:
