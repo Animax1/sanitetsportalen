@@ -98,9 +98,12 @@ def registrer_mislykket(bruker, ip) -> None:
 
 
 def _tell_maskin(bruker, ip) -> None:
-    antall_nokkel, laast_nokkel = _nokler(bruker, ip)
     sekunder = int(SPERRETID.total_seconds())
+    # `_nokler` leser generasjonen fra cachen, så den står *inne* i `try`:
+    # utenfor ga et Redis-utfall 500 på feil passord for en bilkonto, i stedet
+    # for «Feil brukernavn eller passord» (funnet i gjennomgangen 29. sep. 2026).
     try:
+        antall_nokkel, laast_nokkel = _nokler(bruker, ip)
         cache.add(antall_nokkel, 0, sekunder)
         if cache.incr(antall_nokkel) >= TERSKEL:
             cache.set(laast_nokkel, True, sekunder)

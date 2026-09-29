@@ -495,3 +495,59 @@ class BrukernavnetsTegnTests(TestCase):
             with self.subTest(navn=navn):
                 self._opprett(navn)
                 self.assertTrue(CustomUser.objects.filter(username=navn).exists())
+
+
+class _DodCache:
+    """En cache der hvert kall kaster, som Djangos `RedisCache` når Redis er borte."""
+
+    def __getattr__(self, navn):
+        def kast(*a, **k):
+            raise ConnectionError('Redis svarer ikke')
+        return kast
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KontolaasenFallerAapenTests(TestCase):
+    """Gjennomgangen 29. sep. 2026: `_tell_maskin` leste generasjonen fra cachen
+    utenfor `try`, så feil passord på en bilkonto ga 500 når Redis var nede."""
+
+    def setUp(self):
+        self.bil = CustomUser.objects.create_user(
+            username='bil_dod', password=PASSORD, must_change_password=False,
+            er_delt_konto=True)
+
+    def test_feil_passord_gir_feilmelding_ikke_500(self):
+        with patch('accounts.kontolaas.cache', _DodCache()):
+            svar = Client(REMOTE_ADDR='10.0.0.5').post(
+                LOGIN, {'username': 'bil_dod', 'password': 'feil'})
+        self.assertEqual(svar.status_code, 200)
+        self.assertContains(svar, 'Feil brukernavn eller passord')
+        self.bil.refresh_from_db()
+        self.assertEqual(self.bil.failed_login_attempts, 1, 'taket i databasen teller fortsatt')
+
+    def test_riktig_passord_slipper_inn(self):
+        with patch('accounts.kontolaas.cache', _DodCache()):
+            c = Client(REMOTE_ADDR='10.0.0.5')
+            c.post(LOGIN, {'username': 'bil_dod', 'password': PASSORD})
+        self.assertTrue(_innlogget(c))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class StrupetIpSlaarIkkeOppKontoenTests(TestCase):
+    """Gjennomgangen 29. sep. 2026: brukernavnbøtta slår opp kontoen, så en IP
+    som alt er strupet skal stoppes av IP-bøtta før den koster en spørring."""
+
+    def test_ip_boetta_sjekkes_foer_kontooppslaget(self):
+        from accounts import views as kontoviews
+        ekte = kontoviews.core_er_rate_limited
+
+        def strupet_ip(request, *, group, **kw):
+            if group == 'login:ip':
+                return True
+            return ekte(request, group=group, **kw)
+
+        with patch.object(kontoviews, 'core_er_rate_limited', strupet_ip), \
+                patch.object(kontoviews, 'finn_konto') as oppslag:
+            svar = Client().post(LOGIN, {'username': 'hvem_som_helst', 'password': 'x'})
+        self.assertEqual(svar.status_code, 429)
+        oppslag.assert_not_called()

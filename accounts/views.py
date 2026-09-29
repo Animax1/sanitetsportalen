@@ -339,8 +339,12 @@ def login_view(request):
         # `post:username` ville «Kari» og «kari» vært to bøtter mot én og
         # samme konto, og en angriper kunne mangedoblet forsøksbudsjettet
         # sitt ved å variere store bokstaver.
-        if _er_rate_limited(request, 'login:username', _brukernavn_nokkel, '10/5m') \
-                or _er_rate_limited(request, 'login:ip', ratelimit_nokkel, '50/5m'):
+        #
+        # IP-bøtta først: brukernavnnøkkelen slår opp kontoen (`finn_konto`,
+        # for å se om den er delt), og en IP som alt er strupet skal ikke koste
+        # databasen noe (29. sep. 2026).
+        if _er_rate_limited(request, 'login:ip', ratelimit_nokkel, '50/5m') \
+                or _er_rate_limited(request, 'login:username', _brukernavn_nokkel, '10/5m'):
             return ratelimited_view(request)
 
         form = LoginForm(request.POST)

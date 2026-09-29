@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Etter gjennomgangen av pulje 1–4: 500 på feil passord for bilen når Redis er nede, og rate-limiten før kontooppslaget  `#sikkerhet` `#innlogging`
+
+**Hvorfor:** En uavhengig gjennomgang av de fire puljene (André la den fram) fant én ekte feil
+og to ting verdt å rette. Alle tre er kontrollert mot koden før rettingen.
+
+**Hva:**
+- **Feil passord på en bilkonto ga 500 når Redis var nede.** `kontolaas._tell_maskin` kalte
+  `_nokler()` — som leser generasjonen fra cachen — *før* `try`, mens resten av modulen faller
+  åpen. Djangos `RedisCache` kaster `ConnectionError` ved utfall, så innloggingssiden svarte
+  500 i stedet for «Feil brukernavn eller passord». Bare delte kontoer, bare feil passord —
+  altså bilen, midt i en hendelse. I prod i dag er cachen `LocMemCache` (lavkostnad-modus),
+  som ikke kaster, så feilen var sovende til Redis settes for en vakt (runbook §1b).
+  Mutanten overlevde pulje 1 fordi ingen test lot cachen kaste; `KontolaasenFallerAapenTests`
+  gjør det nå, og krever at taket i databasen fortsatt teller.
+- **IP-bøtta sjekkes før brukernavnbøtta** i `login_view`. Siden pulje 1 slår
+  brukernavnnøkkelen opp kontoen (`finn_konto`, for å se om den er delt) — for et ukjent navn
+  tre spørringer og en skanning — og det skjedde før en strupet IP ble stoppet. Regelen er
+  uendret; bare rekkefølgen.
+- **`vaktliste/CLAUDE.md`:** `epost_fra_leder` har en blindvei med vilje — lederen kan ikke
+  «godkjenne» en adresse korps-føreren la inn ved å lagre den uendret. Hun må endre og
+  tilbake, eller admin kobler for hånd. Står nå der, så det ikke meldes som en feil.
+
+**Ikke rettet, med grunn:** gjenopprettingen parser fila flere ganger (`oversett_modellnavn`,
+`fjern_utgaatte`, `_kontroller_innhold`, `_inspect_payload`) — men etter hverandre, ikke
+samtidig, så det koster tid og ikke dobbelt minne. Og «finnes allerede på volumet» sto
+allerede i runbooken (§8b-tabellen).
+
+**Mutasjoner: 2, begge drept** (hver retting tatt tilbake → testen rød).
+
 ## 2026-09-29 — Sikkerhet, pulje 4: escaping i pasienttabellen, plantet e-post i vaktlista, bilkontoen på sentralbordets endepunkter, og `pip-audit` i CI  `#sikkerhet` `#vaktliste` `#oppdrag` `#park` `#ci`
 
 **Hvorfor:** Pulje 4 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — siste pulje før

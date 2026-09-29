@@ -67,10 +67,10 @@ nivåene *betyr* i vaktlista, og de to halvdelene som må sjekkes samlet.
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
   andre kobler gjennom **`Mannskap.epost`**: finnes en aktiv, ledig portalkonto med samme
   e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`) — men
-  **bare når den som lagrer er `skriv_leder` eller global admin** (13. sep. 2026, M5 —
-  først `skriv_full`+, snevret samme kveld: «Fiks alt inkludert kobling»): koblingen
-  flytter en badge, og den som bemanner skal ikke velge hvilken konto som blir hvem.
-  Alle andre lagrer e-posten; merket sier at kontoen finnes, og lederen kobler.
+  **bare når den som lagrer er `skriv_leder` eller global admin** (13. sep. 2026, M5):
+  den som bemanner skal ikke velge hvilken konto som blir hvem. Andre lagrer e-posten.
+  **Bare en adresse lederen selv skrev** (`epost_fra_leder`, 28. sep.): lagret uendret
+  godkjenner hun den ikke — hun må endre den og tilbake, eller admin kobler for hånd.
   **Korps-føreren uten badge** ser alle korps, men fører ingen — sida sier det
   (`mangler_badge`), og «Mannskapsregisteret er tomt» leser registeret hun *ser*
   (`registeretErTomt`), ikke lista over dem hun får sette.
