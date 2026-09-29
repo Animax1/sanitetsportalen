@@ -901,12 +901,11 @@ seksti. Bruk **2 × grensen + 1** forsøk, så bryter den ene siden uansett hvor
 faller: duebolprinsippet, ikke flaks.
 
 **Regelen er en funksjon, `nok_til_a_bryte(grense)` i `core/tests_ratelimit.py`**, og ikke
-et tall man skriver av. Den ble brutt tre steder samtidig etter at jeg trodde jeg hadde
-rettet den: `test_opprett_pasient_strupes` (65 mot 60/m), `test_full_stats_strupes` (35 mot
-30) og `test_auditlog_eksport_strupes` (15 mot 10). Den første var «den uforklarte
-enkeltfeilen» som gikk igjen i suiten i flere dager — den ble først fanget da en full
-kjøring ble tatt vare på med `tee` i stedet for å bli grep-et bort. **Behold loggen fra
-hver full kjøring.**
+et tall man skriver av — og den håndheves av `core/tests_ratelimit_vinduskant.py` (29. sep.
+2026): en test som krever 429 etter en serie uten hjelperen, blir rød. Prosaen alene holdt
+ikke; regelen ble brutt åtte ganger. Én av dem var «den uforklarte enkeltfeilen» som gikk
+igjen i suiten i flere dager — den ble først fanget da en full kjøring ble tatt vare på med
+`tee` i stedet for å bli grep-et bort. **Behold loggen fra hver full kjøring.**
 
 ## Migrasjoner
 

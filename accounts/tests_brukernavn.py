@@ -21,6 +21,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from accounts.test_helpers import gi_standardtilgang
+from core.tests_ratelimit import nok_til_a_bryte
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -122,7 +123,8 @@ class RateLimitNokkelTests(TestCase):
         varianter = ['kari.nordmann', 'Kari.Nordmann', 'KARI.NORDMANN']
 
         statuser = []
-        for i in range(15):
+        # 10/5m per brukernavn; se `nok_til_a_bryte`.
+        for i in range(nok_til_a_bryte(10)):
             statuser.append(klient.post(reverse('accounts:login'), {
                 'username': varianter[i % 3],
                 'password': 'FeilPassord123!',

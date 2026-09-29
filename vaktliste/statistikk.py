@@ -107,8 +107,15 @@ def bemanning_stats(vakt, naa=None):
     for p in poster:
         skift_per_ressurs.setdefault(p.ressurs_id, []).append((p.fra_tid, p.til_tid))
     bemannet_per_ressurs = {rid: slaa_sammen(s) for rid, s in skift_per_ressurs.items()}
-    enhetstimer = round(sum(_timer(b) for rid, b in bemannet_per_ressurs.items()
-                            if ressurser[rid].enhet_id is not None), 2)
+    # **Enheter slås sammen per enhet, ikke per ressurs.** `Ressurs.enhet` er en
+    # FK, så dagbilen og nattbilen kan være samme bil; summert per ressurs ble
+    # overlappen talt to ganger, og KPI-en sa noe annet enn utnyttelsen under.
+    bemannet_per_enhet: dict[int, list] = {}
+    for rid, b in bemannet_per_ressurs.items():
+        if ressurser[rid].enhet_id is not None:
+            bemannet_per_enhet.setdefault(ressurser[rid].enhet_id, []).extend(b)
+    bemannet_per_enhet = {e: slaa_sammen(b) for e, b in bemannet_per_enhet.items()}
+    enhetstimer = round(sum(_timer(b) for b in bemannet_per_enhet.values()), 2)
     lagtimer = round(sum(_timer(b) for rid, b in bemannet_per_ressurs.items()
                          if ressurser[rid].enhet_id is None), 2)
     persontimer = round(sum((p.til_tid - p.fra_tid).total_seconds() for p in poster) / 3600, 2)
@@ -127,15 +134,13 @@ def bemanning_stats(vakt, naa=None):
         ledig = next((m.tidspunkt for m in meldinger.get(rad.oppdrag_id, [])
                       if m.oppdragsenhet_id == rad.pk and m.status == choices.LEDIG), None)
         opptatt_per_enhet.setdefault(rad.enhet_id, []).append((rad.varslet_at, ledig or naa))
-    bemannet_per_enhet: dict[int, list] = {}
-    for rid, b in bemannet_per_ressurs.items():
+    for rid in bemannet_per_ressurs:
         r = ressurser[rid]
         if r.enhet_id is not None:
-            bemannet_per_enhet.setdefault(r.enhet_id, []).extend(b)
             navn_per_enhet.setdefault(r.enhet_id, r.navn)
     utnyttelse = {}
     for enhet_id, navn in sorted(navn_per_enhet.items(), key=lambda p: norsk_nokkel(p[1])):
-        bemannet = slaa_sammen(bemannet_per_enhet.get(enhet_id, []))
+        bemannet = bemannet_per_enhet.get(enhet_id, [])
         opptatt = slaa_sammen(opptatt_per_enhet.get(enhet_id, []))
         bem_t = _timer(bemannet) if bemannet else None
         opp_t = _timer(opptatt)

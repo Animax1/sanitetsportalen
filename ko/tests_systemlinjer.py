@@ -145,6 +145,51 @@ class LoftetSkjerTests(TestCase):
         self.assertIn('HGSD 56', systemlinjer.tegn(linje.systemkode,
                                                    linje.systemdata))
 
+    def _varslet(self):
+        return [systemlinjer.tegn(k, d) for k, d in Logglinje.objects
+                .filter(systemkode=systemlinjer.ENHET_VARSLET)
+                .order_by('pk').values_list('systemkode', 'systemdata')]
+
+    def test_flytt_i_venter_gir_varslet_linje_for_den_nye_bilen(self):
+        """Raden pekes om i `Venter` (A4), og `created` er da `False`. Før
+        29. sep. 2026 sto den nye bilen ikke i loggen i det hele tatt."""
+        oppdrag = self._opprett()
+        ny = Enhet.objects.create(navn='Sandnes 12')
+        oservices.flytt_til_enhet(oppdrag, ny, bruker=self.operator)
+        self.assertEqual(self._varslet(), [
+            'HGSD 56 varslet på O1',
+            'Sandnes 12 varslet på O1 (flyttet fra HGSD 56)',
+        ])
+
+    def test_flyttet_fra_er_det_siste_byttet(self):
+        """A → B → C → B: den siste linja skal si C, ikke A."""
+        oppdrag = self._opprett()
+        b, c = Enhet.objects.create(navn='B'), Enhet.objects.create(navn='C')
+        for til in (b, c, b):
+            oservices.flytt_til_enhet(oppdrag, til, bruker=self.operator)
+        self.assertEqual(self._varslet()[-1], 'B varslet på O1 (flyttet fra C)')
+
+    def test_flytt_etter_utrykning_sier_ikke_flyttet_fra_to_ganger(self):
+        """Etter utrykning får den nye bilen en *ny* rad, og den gamle meldes
+        `Ledig`. Den linja fantes før, og skal ikke få en tvilling."""
+        oppdrag = self._opprett()
+        oservices.sett_status(oppdrag, choices.RYKKER_UT, bruker=self.konto,
+                              enhet=self.enhet)
+        ny = Enhet.objects.create(navn='Sandnes 12')
+        oservices.flytt_til_enhet(oppdrag, ny, bruker=self.operator)
+        self.assertEqual(self._varslet(), [
+            'HGSD 56 varslet på O1',
+            'Sandnes 12 varslet på O1',
+        ])
+
+    def test_annen_lagring_av_raden_gir_ingen_linje(self):
+        """Rekkefølge, lest-merke og lignende er ikke en varsling."""
+        oppdrag = self._opprett()
+        rad = oppdrag.enheter.get()
+        rad.save(update_fields=['rekkefolge', 'updated_at'])
+        rad.save()
+        self.assertEqual(len(self._varslet()), 1)
+
     def test_statusmelding_gir_en_linje(self):
         oppdrag = self._opprett()
         oservices.sett_status(oppdrag, choices.RYKKER_UT, bruker=self.konto,

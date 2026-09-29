@@ -151,6 +151,34 @@ class SummaryTests(Basis):
         self.assertEqual(s['antall_oppdrag'], 3)
         self.assertEqual(s['oppdrag_per_enhetstime'], 1.0)
 
+    def test_to_ressurser_paa_samme_bil_gir_en_bils_enhetstimer(self):
+        """Dagbilen og nattbilen kan være samme `Enhet` (`Ressurs.enhet` er en FK).
+        Overlapper skiftene, var det **én** bil på veien i overlappen.
+
+        Summen per ressurs ga 4 t her, og `oppdrag_per_enhetstime` ble tilsvarende
+        for lav — mens utnyttelsen per enhet, på samme side, sa 3 t. Funnet under
+        E5 26. sep. 2026, rettet 29. sep."""
+        natt = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1 natt', enhet=self.enhet)
+        self._post(self.bil, 0, 120)                  # 20:00–22:00
+        self._post(natt, 60, 180)                     # 21:00–23:00, samme bil
+        self._oppdrag(self.enhet, 10, ledig=40)
+        self._oppdrag(self.enhet, 50, ledig=70)
+        self._oppdrag(self.enhet, 90, ledig=100)
+
+        st = self.stats()
+        self.assertEqual(st['summary']['enhetstimer'], 3.0, 'union per enhet, ikke 4 t')
+        self.assertEqual(st['summary']['oppdrag_per_enhetstime'], 1.0)
+        self.assertEqual(st['summary']['enhetstimer'],
+                         st['utnyttelse']['Ambulanse 1']['bemannet_timer'],
+                         'KPI-en og utnyttelsestabellen skal si det samme om samme bil')
+
+    def test_to_biler_summeres_fortsatt(self):
+        """Motvekten: sammenslåingen er per enhet, ikke over alle enheter."""
+        bil2 = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 2', enhet=self.enhet2)
+        self._post(self.bil, 0, 120)
+        self._post(bil2, 60, 180)
+        self.assertEqual(self.stats()['summary']['enhetstimer'], 4.0)
+
     def test_uten_vaktliste(self):
         self.vl.delete()
         s = self.stats()

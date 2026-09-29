@@ -187,6 +187,11 @@ statistikk er per vakt, og `Vaktliste.vakt` er én-til-én.
 overlappende skift på en bil er ikke dobbel bemanning. Et skift som slutter 22:00 sto ikke
 i time 22.
 
+**Enhetstimer er unionen per *enhet*, ikke per ressurs** (29. sep. 2026). `Ressurs.enhet` er
+en FK, så dagbilen og nattbilen kan være samme bil; summert per ressurs ble overlappen talt
+to ganger, og KPI-en sa noe annet enn utnyttelsestabellen rett under. Lagtimer er fortsatt
+per ressurs — et lag har ingen enhet å slå sammen på.
+
 **«Ukjent», ikke null.** En bil uten ressurs i vaktlista får `None` i bemannet tid, andel
 og lengste ledigtid — et tall der ville sett ut som en måling. Andelen kappes ved 100.
 

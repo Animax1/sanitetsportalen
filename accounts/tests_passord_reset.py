@@ -17,6 +17,7 @@ from accounts.passord_reset import (
     vent_paa_utsendinger,
 )
 from accounts.test_helpers import gi_standardtilgang
+from core.tests_ratelimit import nok_til_a_bryte
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -246,7 +247,7 @@ class ResetRateLimitTests(TestCase):
         statuser = [
             klient.post(reverse('accounts:glemt_passord'),
                         {'email': 'kari@eksempel.no'}).status_code
-            for _ in range(8)
+            for _ in range(nok_til_a_bryte(3))   # 3/10m per adresse
         ]
         self.assertIn(429, statuser)
 
@@ -257,7 +258,7 @@ class ResetRateLimitTests(TestCase):
         statuser = [
             klient.post(reverse('accounts:glemt_passord'),
                         {'email': varianter[i % 3]}).status_code
-            for i in range(8)
+            for i in range(nok_til_a_bryte(3))
         ]
         self.assertIn(429, statuser)
 

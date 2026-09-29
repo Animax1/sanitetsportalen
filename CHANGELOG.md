@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Vakt mot rate-limit-tester som teller for hånd, enhetstimer telte en bil to ganger, og KO-loggen glemte bilen ved flytt i Venter  `#tester` `#statistikk` `#ko`
+
+**Hvorfor:** De tre neste punktene på lista etter sikkerhetsgjennomgangen (André: «Du kan ta
+2a, b og c»).
+
+**1. Rate-limit-tester som ikke tåler vinduskanten — nå håndhevet, ikke bare beskrevet.**
+Regelen «2 × grense + 1» (`nok_til_a_bryte()`) sto i `CLAUDE.md`, og var brutt fem ganger —
+sist da CI på `main` ble rød på `50bdcdf` mens samme commit var grønn på `staging`.
+Kartleggingen fant **tre brudd til** som ikke hadde slått til ennå:
+- `test_store_bokstaver_deler_botte_med_smaa` — 15 forsøk mot `10/5m` (innlogging per brukernavn)
+- `MfaRateLimitTests.test_egen_bruker_blir_ratelimited` — 12 mot `10/5m` (MFA)
+- to tester som skrev `2 * 10 + 1` av for hånd (riktig tall, men ikke koblet til regelen),
+  og to som sendte 8 mot `3/m` og `3/10m` (nok, men håndtelt).
+
+Alle henter nå antallet fra `nok_til_a_bryte()`. **`core/tests_ratelimit_vinduskant.py`**
+leser alle `tests*.py` med AST og krever det: en test som har en positiv assertion med 429
+(direkte, eller gjennom `blokkert`/`_is_blocked`) og sender en serie — i en løkke, eller
+gjennom en hjelper som `_statuser(kall, antall)` — må bruke hjelperen, eller stå i `UNNTAK`
+med begrunnelse. Ett unntak: `park/tests_js.py`, der 429 er data i en JS-tabell.
+Vakten ser at hjelperen brukes, **ikke at argumentet er riktig grense**; den grensen er
+bevisst og står i modulens docstring. Første utkast så ikke `_statuser`-testene — løkka står
+i hjelperen, ikke i testen — og fanget det selv via kontrollen av kjente tester.
+
+**2. `enhetstimer` i bemanningsstatistikken telte en bil to ganger.** `Ressurs.enhet` er en
+FK, så dagbilen og nattbilen kan være samme bil; overlappet skiftene, ble overlappen summert
+per ressurs. KPI-en «Enhetstimer» og «oppdrag per enhetstime» sa da noe annet enn
+utnyttelsestabellen rett under (som var riktig). Nå unionen per enhet
+(`bemannet_per_enhet`), samme liste utnyttelsen bruker. Funnet under E5 26. sep. Frosne sett
+i `core.VaktStatistikk` regnes ikke ut på nytt; formen er uendret, så `statistikk_versjon`
+står.
+
+**3. KO-loggen fikk ingen «varslet»-linje når et oppdrag ble flyttet i Venter.** Der pekes
+koblingsraden om (A4, 26. sep.), `created` er `False`, og `enhet_varslet` i `ko/signals.py`
+så bare nye rader — den nye bilen sto ikke i loggen i det hele tatt. Nå skrives linja også
+når `enhet` står i `update_fields`, med `flyttet_fra` fra byttet flyttingen nettopp skrev:
+**«Sandnes 12 varslet på O1 (flyttet fra HGSD 56)»**. Uten «flyttet fra» ville to
+varslet-linjer lest som at det ble sendt to biler — nettopp spørsmålet linja finnes for.
+Ingen ny systemkode; bare et datafelt, og tegningen i `ko/systemlinjer.py`. Flytt etter
+utrykning er uendret (ny rad, gammel bil `Ledig`).
+
+**Tester:** `RateLimitTesterTaalerVinduskantenTests`, `KlassifiseringenTests`;
+`test_to_ressurser_paa_samme_bil_gir_en_bils_enhetstimer`, `test_to_biler_summeres_fortsatt`;
+`test_flytt_i_venter_gir_varslet_linje_for_den_nye_bilen`, `test_flyttet_fra_er_det_siste_byttet`,
+`test_flytt_etter_utrykning_sier_ikke_flyttet_fra_to_ganger`, `test_annen_lagring_av_raden_gir_ingen_linje`.
+
+**Mutasjoner: 21, 20 drept.** Vakten 8/8 (håndtelt serie tilbake, `_statuser` med håndtall,
+klasseattributt, hjelper-løkker, sperrehjelper, alt godtatt, unntak ignorert, navnesporet).
+Enhetstimer 4/4 (ingen union, union over alle biler, gammel sum, lag med). KO 8/9: den som
+overlevde lagret raden i to omganger med `enhet` i den andre — atferdslik, linja skrives
+riktig. Varianten som faktisk bryter, `rad.save()` uten `update_fields`, ble rød.
+
 ## 2026-09-29 — Siste runde, bilkontoenes innlogging: maskinlåsen stengte ikke den som gjettet, og et tvetydig brukernavn ble aldri låst  `#sikkerhet` `#innlogging`
 
 **Hvorfor:** André ba om en siste runde. En agent uten kontekst prøvde å bryte én egenskap: at

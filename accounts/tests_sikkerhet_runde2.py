@@ -13,6 +13,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from accounts.models import CustomUser, LoginEvent
 from accounts.test_helpers import gi_standardtilgang
 from accounts.views import _check_mfa_trust, _trust_token
+from core.tests_ratelimit import nok_til_a_bryte
 
 
 class _Req:
@@ -154,7 +155,7 @@ class RateLimitPaaBrukeradminTests(TestCase):
     #: Med 2 × 10 + 1 forsøk må den ene siden av en hvilken som helst
     #: oppdeling ha minst elleve, og 429 er garantert uansett når i minuttet
     #: testen kjører. (Funnet og rettet 14. sep. 2026.)
-    FORSOK = 2 * 10 + 1
+    FORSOK = nok_til_a_bryte(10)
 
     def test_sletting_strupes(self):
         adm = CustomUser.objects.create_user(username='adm_rl', password='x', role='admin',

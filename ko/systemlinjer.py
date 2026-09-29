@@ -221,6 +221,8 @@ def tegn(kode: str, data: dict) -> str:
         linje = f'{_enhet(data)} varslet på {_oppdrag(data)}'
         if data.get('modus') == 'passiv':
             linje += ' (passiv vakt)'
+        if data.get('flyttet_fra'):
+            linje += f' (flyttet fra {data["flyttet_fra"]})'
         return linje
     if kode == ENHET_TATT_AV:
         return f'{_enhet(data)} tatt av {_oppdrag(data)}'

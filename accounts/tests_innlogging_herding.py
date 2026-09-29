@@ -21,6 +21,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from accounts.models import CustomUser
 from accounts.test_helpers import gi_standardtilgang
+from core.tests_ratelimit import nok_til_a_bryte
 
 
 def _make_totp_code(device):
@@ -276,7 +277,7 @@ class MfaRateLimitTests(TestCase):
         self._til_verify(self.client_a, self.bruker_a)
         statuser = [
             self.client_a.post(self.url, {'totp_code': '000000'}).status_code
-            for _ in range(12)
+            for _ in range(nok_til_a_bryte(10))   # 10/5m per bruker
         ]
         self.assertIn(429, statuser)
 

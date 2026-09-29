@@ -180,21 +180,6 @@ og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. 
       signatursjekken står fortsatt i pasientmodulens og oppdragsmodulens egne vinduer. Å samle
       dem krever en visning gjennom `core.arkiv`-registeret, ikke to modul-API-er kalt fra `core`.
 
-### Vakt mot rate-limit-tester som ikke tåler vinduskanten — 27. sep. 2026
-
-- [ ] **En test som finner rate-limit-tester som sender nøyaktig grense + 1 forsøk.** Regelen
-      står i `CLAUDE.md` («Rate-limit-tester må tåle vinduskanten»), og hjelperen
-      `nok_til_a_bryte()` finnes i `core/tests_ratelimit.py` — men regelen håndheves bare av
-      prosa, og den er brutt **fem ganger**: tre funnet tidligere, og 27. sep. to til i
-      `accounts/tests.py` (CI på `main` ble rød på `50bdcdf`, mens samme commit var grønn på
-      `staging`). En slik feil viser seg bare når vinduskanten faller midt i serien, altså
-      sjelden og på en annen maskin enn din.
-      **Forslag:** gå gjennom testfilene med AST, finn løkker som poster mot et endepunkt med
-      `@rate_limit` eller et `is_ratelimited`-kall, og krev at antallet kommer fra
-      `nok_til_a_bryte()` — eller at testen står i en unntaksliste med begrunnelse. Først:
-      kartlegg hvor mange rate-limit-tester som finnes (sju testfiler nevner rate-limiting),
-      så vakten ikke blir en liste som forfaller.
-
 ### Offline og papir som reserve — avklart 27. sep. 2026, ikke påbegynt
 
 André meldte at merknader ikke kan redigeres offline i vaktlista («virker ut som bare
@@ -246,10 +231,6 @@ virkeligheten, og rekkefølgen under følger av det.*
 `636e1f2`). Funnene, begrunnelsene og «ferdig når» står i notatet; her står bare puljene,
 i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
 
-- [ ] **KO-loggen får ingen «varslet»-linje for den nye bilen ved flytt i Venter.** Raden
-      pekes om (A4, 26. sep. 2026), og `enhet_varslet` i `ko/signals.py` fyrer bare på en ny
-      rad. Var slik før også. Enten et eget signal på `Enhetsbytte`, eller at KO leser
-      byttet — KOs sak, ikke oppdragsmodulens.
 - [ ] **Pulje C — avgjørelser, venter med vilje.** C1 og C2 levert 26. sep. C3 og C4
       står der de står til utviklingen er kommet dit (André, 26. sep.: «vi er ikke ferdig
       med å utvikle og kan holde de der de er inntil videre»):
@@ -259,13 +240,6 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
         Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
         med. Avgjøres **før** noen bygger en avmeldingsknapp.
-- [ ] **`enhetstimer` i bemanningsstatistikken teller en bil to ganger** når to ressurser
-      er koblet til samme enhet og skiftene overlapper (`Ressurs.enhet` er en FK — dagbil og
-      nattbil kan være samme bil). `vaktliste/statistikk.py` summerer unionen *per ressurs*;
-      utnyttelsen per enhet slår sammen *per enhet* og er riktig. Funnet under E5, ikke rettet
-      der: det endrer et tall på statistikksiden, og da skal det være et eget valg. Rettingen er
-      å summere `bemannet_per_enhet` i stedet, med en test som
-      `test_to_ressurser_paa_samme_bil_telles_en_gang`.
 - [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
       utdaterte kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep., og av G1 server-status,

@@ -37,6 +37,7 @@ from core.models import AppSetting
 from oppdrag import choices
 from oppdrag.models import (
     Enhet,
+    Enhetsbytte,
     Enhetshendelse,
     Lokasjon,
     Oppdrag,
@@ -216,17 +217,32 @@ def enhet_varslet(sender, instance, created, **kwargs):
     `varslet_modus` er frosset ved varsling i oppdragsmodulen, og brukes som
     den er: merket «(passiv vakt)» på et oppdrag fra tre timer siden skal ikke
     skifte tekst i det noen vipper bryteren.
+
+    **En flytt i `Venter` er også en varsling** (29. sep. 2026). Der pekes
+    raden om i stedet for å lages på nytt (`flytt_til_enhet`, A4), så `created`
+    er `False` — og den nye bilen sto ikke i loggen i det hele tatt. Linja får
+    da `flyttet_fra`: to «varslet»-linjer uten den ville lest som at det ble
+    sendt to biler, og det er nettopp spørsmålet linja finnes for å svare på.
+    Den gamle bilen trenger ingen egen linje; «flyttet fra» sier at den gikk av.
     """
-    if not created:
+    ompekt = not created and 'enhet' in (kwargs.get('update_fields') or ())
+    if not (created or ompekt):
         return
+    data = {
+        'oppdragsnummer': instance.oppdrag.oppdragsnummer,
+        'enhet': _enhetsnavn(instance.enhet),
+        'modus': instance.varslet_modus or '',
+    }
+    if ompekt:
+        # Byttet er skrevet i samme transaksjon, rett før raden ble pekt om.
+        bytte = (Enhetsbytte.objects
+                 .filter(oppdrag_id=instance.oppdrag_id, til_enhet_id=instance.enhet_id)
+                 .select_related('fra_enhet').order_by('-created_at', '-pk').first())
+        data['flyttet_fra'] = _enhetsnavn(bytte.fra_enhet) if bytte else ''
     systemlinje(
         instance.oppdrag.vakt,
         systemlinjer.ENHET_VARSLET,
-        {
-            'oppdragsnummer': instance.oppdrag.oppdragsnummer,
-            'enhet': _enhetsnavn(instance.enhet),
-            'modus': instance.varslet_modus or '',
-        },
+        data,
         tidspunkt=instance.varslet_at,
     )
 
