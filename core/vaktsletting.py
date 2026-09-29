@@ -113,7 +113,11 @@ def _backup_foer(slug, bruker, note):
         logger.exception('vaktsletting: backupen før slettingen feilet')
         raise KanIkkeSlettes('Backupen før slettingen feilet, så ingenting er slettet. '
                              'Se backup-siden.') from feil
-    rydd_pre_slett(slug)
+    # Oppryddingen av eldre `pre_slett`-filer er ingen forutsetning for slettingen.
+    try:
+        rydd_pre_slett(slug)
+    except Exception:  # noqa: BLE001
+        logger.warning('vaktsletting: oppryddingen av pre_slett feilet', exc_info=True)
 
 
 def _arkiver_for(vakt):

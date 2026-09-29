@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-29 — Tredje gjennomgang: minuttene i låsemeldingen røpte passordet, navneknappen som førte til en vegg, og tre kappløp som ga 500  `#sikkerhet` `#innlogging` `#vaktliste`
+
+**Hvorfor:** En tredje gjennomgang uten kontekst (egen agent, 29. sep.) av `8df4f1d..0adefda`, bedt
+om å se særlig på de to siste rettecommitene og på modulene de forrige så minst på. Fem funn,
+alle kontrollert mot koden.
+
+**Hva:**
+- **Rettingen i forrige commit tettet ikke orakelet, den gjorde det tregere.** En låst delt
+  konto svarte «låst» uansett passord — men **galt** passord ble fortsatt talt, og riktig
+  ikke. Hvert femtiende gale gjett satte `locked_until` til 15 minutter på nytt, og
+  meldingen viser minuttene som gjenstår: 49 kjente gale, kandidaten, ett galt til — «15
+  minutt(er)» betyr at kandidaten var gal. Ett passord prøvd per ~51 forespørsler, fra hvor
+  mange IP-er man vil, med bilen låst hele tiden. **Nå telles ingenting mens en delt konto
+  er låst**; låsen utløper av seg selv, og neste runde med `DELT_KONTO_TAK` feil låser den
+  igjen. `LaastDeltKontoTellerIkkeTests` kjører angrepet slik det ble kjørt.
+- **«Gi nytt navn» sto der for plasser «åpne for alle», og førte til 403.** Pulje 4 endret
+  `services.kan_gi_nytt_navn`, men ikke speilet `kanGiNyttNavn` i `vaktliste-kjerne.js`.
+  Serversidens test gikk grønn; ingen JS-test dekket regelen. Nå en node-test av begge veier.
+- **Gjenåpning av en vakt som ble slettet imens ga 500** (`update_fields` traff ingen rad).
+  `vakt_gjenaapne_view` ser nå etter vakta under låsen.
+- **To samtidige slettinger av samme arkiv ga 500** fra pasient- og oppdragsarkivets
+  JSON-endepunkter — de fanget bare `KanIkkeSlettes`. Nå 404, som vakt-siden alt gjorde.
+- **Oppryddingen av eldre `pre_slett`-filer stopper ikke lenger slettingen** hvis den feiler;
+  backupen er tatt, og oppryddingen er ingen forutsetning.
+- **En påstand i pulje 1-oppføringen var feil:** halvinnloggede sesjoner slettes *ikke* ved
+  innlogging et annet sted — én-sesjon-regelens raske sti sletter bare forrige innloggede
+  nøkkel. Oppføringen er rettet med merknad; koden er uendret, fordi steget er bundet til
+  passordet og utløper etter 15 minutter.
+
+**Mutasjoner: 6, alle drept.**
+
 ## 2026-09-29 — Andre gjennomgang: låst bilkonto røpte passordet, vaktsletting under gjenåpning, og MFA-innlogginger som ikke ble talt  `#sikkerhet` `#innlogging` `#vakt`
 
 **Hvorfor:** En gjennomgang uten kontekst fra arbeidet (egen agent, 29. sep.) av `8df4f1d..acd4a97`.
@@ -306,8 +337,10 @@ det sluttet å virke når passordet byttet under det.
 - **Steg 2 avviser når kontoen alt har en bekreftet enhet.** Sjekken står før noe opprettes,
   så eierens reservekoder ikke slettes.
 - **`slett_brukerens_sesjoner` tar også de halvinnloggede** (`core.sesjoner.gjelder_bruker`,
-  `HALVINNLOGGET_NOKLER`). Gjelder frys, «Nullstill MFA», passordreset — og innlogging et
-  annet sted, gjennom én-sesjon-regelen.
+  `HALVINNLOGGET_NOKLER`). Gjelder frys, «Nullstill MFA» og passordreset. *Rettet 29. sep.
+  (tredje gjennomgang): ikke innlogging et annet sted, som det sto her — én-sesjon-regelen
+  sletter i den raske stien bare den forrige innloggede nøkkelen. Steget er uansett bundet
+  til passordet og utløper etter 15 minutter.*
 - Sesjoner fra før denne releasen har ikke avtrykket og må begynne på nytt, én gang.
 
 **De seks andre:**

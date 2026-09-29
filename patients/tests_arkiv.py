@@ -268,6 +268,16 @@ class ArkivSlettTests(ArkivTestMixin, TestCase):
             resp = self._slett_arkiv(self.arkiv.pk, client=c)
             self.assertEqual(resp.status_code, 403, f'Forventet 403 for rolle {role_user.role}')
 
+    def test_slettet_av_en_annen_imens_gir_404_ikke_500(self):
+        """Tredje gjennomgang 29. sep. 2026: `slett_arkiv` henter arkivet på nytt
+        under sperren, og to samtidige slettinger ga 500 for den andre."""
+        from unittest import mock
+        from patients.models import VaktArkiv
+        with mock.patch('core.vaktsletting.slett_arkiv',
+                        side_effect=VaktArkiv.DoesNotExist):
+            resp = self._slett_arkiv(self.arkiv.pk)
+        self.assertEqual(resp.status_code, 404)
+
     def test_arkiv_slett_krever_confirm(self):
         """Sletting uten confirm → 400."""
         resp = self._slett_arkiv(self.arkiv.pk, confirm=False)

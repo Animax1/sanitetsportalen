@@ -203,6 +203,11 @@ def vakt_gjenaapne_view(request, pk):
         # (28. sep. 2026). Et kappløp kunne etterlate to aktive; dette retter
         # opp også en slik tilstand, i stedet for å bygge videre på den.
         laas_aktiv_vakt()
+        # Under låsen: en sletting kan ha holdt den, og vakta er borte når vi
+        # slipper til (tredje gjennomgang 29. sep. — ellers 500).
+        if not Vakt.objects.filter(pk=vakt.pk).exists():
+            messages.error(request, f'«{vakt.navn}» ble slettet før den rakk å gjenåpnes.')
+            return redirect('portaladmin:vakt')
         Vakt.objects.filter(er_aktiv=True).exclude(pk=vakt.pk).update(
             er_aktiv=False, avsluttet=timezone.now())
         vakt.er_aktiv = True

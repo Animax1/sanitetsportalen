@@ -305,9 +305,11 @@ function kanGiNyttNavn(ressurs) {
   // ureservert, og reservasjonen settes i «Rediger» — som er lederens. Leste
   // navneretten ressursens reservasjon alene, ville knappen nesten aldri stått
   // der. En plass satt av til korpset gjør ressursen hennes å navngi.
+  // En plass «åpen for alle» gir ingen navnerett (28. sep. 2026) — den er
+  // alles, og ville gitt hvert korps navneretten til en annen korps' ressurs.
   if (kanBemanne(ressurs)) return true;
   return (aktivListe?.vaktposter || []).some(
-    (vp) => vp.ressurs_id === ressurs.id && kanBemannePlass(vp, ressurs));
+    (vp) => vp.ressurs_id === ressurs.id && !vp.alle_korps && kanBemannePlass(vp, ressurs));
 }
 
 

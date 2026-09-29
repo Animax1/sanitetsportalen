@@ -16,6 +16,7 @@ oppdrag, ikke vaktas arkiv.
 """
 from __future__ import annotations
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
@@ -122,4 +123,8 @@ def arkiv_detalj_view(request, pk):
         slett_arkiv('oppdrag', arkiv.pk, bruker=request.user, request=request)
     except KanIkkeSlettes as feil:
         return JsonResponse({'status': 'error', 'message': str(feil)}, status=409)
+    except ObjectDoesNotExist:
+        # Slettet av en annen imens — `slett_arkiv` henter på nytt under sperren.
+        return JsonResponse({'status': 'error', 'message': 'Arkivet er allerede slettet.'},
+                            status=404)
     return JsonResponse({'status': 'ok'})

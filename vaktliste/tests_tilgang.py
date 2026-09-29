@@ -2609,3 +2609,35 @@ class MinnetBrukesFraDeEkteInngangeneTests(SimpleTestCase):
         """)
         self.assertIn('42', ut.splitlines(),
                       'lastingen skal lagre lista den nettopp hentet')
+
+
+class NavnerettJsTests(SimpleTestCase):
+    """Tredje gjennomgang 29. sep. 2026: `kanGiNyttNavn` i nettleseren fulgte ikke
+    med da serveren sluttet å gi navnerett for plasser «åpne for alle». Knappen sto
+    der, og førte til en 403 — en knapp som fører til en vegg."""
+
+    def setUp(self):
+        from patients.js_test_utils import VAKTLISTE_JS, build_harness, node_available
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.h = build_harness((
+            (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede', 'kanBemanne',
+                            'kanBemannePlass', 'kanGiNyttNavn')),
+        ))
+
+    def _kjor(self, plass, forventet):
+        from patients.js_test_utils import run_node
+        run_node(self.h, f"""
+            globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: 'skriv_handling', admin: false }},
+                                   MITT_KORPS_ID: 1 }};
+            globalThis.aktivListe = {{ vaktposter: [ {plass} ] }};
+            const utfall = kanGiNyttNavn({{id: 5, korps_id: 2}});
+            assert(utfall === {forventet}, 'kanGiNyttNavn ga ' + utfall);
+        """)
+
+    def test_aapen_for_alle_gir_ikke_navnerett(self):
+        self._kjor('{ressurs_id: 5, alle_korps: true, reservert_korps_id: null}', 'false')
+
+    def test_plass_satt_av_til_korpset_gir_navnerett(self):
+        """Motprøven."""
+        self._kjor('{ressurs_id: 5, alle_korps: false, reservert_korps_id: 1}', 'true')

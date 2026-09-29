@@ -597,6 +597,18 @@ class ArkivEndepunktTests(ArkivBasis):
         self.assertEqual(OppdragArkiv.objects.count(), 0)
         self.assertEqual(ArkivertOppdrag.objects.count(), 0)
 
+    def test_slettet_av_en_annen_imens_gir_404_ikke_500(self):
+        """Tredje gjennomgang 29. sep. 2026: to samtidige slettinger ga 500."""
+        from unittest import mock
+        self._oppdrag()
+        arkiv, _ = arkiver_vakt(self.vakt, '', self.admin)
+        with mock.patch('core.vaktsletting.slett_arkiv',
+                        side_effect=OppdragArkiv.DoesNotExist):
+            resp = self._klient(self.admin).delete(
+                f'/oppdrag/api/arkiv/{arkiv.pk}/', data=json.dumps({'confirm': True}),
+                content_type='application/json')
+        self.assertEqual(resp.status_code, 404)
+
     def test_arkivering_loggfores_i_audit(self):
         from audit.models import AuditLog
         from oppdrag.vaktslutt import OppdragVaktslutt

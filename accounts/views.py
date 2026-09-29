@@ -384,8 +384,12 @@ def login_view(request):
         delt_og_laast = (user_obj is not None and user_obj.er_delt_konto
                          and user_obj.is_active and user_obj.is_locked())
         if delt_og_laast and user is None:
+            # **Og ingenting telles mens den er låst** (tredje gjennomgang, 29.
+            # sep.). Talte galt passord og ikke riktig, flyttet hvert femtiende
+            # gale gjett `locked_until`, og minuttene i meldingen røpte om
+            # gjettet imellom var riktig. Låsen utløper av seg selv; neste runde
+            # med `DELT_KONTO_TAK` feil låser den igjen.
             error = _laast_melding(user_obj)
-            kontolaas.registrer_mislykket(user_obj, ip)
             LoginEvent.objects.create(
                 user=user_obj, username_attempt=username, success=False,
                 ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,

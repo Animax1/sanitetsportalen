@@ -613,3 +613,36 @@ class Ipv6TellesPerNettTests(TestCase):
 
     def test_ipv4_er_uendret(self):
         self.assertEqual(self._nokkel('10.0.0.5'), '10.0.0.5')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class LaastDeltKontoTellerIkkeTests(TestCase):
+    """Tredje gjennomgang 29. sep. 2026: mens en delt konto var låst, talte galt
+    passord og ikke riktig. Hvert femtiende gale gjett flyttet `locked_until`, og
+    minuttene i meldingen røpte om gjettet imellom var riktig."""
+
+    def setUp(self):
+        cache.clear()
+        from accounts.kontolaas import DELT_KONTO_TAK
+        self.bil = CustomUser.objects.create_user(
+            username='bil_minutt', password=PASSORD, must_change_password=False,
+            er_delt_konto=True)
+        CustomUser.objects.filter(pk=self.bil.pk).update(
+            locked_until=timezone.now() + timedelta(minutes=5),
+            failed_login_attempts=DELT_KONTO_TAK - 1)
+
+    def _prov(self, passord):
+        return Client(REMOTE_ADDR='10.3.3.3').post(
+            LOGIN, {'username': 'bil_minutt', 'password': passord}).context['error']
+
+    def test_galt_passord_flytter_ikke_laasen(self):
+        for_ = CustomUser.objects.get(pk=self.bil.pk).locked_until
+        self._prov('feil')
+        self.assertEqual(CustomUser.objects.get(pk=self.bil.pk).locked_until, for_)
+
+    def test_minuttene_roper_ikke_det_riktige_gjettet(self):
+        """Angrepet slik det ble kjørt: riktig passord imellom, så et galt."""
+        etter_riktig = self._prov(PASSORD)
+        etter_galt = self._prov('feil')
+        self.assertEqual(etter_riktig, etter_galt)
+        self.assertIn('5 minutt', etter_galt)

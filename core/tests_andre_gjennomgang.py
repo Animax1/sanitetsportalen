@@ -94,3 +94,27 @@ class FullforteInnloggingerTelles(TestCase):
     def test_driftsstatusen_teller_to(self):
         from core.admin_status import _get_innlogging
         self.assertEqual(_get_innlogging()['vellykkede'], 2)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class TredjeGjennomgangTests(_MedAdmin):
+    """Tredje gjennomgang 29. sep. 2026: kappløpene rundt slettingen ga 500."""
+
+    def test_gjenaapning_av_en_vakt_som_slettes_imens_gir_melding(self):
+        from core import vakt as vaktmodul
+        ekte = vaktmodul.laas_aktiv_vakt
+
+        def slettet_mens_vi_ventet():
+            Vakt.objects.filter(pk=self.gammel.pk).delete()
+            return ekte()
+
+        with mock.patch('core.views_vakt.laas_aktiv_vakt', side_effect=slettet_mens_vi_ventet):
+            svar = self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/gjenaapne/', follow=True)
+        self.assertEqual(svar.status_code, 200)
+        self.assertContains(svar, 'ble slettet før den rakk å gjenåpnes')
+        self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
+
+    def test_oppryddingen_etter_backupen_stopper_ikke_slettingen(self):
+        with mock.patch('core.backup.rydd_pre_slett', side_effect=OSError('les-feil')):
+            self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
+        self.assertFalse(Vakt.objects.filter(pk=self.gammel.pk).exists())

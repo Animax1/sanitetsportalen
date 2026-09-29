@@ -3,6 +3,7 @@
 Skilt ut fra ``views.py`` i N13.3.
 """
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
@@ -114,4 +115,7 @@ def arkiv_detalj_view(request, pk):
         slett_arkiv('patients', arkiv.pk, bruker=request.user, request=request)
     except KanIkkeSlettes as feil:
         return JsonResponse({'error': str(feil)}, status=409)
+    except ObjectDoesNotExist:
+        # Slettet av en annen imens — `slett_arkiv` henter på nytt under sperren.
+        return JsonResponse({'error': 'Arkivet er allerede slettet.'}, status=404)
     return JsonResponse({'ok': True})
