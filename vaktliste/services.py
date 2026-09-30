@@ -1393,6 +1393,120 @@ def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):
     }
 
 
+# ── Drift ved vaktas start (30. sep. 2026) ───────────────────────────────────
+#
+# André, 14. sep.: «fjern i drift-knappen og heller ha det slik at når
+# vaktlisten starter så er den automatisk i drift». Avgjort 15. sep.
+# (`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md` §6): **automatisk, med overstyring
+# beholdt**. Glemmer noen knappen, er innsjekken stengt ved vaktstart — altså
+# nøyaktig når alle har mest å gjøre.
+#
+# **Klokkesatt, ikke utledet.** `status` står som et felt, satt av klokka: da
+# overlever `satt_i_drift_at`, auditsporet og e-postutsendingen ved drift, og
+# «ut av drift» betyr fortsatt noe. Et utledet `i_drift` ville hatt ingen av dem.
+#
+# **Klokka åpner, den stenger aldri** (André, 30. sep.: «vi trenger ikke å ha
+# det»). Den som møter tidlig åpner med knappen; lista står i drift til noen
+# tar den ut eller arkiverer den. En innsjekk som stengte seg selv ved
+# `planlagt_slutt`, ville tatt fra noen muligheten til å stemple av.
+
+#: Uten planlagt slutt setter klokka lista i drift bare det første døgnet.
+#: En liste som aldri fikk slutt og ble glemt, skal ikke åpne seg en uke senere.
+AUTODRIFT_UTEN_SLUTT = timedelta(hours=24)
+
+
+def skal_settes_i_drift(vl, naa) -> bool:
+    """Skal klokka sette denne lista i drift nå? Hver regel er en egen ting
+    noen kan ville løsne på, og hver har en grunn:
+
+    - **Bare én gang.** `satt_i_drift_at` er satt så snart lista har vært i
+      drift — av knappen eller av klokka. Tok noen den *ut* av drift, var det
+      et valg, og klokka skal ikke overstyre det et minutt senere.
+    - **Starten må ha ligget fram i tid da lista ble laget.** «Ny vaktliste»
+      uten start gir start = nå; uten denne regelen ville lista gått i drift
+      idet den ble opprettet, midt i planleggingen. Den samme regelen gjør at
+      gamle lister ikke åpner seg den dagen dette deployes.
+    - **Ikke etter slutten** — `planlagt_slutt`, eller et døgn uten den.
+    - **Ikke arkivert, ikke en avsluttet vakt.** Samme sperre som knappen.
+    """
+    vakt = vl.vakt
+    if vl.status != choices.PLANLEGGING or vl.arkivert_at is not None:
+        return False
+    if vl.satt_i_drift_at is not None:
+        return False
+    if vakt.avsluttet is not None or vakt.startet is None:
+        return False
+    if vl.created_at is None or vl.created_at >= vakt.startet:
+        return False
+    slutt = vl.planlagt_slutt or (vakt.startet + AUTODRIFT_UTEN_SLUTT)
+    return vakt.startet <= naa < slutt
+
+
+def autodrift_tidspunkt(vl):
+    """Når klokka vil sette lista i drift, eller `None` om den ikke vil.
+
+    For grensesnittet: knappen skal kunne si «settes i drift av seg selv fre.
+    15:00». Svaret er vaktas start når reglene vil slippe den gjennom da."""
+    start = vl.vakt.startet
+    if start is None:
+        return None
+    return start if skal_settes_i_drift(vl, max(start, timezone.now())) else None
+
+
+def sett_i_drift_ved_start(vl, naa=None) -> bool:
+    """Sett én liste i drift hvis tiden er kommet. Returnerer True om klokka
+    gjorde det — da er `vl` sin rad endret, og kalleren må lese den på nytt.
+
+    **Låst og sjekket på nytt i transaksjonen.** Klokka i middlewaren og et
+    view kan komme til samme liste samtidig; uten `select_for_update` ville
+    begge satt drift, og begge sendt fila.
+
+    **Auditraden står uten bruker** (`uten_request`): klokka kan gå inne i et
+    view, og da ville raden stått på den som åpnet siden.
+
+    Fila sendes som ved knappen, etter at drift er lagret og aldri som en
+    sperre — `send_fil` kaster ikke.
+    """
+    from audit.utils import uten_request
+
+    from . import fil
+    from .models import Utsending
+
+    naa = naa or timezone.now()
+    with transaction.atomic():
+        laast = (Vaktliste.objects.select_for_update()
+                 .select_related('vakt').filter(pk=vl.pk).first())
+        if laast is None or not skal_settes_i_drift(laast, naa):
+            return False
+        laast.status = choices.DRIFT
+        laast.satt_i_drift_at = naa
+        laast.satt_i_drift_av = None
+        laast.drift_automatisk = True
+        with uten_request():
+            laast.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
+                                      'drift_automatisk', 'updated_at'])
+    if fil.sendes_ved_drift() and fil.mottakere():
+        fil.send_fil(laast, bruker=None, utloest=Utsending.DRIFT)
+    return True
+
+
+def sett_forfalte_i_drift(naa=None) -> list:
+    """Klokka: sett i drift hver liste som har nådd starten. Returnerer dem som
+    ble satt. Én spørring når ingenting er forfalt — den går hvert minutt.
+
+    Kalles av `FilutsendingMiddleware`, og av viewene som leser lista eller
+    stempler, så innsjekken er åpen i det første trykket etter start og ikke
+    et minutt senere."""
+    naa = naa or timezone.now()
+    kandidater = (Vaktliste.objects
+                  .filter(status=choices.PLANLEGGING, arkivert_at__isnull=True,
+                          satt_i_drift_at__isnull=True,
+                          vakt__startet__lte=naa, vakt__avsluttet__isnull=True)
+                  .select_related('vakt'))
+    return [vl for vl in kandidater
+            if skal_settes_i_drift(vl, naa) and sett_i_drift_ved_start(vl, naa)]
+
+
 def lister_i_drift():
     """Vaktlistene som står i drift — **og ikke er arkivert**.
 

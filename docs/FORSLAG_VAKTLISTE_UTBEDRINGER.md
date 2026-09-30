@@ -5,8 +5,8 @@ og tre ønsker fra André som ennå ikke er bygget. Punktvis står ønskene i `T
 notatet finnes fordi **de henger sammen på måter som ikke synes når de leses hver for seg**,
 og fordi rekkefølgen man bygger dem i avgjør om vi ender med én regel eller tre.
 
-~~Ingenting her er besluttet.~~ **Avgjort 15. sep. 2026** — se §6 nederst. To av de tre er
-levert samme dag; drift-automatikken står igjen.
+~~Ingenting her er besluttet.~~ **Avgjort 15. sep. 2026** — se §6 nederst. Alle tre er
+levert: to samme dag, drift-automatikken 30. sep. 2026.
 
 ---
 
@@ -179,7 +179,9 @@ etter tilbakemelding fra staging samme dag, **dagen som ytterste nivå i gruppef
 planleggingsflatene leses nå likt; `_blokkerMedDager()` er bare «Mitt korps» igjen.
 Detaljene og de tre valgene bak `ressursApen` står i `CHANGELOG.md`.
 
-**Står igjen:** drift-automatikken (§3.3). Den deler ingen kode med de tre andre.
+**Drift-automatikken (§3.3) er levert 30. sep. 2026:** klokka setter lista i drift ved
+vaktas start, én gang, og stenger den aldri; knappen står igjen som overstyring. Reglene i
+`vaktliste.services.skal_settes_i_drift()`, detaljene i `CHANGELOG.md`.
 
 ---
 

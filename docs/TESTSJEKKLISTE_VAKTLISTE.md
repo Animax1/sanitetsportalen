@@ -233,6 +233,12 @@ plass, og hvem som får **fylle** den.*
 - [ ] **Redigering virker i drift**: tider, kompetanse og merknad står i driftraden, ikke
       bare bak en blyant.
 - [ ] **Drift inn og ut står i audit-loggen**, med hvem.
+- [ ] **Klokka setter lista i drift ved vaktas start** (`test-vl-leder`): lag en vaktliste med
+      start om fem minutter. Før start sier «Innstillinger» «settes i drift av seg selv
+      …». Etter start — last siden, eller stempl noen — står lista i drift, og teksten sier
+      «Satt i drift automatisk». Audit-raden står **uten** bruker. Fila sendes én gang.
+- [ ] **Klokka åpner én gang:** ta lista ut av drift → den blir stående ute. En liste laget
+      *uten* start (start = nå) settes ikke i drift av seg selv.
 
 ## 11. Offline (drifts-PC uten nett)
 

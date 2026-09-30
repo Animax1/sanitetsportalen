@@ -195,8 +195,7 @@ og de må ikke slås sammen.
   `Vakt.avsluttet` betyr «vakta ble avsluttet» — en hendelse — og kan ikke bære
   et anslag man flytter på. Spennet er det bemanningskurven tegnes over.
 - **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
-  `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen. Stemplene settes
-  først i fase 4, og da bak `skriv_full`.
+  `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen.
 - **«Ny planlagt vakt» lager en `core.Vakt` med `er_aktiv=False` og lar `aktiv_vakt_id`
   stå.** Oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
   registrert i dag scopes til den. Kopiering av oppsett tar ressursene, **aldri**
@@ -359,11 +358,8 @@ Avstanden mellom de to første er arbeidslista. `Vaktliste.timetak` er **denne**
 budsjett (`Belastningsgrenser` er organisasjonens og gjelder alle), `igjen` måles mot
 **satt opp** og ikke mot bemannet, og `_dagbolker()` bryter ned per dag uten egne tak.
 
-**Linja sto først i «Timeoversikt», og ble flyttet samme dag.** Jeg leste «en planlegger»
-som «planleggingstall» og la budsjettet i belastningsfanen; André: «Jeg ba om en
-planlegger … Den skal bare admin og leder ha tilgang til. For den genererer grunnlaget på
-alt.» Det er to ulike ting: **«Timeoversikt» er lista regnet sammen** (`les`, hva den
-koster dem som står der), **«Planlegger» er stedet grunnlaget lages** (`kan_lede`).
+**«Timeoversikt» er lista regnet sammen** (`les`), **«Planlegger» er stedet grunnlaget
+lages** (`kan_lede`) — og budsjettet hører til den siste (CHANGELOG 15. sep. 2026).
 
 **«Oversikt» er en talltabell, ikke en personliste** (16. sep. 2026, André: «Den viser mye
 av det som allerede er i de respektive ressursfanene. Må være en faktisk oversikt»). Én rad
@@ -460,6 +456,10 @@ begge veier og rører ingen stempler.
   Prisen er bredden: `.vl-tabell-drift` har eget `min-width` over regnearkets, og
   `RessurstabellensBreddeTests` regner ut at tidskolonnene rommer feltet i begge
   former.
+- **Klokka setter lista i drift ved vaktas start; knappen er overstyringen** (30. sep.
+  2026). Reglene: `services.skal_settes_i_drift()` — én gang, bare lister planlagt i
+  forveien, aldri stenging. Går i `FilutsendingMiddleware` og i viewene; auditraden
+  skrives `uten_request()`, og `drift_automatisk` sier at det var klokka.
 - **«Sett i drift» bor i «Innstillinger»** (12. sep. 2026), i bolken for én liste,
   og tegnes av `tegnDriftknapp()` både ved lasting og når vinduet åpnes. Statusmerket
   i vaktlinja (`tegnStatus`, `.vl-status.vl-drift`/`.vl-planlegging`) sier formen med

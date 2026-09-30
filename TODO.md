@@ -298,16 +298,22 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
       og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
       kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
-### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 2–5
+### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 3–5
 
 *En ekstern gjennomgang av `/vaktliste/` (Fable), kontrollert mot koden 30. sep. 2026. Dommen:
 mekanikken er solid; det som svikter er **begrepene** og **inngangen** for hver rolle. Pulje
-1 — rettinger uten avgjørelser — er levert (CHANGELOG 30. sep.). André: «ser nærmere på de
-andre puljene når vi nærmer oss». Rekkefølgen under er begrunnet: 2 er den eneste som kan
-stoppe en ekte vakt, og 3 må før 4 og 5, ellers navngis knapper og skrives veiledning med
-ord som skal byttes.*
+1 (rettinger uten avgjørelser) og pulje 2 (drift automatisk ved vaktas start) er levert —
+CHANGELOG 30. sep. 3 må før 4 og 5, ellers navngis knapper og skrives veiledning med ord
+som skal byttes.*
 
-- [ ] **Pulje 2 — drift automatisk, med overstyring.** Avgjort 15. sep., se punktet under.
+- [ ] **Staging-sjekken for hele gjennomgangen — til slutt, etter siste pulje** (André,
+      30. sep.: «ta med disse sjekkene til slutten av hele økten av puljer»). Punktene står
+      i `docs/TESTSJEKKLISTE_VAKTLISTE.md` og vokser med hver pulje:
+      - **Pulje 1** (`902f918`): §3 — `test-vl-fore` lander på «Mitt korps»; §7 —
+        kompetansene som avkryssinger (prøv på telefon, AFØR + VFØR overlever en lagring),
+        e-posthintet per nivå, «Ikke plassert» med korpsvelgeren.
+      - **Pulje 2**: §10 — lista går i drift av seg selv ved start, én gang, audit uten
+        bruker, fila én gang; en liste uten start går ikke i drift av seg selv.
 - [ ] **Pulje 3 — ordboka på skjermen, i vaktlista først.** André, 30. sep.: «vi starter med
       vaktlisten». Hans egen bruk: **ressurs** er typen (ambulanse, lag, mannskapsbil),
       **enhet** er den konkrete (Karmøy 51). Koden har det motsatt — `Ressursgruppe` er
@@ -337,52 +343,6 @@ ord som skal byttes.*
       gjøres, lenket fra `/vaktliste/`. **Etter** pulje 3. Tilgangstabellen i
       `docs/TESTSJEKKLISTE_VAKTLISTE.md` §16 er den beste forklaringen som finnes i dag.
       Krympingen av `vaktliste/CLAUDE.md` (punktet lenger ned) tas samtidig.
-
-### Vaktlista: fjern «Sett i drift», la drift følge vakta — ønsket 14. sep. 2026
-
-**André:** «fjern i drift-knappen og heller ha det slik at når vaktlisten starter så er den
-automatisk i drift».
-
-**Avgjort 15. sep. 2026** (`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md` §6): **automatisk, med
-overstyring beholdt** — `satt_i_drift_av` og auditsporet overlever, og e-postutløseren
-flyttes til `FilutsendingMiddleware`. Det peker mot *klokkesatt* under, ikke utledet. Punktet
-sto med designspørsmålene som åpne til 30. sep., og motsa dermed notatet.
-
-**Kantene, forslag 30. sep.** (André spurte «vi trenger ikke å ha det, gjør vi?»): nei, med
-overstyringen trengs verken et tidligvindu eller automatisk stenging. Drift settes av seg
-selv ved vaktas start; den som møter tidlig åpner med knappen som i dag; lista står i drift
-til noen tar den ut eller arkiverer den. Bekreftes når pulje 2 tas opp.
-
-**Drift gjør mer enn å åpne innsjekken** — det må følge med: den avgjør hvilken liste
-sentralbordet og KO leser (`vaktliste_i_bruk()`), hvilke lister intervallsendingen går for
-(`fil.send_planlagte()`), at «Tilstede nå» finnes, og at en liste ikke kan arkiveres.
-
-**Problemet den løser er ekte:** glemmer noen å trykke, kan ingen stemple møtt ved
-vaktstart — altså nøyaktig når det betyr noe, og nøyaktig når alle har mest å gjøre.
-Innsjekken er stengt fordi noen glemte en knapp, ikke fordi noen bestemte det.
-
-**Men knappen gjør fire ting, ikke én** (`vaktliste/views.drift_view`), og alle fire må
-ha et nytt hjem:
-
-| I dag | Hvis drift *utledes* — varianten som ble valgt bort 15. sep., og hvorfor |
-|---|---|
-| `status = DRIFT` | Utledes av om «nå» er innenfor vaktas spenn — se under |
-| `satt_i_drift_at` | Blir vaktas starttidspunkt. Uproblematisk |
-| **`satt_i_drift_av`** | **Mister mening.** I dag kan man svare på «hvem åpnet innsjekken». Ingen åpner den lenger |
-| **Sender vaktlista på e-post** (`fil.sendes_ved_drift()`) | **Utløseren forsvinner.** Må flyttes til en klokke |
-
-#### Det som må med når pulje 2 bygges
-
-- [ ] **E-postutsendingen ved drift** må flyttes, ellers slutter reserven å bli sendt.
-      `fil.send_planlagte()` og `FilutsendingMiddleware` finnes alt og er riktig sted.
-- [ ] **Auditsporet.** Drift inn og ut logges på feltnivå i dag (`vaktliste/signals.py`).
-      Setter klokka drift, har overgangen ingen bruker — auditraden og `satt_i_drift_av`
-      skal da si at det var automatisk, ikke stå tomme som om noen er ukjent. Overstyringen
-      beholder brukeren som i dag.
-
-*Verdt å merke: dagens design er begrunnet i notatet — «drift er en innsjekk-port, ikke en
-livssyklus … lista kan fortsatt endres, for folk uteblir og bytter». Endringen rører ikke
-den begrunnelsen; den rører bare hvem som åpner døra.*
 
 ### Vaktlista: nedtrekket i «Rediger skift» — bevisst ufiltrert (14. sep. 2026)
 

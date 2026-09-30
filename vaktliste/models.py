@@ -496,6 +496,15 @@ class Vaktliste(BaseTimeStampedModel):
         related_name='vaktlister_satt_i_drift',
         verbose_name='Satt i drift av',
     )
+    # **Klokka setter lista i drift ved vaktas start** (30. sep. 2026, avgjort
+    # 15. sep.: «automatisk, med overstyring beholdt»). Feltet sier at det var
+    # klokka — uten det ville en tom `satt_i_drift_av` ikke kunne skilles fra
+    # en konto som er slettet. `db_default`: gammel kode lager rader uten
+    # feltet i release-vinduet, som `core/0012`. Reglene står i
+    # `services.skal_settes_i_drift()`.
+    drift_automatisk = models.BooleanField(
+        default=False, db_default=False,
+        verbose_name='Satt i drift automatisk')
     notat = models.TextField(blank=True, default='', verbose_name='Notat')
     # **Brannrutinen står øverst på brannlista** (André, 25. sep. 2026:
     # «tillat oss å skrive det inn selv som skriv leder»). Samleplass,

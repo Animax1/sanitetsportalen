@@ -165,6 +165,7 @@ def _vaktliste_til_dict(vl, user):
     """`user` avgjør om feilteksten fra siste utsending sendes (B7). Påkrevd,
     ikke valgfri: et nytt endepunkt skal ikke kunne glemme den."""
     vis_feil = services.kan_skrive_alt(user)
+    autodrift = services.autodrift_tidspunkt(vl)
     return {
         'id': vl.pk,
         'vakt_navn': vl.vakt.navn,
@@ -174,6 +175,9 @@ def _vaktliste_til_dict(vl, user):
         'i_drift': vl.i_drift,
         'satt_i_drift_at': (vl.satt_i_drift_at.isoformat()
                             if vl.satt_i_drift_at else None),
+        'drift_automatisk': vl.drift_automatisk,
+        # Når klokka vil sette lista i drift — for teksten ved knappen.
+        'autodrift_at': autodrift.isoformat() if autodrift else None,
         'startet': vl.vakt.startet.isoformat() if vl.vakt.startet else None,
         'planlagt_slutt': (vl.planlagt_slutt.isoformat()
                            if vl.planlagt_slutt else None),
@@ -306,6 +310,9 @@ def vaktlister_view(request):
         return _nektet()
 
     if request.method == 'GET':
+        # Klokka først, så «— i drift» i velgeren stemmer fra første lasting
+        # etter start (30. sep. 2026, `services.sett_forfalte_i_drift`).
+        services.sett_forfalte_i_drift()
         # Arkiverte lister er ute av velgeren. `?arkiverte=1` gir dem, og
         # bare til global admin — det er hun som henter tilbake.
         if request.GET.get('arkiverte'):
@@ -415,6 +422,12 @@ def vaktliste_detalj_view(request, pk):
         vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
+
+    # **Klokka går også her**, ikke bare i middlewaren (30. sep. 2026): den
+    # sjekker høyst hvert minutt, og innsjekken skal være åpen i det første
+    # trykket etter start.
+    if request.method == 'GET' and services.sett_i_drift_ved_start(vl):
+        vl.refresh_from_db()
 
     if request.method == 'DELETE':
         if not json_body(request).get('confirm'):
@@ -1115,8 +1128,10 @@ def drift_view(request, pk, tilstand):
         # stenging: «i drift siden 08:04» skal fortsatt kunne leses etterpå.
         vl.satt_i_drift_at = timezone.now()
         vl.satt_i_drift_av = request.user
+        # Knappen er overstyringen: en person satte den, ikke klokka.
+        vl.drift_automatisk = False
         vl.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
-                               'updated_at'])
+                               'drift_automatisk', 'updated_at'])
         # **Reserven sendes ved vaktstart** (12. sep. 2026) når admin har
         # slått det på og satt mottakere. Etter at drift er lagret, og aldri
         # som en sperre: en e-posttjeneste som er nede skal ikke hindre at
@@ -1220,6 +1235,10 @@ def stempling_view(request, pk, handling):
     except Vaktpost.DoesNotExist:
         return json_feil('Skiftet finnes ikke', status=404)
 
+    # Klokka før porten: første stempel etter start skal ikke få 409 fordi
+    # middlewaren ennå ikke har sjekket (30. sep. 2026).
+    if services.sett_i_drift_ved_start(vp.ressurs.vaktliste):
+        vp.ressurs.vaktliste.refresh_from_db()
     if not vp.ressurs.vaktliste.i_drift:
         return json_feil(
             'Innsjekken er stengt. Sett vaktlista i drift først — da åpnes '

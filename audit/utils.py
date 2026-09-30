@@ -1,5 +1,6 @@
 """Hjelpefunksjoner for revisjonslogg."""
 import threading
+from contextlib import contextmanager
 
 _thread_local = threading.local()
 
@@ -17,6 +18,23 @@ def get_current_request():
 def clear_current_request():
     """Fjern request fra thread-local storage."""
     _thread_local.request = None
+
+
+@contextmanager
+def uten_request():
+    """Skriv uten å låne brukeren til requesten som tilfeldigvis kjører.
+
+    For det **maskinen** gjør mens en request er i gang (30. sep. 2026):
+    vaktlista settes i drift av klokka, og klokka kan gå inne i et view. Uten
+    dette sto auditraden på den som åpnet siden — en påstand om at hun gjorde
+    noe hun ikke gjorde. Requesten settes tilbake etterpå, også ved feil.
+    """
+    forrige = get_current_request()
+    clear_current_request()
+    try:
+        yield
+    finally:
+        set_current_request(forrige)
 
 
 def ikke_under_loaddata(fn):

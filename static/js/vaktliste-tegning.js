@@ -47,6 +47,23 @@ function tegnStatus() {
 }
 
 
+function driftforklaring(vl, iDriftNaa) {
+  // **Knappen er overstyringen, klokka er normalen** (30. sep. 2026). Lista
+  // settes i drift av seg selv ved vaktas start (`services.skal_settes_i_drift`);
+  // teksten skal si det, ellers trykker man av vane — eller lar være fordi
+  // man tror klokka gjør det på en liste der den ikke vil.
+  if (iDriftNaa) {
+    const hvem = vl.drift_automatisk ? 'Satt i drift automatisk ved vaktas start. ' : '';
+    return `${hvem}Innsjekken er åpen. Ut av drift stenger den; ingen stempler røres.`;
+  }
+  if (vl.autodrift_at) {
+    return `Settes i drift av seg selv ved vaktas start, ${_dag(vl.autodrift_at)} `
+      + `${_kl(vl.autodrift_at)}. Knappen åpner innsjekken før det.`;
+  }
+  return 'Sett i drift åpner innsjekken — møtt og av vakt — for denne lista.';
+}
+
+
 function tegnDriftknapp() {
   // **Døra til innsjekken står i «Innstillinger»** (André, 12. sep. 2026).
   // Den sto i vaktlinja ved statusmerket til da — men den trykkes to ganger
@@ -60,9 +77,7 @@ function tegnDriftknapp() {
   if (!el) return;
   if (!aktivListe || !kanSkriveAlt()) { el.innerHTML = ''; return; }
 
-  const forklaring = iDrift()
-    ? 'Innsjekken er åpen. Ut av drift stenger den; ingen stempler røres.'
-    : 'Sett i drift åpner innsjekken — møtt og av vakt — for denne lista.';
+  const forklaring = driftforklaring(aktivListe.vaktliste, iDrift());
   el.innerHTML = (iDrift()
     ? `<button class="btn btn-sm btn-outline-warning" type="button"
                data-action="settDrift" data-arg="stopp">

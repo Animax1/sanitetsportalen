@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Vaktlista, pulje 2: lista settes i drift av seg selv ved vaktas start — «Sett i drift» er overstyringen  `#vaktliste` `#drift` `#audit`
+
+**Hvorfor:** André, 14. sep.: «fjern i drift-knappen og heller ha det slik at når vaktlisten
+starter så er den automatisk i drift». Avgjort 15. sep. (`FORSLAG_VAKTLISTE_UTBEDRINGER.md`
+§6): automatisk, med overstyring beholdt. Glemmer noen knappen, er innsjekken stengt ved
+vaktstart — nøyaktig når alle har mest å gjøre. Kantene 30. sep. (André: «vi trenger ikke
+å ha det, gjør vi?»): **klokka åpner, den stenger aldri**, og ingen tidligvindu — den som
+møter tidlig bruker knappen.
+
+**Hva:**
+- **`services.skal_settes_i_drift()`** — reglene, hver med sin grunn i docstringen:
+  - **én gang:** har lista vært i drift (knapp eller klokke), rører klokka den ikke — tok
+    noen den *ut*, var det et valg;
+  - **bare lister planlagt i forveien:** starten må ha ligget fram i tid da lista ble
+    laget. «Ny vaktliste» uten start gir start = nå, og uten regelen gikk lista i drift
+    idet den ble opprettet. Samme regel gjør at gamle lister ikke åpner seg ved deploy;
+  - **mellom start og `planlagt_slutt`** (et døgn uten slutt), ikke arkivert, ikke en
+    avsluttet vakt.
+- **Klokkesatt, ikke utledet:** `status` er fortsatt et felt. Da overlever
+  `satt_i_drift_at`, auditsporet og **fila på e-post ved drift** (sendes som ved knappen,
+  én gang). Klokka går i `FilutsendingMiddleware` (hvert minutt, før intervallsendingen,
+  hver i sin `try`) **og** i viewene som leser lista eller stempler — så det første
+  «møtt» etter start ikke får 409 fordi middlewaren ikke har sjekket ennå.
+- **Låst og sjekket på nytt** (`select_for_update`): klokka og et view kan komme til samme
+  liste samtidig; ellers ble fila sendt to ganger.
+- **Auditraden står uten bruker.** Klokka kan gå inne i et view, og da ville raden stått på
+  den som tilfeldigvis åpnet siden. Ny `audit.utils.uten_request()` skriver uten å låne
+  requesten, og setter den tilbake etterpå.
+- **`Vaktliste.drift_automatisk`** (migrasjon `vaktliste/0028`, rent tillegg med
+  `db_default` for release-vinduet) sier at det var klokka — en tom `satt_i_drift_av` kunne
+  ellers ikke skilles fra en slettet konto. Knappen setter den tilbake til `False`.
+- **Teksten ved knappen** (`driftforklaring()`): «Settes i drift av seg selv ved vaktas
+  start, fre. 15:00. Knappen åpner innsjekken før det» — og i drift: «Satt i drift
+  automatisk ved vaktas start». Serveren sender `autodrift_at`, så klienten ikke regner
+  reglene på nytt.
+
+**Tester:** `vaktliste/tests_drift_automatisk.py` — 25: hver regel og hver grense, audit
+inne i en request, fila én gang, og kallstedene gjennom de ekte inngangene (stempling,
+detalj-GET, velgeren, middlewaren).
+
+**Mutasjoner: 24, alle drept** — hver regel, begge grensene (start inkludert, slutt
+ekskludert), laget-før-start av med én, sjekken under låsen, `uten_request`, merket, fila
+og admin-bryteren, alle fire kallstedene, feilskillet i middlewaren, at requesten settes
+tilbake, og begge grenene av teksten. **Ikke prøvd:** at `select_for_update` hindrer to
+samtidige klokker — SQLite i testene har ingen radlås. Regelen hviler på PostgreSQL.
+
 ## 2026-09-30 — Vaktlista, pulje 1 etter gjennomgangen: korps-føreren lander på «Mitt korps», «Ikke plassert» viste folk som sto på lista, kompetanser som avkryssinger, og e-posthintet som lovet for mye  `#vaktliste` `#dokumentasjon`
 
 **Hvorfor:** André ba om en plan for `/vaktliste/` ut fra en ekstern gjennomgang (Fable),
