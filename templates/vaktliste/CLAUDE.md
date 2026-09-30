@@ -95,6 +95,13 @@ Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
     hvert sitt utseende så lenge de står om hverandre.
   - `FanerekkaHarToBolkerTests` pinner hele rekka i sin helhet. En ny fane lagt til feil
     sted blir rød der, ikke oppdaget på staging.
+- **Startfanen er `startfane()`, ikke rekkefølgen** (30. sep. 2026). Korps-føreren med
+  badge lander på «Mitt korps» — der arbeidet hennes er — ved sidelasting og ved bytte av
+  vaktliste; alle andre på «Oversikt». Rekka flyttes ikke: den er ordnet etter hva slags
+  fane det er, og en fane som hopper fram for ett nivå ville brutt det.
+- **«Ikke plassert» regner «plassert» mot hele lista (`alle_vaktposter`), og
+  korpsvelgeren filtrerer personene** (30. sep. 2026). Den leste den filtrerte lista, så
+  med korps A valgt sto alle fra B som faktisk var satt opp, som uplassert.
 - **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
   på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
   ga ti faner på en vakt med ti biler, og ingen plass der man så dem i

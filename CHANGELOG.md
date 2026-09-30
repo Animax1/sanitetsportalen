@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Vaktlista, pulje 1 etter gjennomgangen: korps-føreren lander på «Mitt korps», «Ikke plassert» viste folk som sto på lista, kompetanser som avkryssinger, og e-posthintet som lovet for mye  `#vaktliste` `#dokumentasjon`
+
+**Hvorfor:** André ba om en plan for `/vaktliste/` ut fra en ekstern gjennomgang (Fable),
+«gjerne sjekk du og». Hver påstand ble kontrollert mot koden før planen ble skrevet. Planen
+— pulje 2–5 — står i `TODO.md` under «Vaktlista: gjennomgangen 30. sep. 2026». Pulje 1 er
+rettingene som ikke krever en avgjørelse.
+
+**Kontrollen av gjennomgangen.** Det aller meste holdt. **Én påstand var feil:** «Ikke
+plassert viser hele organisasjonens register for korpskontakten» — lista er alt filtrert til
+eget korps (`mannskap_brukeren_kan_sette`). Men kontrollen fant en **ekte feil i samme
+funksjon** (under). **Og én påstand jeg først avviste, var riktig:** drift «automatisk med
+overstyring» *er* avgjort (`FORSLAG_VAKTLISTE_UTBEDRINGER.md` §6, 15. sep.) — det var
+`TODO.md` som fortsatt sto med designspørsmålene som åpne. To kilder med hver sin vri.
+
+**Hva:**
+- **«Ikke plassert» viste folk som sto på lista.** `_ikkePlassert()` regnet «plassert» mot
+  `aktivListe.vaktposter`, som korpsvelgeren har filtrert: valgte vaktlederen korps A, sto
+  alle fra korps B som faktisk var satt opp, som uplassert — og personene ble ikke
+  filtrert på korps i det hele tatt. Nå regnes «plassert» mot hele lista, og velgeren
+  filtrerer personene.
+- **Korps-føreren lander på «Mitt korps»** — `startfane()`, ved sidelasting og ved bytte av
+  vaktliste. Fanen sto bakerst, etter alle gruppefanene, og siden åpnet på «Oversikt». Uten
+  badge, og for alle andre nivåer, er det fortsatt «Oversikt».
+- **Kompetansene er avkryssinger**, ikke en flervalgsliste med «Hold Ctrl» — den finnes
+  ikke på telefonen. `mkKompetansevalg()` er i XSS-skannerens liste.
+- **Skjemaet viste ikke hele kompetansesettet — og en lagring fjernet resten** (funnet
+  underveis). Det leste `kompetanser`, som utelater det stigen impliserer: en person med
+  AFØR og VFØR ble vist med bare AFØR, og lagret man telefonnummeret, forsvant VFØR fra
+  det lagrede settet. Nå `alle_kompetanser`, som docstringen til `_mannskap_til_dict` har
+  sagt hele tiden.
+- **E-posthintet lovet «kobles kontoen av seg selv» til alle.** Koblingen skjer bare når en
+  vaktleder har lagt inn e-posten (13. og 28. sep., med vilje). `epostHint()`: lederen får
+  «kobles når du lagrer», de andre «kobles når en vaktleder legger inn e-posten».
+- **Dokumentasjon som sto feil:** malens toppkommentar («admin-only i fase 2») og
+  kommentaren om fanerekka (peker nå på `tegnFaner()` i stedet for en liste som råtner);
+  `vaktliste/CLAUDE.md` («fase 3–7 gjenstår»); `BESLUTNING_VAKTLISTE.md` §10 (fase 7 er
+  delvis levert — statistikken, ikke en `core.arkiv`-signatur); testsjekklista §0
+  («synligheten følger ikke stigen» — den gjør det fra 12. sep.) og §3 (fanerekka manglet
+  Overnatting og Ikke plassert). Sjekklista har fått punkter for alt over.
+- **TODO-punktet om drift** sier nå det som ble avgjort 15. sep., med forslag til kantene:
+  André spurte «vi trenger ikke å ha det, gjør vi?» — med overstyring trengs verken et
+  tidligvindu eller automatisk stenging.
+
+**Tester:** `vaktliste/tests_korpsforer_flate.py` — ti tester i node, gjennom kallstedene
+`byttVaktliste()` og `_fyllPersonskjema()` der det går.
+
+**Mutasjoner: 10, 8 drept.** De to som overlevde: **M1** (regne «plassert» mot den
+filtrerte lista) er atferdslik så lenge korpsfilteret ligger på personene — `korps_id` på
+et skift *er* personens korps; `alle_vaktposter` står fordi regelen da ikke hviler på den
+koblingen. **M6** (kallet til `startfane()` ved sidelasting fjernet) er **udekket**: det
+sitter i den anonyme `DOMContentLoaded`-lytteren i `vaktliste-register.js`, som ingen test
+kjører. Kallet i `byttVaktliste()` er dekket.
+
 ## 2026-09-29 — Vakt mot rate-limit-tester som teller for hånd, enhetstimer telte en bil to ganger, og KO-loggen glemte bilen ved flytt i Venter  `#tester` `#statistikk` `#ko`
 
 **Hvorfor:** De tre neste punktene på lista etter sikkerhetsgjennomgangen (André: «Du kan ta

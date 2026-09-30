@@ -307,6 +307,18 @@
 }
 
 /* ── Registersiden ────────────────────────────────────────────────────── */
+
+/* Kompetansene som avkryssinger (30. sep. 2026). Kolonner som brytes etter
+   bredden, så telefonen får én og en bred skjerm flere; høyden kappes, så en
+   lang liste ruller i stedet for å skyve lagreknappen ut av vinduet. */
+.vl-kompetansevalg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.25rem 1rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.vl-kompetansevalg .form-check { margin-bottom: 0; }
 /*
    En inaktiv rad skal være tydelig nedtonet uten å bli uleselig: pensjonering
    er den normale veien ut av registeret, ikke en feiltilstand, og raden må

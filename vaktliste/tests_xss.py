@@ -582,7 +582,9 @@ class VaktlisteLogikkTests(SimpleTestCase):
 # lagt ned og fanen flyttet inn i planleggingssiden. Egen bygger-liste fordi
 # escaping-kravene er de samme, men byggerne er andre enn tabellens.
 
-REGISTER_BUILDERS = ('mkMannskap', 'mkVerdiliste', '_personKolonne')
+# `mkKompetansevalg` (30. sep. 2026): avkryssingene i personvinduet. Navnet
+# er fritekst fra verdilista, og havner i `innerHTML`.
+REGISTER_BUILDERS = ('mkMannskap', 'mkVerdiliste', '_personKolonne', 'mkKompetansevalg')
 
 REGISTER_REVIEWED = {
     'inaktiv': 'hardkodet CSS-klasse fra en ternær',
@@ -622,6 +624,9 @@ REGISTER_REVIEWED = {
     "_personKolonne('navn', 'Navn')": 'bygger med escapet innhold, se funksjonen',
     "_personKolonne('korps', 'Korps')": 'bygger med escapet innhold, se funksjonen',
     "_personKolonne('telefon', 'Telefon')": 'bygger med escapet innhold, se funksjonen',
+    # Kompetansevalget (30. sep. 2026).
+    'id': 'bygget lokalt av et fast prefiks og kompetanse-id-en, escapet inni',
+    'avkrysset': 'hardkodet attributt fra en ternær',
 }
 
 

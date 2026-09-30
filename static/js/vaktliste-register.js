@@ -244,14 +244,60 @@ function _apneModal(id) {
 }
 
 
+function mkKompetansevalg(kompetanser, valgte) {
+  // Én avkryssing per kompetanse (30. sep. 2026). Flervalgslisten krevde
+  // «Hold Ctrl», som ikke finnes på telefonen korps-føreren sitter med.
+  // `valgte` er et Set med id-er.
+  if (!kompetanser.length) {
+    return '<div class="vl-meta">Ingen kompetanser er lagt inn ennå.</div>';
+  }
+  return kompetanser.map((k) => {
+    const id = `person-komp-${escHtmlValue(k.id)}`;
+    const avkrysset = valgte.has(k.id) ? ' checked' : '';
+    return `<div class="form-check">
+      <input class="form-check-input" type="checkbox" id="${id}"
+             value="${escHtmlValue(k.id)}"${avkrysset}>
+      <label class="form-check-label" for="${id}">${escapeHtml(k.navn)}</label>
+    </div>`;
+  }).join('');
+}
+
+
+function _valgteKompetanser() {
+  return Array.from(document.querySelectorAll('#person-kompetanser input:checked'))
+    .map((el) => Number(el.value));
+}
+
+
+function epostHint() {
+  // **Hintet følger regelen i `_koble_paa_epost`, ikke ønsket om den**
+  // (30. sep. 2026). Teksten sa «kobles kontoen av seg selv» til alle, men
+  // koblingen skjer bare når en vaktleder har lagt inn e-posten — siden
+  // 13. og 28. sep. med vilje, fordi koblingen flytter en badge. For
+  // korps-føreren var løftet usant: hun så ikonet og ingenting skjedde.
+  if (kanLede()) {
+    return 'Valgfritt. Legger du inn e-posten til en portalbruker, kobles '
+      + 'kontoen til personen når du lagrer.';
+  }
+  return 'Valgfritt. Kontoen kobles når en vaktleder legger inn e-posten.';
+}
+
+
 function _fyllPersonskjema(person) {
   // Inaktive korps og kompetanser tilbys ikke på nye rader, men beholdes på
   // dem som alt har dem — derfor filtreres det bare når feltet er tomt.
   const korps = register.korps.filter(
     (k) => k.er_aktiv || (person && person.korps_id === k.id));
   _fyll('person-korps', korps, velgTekst());
-  _fyll('person-kompetanser', register.kompetanser.filter(
-    (k) => k.er_aktiv || (person && person.kompetanser.some((x) => x.id === k.id))), '');
+  // **`alle_kompetanser` og ikke `kompetanser`** (30. sep. 2026). Den siste
+  // utelater det stigen impliserer, så skjemaet viste AFØR uten VFØR — og
+  // en lagring av telefonnummeret fjernet VFØR fra det lagrede settet.
+  // Docstringen til `_mannskap_til_dict` har sagt dette hele tiden.
+  const valgte = new Set(person
+    ? (person.alle_kompetanser || person.kompetanser).map((k) => k.id) : []);
+  document.getElementById('person-kompetanser').innerHTML = mkKompetansevalg(
+    register.kompetanser.filter((k) => k.er_aktiv || valgte.has(k.id)), valgte);
+  document.getElementById('person-epost-hint').textContent = epostHint();
 
   // En konto kan bare kobles til én person (OneToOne). Vis de ledige, pluss
   // denne personens egen.
@@ -269,11 +315,6 @@ function _fyllPersonskjema(person) {
   _settVerdi('person-notat', person ? person.notat : '');
   document.getElementById('person-aktiv').checked = person ? person.er_aktiv : true;
   document.getElementById('person-aktiv-rad').classList.toggle('d-none', !person);
-
-  const valgte = new Set(person ? person.kompetanser.map((k) => k.id) : []);
-  Array.from(document.getElementById('person-kompetanser').options).forEach((o) => {
-    o.selected = valgte.has(Number(o.value));
-  });
 }
 
 
@@ -317,9 +358,7 @@ async function lagrePerson() {
       epost: _lesFelt('person-epost'),
       issi: _lesFelt('person-issi'),
       notat: _lesFelt('person-notat'),
-      kompetanse_ider: Array.from(
-        document.getElementById('person-kompetanser').selectedOptions)
-        .map((o) => Number(o.value)),
+      kompetanse_ider: _valgteKompetanser(),
     };
     if (redigererPerson) {
       kropp.er_aktiv = document.getElementById('person-aktiv').checked;
@@ -566,6 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ?.addEventListener('change', () => foreslaaTil('ny-vaktpost-fra', 'ny-vaktpost-til'));
   document.getElementById('vaktpost-fra')
     ?.addEventListener('change', () => foreslaaTil('vaktpost-fra', 'vaktpost-til'));
+  aktivFane = startfane();
   lastVaktlister();
   // Registeret (korps, kompetanser, mannskap) hentes med én gang, ikke
   // først når noen åpner «Innstillinger» — vinduet sto og ventet på nettet

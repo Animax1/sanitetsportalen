@@ -421,7 +421,7 @@ utformingen her stenger for det.
 | 4 | ✅ Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift. Ingen migrasjon — feltene kom i fase 2. Ett avvik: én stempelknapp per rad framfor to, se CHANGELOG 30. aug. | levert |
 | 5 | ✅ Planleggingstall (§8b): per person, varsler mot admin-styrte grenser, faktisk mot planlagt. Bemanningskurvene kom i fase 2 og står per ressursgruppe. Kompetansedekning ikke levert — den sto som mulig utvidelse | levert |
 | 6 | ✅ Kobling til `/oppdrag`: besetningspanel på enheten, åpnes ved klikk. Retningen håndheves med AST-test. Ingen migrasjon | levert |
-| 7 | Arkiv + statistikk via `core.arkiv` og `core.stats` | 4–6 t |
+| 7 | Arkiv + statistikk via `core.arkiv` og `core.stats`. **Delvis:** statistikken er levert (pulje 7c, 21. sep. 2026, `vaktliste/statistikk.py`) og fryses ved «Avslutt vakt» (28. sep.). Arkivet er ikke en `core.arkiv`-handler: lista arkiveres med `arkivert_at`, og radene slettes med vakta (`vaktliste/vaktsletting.py`). Om en signert arkivering trengs, er ikke avgjort | delvis |
 
 **Fram til fase 3 er modulen admin-only.** Det er fail-closed, og ingen andre slipper
 inn i mellomtiden. Tilgangsreglene er lettere å skrive riktig når det finnes rader å

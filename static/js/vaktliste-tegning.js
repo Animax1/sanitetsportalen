@@ -195,8 +195,16 @@ function _ikkePlassert() {
   // Mannskap som ikke står på noen ressurs i denne lista. Fanen finnes for
   // at ingen skal bli glemt — en person som er meldt på og ikke satt opp er
   // usynlig ellers.
-  const satt = new Set((aktivListe.vaktposter || []).map((vp) => vp.mannskap_id));
-  return (aktivListe.mannskap || []).filter((m) => !satt.has(m.id));
+  //
+  // **«Plassert» regnes mot hele lista, og korpsvelgeren filtrerer personene**
+  // (30. sep. 2026). `vaktposter` er det korpsvelgeren har filtrert: valgte
+  // vaktlederen korps A, sto alle fra korps B som faktisk var satt opp, som
+  // «ikke plassert» — mens registeret for alle korps sto urørt. Korps-føreren
+  // får bare eget korps fra serveren (`mannskap_brukeren_kan_sette`).
+  const satt = new Set((aktivListe.alle_vaktposter || aktivListe.vaktposter || [])
+    .map((vp) => vp.mannskap_id));
+  return (aktivListe.mannskap || []).filter((m) => !satt.has(m.id)
+    && (korpsfilter == null || m.korps_id === korpsfilter));
 }
 
 

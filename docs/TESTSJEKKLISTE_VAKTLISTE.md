@@ -18,8 +18,9 @@ staging, `main` = prod).
 ## 0. Før du begynner
 
 **Kontoene.** Halve lista handler om hvem som får røre hva, og det kan ikke prøves med én
-konto. Modulen har fem nivåer, og **synligheten følger ikke stigen** — `skriv_handling`
-ligger over `les_alle` og ser likevel alle korps, mens `les` bare ser sitt eget.
+konto. Modulen har fem nivåer. **Synligheten følger stigen** (fra 12. sep. 2026): bare
+`les` ser sitt eget korps, `les_alle` og alt over ser alle. **Å se er ikke å redigere** —
+`skriv_handling` fører fortsatt bare eget korps.
 
 | Konto | Nivå | Badge (`Mannskap.korps`) | Prøver |
 |---|---|---|---|
@@ -77,7 +78,11 @@ flere av feilene under finnes bare der.
 ## 3. Fanerekka
 
 - [ ] **Rekkefølgen er:** Oversikt · Mannskap · \<én fane per ressursgruppe\> · Ny ressurs ·
-      Mitt korps · Timeoversikt · Planlegger · Tilstede nå.
+      Mitt korps · Overnatting · Timeoversikt · Planlegger · Tilstede nå · Ikke plassert.
+      Fanene som ikke gjelder deg eller lista, er borte: «Mitt korps» uten korps,
+      «Overnatting» uten rom, «Planlegger» under leder, «Tilstede nå» utenfor drift.
+- [ ] **`test-vl-fore` lander på «Mitt korps»**, også etter bytte av vaktliste. Alle andre
+      lander på «Oversikt».
 - [ ] **Gruppefanene ser annerledes ut** enn de faste visningene, med et skille mellom
       bolkene. *De to er ulike slags ting: det ene er der du fører, det andre er der du ser
       hva føringen ble.*
@@ -159,6 +164,12 @@ plass, og hvem som får **fylle** den.*
 - [ ] **Notat lagres uten verdier i audit-loggen** (sjekk en endring i audit).
 - [ ] **Korps og kompetanser** under «Innstillinger»: opprett, endre navn, deaktiver.
 - [ ] **Kompetansestigen**: gi noen AFØR → VFØR og GFØR skjules i listene.
+- [ ] **Kompetansene er avkryssinger** i personvinduet — prøv på telefon. Gi noen både AFØR
+      og VFØR, lagre telefonnummeret, åpne igjen → **begge** står krysset av.
+- [ ] **E-posthintet** sier «når du lagrer» for `test-vl-leder`, og «når en vaktleder
+      legger inn e-posten» for `test-vl-fore` og `test-vl-full`.
+- [ ] **«Ikke plassert» med korpsvelgeren** (`test-vl-leder`): velg korps A → bare
+      uplasserte fra A. En person fra B som står på lista, skal ikke dukke opp.
 - [ ] **Ressursgrupper**: opprett med ikon, endre, deaktiver. Slett en gruppe **i bruk** →
       avvist med antallet og et peik på `er_aktiv`. Slett en tom gruppe **med roller** →
       409 med antallet, og bekreftelse kreves. Slett en tom gruppe **uten roller** → går

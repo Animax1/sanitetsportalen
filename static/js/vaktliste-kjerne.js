@@ -705,10 +705,24 @@ function velgKorps() {
 }
 
 
+function startfane() {
+  // **Korps-føreren starter der arbeidet hennes er** (30. sep. 2026). «Mitt
+  // korps» er plassene korpset skal fylle, og tallet på fanen er det som
+  // gjenstår — men fanen sto bakerst, etter alle gruppefanene, og siden åpnet
+  // på «Oversikt». Uten badge finnes ikke fanen, og da er «Oversikt» riktig.
+  // Den som ser alle korps har korpsvelgeren, og starter der hun alltid gjorde.
+  if (!_erAdmin() && _nivaa() === 'skriv_handling'
+      && globalThis.window?.MITT_KORPS_ID != null) {
+    return MITT_KORPS;
+  }
+  return OVERSIKT;
+}
+
+
 function byttVaktliste() {
   const velger = document.getElementById('vaktliste-velger');
   if (!velger || !velger.value) return;
-  aktivFane = OVERSIKT;
+  aktivFane = startfane();
   lastListe(Number(velger.value));
 }
 

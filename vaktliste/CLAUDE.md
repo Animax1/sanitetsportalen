@@ -5,8 +5,8 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Fase 1–2 levert (registre, mannskap, oppsett og planleggingsside på `/vaktliste/`);
-fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i sin helhet.
+Fase 1–6 levert, 7 delvis: statistikken, men ingen `core.arkiv`-signatur — lista
+arkiveres med `arkivert_at` og slettes med vakta. Se `docs/BESLUTNING_VAKTLISTE.md` §10.
 
 | Regel | Hvor |
 |---|---|

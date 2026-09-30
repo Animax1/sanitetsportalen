@@ -4,11 +4,12 @@
 {% block title %}Vaktliste – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  Planleggingssiden (fase 2). Fanene bygges av ressursene i nettleseren —
-  de er data, ikke kode, og tilpasser seg vaktas art av seg selv.
+  Planleggingssiden. Fanene bygges av ressursene i nettleseren — de er data,
+  ikke kode, og tilpasser seg vaktas art av seg selv.
 
-  Modulen er admin-only i fase 2: nivåene er deklarert, men badge- og
-  reservasjonssjekkene kommer i fase 3. Se vaktliste/views.py.
+  Tilgangen er modulbasert, med badge og reservasjon på objektnivå (fase 3,
+  30. aug. 2026) — se `vaktliste/CLAUDE.md`, «Tilgang». Denne kommentaren sa
+  «admin-only i fase 2» til 30. sep. 2026.
 {% endcomment %}
 
 {% block extra_head %}
@@ -155,9 +156,8 @@
   </div>
 
   {% comment %}
-    Fanerekka. Bygges i sin helhet av `tegnFaner()`:
-
-      Oversikt · Mannskap↗ · <én fane per ressursgruppe> · Ikke plassert · + Ny ressurs
+    Fanerekka. Bygges i sin helhet av `tegnFaner()`, og **rekkefølgen står
+    der og ikke her** — den som sto her var utdatert i to uker (30. sep. 2026).
 
     **Én fane per gruppe**, ikke per ressurs: fanen «Ambulanse» er alle
     ambulansene som skal på vakt, med hver bil som sitt eget kort inni.
@@ -934,10 +934,13 @@
           </div>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="person-kompetanser">Kompetanser</label>
-          <select id="person-kompetanser" class="form-select" multiple size="5"></select>
-          <div class="form-text">Hold <kbd>Ctrl</kbd> (<kbd>Cmd</kbd> på Mac) for å
-            velge flere. Kompetansen følger personen; rollen settes per vakt.</div>
+          {# Avkryssinger, ikke en flervalgsliste (30. sep. 2026): «Hold Ctrl» #}
+          {# finnes ikke på telefonen korps-føreren sitter med. #}
+          <div class="form-label" id="person-kompetanser-tittel">Kompetanser</div>
+          <div id="person-kompetanser" class="vl-kompetansevalg" role="group"
+               aria-labelledby="person-kompetanser-tittel"></div>
+          <div class="form-text">Kryss av for alle som gjelder. Kompetansen følger
+            personen; rollen settes per vakt.</div>
         </div>
         <div class="row g-2 mb-3">
           <div class="col-md-6">
@@ -948,8 +951,8 @@
           <div class="col-md-6">
             <label class="form-label" for="person-epost">E-post</label>
             <input type="email" id="person-epost" class="form-control" maxlength="120">
-            <div class="form-text">Valgfritt. Finnes en portalbruker med samme
-              e-post, kobles kontoen av seg selv.</div>
+            {# Teksten settes per nivå av `epostHint()` — se den. #}
+            <div class="form-text" id="person-epost-hint">Valgfritt.</div>
           </div>
           {# ISSI (André, 12. sep. 2026): «da vet vi hvilken nødnett vi skal ringe». #}
           <div class="col-md-6">
