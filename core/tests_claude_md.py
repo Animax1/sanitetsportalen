@@ -105,12 +105,6 @@ MODUL_TEGNGRENSE = 22_000
 #: større, og det skal være en avgjørelse noen tar i en diff — ikke noe som
 #: skjer fordi testen ble rød en travel kveld.
 FOR_STORE_I_DAG: dict[str, int] = {
-    # 21 976 tegn 30. sep. 2026 — 24 under taket — da kartkoblingen trengte én
-    # peker i tavle-raden (`ko/kartkobling.py`, `docs/PLAN_KARTKOBLING.md` §8).
-    # Selve regelen står i modulens docstring; her står bare hvor den er. Fila
-    # skal deles (programmet og hendelsesloggen er de største seksjonene), se
-    # `TODO.md`. Taket følger fila nedover som de andre.
-    'ko/CLAUDE.md': 22_200,
     # 56 799 tegn 17. sep. 2026. Fila ble **strukturert** samme dag — 13
     # seksjoner der det var én — og vokste 1 056 tegn av overskriftene og
     # ingressene. Det er en bevisst byttehandel: en fil man kan lete i, og en

@@ -6,12 +6,24 @@ som ble avgjort før koden, og som reglene her holder:
 
 | Regel | Hvorfor |
 |---|---|
-| **Typen setter ingen ressurser** | André: «Konserttyper skal ikke automatisk sette ressurser.» Behovet skrives inn for hånd på hver konsert |
-| Beredskapsnivå grønn/gul/oransje/rød, eller tomt for et fast behov | «En standardisert form» (André). Ukjent verdi avvises, rettes ikke — som prioriteten på hendelsene |
-| Behovet telles i **vaktlistas ressursgrupper** | «Spesiallag» er en egen gruppe der (André: «en fast type lag»). Da kan planleggeren sammenligne med skiftene, og tavla med plasseringene |
-| Alt valideres før noe lagres, og behovet lagres i samme transaksjon | En konsert uten behovet sitt er et halvt svar som ser helt ut |
-| Navnene ut av modulen fryses (sted, type, gruppe) | Programmet skal kunne leses år etter år, også når stedet er omdøpt |
-| **KO-leder skriver**, alle med `les` i KO ser | André: «KO-leder», både før og under vakta |
+| **Artisten setter ingen ressurser**; behovet skrives inn per konsert. Tomt navn er artistens | André: «Konserttyper skal ikke automatisk sette ressurser» |
+| Beredskapsnivå grønn/gul/oransje/rød (`BEREDSKAP_VALG`), tomt for et fast behov; ukjent avvises | «En standardisert form» |
+| Artister og kjennetegn er `VERDILISTER` (`skriv_leder`); typeforslaget fra `0017` fjernet der ubrukt (`0021`); i bruk slettes ikke | Kjennetegnene legges inn når samarbeidspartneren svarer |
+| Alt valideres før noe skrives, og `lagre_post` er én transaksjon; behovet byttes ut i sin helhet | En konsert uten behovet sitt er et halvt svar som ser helt ut |
+| Inaktivt sted/type avvises på en ny post, beholdes på en endring | Som en deaktivert problemstilling på et oppdrag |
+| Sted, type og gruppe fryses som navn; `lokasjon`, `endret_av` og `Programbehov.gruppe` strippes i backupen | Programmet skal leses år etter år. Samme sirkel som `HendelseLag.ressurs` |
+| **`Tavleplassering.folger`**: «følger konserten» — samme sted, samme vakt, ikke over. Aldri sammen med `planlagt_til`; tavlesvaret gir den gjeldende slutten | Konserten forsinkes, og lagenes slutt følger med uten at noen retter noe |
+| **KO-leder skriver** (`/ko/api/program/`), `les` ser | André: «KO-leder», før og under vakta |
+| **Dekningen** (`paa_vakt_per_time`, `…/dekning/?fra=&timer=` — 1–48, tavlas vindu): på vakt per gruppe midt i hver time, fra `ressurser_med_skift` — **også for bilene**; minus lag i *pause*, ikke på et sted. Gaten er vaktlistas `les` | Planleggeren har ingen egen mening om hvem som er på vakt. Bilens `pa_vakt` er *nå*, ikke i kveld |
+
+**Endringer, plan mot faktisk og kopiering** (steg 5):
+
+| Regel | Hvorfor |
+|---|---|
+| `Programendring` ved hver lagring og sletting; «endret» bærer **bare feltene som endret seg**, og uendret gir ingen rad. Bildet er tekst med dato | Leses år etter år, også når sted eller gruppe er borte |
+| **`program_endret` i KO-loggen bare i drift**: pågår eller begynner innen 2 t (`I_DRIFT_FORVARSEL`), før *eller* etter endringen | Planlegging i god tid er oppsett, ikke en hendelse |
+| **Plan mot faktisk**: tavlas plasseringer (ikke pauser) på stedet, gruppe på id ellers navn, klippet til konserten. Oppdrag fra tabellen eller arkivet (distinkt nummer), **`None` etter kollaps** | Null ville vært en påstand. Bilens tid på oppdrag er ikke med, som i «Besøk» |
+| Tidligere vakter og **«kopier programmet»** er KO-lederens. Kopien flyttes i hele døgn (døgnstarten gjelder), går gjennom `lagre_post`, og det som ikke kan tas med **nevnes**. 409 med antallet før den legger til | Strukturen, ikke det som skjedde — som «Kopier oppsett» i vaktlista |
 
 `ko` → `oppdrag` (lokasjonen) og `ko` → `vaktliste` (ressursgruppa) er de
 tillatte retningene; ingen av dem kjenner programmet.

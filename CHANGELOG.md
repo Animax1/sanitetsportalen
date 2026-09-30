@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling prøvd på staging — «Det fungerte!» — og `ko/CLAUDE.md` er under taket igjen  `#kartkobling` `#staging` `#dokumentasjon`
+
+**Hvorfor:** André stemplet fra en bil i staging-portalen og så markøren i
+`testkart.sanitet.net` («Det fungerte!»). Det er planens krav til «ferdig» (§0), og da skal
+prøvepunktet ut av TODO. Koblingen går til `main` samme kveld (André: «Når det er klart kan du
+pushe til main»).
+
+**Hva:**
+- TODO: «Bekreft kartkoblingen på staging» er slettet. Øverst står nå **«Nøkkel til
+  kart.sanitet.net i prod»** med Python-kommandoen for nøkkelen
+  (`python -c "import secrets; print(secrets.token_hex(32))"`) og stegene i Railway. Seksjonen
+  «Kartkobling» er borte; det var bare det punktet igjen.
+- **`ko/CLAUDE.md` delt** (TODO-punktet fra pulje E): de to programtabellene — reglene for
+  konsertene, dekningen, endringene, plan mot faktisk og kopieringen — er flyttet inn i
+  docstringen til `ko/program.py`, som alt hadde halvparten av dem i en eldre form. Én kilde i
+  stedet for to som glir fra hverandre. Modulfila står igjen med en peker, og er på 19 596 tegn.
+  Unntaket i `FOR_STORE_I_DAG` er strøket.
+
 ## 2026-09-30 — Kartkobling: dokumentasjonen kjenner staging-kartet (testkart.sanitet.net)  `#kartkobling` `#dokumentasjon` `#staging`
 
 **Hvorfor:** André satte opp et eget staging-miljø for kartet 30. sep. («vi skal kjøre dette på
