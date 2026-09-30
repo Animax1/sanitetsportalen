@@ -214,7 +214,7 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
         rad.antall_rader = antall_skift(grupper)
         rad.innhold_sha256 = signatur(grupper, overnatting.brannliste(vaktliste))
     except Exception as exc:   # noqa: BLE001 — sporet skal ha årsaken
-        logger.exception('Vaktlista kunne ikke bygges for vaktliste %s', vaktliste.pk)
+        logger.exception('Vaktlisten kunne ikke bygges for vaktliste %s', vaktliste.pk)
         rad.feil = _feiltekst(exc)
         rad.save()
         return rad
@@ -227,9 +227,9 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
         innhold = bygg_fil(vaktliste, naa)
         melding = EmailMessage(
             subject=f'Vaktliste: {vaktliste.vakt.navn}',
-            body=(f'Vedlagt ligger vaktlista for «{vaktliste.vakt.navn}» slik den sto '
+            body=(f'Vedlagt ligger vaktlisten for «{vaktliste.vakt.navn}» slik den sto '
                   f'{timezone.localtime(naa):%d.%m.%Y %H:%M}, som reserve hvis portalen er nede.\n\n'
-                  f'Fila inneholder navn og telefonnumre. Slett den etter vakta.\n'),
+                  f'Filen inneholder navn og telefonnumre. Slett den etter vakten.\n'),
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=adresser,
         )
@@ -238,7 +238,7 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
         if not sendt:
             rad.feil = 'E-posttjenesten tok ikke imot meldingen.'
     except Exception as exc:   # noqa: BLE001 — sporet skal ha årsaken
-        logger.exception('Vaktlista kunne ikke sendes for vaktliste %s', vaktliste.pk)
+        logger.exception('Vaktlisten kunne ikke sendes for vaktliste %s', vaktliste.pk)
         rad.feil = _feiltekst(exc)
     rad.save()
     return rad

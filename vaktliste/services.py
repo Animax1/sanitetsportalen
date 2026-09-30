@@ -47,7 +47,7 @@ def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
 
     startet = startet or timezone.now()
     if planlagt_slutt is not None and planlagt_slutt <= startet:
-        raise ValueError('Vakta må slutte etter at den begynner.')
+        raise ValueError('Vakten må slutte etter at den begynner.')
     with transaction.atomic():
         vakt = opprett_vakt(navn, year=timezone.localtime(startet).year,
                             startet=startet, er_aktiv=False)
@@ -104,7 +104,7 @@ def _linjens_skift(linje):
     """
     vinduer = linje.get('vinduer') or []
     if not vinduer:
-        raise Planleggerfeil('Hver ressurs må ha minst ett skiftvindu.')
+        raise Planleggerfeil('Hver enhet må ha minst ett skiftvindu.')
     ut = []
     for vindu in vinduer:
         fra, til = vindu.get('fra'), vindu.get('til')
@@ -279,7 +279,7 @@ def _planlegg(vaktliste, linjer):
             ).select_related('gruppe').first()
             if ressurs is None:
                 raise Planleggerfeil(
-                    'Ressursen finnes ikke lenger på denne vaktlista.')
+                    'Enheten finnes ikke lenger på denne vaktlisten.')
             # **Én linje per ressurs.** To linjer på samme ressurs ville latt
             # den andre rydde bort kladden den første nettopp lagde, og
             # resultatet avhengt av rekkefølgen.
@@ -301,11 +301,11 @@ def _planlegg(vaktliste, linjer):
 
         gruppe = grupper.get(linje.get('gruppe_id'))
         if gruppe is None:
-            raise Planleggerfeil('Ukjent ressursgruppe.')
+            raise Planleggerfeil('Ukjent ressurstype.')
 
         antall = int(linje.get('antall') or 1)
         if antall < 1:
-            raise Planleggerfeil('Antall ressurser må være minst én.')
+            raise Planleggerfeil('Antall enheter må være minst én.')
 
         # **Noen grupper finnes i ett eksemplar.** Samme regel som
         # `ressurser_view`, og den må stå her også: en generator som lager
@@ -317,7 +317,7 @@ def _planlegg(vaktliste, linjer):
             if finnes_i_gruppa[gruppe.pk]:
                 raise Planleggerfeil(
                     f'«{gruppe.navn}» finnes i ett eksemplar, og står '
-                    f'allerede på denne vaktlista.')
+                    f'allerede på denne vaktlisten.')
 
         for _ in range(antall):
             navn = _neste_navn(gruppe, brukte_navn, finnes_i_gruppa)

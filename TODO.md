@@ -298,13 +298,12 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
       og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
       kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
-### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 3–5
+### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 4–5
 
 *En ekstern gjennomgang av `/vaktliste/` (Fable), kontrollert mot koden 30. sep. 2026. Dommen:
 mekanikken er solid; det som svikter er **begrepene** og **inngangen** for hver rolle. Pulje
-1 (rettinger uten avgjørelser) og pulje 2 (drift automatisk ved vaktas start) er levert —
-CHANGELOG 30. sep. 3 må før 4 og 5, ellers navngis knapper og skrives veiledning med ord
-som skal byttes.*
+1 (rettinger uten avgjørelser), 2 (drift automatisk ved vaktens start) og 3 (ordboka på
+skjermen) er levert — CHANGELOG 30. sep. Pulje 4 og 5 bruker de nye ordene.*
 
 - [ ] **Staging-sjekken for hele gjennomgangen — til slutt, etter siste pulje** (André,
       30. sep.: «ta med disse sjekkene til slutten av hele økten av puljer»). Punktene står
@@ -312,26 +311,16 @@ som skal byttes.*
       - **Pulje 1** (`902f918`): §3 — `test-vl-fore` lander på «Mitt korps»; §7 —
         kompetansene som avkryssinger (prøv på telefon, AFØR + VFØR overlever en lagring),
         e-posthintet per nivå, «Ikke plassert» med korpsvelgeren.
-      - **Pulje 2** (`e81709d`, CI-rettet i neste commit): §10 — lista går i drift av seg selv ved start, én gang, audit uten
-        bruker, fila én gang; en liste uten start går ikke i drift av seg selv.
-- [ ] **Pulje 3 — ordboka på skjermen, i vaktlista først.** André, 30. sep.: «vi starter med
-      vaktlisten». Hans egen bruk: **ressurs** er typen (ambulanse, lag, mannskapsbil),
-      **enhet** er den konkrete (Karmøy 51). Koden har det motsatt — `Ressursgruppe` er
-      typen, `Ressurs` den konkrete — og skjermen blander: «Ny ressurs»/«Rediger ressurs»
-      i vinduene, «3 enheter» i gruppehodet, «Enhet i oppdragsmodulen» om koblingen.
-      Bare etiketter byttes, ikke modeller. Kjente kollisjoner å rydde:
-      - **«Vakt» betyr tre ting på samme side:** «Vaktnavn» (arrangementet), «Opprett vakt»
-        (ett skift — vinduet for samme rad heter «Rediger skift») og «i drift» (statusen).
-      - **«Planlegger»** er både etiketten på vaktlistevelgeren og en fane.
-      - **Koblingen til `oppdrag.Enhet`:** forslag «Koble til delt konto» (André) — enheten
-        er bilens konto. Merk at en enhet kan finnes uten konto (`Enhet.user` er nullbar),
-        så ordlyden må tåle det.
-      Lag først én tabell per begrep (modellnavn · ord i vaktlista · hvert sted det står),
-      så byttes alt i én pulje med testene som leser etiketter. `FanenHeterTimeoversiktTests`
-      er presedensen: regelen testes, ikke ordet.
-- [ ] **Ordboka i `/oppdrag/` og `/ko/` — se på etter pulje 3.** Samme ord brukes der:
-      KOs «ressursoversikt», «et lag er en ressurs uten oppdragsenhet», og `oppdrag.Enhet`
-      er Karmøy 51. Byttes ordene bare i vaktlista, flyttes forvirringen én side bort.
+      - **Pulje 2** (`d0c6439`): §10 — lista går i drift av seg selv ved start, én gang,
+        audit uten bruker, fila én gang; en liste uten start går ikke i drift av seg selv.
+      - **Pulje 3**: §3/§4/§5 og punktet «Ordboka» — de nye ordene overalt på
+        `/vaktliste/`, «Koble til delt konto» med hint, og at lagring, fjerning, skift og
+        pauser på en enhet fortsatt virker (adressene ble rørt av byttet og rettet).
+- [ ] **Ordboka i `/oppdrag/` og `/ko/`.** Vaktlista fikk den 30. sep. (ressurstype, enhet,
+      skift, «Koble til delt konto», -en-form). Samme ord brukes der: KOs
+      «ressursoversikt», «et lag er en ressurs uten oppdragsenhet», og `oppdrag.Enhet` er
+      Karmøy 51 — nå står «enhet» for to ting på tvers av sidene. `vaktliste/tests_ordboka.py`
+      er mønsteret for en vakt per modul; skisser før og etter først, som for vaktlista.
 - [ ] **Pulje 4 — «Del ut» som navngitt handling.** Utdelingen finnes (å sette reservasjon
       er å dele ut, `views.py`-tabellen øverst) men står ikke på skjermen. Forslag: en
       «Del ut»-knapp på ressurser merket «Ureservert», og/eller et sluttsteg i planleggeren

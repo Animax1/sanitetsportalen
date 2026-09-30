@@ -177,7 +177,7 @@ async function opprettVaktliste() {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
-      _visFeil('ny-vakt-feil', d.message || 'Kunne ikke opprette vaktlista.');
+      _visFeil('ny-vakt-feil', d.message || 'Kunne ikke opprette vaktlisten.');
       return;
     }
     _lukkModal('nyVaktlisteModal');
@@ -216,9 +216,9 @@ async function opprettRessurs() {
   _skjulFeil('ny-ressurs-feil');
   await withSubmitGuard('ny-ressurs-knapp', async () => {
     const navn = (document.getElementById('ny-ressurs-navn')?.value || '').trim();
-    if (!navn) { _visFeil('ny-ressurs-feil', 'Ressursen må ha et navn.'); return; }
+    if (!navn) { _visFeil('ny-ressurs-feil', 'Enheten må ha et navn.'); return; }
     if (!document.getElementById('ny-ressurs-gruppe')?.value) {
-      _visFeil('ny-ressurs-feil', 'Velg hvilken gruppe ressursen hører til.');
+      _visFeil('ny-ressurs-feil', 'Velg hvilken ressurstype enheten hører til.');
       return;
     }
 
@@ -234,7 +234,7 @@ async function opprettRessurs() {
       });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
-      _visFeil('ny-ressurs-feil', d.message || 'Kunne ikke legge til ressursen.');
+      _visFeil('ny-ressurs-feil', d.message || 'Kunne ikke legge til enheten.');
       return;
     }
     _lukkModal('nyRessursModal');
@@ -272,8 +272,8 @@ function apneRessurs(id) {
   const tekst = document.getElementById('ressurs-slett-tekst');
   if (tekst) {
     tekst.textContent = antall
-      ? `${antall} oppsatt(e) skift fjernes sammen med ressursen.`
-      : 'Ressursen har ingen skift på seg.';
+      ? `${antall} oppsatt(e) skift fjernes sammen med enheten.`
+      : 'Enheten har ingen skift på seg.';
   }
   bootstrap.Modal.getOrCreateInstance(modal).show();
 }
@@ -309,7 +309,7 @@ async function lagreRessurs() {
   _skjulFeil('ressurs-feil');
   await withSubmitGuard('ressurs-knapp', async () => {
     const navn = (document.getElementById('ressurs-navn')?.value || '').trim();
-    if (!navn) { _visFeil('ressurs-feil', 'Ressursen må ha et navn.'); return; }
+    if (!navn) { _visFeil('ressurs-feil', 'Enheten må ha et navn.'); return; }
 
     const res = await apiFetch(`/vaktliste/api/ressurser/${id}/`, {
       method: 'PUT',
@@ -322,7 +322,7 @@ async function lagreRessurs() {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
-      _visFeil('ressurs-feil', d.message || 'Kunne ikke lagre ressursen.');
+      _visFeil('ressurs-feil', d.message || 'Kunne ikke lagre enheten.');
       return;
     }
     _lukkModal('ressursModal');
@@ -349,7 +349,7 @@ async function slettRessurs() {
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) {
-    _visFeil('ressurs-feil', d.message || 'Kunne ikke fjerne ressursen.');
+    _visFeil('ressurs-feil', d.message || 'Kunne ikke fjerne enheten.');
     return;
   }
   _lukkModal('ressursModal');
@@ -384,7 +384,7 @@ function apneVaktpost(ressursId) {
   ressursApen.set(ressursId, true);
   _skjulFeil('ny-vaktpost-feil');
   document.getElementById('ny-vaktpost-tittel').textContent =
-    `Opprett vakt — ${ressurs.navn}`;
+    `Nytt skift — ${ressurs.navn}`;
   document.getElementById('nyVaktpostModal').dataset.ressurs = String(ressursId);
   // Rollene som tilbys er gruppas — samme regel som i raden.
   _fyll('ny-vaktpost-rolle',
@@ -444,7 +444,7 @@ function apneRoller(ressursId) {
   if (tittel) tittel.textContent = `Roller for ${r.gruppe_navn}`;
   const hjelp = document.getElementById('roller-hjelp');
   if (hjelp) {
-    hjelp.textContent = `Rollene gjelder alle ressurser i gruppa `
+    hjelp.textContent = `Rollene gjelder alle enheter av typen `
                       + `«${r.gruppe_navn}», ikke bare ${r.navn}.`;
   }
 
@@ -464,7 +464,7 @@ function tegnRoller() {
   // for å hoppe. Serveren sender lista i rangert rekkefølge (16. sep. 2026).
   el.innerHTML = roller.length
     ? roller.map((r, i) => mkRolleRad(r, i === 0, i === roller.length - 1)).join('')
-    : '<div class="vl-tom">Ingen roller i denne gruppa ennå.</div>';
+    : '<div class="vl-tom">Ingen roller for denne ressurstypen ennå.</div>';
 }
 
 
@@ -661,7 +661,7 @@ function tegnGrupper() {
   if (!el) return;
   const grupper = (aktivListe && aktivListe.grupper) || [];
   el.innerHTML = grupper.length ? grupper.map(mkGruppeRad).join('')
-    : '<div class="vl-tom">Ingen grupper ennå.</div>';
+    : '<div class="vl-tom">Ingen ressurstyper ennå.</div>';
 }
 
 
@@ -680,7 +680,7 @@ function mkGruppeRad(g) {
     ? '<span class="vl-merkelapp">ett eksemplar</span>' : '';
   const slett = g.i_bruk ? '' : `
         <button class="btn btn-sm btn-outline-danger" type="button"
-                title="Slett gruppa" aria-label="Slett gruppa"
+                title="Slett ressurstypen" aria-label="Slett ressurstypen"
                 data-action="slettGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-trash"></i></button>`;
   // **Gruppene kunne opprettes og slettes, men ikke endres** (André,
   // 16. sep. 2026, pulje 3 punkt 4). Serveren har støttet PUT hele tiden;
@@ -703,7 +703,7 @@ function mkGruppeRad(g) {
   // Rutingflagget (FORSLAG_PARK.md §3.4): gruppas ressurser står i
   // lagnedtrekket på parksiden. Merket viser det; knappen snur det.
   const park = g.registrerer_i_park
-    ? `<button class="btn btn-sm btn-outline-success" type="button" title="Gruppas ressurser kan velges i lagregistreringen (/lag/r/)"
+    ? `<button class="btn btn-sm btn-outline-success" type="button" title="Enhetene av denne typen kan velges i lagregistreringen (/lag/r/)"
                data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':0')}"><i class="bi bi-people me-1"></i>Lagregistrering</button>`
     : `<button class="btn btn-sm btn-outline-secondary" type="button" title="Ikke med i lagregistreringen — klikk for å ta med"
                data-action="settGruppePark" data-arg="${escHtmlValue(g.id + ':1')}"><i class="bi bi-people me-1"></i>Ikke i lagregistrering</button>`;
@@ -732,7 +732,7 @@ async function opprettGruppe() {
   _skjulFeil('gruppe-feil');
   await withSubmitGuard('ny-gruppe-knapp', async () => {
     const navn = (document.getElementById('ny-gruppe-navn')?.value || '').trim();
-    if (!navn) { _visFeil('gruppe-feil', 'Gruppa må ha et navn.'); return; }
+    if (!navn) { _visFeil('gruppe-feil', 'Ressurstypen må ha et navn.'); return; }
 
     const res = await apiFetch('/vaktliste/api/grupper/', {
       method: 'POST',
@@ -744,7 +744,7 @@ async function opprettGruppe() {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
-      _visFeil('gruppe-feil', d.message || 'Kunne ikke legge til gruppa.');
+      _visFeil('gruppe-feil', d.message || 'Kunne ikke legge til ressurstypen.');
       return;
     }
     document.getElementById('ny-gruppe-navn').value = '';
@@ -787,9 +787,9 @@ function avbrytRedigerGruppe() {
 
 async function lagreGruppe(id) {
   const navn = _nyttNavn(id);
-  if (!navn) { _visFeil('gruppe-feil', 'Gruppa må ha et navn.'); return; }
+  if (!navn) { _visFeil('gruppe-feil', 'Ressurstypen må ha et navn.'); return; }
   gruppeRedigeres = null;
-  await _gruppeKall(id, { navn }, 'Kunne ikke endre gruppa.');
+  await _gruppeKall(id, { navn }, 'Kunne ikke endre ressurstypen.');
 }
 
 
@@ -797,7 +797,7 @@ async function settGruppeAktiv(arg) {
   // «id:0» / «id:1» — klikkdelegeringen sender ett argument.
   const [id, paa] = String(arg).split(':');
   await _gruppeKall(Number(id), { er_aktiv: paa === '1' },
-                    'Kunne ikke endre gruppa.');
+                    'Kunne ikke endre ressurstypen.');
 }
 
 
@@ -805,14 +805,14 @@ async function settGruppePark(arg) {
   // «id:0» / «id:1», som `settGruppeAktiv`.
   const [id, paa] = String(arg).split(':');
   await _gruppeKall(Number(id), { registrerer_i_park: paa === '1' },
-                    'Kunne ikke endre gruppa.');
+                    'Kunne ikke endre ressurstypen.');
 }
 
 
 async function slettGruppe(id) {
   const gruppe = (aktivListe.grupper || []).find((g) => g.id === id);
   if (!gruppe) return;
-  if (!confirm(`Slette gruppa «${gruppe.navn}»?`)) return;
+  if (!confirm(`Slette ressurstypen «${gruppe.navn}»?`)) return;
 
   let res = await apiFetch(`/vaktliste/api/grupper/${id}/`, { method: 'DELETE' });
   let d = await res.json().catch(() => ({}));
@@ -917,7 +917,7 @@ async function slettVaktliste() {
   // reversible alternativet ved siden av.
   if (!aktivListe) return;
   const navn = aktivListe.vaktliste.vakt_navn;
-  if (!confirm(`Slette vaktlisten for «${navn}» for godt? Alle ressurser og skift forsvinner. Arkiver i stedet hvis du kan trenge den igjen.`)) return;
+  if (!confirm(`Slette vaktlisten for «${navn}» for godt? Alle enheter og skift forsvinner. Arkiver i stedet hvis du kan trenge den igjen.`)) return;
   if (!confirm(`Er du sikker? «${navn}» kan ikke hentes tilbake.`)) return;
   const res = await apiFetch(`/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/`, {
     method: 'DELETE', body: JSON.stringify({ confirm: true }),
@@ -1317,7 +1317,7 @@ function _planleggerFinnVindu(id) {
 function planleggerNyLinje() {
   const grupper = aktivListe?.grupper || [];
   if (!grupper.length) {
-    visPanelfeil('Det finnes ingen ressursgrupper å velge. Legg dem inn under «Innstillinger».');
+    visPanelfeil('Det finnes ingen ressurstyper å velge. Legg dem inn under «Innstillinger».');
     return;
   }
   planleggerlinjer.push({
@@ -1442,7 +1442,7 @@ function _genererRadmerke(r) {
   // generering over et oppsett som alt er laget rører de fleste radene lite
   // eller ingenting, og en tabell der alle radene ser like ut ville skjult
   // nettopp den ene som endrer seg.
-  if (!r.finnes) return 'ny ressurs';
+  if (!r.finnes) return 'ny enhet';
   if (!r.plasser && !r.fjernes) return 'uendret';
   return 'rettes';
 }
@@ -1475,11 +1475,11 @@ function _genererFasit(fasit) {
       på nytt, og pauser lagt inn for hånd står.` : '';
   return `
     <p class="mb-2">Dette lages: <strong>${escHtmlValue(fasit.ressurser)}</strong>
-      nye ressurser, <strong>${escHtmlValue(fasit.plasser)}</strong> nye tomme
+      nye enheter, <strong>${escHtmlValue(fasit.plasser)}</strong> nye tomme
       plasser, <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.${fjernes}${pauser}</p>
     <div class="vl-tabellramme">
       <table class="vl-tabell">
-        <thead><tr><th>Navn</th><th>Gruppe</th><th></th><th>Skift</th>
+        <thead><tr><th>Navn</th><th>Ressurstype</th><th></th><th>Skift</th>
           <th>Nye plasser</th><th>Fjernes</th><th>Timer</th><th>Pauser</th></tr></thead>
         <tbody>${rader}</tbody>
       </table>
@@ -1602,7 +1602,7 @@ async function settDrift(tilstand) {
   // satt uansett; feilet sendingen, skal vaktleder få vite det nå — ikke
   // oppdage det når portalen er nede.
   const u = d.data && d.data.utsending;
-  if (u && u.feil) visPanelfeil(`Lista er i drift, men fila ble ikke sendt: ${u.feil}`);
+  if (u && u.feil) visPanelfeil(`Listen er i drift, men filen ble ikke sendt: ${u.feil}`);
 }
 
 

@@ -374,7 +374,7 @@ def vaktliste_arkiver_view(request, pk, retning):
         # e-postutsendingen. Ta den ut av drift først — det er en dør, ikke en
         # sletting, og rører ingen stempler.
         if vl.i_drift:
-            return json_feil('Lista står i drift. Ta den ut av drift før den arkiveres.',
+            return json_feil('Listen står i drift. Ta den ut av drift før den arkiveres.',
                          status=409)
         if vl.arkivert_at is None:
             vl.arkivert_at = timezone.now()
@@ -444,11 +444,11 @@ def vaktliste_detalj_view(request, pk):
         slutt = (_tid(data.get('planlagt_slutt')) if 'planlagt_slutt' in data
                  else vl.planlagt_slutt)
         if 'startet' in data and start is None:
-            return json_feil('Vakta må ha et starttidspunkt.')
+            return json_feil('Vakten må ha et starttidspunkt.')
         if start and slutt and slutt <= start:
             # Samme regel som på et skift, og av samme grunn: et negativt
             # spenn ville gitt en kurve som ikke kan tegnes.
-            return json_feil('Vakta må slutte etter at den begynner.')
+            return json_feil('Vakten må slutte etter at den begynner.')
 
         # **Tomt felt betyr «ingen tak», ikke null.** Et nedtrekk eller et
         # tallfelt som tømmes sender `''` eller `null`, og begge skal fjerne
@@ -613,7 +613,7 @@ def grupper_view(request):
     data = json_body(request)
     navn = (data.get('navn') or '').strip()
     if not navn:
-        return json_feil('Gruppa må ha et navn.')
+        return json_feil('Ressurstypen må ha et navn.')
     ikon = (data.get('ikon') or '').strip() or 'box'
 
     try:
@@ -648,13 +648,13 @@ def gruppe_detalj_view(request, pk):
     try:
         gruppe = Ressursgruppe.objects.get(pk=pk)
     except Ressursgruppe.DoesNotExist:
-        return json_feil('Ressursgruppe ikke funnet', status=404)
+        return json_feil('Ressurstype ikke funnet', status=404)
 
     if request.method == 'DELETE':
         if gruppe.ressurser.exists():
             return json_feil(
                 f'«{gruppe.navn}» er i bruk av {gruppe.ressurser.count()} '
-                'ressurs(er) og kan ikke slettes. Deaktiver den i stedet — da '
+                'enheter og kan ikke slettes. Deaktiver den i stedet — da '
                 'forsvinner den fra nedtrekkene, men står igjen der den brukes.')
         # **Rollene følger med, og det skal sies høyt** (André, 16. sep. 2026).
         # `Ressursrolle.gruppe` er `CASCADE`, mens `Ressurs.gruppe` er
@@ -676,7 +676,7 @@ def gruppe_detalj_view(request, pk):
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
         if not navn:
-            return json_feil('Gruppa må ha et navn.')
+            return json_feil('Ressurstypen må ha et navn.')
         gruppe.navn = navn
     if 'ikon' in data:
         gruppe.ikon = (data.get('ikon') or '').strip() or 'box'
@@ -730,7 +730,7 @@ def roller_rekkefolge_view(request):
         # nye tall og latt resten stå — og da er rekkefølgen en blanding av to
         # oppfatninger. Feilen er også den eneste måten å oppdage at klienten
         # og serveren ser ulike lister.
-        return json_feil('Lista må inneholde nøyaktig rollene i gruppa.')
+        return json_feil('Listen må inneholde nøyaktig rollene for ressurstypen.')
 
     with transaction.atomic():
         for plass, rolle_id in enumerate(ider, start=1):
@@ -787,12 +787,12 @@ def ressurser_view(request, pk):
     data = json_body(request)
     navn = (data.get('navn') or '').strip()
     if not navn:
-        return json_feil('Ressursen må ha et navn.')
+        return json_feil('Enheten må ha et navn.')
 
     gruppe_id = _int(data.get('gruppe_id'))
     gruppe = Ressursgruppe.objects.filter(pk=gruppe_id).first()
     if not gruppe:
-        return json_feil('Ressursen må høre til en gruppe.')
+        return json_feil('Enheten må høre til en ressurstype.')
 
     # **Noen grupper finnes i ett eksemplar.** Samleplassen og KO er
     # samlingspunkt for flere korps, ikke flåter — «Samleplass 2» er ikke en
@@ -802,7 +802,7 @@ def ressurser_view(request, pk):
     if not gruppe.flere_enheter and Ressurs.objects.filter(
             vaktliste=vl, gruppe=gruppe).exists():
         return json_feil(f'«{gruppe.navn}» finnes i ett eksemplar, og står '
-                     f'allerede på denne vaktlista.')
+                     f'allerede på denne vaktlisten.')
 
     ukjent = _ukjent_peker(Ressurs, korps=_int(data.get('korps_id')),
                            enhet=_int(data.get('enhet_id')))
@@ -820,7 +820,7 @@ def ressurser_view(request, pk):
                             or services.neste_rekkefolge(vl)),
             )
     except IntegrityError:
-        return json_feil(f'«{navn}» finnes allerede på denne vaktlista.')
+        return json_feil(f'«{navn}» finnes allerede på denne vaktlisten.')
 
     ressurs = (Ressurs.objects
                .select_related('korps', 'enhet', 'gruppe').get(pk=ressurs.pk))
@@ -841,7 +841,7 @@ def ressurser_uten_enhet_view(request):
     """
     if not (services.ser_alle_korps(request.user)
             or har_tilgang(request.user, 'oppdrag', 'les')):
-        return json_feil('Lista viser alle korps, og du ser bare ditt eget.', status=403)
+        return json_feil('Listen viser alle korps, og du ser bare ditt eget.', status=403)
     return JsonResponse({'status': 'ok', 'data': services.ressurser_uten_enhet()})
 
 
@@ -887,10 +887,10 @@ def besetning_view(request, pk):
     annen = services.koblet_i_annen_vakt(pk)
     if annen:
         return json_feil(
-            f'Enheten er koblet i vaktlista for «{annen}», som verken er i '
-            f'drift eller hører til den aktive vakten. Sett den lista i drift, '
-            f'eller koble enheten i vaktlista for vakten som går nå.', status=404)
-    return json_feil('Enheten er ikke koblet til en ressurs i noen vaktliste.',
+            f'Enheten er koblet i vaktlisten for «{annen}», som verken er i '
+            f'drift eller hører til den aktive vakten. Sett den listen i drift, '
+            f'eller koble enheten i vaktlisten for vakten som går nå.', status=404)
+    return json_feil('Enheten er ikke koblet til noen vaktliste.',
                  status=404)
 
 
@@ -914,7 +914,7 @@ def _planleggerlinjer(data):
         vinduer = raa.get('vinduer')
         if not isinstance(vinduer, list) or not vinduer:
             raise services.Planleggerfeil(
-                'Hver ressurs må ha minst ett skiftvindu.')
+                'Hver enhet må ha minst ett skiftvindu.')
         lest = []
         for vindu in vinduer:
             if not isinstance(vindu, dict):
@@ -1120,7 +1120,7 @@ def drift_view(request, pk, tilstand):
     utsending = None
     if tilstand == 'start' and vl.arkivert_at is not None:
         # Samme sperre motsatt vei (A6): en arkivert liste er ute av velgeren.
-        return json_feil('Lista er arkivert. Hent den tilbake før den settes i drift.',
+        return json_feil('Listen er arkivert. Hent den tilbake før den settes i drift.',
                      status=409)
     if tilstand == 'start':
         vl.status = choices.DRIFT
@@ -1189,10 +1189,10 @@ def send_fil_view(request, pk):
         return json_feil('Vaktliste ikke funnet', status=404)
     if not fil.mottakere():
         return json_feil('Ingen mottakere er satt. Global admin setter dem under '
-                     'Portalinnstillinger → «Vaktlista på e-post».')
+                     'Portalinnstillinger → «Vaktlisten på e-post».')
     rad = fil.send_fil(vl, bruker=request.user, utloest=Utsending.KNAPP)
     if rad.feil:
-        return JsonResponse({'status': 'error', 'message': f'Fila ble ikke sendt: {rad.feil}',
+        return JsonResponse({'status': 'error', 'message': f'Filen ble ikke sendt: {rad.feil}',
                              'data': fil.utsending_til_dict(rad)}, status=502)
     return JsonResponse({'status': 'ok', 'data': fil.utsending_til_dict(rad)})
 
@@ -1241,7 +1241,7 @@ def stempling_view(request, pk, handling):
         vp.ressurs.vaktliste.refresh_from_db()
     if not vp.ressurs.vaktliste.i_drift:
         return json_feil(
-            'Innsjekken er stengt. Sett vaktlista i drift først — da åpnes '
+            'Innsjekken er stengt. Sett vaktlisten i drift først — da åpnes '
             'møtt og av vakt.', status=409)
 
     klienttid = None
@@ -1309,7 +1309,7 @@ def ressurs_detalj_view(request, pk):
         ressurs = (Ressurs.objects
                    .select_related('korps', 'enhet', 'gruppe').get(pk=pk))
     except Ressurs.DoesNotExist:
-        return json_feil('Ressurs ikke funnet', status=404)
+        return json_feil('Enhet ikke funnet', status=404)
 
     # **Inngangsporten er navneretten, ikke `kan_lede`** (André, 15. sep.
     # 2026: «redigere ressursens navn, men ikke gruppe, reservering, enhet i
@@ -1327,7 +1327,7 @@ def ressurs_detalj_view(request, pk):
     if request.method == 'DELETE':
         # CASCADE tar skiftene, og det er ikke en handling man angrer.
         if not services.kan_lede(request.user):
-            return _nektet('Ressurser fjernes av den som satte dem opp.')
+            return _nektet('Enheter fjernes av den som satte dem opp.')
         if not json_body(request).get('confirm'):
             return json_feil('Bekreftelse mangler. Send {"confirm": true}.')
         # CASCADE tar vaktpostene. Det er riktig her: fjernes bilen fra
@@ -1339,18 +1339,18 @@ def ressurs_detalj_view(request, pk):
 
     sperret = services.oppsettfelter(data, services.RESSURS_OPPSETTFELTER)
     if sperret and not services.kan_lede(request.user):
-        return _nektet('Gruppe, reservasjon og enhetskobling settes av den '
-                       'som setter opp vakta: ' + ', '.join(sperret))
+        return _nektet('Ressurstype, reservasjon og kobling til delt konto settes av den '
+                       'som setter opp vakten: ' + ', '.join(sperret))
 
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
         if not navn:
-            return json_feil('Ressursen må ha et navn.')
+            return json_feil('Enheten må ha et navn.')
         ressurs.navn = navn
     if 'gruppe_id' in data:
         gruppe_id = _int(data['gruppe_id'])
         if not gruppe_id or not Ressursgruppe.objects.filter(pk=gruppe_id).exists():
-            return json_feil('Ressursen må høre til en gruppe.')
+            return json_feil('Enheten må høre til en ressurstype.')
         ressurs.gruppe_id = gruppe_id
     if 'korps_id' in data:
         ressurs.korps_id = _int(data['korps_id'])
@@ -1366,7 +1366,7 @@ def ressurs_detalj_view(request, pk):
         with transaction.atomic():
             ressurs.save()
     except IntegrityError:
-        return json_feil(f'«{ressurs.navn}» finnes allerede på denne vaktlista.')
+        return json_feil(f'«{ressurs.navn}» finnes allerede på denne vaktlisten.')
 
     ressurs.refresh_from_db()
     return JsonResponse({'status': 'ok', 'data': _ressurs_til_dict(ressurs)})
@@ -1390,7 +1390,7 @@ def vaktposter_view(request, pk):
     try:
         ressurs = Ressurs.objects.select_related('korps').get(pk=pk)
     except Ressurs.DoesNotExist:
-        return json_feil('Ressurs ikke funnet', status=404)
+        return json_feil('Enhet ikke funnet', status=404)
 
     data = json_body(request)
 
@@ -1412,7 +1412,7 @@ def vaktposter_view(request, pk):
     # femti tomme plasser med `antall`, på sin egen ressurs. Å *fylle* en
     # plass er et annet spørsmål, og det stilles i `vaktpost_detalj_view`.
     if not services.kan_sette_opp_skift(request.user):
-        return _nektet('Skift settes opp av den som setter opp vakta.')
+        return _nektet('Skift settes opp av den som setter opp vakten.')
     # Badgen sjekkes fortsatt på paret: den doble regelen gjelder også når
     # den som setter opp er lederen selv, og det er her den leses.
     if not services.kan_sette_vaktpost(request.user, ressurs, mannskap):
@@ -1498,10 +1498,10 @@ def pauser_view(request, pk):
     """Ny pause på en ressurs. **Lederens** (André, 23. sep. 2026: «leder») —
     samme terskel som planleggeren og resten av oppsettet."""
     if not services.kan_lede(request.user):
-        return _nektet('Pausene settes av den som setter opp vakta.')
+        return _nektet('Pausene settes av den som setter opp vakten.')
     ressurs = Ressurs.objects.filter(pk=pk).first()
     if ressurs is None:
-        return json_feil('Ressurs ikke funnet', status=404)
+        return json_feil('Enhet ikke funnet', status=404)
     fra, til = _pausetider(json_body(request))
     try:
         pause = pauser.lagre(ressurs, fra, til)
@@ -1516,7 +1516,7 @@ def pauser_view(request, pk):
 def pause_detalj_view(request, pk):
     """Flytt eller fjern en pause. Lederens, som opprettingen."""
     if not services.kan_lede(request.user):
-        return _nektet('Pausene settes av den som setter opp vakta.')
+        return _nektet('Pausene settes av den som setter opp vakten.')
     pause = Pause.objects.select_related('ressurs').filter(pk=pk).first()
     if pause is None:
         return json_feil('Pausen finnes ikke', status=404)
@@ -1547,7 +1547,7 @@ def _svar_rom(rom):
 def overnattingsrom_view(request, pk):
     """Nytt rom på en vaktliste. Lederens, som ressursene."""
     if not overnatting.kan_sette_opp(request.user):
-        return _nektet('Rommene settes opp av den som setter opp vakta.')
+        return _nektet('Rommene settes opp av den som setter opp vakten.')
     vl = Vaktliste.objects.select_related('vakt').filter(pk=pk).first()
     if vl is None:
         return json_feil('Vaktliste ikke funnet', status=404)
@@ -1571,7 +1571,7 @@ def overnattingsrom_detalj_view(request, pk):
     verre enn en som mangler et.
     """
     if not overnatting.kan_sette_opp(request.user):
-        return _nektet('Rommene settes opp av den som setter opp vakta.')
+        return _nektet('Rommene settes opp av den som setter opp vakten.')
     rom = Overnattingsrom.objects.select_related('vaktliste').filter(pk=pk).first()
     if rom is None:
         return json_feil('Rommet finnes ikke', status=404)
@@ -1678,7 +1678,7 @@ def vaktpost_detalj_view(request, pk):
     # gjennom — og det var hullet André meldte. Se `services.oppsettfelter`.
     sperret = services.oppsettfelter(data, services.SKIFT_OPPSETTFELTER)
     if sperret and not services.kan_sette_opp_skift(request.user):
-        return _nektet('Tider og utdeling settes av den som setter opp vakta: '
+        return _nektet('Tider og utdeling settes av den som setter opp vakten: '
                        + ', '.join(sperret))
 
     # **Å fylle en ledig plass er den ene skrivingen som endrer hvem regelen
@@ -1754,7 +1754,7 @@ def vaktpost_detalj_view(request, pk):
         with transaction.atomic():
             vaktpost.save()
     except IntegrityError:
-        return json_feil('Personen står allerede på denne ressursen fra dette '
+        return json_feil('Personen står allerede på denne enheten fra dette '
                      'tidspunktet.')
 
     vaktpost.refresh_from_db()

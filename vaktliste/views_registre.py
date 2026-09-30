@@ -191,7 +191,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             gruppe_id = _int(data.get('gruppe_id'))
             if not gruppe_id or not Ressursgruppe.objects.filter(
                     pk=gruppe_id).exists():
-                return json_feil(f'{etikett} må høre til en ressursgruppe.')
+                return json_feil(f'{etikett} må høre til en ressurstype.')
             felter['gruppe_id'] = gruppe_id
         try:
             with transaction.atomic():
@@ -523,7 +523,7 @@ def mannskap_view(request):
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
     except IntegrityError:
         return json_feil(f'«{navn}» finnes allerede i {korps.navn}. '
-                     f'To like navn i samme korps er umulige å skille i lista.')
+                     f'To like navn i samme korps er umulige å skille i listen.')
 
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))

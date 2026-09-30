@@ -1994,7 +1994,7 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
 
     def test_vaktlederen_far_den(self):
         """Den andre retningen: gates det for hardt, mister lederen knappen."""
-        self.assertIn('Opprett vakt', self._tegn('skriv_full'))
+        self.assertIn('Nytt skift', self._tegn('skriv_full'))
 
     def test_tidene_staar_som_tekst_for_korpsforeren(self):
         """Et felt man kan skrive i og ikke lagre er verre enn en tekst: det

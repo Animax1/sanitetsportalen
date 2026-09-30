@@ -51,7 +51,7 @@
   </div>
 
   <div class="vl-vaktvelger mb-3">
-    <label class="vl-meta mb-0" for="vaktliste-velger">Planlegger</label>
+    <label class="vl-meta mb-0" for="vaktliste-velger">Vaktliste</label>
     {# `data-hendelse="change"` er ikke pynt: uten den fyrer delegeringen i #}
     {# portal-utils.js paa *klikk* — med den gamle verdien — og ikke naar du #}
     {# velger. Lista byttet foerst ved neste klikk paa velgeren, og det leste #}
@@ -134,8 +134,8 @@
     <div id="vl-korpsfilter" class="alert alert-warning py-2">
       <i class="bi bi-person-x me-1"></i><strong>Kontoen din er ikke knyttet
       til et korps.</strong> Tilgangen din gjelder eget korps, og uten
-      kobling i mannskapsregisteret er lista tom. Be den som administrerer
-      vaktlista koble kontoen til mannskapsraden din.
+      kobling i mannskapsregisteret er listen tom. Be den som administrerer
+      vaktlisten koble kontoen til mannskapsraden din.
     </div>
     {% endif %}
   {% elif mangler_badge %}
@@ -144,13 +144,13 @@
       <i class="bi bi-person-x me-1"></i><strong>Kontoen din er ikke knyttet
       til et korps.</strong> Du ser alle korps, men kan bare føre ditt eget —
       og uten kobling i mannskapsregisteret kan du ikke redigere noen. Be den
-      som administrerer vaktlista koble kontoen til mannskapsraden din.
+      som administrerer vaktlisten koble kontoen til mannskapsraden din.
     </div>
   {% endif %}
 
   <div id="vl-mangler-mannskap" class="alert alert-warning d-none">
     <strong>Mannskapsregisteret er tomt.</strong>
-    Vaktlista bemannes fra det registeret — legg inn korps under
+    Vaktlisten bemannes fra det registeret — legg inn korps under
     <strong>Innstillinger</strong> og mannskap i <strong>Mannskap</strong>-fanen
     først.
   </div>
@@ -199,7 +199,7 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label" for="ny-vakt-navn">Vaktnavn</label>
+          <label class="form-label" for="ny-vakt-navn">Navn på vakten</label>
           <input type="text" id="ny-vakt-navn" class="form-control" maxlength="255"
                  placeholder="f.eks. «Landsskytterstevnet 2027»">
           <div class="form-text">Navnet må være unikt. Det er dette vakten heter i hele portalen.</div>
@@ -251,7 +251,7 @@
           <label class="form-label" for="ny-vakt-kopier">Kopier oppsett fra</label>
           <select id="ny-vakt-kopier" class="form-select"></select>
           <div class="form-text">
-            Kopierer ressursene med type, reservasjon og rekkefølge —
+            Kopierer enhetene med type, reservasjon og rekkefølge —
             <strong>aldri personene</strong>.
           </div>
         </div>
@@ -270,7 +270,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="roller-tittel">Ressursroller</h5>
+        <h5 class="modal-title" id="roller-tittel">Roller</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
@@ -283,9 +283,9 @@
         {% endcomment %}
         <p class="form-text mt-0" id="roller-hjelp"></p>
         <p class="form-text mt-0">
-          Rollen en person har <strong>på en ressurs</strong> — «Lagleder»,
+          Rollen en person har <strong>på en enhet</strong> — «Lagleder»,
           «Sjåfør», «KO-operatør». Samme person kan ha ulik rolle på ulike
-          ressurser, så rollen settes per skift i tabellen.
+          enheter, så rollen settes per skift i tabellen.
         </p>
         <div class="input-group input-group-sm mb-3">
           <input type="text" id="ny-rolle-navn" class="form-control"
@@ -405,7 +405,7 @@
         <div class="vl-krev-leder d-none mb-3">
           <button type="button" class="btn btn-outline-secondary btn-sm"
                   data-action="apneGrupper">
-            <i class="bi bi-collection me-1"></i>Ressursgrupper
+            <i class="bi bi-collection me-1"></i>Ressurstyper
           </button>
         </div>
 
@@ -429,7 +429,7 @@
             </div>
           </div>
           <button type="button" class="btn btn-primary" id="vakt-lengde-knapp"
-                  data-action="lagreVaktlengde">Lagre vaktas lengde</button>
+                  data-action="lagreVaktlengde">Lagre vaktens lengde</button>
         </div>
         <div id="vakt-lengde-feil" class="text-danger small d-none mt-2"></div>
       </div>
@@ -476,20 +476,20 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Ressursgrupper</h5>
+        <h5 class="modal-title">Ressurstyper</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         <p class="form-text mt-0">
-          Gruppa er hva slags ting ressursen er — «Ambulanse», «Samleplass»,
+          Ressurstypen er hva slags ting enheten er — «Ambulanse», «Samleplass»,
           «Førstehjelpstelt». Den styrer fanen, ikonet, hvilke roller som
-          tilbys, og hvilken bemanningskurve enhetene telles i. Gruppene
+          tilbys, og hvilken bemanningskurve enhetene telles i. Ressurstypene
           gjelder alle vaktlister.
         </p>
         <div class="row g-2 mb-3">
           <div class="col-7">
             <input type="text" id="ny-gruppe-navn" class="form-control form-control-sm"
-                   maxlength="60" placeholder="Ny gruppe, f.eks. «Førstehjelpstelt»">
+                   maxlength="60" placeholder="Ny ressurstype, f.eks. «Førstehjelpstelt»">
           </div>
           <div class="col-3">
             <input type="text" id="ny-gruppe-ikon" class="form-control form-control-sm"
@@ -503,7 +503,7 @@
         <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="ny-gruppe-flere" checked>
           <label class="form-check-label" for="ny-gruppe-flere">
-            Gruppa rommer flere enheter
+            Typen rommer flere enheter
           </label>
           <div class="form-text mt-0">
             På for flåter — ambulanser, biler, lag. Av for det som finnes i ett
@@ -529,24 +529,24 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Rediger ressurs</h5>
+        <h5 class="modal-title">Rediger enhet</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         <p id="ressurs-laast-hint" class="vl-laast-hint d-none">
           <i class="bi bi-lock-fill me-1"></i>De stiplede feltene bestemmer hvem
-          ressursen er til for, og settes av vaktleder. Navnet kan du rette.
+          enheten er til for, og settes av vaktleder. Navnet kan du rette.
         </p>
         <div class="mb-3">
           <label class="form-label" for="ressurs-navn">Navn</label>
           <input type="text" id="ressurs-navn" class="form-control" maxlength="120">
         </div>
         <div class="mb-3">
-          <label class="form-label" for="ressurs-gruppe">Gruppe</label>
+          <label class="form-label" for="ressurs-gruppe">Ressurstype</label>
           <select id="ressurs-gruppe" class="form-select"></select>
           <div class="form-text">
             Styrer ikon, hvilke roller som tilbys, og hvilken bemanningskurve
-            ressursen telles i.
+            enheten telles i.
           </div>
         </div>
         <div class="mb-3">
@@ -554,19 +554,20 @@
           <select id="ressurs-korps" class="form-select"></select>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="ressurs-enhet">Enhet i oppdragsmodulen</label>
+          <label class="form-label" for="ressurs-enhet">Koble til delt konto</label>
           <select id="ressurs-enhet" class="form-select"></select>
+          <div class="form-text">Bilens konto i /oppdrag. «Ingen» for et lag uten konto.</div>
         </div>
         <div id="ressurs-feil" class="text-danger small d-none"></div>
 
         {# Sletting tar skiftene med seg (CASCADE) og er lederens alene. #}
         <hr class="vl-krev-leder d-none">
         <div class="vl-farlig vl-krev-leder d-none">
-          <strong class="d-block mb-1">Fjern ressursen</strong>
+          <strong class="d-block mb-1">Fjern enheten</strong>
           <span class="vl-meta d-block mb-2" id="ressurs-slett-tekst"></span>
           <button type="button" class="btn btn-outline-danger btn-sm"
                   data-action="slettRessurs">
-            <i class="bi bi-trash me-1"></i>Fjern ressurs
+            <i class="bi bi-trash me-1"></i>Fjern enhet
           </button>
         </div>
       </div>
@@ -583,7 +584,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="ny-ressurs-tittel">Ny ressurs</h5>
+        <h5 class="modal-title" id="ny-ressurs-tittel">Ny enhet</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
@@ -593,7 +594,7 @@
                  placeholder="f.eks. «Mannskapsbil 1»">
         </div>
         <div class="mb-3">
-          <label class="form-label" for="ny-ressurs-gruppe">Gruppe</label>
+          <label class="form-label" for="ny-ressurs-gruppe">Ressurstype</label>
           {% comment %}
             Fylles av JS fra `/vaktliste/api/vaktlister/<id>/`. Gruppene lå i
             `choices.py` til 30. aug. 2026 og ble rendret her; nå er de en
@@ -636,7 +637,7 @@
         {# `_laasFelter()`, samme funksjon som låser — to steder å huske på #}
         {# ville før eller siden gitt låste felter uten forklaring. #}
         <p id="vaktpost-laast-hint" class="vl-laast-hint d-none">
-          <i class="bi bi-lock-fill me-1"></i>De stiplede feltene er vaktas
+          <i class="bi bi-lock-fill me-1"></i>De stiplede feltene er vaktens
           rammer og settes av vaktleder. Du fyller plassen og skriver merknad.
         </p>
         <div class="mb-3">
@@ -650,7 +651,7 @@
         <div class="mb-3 vl-krev-full d-none">
           <label class="form-label" for="vaktpost-korps">Reservert korps</label>
           <select id="vaktpost-korps" class="form-select"></select>
-          <div class="form-text">Tom = som ressursen.</div>
+          <div class="form-text">Tom = som enheten.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="vaktpost-rolle">Rolle</label>
@@ -694,7 +695,7 @@
         <div class="vl-farlig vl-krev-full d-none">
           <strong class="d-block mb-1">Fjern skiftet</strong>
           <span class="vl-meta d-block mb-2">
-            Raden forsvinner fra vaktlista. Skal plassen bestå uten person,
+            Raden forsvinner fra vaktlisten. Skal plassen bestå uten person,
             velg «— ledig plass —» over i stedet.
           </span>
           <button type="button" class="btn btn-outline-danger btn-sm"
@@ -735,8 +736,8 @@
           </div>
         </div>
         <div class="form-text mb-2" id="pause-hjelp">
-          Pausen gjelder hele ressursen og må ligge innenfor skiftene. Den teller i timene.
-          KO ser den i Pause-raden på tavla.
+          Pausen gjelder hele enheten og må ligge innenfor skiftene. Den teller i timene.
+          KO ser den i Pause-raden på tavlen.
         </div>
         <div id="pause-feil" class="text-danger small d-none"></div>
       </div>
@@ -835,7 +836,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label" for="brannrutine-tekst">Står øverst på brannlista</label>
+        <label class="form-label" for="brannrutine-tekst">Står øverst på brannlisten</label>
         <textarea id="brannrutine-tekst" class="form-control" rows="5" maxlength="2000"
                   placeholder="Samleplass ved alarm: parkeringsplassen nord. Nattevakta ringer 110 og teller opp."></textarea>
         <div id="brannrutine-feil" class="text-danger small d-none mt-2"></div>
@@ -853,7 +854,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="ny-vaktpost-tittel">Opprett vakt</h5>
+        <h5 class="modal-title" id="ny-vaktpost-tittel">Nytt skift</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
@@ -869,7 +870,7 @@
           <label class="form-label" for="ny-vaktpost-korps">Reservert korps</label>
           <select id="ny-vaktpost-korps" class="form-select"></select>
           <div class="form-text">
-            Hvilket korps plassen er satt av til. Tom = som ressursen.
+            Hvilket korps plassen er satt av til. Tom = som enheten.
             En samleplass har gjerne plasser til flere korps.
           </div>
         </div>
@@ -926,7 +927,7 @@
             <label class="form-label" for="person-navn">Navn</label>
             <input type="text" id="person-navn" class="form-control" maxlength="150">
             <div class="form-text">Unikt innenfor korpset. To like navn i samme
-              korps er umulige å skille i lista.</div>
+              korps er umulige å skille i listen.</div>
           </div>
           <div class="col-md-5">
             <label class="form-label" for="person-korps">Korps</label>
@@ -1022,7 +1023,7 @@
             <select id="verdi-bygger-paa" class="form-select"></select>
             <div class="form-text">
               Kompetansen denne overordner — f.eks. VFØR for AFØR. Har personen
-              begge, vises bare den øverste i lista.
+              begge, vises bare den øverste i listen.
             </div>
           </div>
           <div class="mb-3 d-none" id="verdi-kortnavn-rad">
@@ -1070,12 +1071,12 @@
       <div class="modal-body">
         <div id="generer-fasit"></div>
         <div class="form-text mt-3">
-          <i class="bi bi-info-circle me-1"></i>Radene som alt står på lista
+          <i class="bi bi-info-circle me-1"></i>Radene som alt står på listen
           blir <strong>rettet</strong>: plasser som fortsatt er
           <strong>planlagt</strong> lages på nytt av vinduene dine. Plasser som
           er satt av til et korps, plasser som er åpne for alle, og
           <strong>alle</strong> plasser med navn på, blir stående — og
-          ressurser som ikke er med i oppsettet røres ikke i det hele tatt.
+          enheter som ikke er med i oppsettet røres ikke i det hele tatt.
         </div>
         <div id="generer-feil" class="text-danger small d-none mt-2"></div>
       </div>
@@ -1133,7 +1134,7 @@
           <label class="form-label" for="grense-skift">Lengste skift (timer)</label>
           <input type="number" id="grense-skift" class="form-control"
                  min="1" max="168" step="1">
-          <div class="form-text">Skift <em>over</em> dette merkes i lista.</div>
+          <div class="form-text">Skift <em>over</em> dette merkes i listen.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="grense-hvile">Korteste hvile (timer)</label>
@@ -1144,7 +1145,7 @@
         <div class="form-text">
           <i class="bi bi-info-circle me-1"></i>Grensene <strong>varsler,
           de sperrer ikke</strong>. Noen ganger må noen ta et langt skift, og
-          da skal lista si det høyt framfor å nekte. De gjelder alle
+          da skal listen si det høyt framfor å nekte. De gjelder alle
           vaktlister.
         </div>
         <div id="grenser-feil" class="text-danger small d-none mt-2"></div>

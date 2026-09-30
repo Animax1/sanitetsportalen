@@ -49,11 +49,11 @@ def _kjor():
     try:
         services.sett_forfalte_i_drift()
     except Exception:   # noqa: BLE001 — klokka skal aldri ta ned appen
-        logger.exception('Automatisk drift av vaktlista feilet')
+        logger.exception('Automatisk drift av vaktlisten feilet')
     try:
         fil.send_planlagte()
     except Exception:   # noqa: BLE001 — sendingen skal aldri ta ned appen
-        logger.exception('Intervallsending av vaktlista feilet')
+        logger.exception('Intervallsending av vaktlisten feilet')
     finally:
         # Tråden har sin egen databasetilkobling; uten close() blir den
         # liggende til prosessen dør.

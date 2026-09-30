@@ -172,7 +172,7 @@ class PlasseringTests(_Overnatting):
         self.assertFalse(Overnatting.objects.exists())
 
     def test_bare_vaktas_netter(self):
-        with self.assertRaisesRegex(overnatting.Ugyldig, 'går ikke over natta'):
+        with self.assertRaisesRegex(overnatting.Ugyldig, 'går ikke over natten'):
             overnatting.plasser(self.rom, self.p_hgsd, [SON.isoformat()])
         for feil in ([], None, 'fredag', ['i morgen']):
             with self.subTest(netter=feil), self.assertRaises(overnatting.Ugyldig):

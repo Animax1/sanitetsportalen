@@ -1058,7 +1058,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
         rekke = self._rekke(json.loads(self._markup().strip().splitlines()[0]))
         forste, siste = rekke.index('│'), len(rekke) - 1 - rekke[::-1].index('│')
         inni = rekke[forste + 1:siste]
-        self.assertEqual(inni, ['Ambulanse', 'Lag', 'Ny ressurs'],
+        self.assertEqual(inni, ['Ambulanse', 'Lag', 'Ny enhet'],
                          'bare gruppene og knappen som lager en til')
         self.assertNotIn('Mitt korps', inni)
 
@@ -1068,7 +1068,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
         rekke = self._rekke(json.loads(self._markup().strip().splitlines()[0]))
         self.assertEqual(rekke, [
             'Oversikt', 'Mannskap',
-            '│', 'Ambulanse', 'Lag', 'Ny ressurs', '│',
+            '│', 'Ambulanse', 'Lag', 'Ny enhet', '│',
             'Mitt korps', 'Overnatting', 'Timeoversikt', 'Planlegger', 'Ikke plassert'])
 
     def test_bare_gruppefanene_baerer_gruppeklassen(self):
@@ -1079,7 +1079,7 @@ class FanerekkaHarToBolkerTests(SimpleTestCase):
         med = [_re.search(r'</i>([^<]+)', k).group(1).strip()
                for k in _re.findall(r'<button class="vl-fane vl-fane-gruppe[^>]*>.*?</button>',
                                     markup, _re.S)]
-        self.assertEqual(sorted(med), ['Ambulanse', 'Lag', 'Ny ressurs'])
+        self.assertEqual(sorted(med), ['Ambulanse', 'Lag', 'Ny enhet'])
 
     def test_uten_grupper_staar_ingen_skiller(self):
         """Et skille mot ingenting er en strek man lurer på."""

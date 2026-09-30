@@ -183,7 +183,7 @@ function _sengerad(p) {
   const fjern = kanPlassereKorps(p.korps_id)
     ? `<button type="button" class="btn btn-sm btn-link text-danger p-0"
                data-action="fjernOvernatting" data-id="${escHtmlValue(p.id)}"
-               title="Ta ut av rommet denne natta" aria-label="Ta ut av rommet">
+               title="Ta ut av rommet denne natten" aria-label="Ta ut av rommet">
          <i class="bi bi-x-lg"></i></button>`
     : '';
   const vakt = _paaVaktTekst(p);
@@ -225,7 +225,7 @@ function _romkort(rom, natt) {
     ? `<div class="vl-tabellramme"><table class="vl-tabell vl-sengetabell">
          <thead><tr><th>Navn</th><th>Korps</th><th>Telefon</th><th></th><th></th></tr></thead>
          <tbody>${rader}</tbody></table></div>`
-    : '<div class="vl-tom">Ingen sover her denne natta.</div>';
+    : '<div class="vl-tom">Ingen sover her denne natten.</div>';
   return `
     <div class="vl-kort vl-romkort">
       <div class="vl-romhode">
@@ -289,7 +289,7 @@ function mkBrannliste(netter) {
           <tbody>${rader}</tbody>
         </table>`;
     }).join('');
-    const tom = rom ? '' : '<p>Ingen er registrert denne natta.</p>';
+    const tom = rom ? '' : '<p>Ingen er registrert denne natten.</p>';
     return `
       <section class="vl-brannliste-ark">
         <h2>Brannliste – ${escapeHtml(aktivListe.vaktliste.vakt_navn)}</h2>
@@ -297,7 +297,7 @@ function mkBrannliste(netter) {
           ${escHtmlValue(t.antall)} overnatter · ${escHtmlValue(t.paaVakt)} på vakt ·
           <strong>${escHtmlValue(t.inne)} skal være inne</strong></div>
         ${rutine}${rom}${tom}
-        <div class="vl-meta">Skrevet ut ${escapeHtml(_kl(new Date().toISOString()))}. Slett etter vakta.</div>
+        <div class="vl-meta">Skrevet ut ${escapeHtml(_kl(new Date().toISOString()))}. Slett etter vakten.</div>
       </section>`;
   }).join('');
   return `<div class="vl-brannliste">${ark}</div>`;
@@ -309,7 +309,7 @@ function mkOvernatting() {
   if (!o.netter.length) {
     return `
       <div class="vl-kort"><div class="vl-tom">
-        Vakta går ikke over noen natt. Sett vaktas lengde under «Innstillinger»
+        Vakten går ikke over noen natt. Sett vaktens lengde under «Innstillinger»
         slik at den dekker nettene folk skal sove, så kan rommene fylles.
       </div></div>`;
   }

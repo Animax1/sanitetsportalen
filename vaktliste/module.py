@@ -42,7 +42,7 @@ VaktlisteModule = Module(
     slug='vaktliste',
     name='Vaktliste',
     description=(
-        'Personell og bemanning: mannskapsregister, vaktoppsett per ressurs, '
+        'Personell og bemanning: mannskapsregister, vaktoppsett per enhet, '
         'innsjekk og tilstedeoversikt.'
     ),
     url='/vaktliste/',
@@ -58,6 +58,6 @@ VaktlisteModule = Module(
         ('les_alle', 'Lese: alle korps'),
         ('skriv_handling', 'Skrive: eget korps, ser alle'),
         ('skriv_full', 'Skrive: alle korps'),
-        ('skriv_leder', 'Skrive: leder — setter opp vakta'),
+        ('skriv_leder', 'Skrive: leder — setter opp vakten'),
     ),
 )

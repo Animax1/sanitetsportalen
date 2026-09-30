@@ -770,7 +770,7 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Åpen for alle' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
-    }))), '— som ressursen —');
+    }))), '— som enheten —');
 
   // Rollenedtrekket i «Sett på vakt» fylles når vinduet åpnes: det som
   // tilbys avhenger av hvilken ressurs man står på, altså av gruppa.

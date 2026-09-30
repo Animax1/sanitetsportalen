@@ -172,7 +172,7 @@ class OvernattingJsTests(SimpleTestCase):
     def test_en_annen_natt_viser_sine_egne(self):
         m = self._markup("overnattingNatt = '2026-10-03';").split('vl-brannliste')[0]
         self.assertNotIn('Ola', m)
-        self.assertIn('Ingen sover her denne natta', m)
+        self.assertIn('Ingen sover her denne natten', m)
 
     def test_markup_i_data_kommer_ut_som_tekst(self):
         m = self._markup("""
@@ -234,7 +234,7 @@ class OvernattingJsTests(SimpleTestCase):
 
     def test_vakt_uten_netter_sier_hva_som_maa_gjoeres(self):
         m = self._markup("aktivListe.overnatting.netter = [];")
-        self.assertIn('Vakta går ikke over noen natt', m)
+        self.assertIn('Vakten går ikke over noen natt', m)
 
     # ── Fanen og panelet ─────────────────────────────────────────────────
 

@@ -432,7 +432,7 @@ def utsending_post_save(sender, instance, created, **kwargs):
         status = 'sendt' if not instance.feil else f'feilet: {instance.feil[:120]}'
         _logg_opprettet(
             instance, UTSENDING_TABELLNAVN,
-            f'Vaktlista «{instance.vaktliste.vakt.navn}» {status} — '
+            f'Vaktlisten «{instance.vaktliste.vakt.navn}» {status} — '
             f'{instance.get_utloest_display().lower()}, {instance.antall_rader} skift, '
             f'til: {instance.mottakere or "(ingen)"}')
 

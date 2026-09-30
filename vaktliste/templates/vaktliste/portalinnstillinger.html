@@ -8,16 +8,16 @@ feltene er vaktlistas. Den inkluderes av portalens side gjennom registeret i
 Flyttet hit 14. sep. 2026 — fram til da sto den midt i `core`s egen mal.
 {% endcomment %}
   <div class="card mb-3">
-    <div class="card-header"><strong>Vaktlista på e-post</strong></div>
+    <div class="card-header"><strong>Vaktlisten på e-post</strong></div>
     <div class="card-body">
       <label class="form-label" for="vaktliste_fil_mottakere">Mottakere</label>
       <textarea id="vaktliste_fil_mottakere" name="vaktliste_fil_mottakere"
                 class="form-control" rows="3"
                 placeholder="Én adresse per linje">{{ vaktliste_fil_mottakere }}</textarea>
       <div class="form-text">
-        Vaktlista sendes hit som en selvstendig HTML-fil — reserven når
-        portalen er nede. Fila inneholder navn, korps, rolle, skift, telefon
-        og ISSI. Hold lista kort: hver adresse er en kopi som blir liggende.
+        Vaktlisten sendes hit som en selvstendig HTML-fil — reserven når
+        portalen er nede. Filen inneholder navn, korps, rolle, skift, telefon
+        og ISSI. Hold listen kort: hver adresse er en kopi som blir liggende.
       </div>
       <div class="form-check mt-3">
         <input class="form-check-input" type="checkbox" id="vaktliste_fil_ved_drift"
@@ -28,12 +28,12 @@ Flyttet hit 14. sep. 2026 — fram til da sto den midt i `core`s egen mal.
         </label>
       </div>
       <div class="form-text">
-        Vaktleder kan alltid sende på knapp fra «Innstillinger» på vaktlista.
+        Vaktleder kan alltid sende på knapp fra «Innstillinger» på vaktlisten.
         Hver utsending logges.
       </div>
 
       <hr>
-      <label class="form-label" for="vaktliste_fil_intervall_min">Send på nytt mens lista er i drift</label>
+      <label class="form-label" for="vaktliste_fil_intervall_min">Send på nytt mens listen er i drift</label>
       <div class="input-group" style="max-width:220px;">
         <span class="input-group-text">hvert</span>
         <input type="number" id="vaktliste_fil_intervall_min" name="vaktliste_fil_intervall_min"
@@ -43,7 +43,7 @@ Flyttet hit 14. sep. 2026 — fram til da sto den midt i `core`s egen mal.
       </div>
       <div class="form-text">
         0 slår det av. Sendingen henger på trafikken i portalen og treffer
-        innen et minutt etter intervallet. Klokka går fra forrige utsending,
+        innen et minutt etter intervallet. Klokken går fra forrige utsending,
         uansett hva som utløste den.
       </div>
       <div class="form-check mt-2">
@@ -51,26 +51,26 @@ Flyttet hit 14. sep. 2026 — fram til da sto den midt i `core`s egen mal.
                name="vaktliste_fil_bare_endret" value="1"
                {% if vaktliste_fil_bare_endret %}checked{% endif %}>
         <label class="form-check-label" for="vaktliste_fil_bare_endret">
-          Bare hvis vaktlista er endret siden forrige utsending
+          Bare hvis vaktlisten er endret siden forrige utsending
         </label>
       </div>
     </div>
   </div>
 
   <div class="card mb-3">
-    <div class="card-header"><strong>Pausene i vaktlista</strong></div>
+    <div class="card-header"><strong>Pausene i vaktlisten</strong></div>
     <div class="card-body">
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="vaktliste_vis_pauser"
                name="vaktliste_vis_pauser" value="1"
                {% if vaktliste_vis_pauser %}checked{% endif %}>
         <label class="form-check-label" for="vaktliste_vis_pauser">
-          Vis pausene på utskriften og i fila på e-post
+          Vis pausene på utskriften og i filen på e-post
         </label>
       </div>
       <div class="form-text">
         Pausene står alltid på skjermen for den som planlegger, og i Pause-raden
-        på KO-tavla. Dette gjelder bare det mannskapet får på papir og e-post.
+        på KO-tavlen. Dette gjelder bare det mannskapet får på papir og e-post.
       </div>
     </div>
   </div>

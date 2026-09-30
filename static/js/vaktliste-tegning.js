@@ -53,14 +53,14 @@ function driftforklaring(vl, iDriftNaa) {
   // teksten skal si det, ellers trykker man av vane — eller lar være fordi
   // man tror klokka gjør det på en liste der den ikke vil.
   if (iDriftNaa) {
-    const hvem = vl.drift_automatisk ? 'Satt i drift automatisk ved vaktas start. ' : '';
+    const hvem = vl.drift_automatisk ? 'Satt i drift automatisk ved vaktens start. ' : '';
     return `${hvem}Innsjekken er åpen. Ut av drift stenger den; ingen stempler røres.`;
   }
   if (vl.autodrift_at) {
-    return `Settes i drift av seg selv ved vaktas start, ${_dag(vl.autodrift_at)} `
+    return `Settes i drift av seg selv ved vaktens start, ${_dag(vl.autodrift_at)} `
       + `${_kl(vl.autodrift_at)}. Knappen åpner innsjekken før det.`;
   }
-  return 'Sett i drift åpner innsjekken — møtt og av vakt — for denne lista.';
+  return 'Sett i drift åpner innsjekken — møtt og av vakt — for denne listen.';
 }
 
 
@@ -122,7 +122,7 @@ function tegnFilknapper() {
   if (vl.fil_ved_drift) auto.push('ved sett i drift');
   if (vl.fil_intervall_min > 0) {
     auto.push(`hvert ${vl.fil_intervall_min}. min i drift`
-              + (vl.fil_bare_endret ? ' når lista er endret' : ''));
+              + (vl.fil_bare_endret ? ' når listen er endret' : ''));
   }
   const mottakere = harMottakere
     ? `${vl.fil_mottakere} ${vl.fil_mottakere === 1 ? 'mottaker' : 'mottakere'} er satt`
@@ -147,13 +147,13 @@ async function sendVaktlistefil() {
   const vl = aktivListe.vaktliste;
   const antall = vl.fil_mottakere || 0;
   // Bekreftelse: fila går ut av portalen, og hver adresse er en kopi.
-  if (!confirm(`Sende vaktlista for «${vl.vakt_navn}» til ${antall} `
-             + `${antall === 1 ? 'mottaker' : 'mottakere'}? Fila inneholder navn og telefonnumre.`)) return;
+  if (!confirm(`Sende vaktlisten for «${vl.vakt_navn}» til ${antall} `
+             + `${antall === 1 ? 'mottaker' : 'mottakere'}? Filen inneholder navn og telefonnumre.`)) return;
   skjulPanelfeil();
   const res = await apiFetch(`/vaktliste/api/vaktlister/${vl.id}/fil/send/`, { method: 'POST' });
   const d = await res.json().catch(() => ({}));
   if (!res.ok || d.status !== 'ok') {
-    visPanelfeil(d.message || 'Kunne ikke sende vaktlista.');
+    visPanelfeil(d.message || 'Kunne ikke sende vaktlisten.');
   }
   await lastListe(vl.id);
 }
@@ -338,7 +338,7 @@ function tegnFaner() {
   const nyRessurs = kanLede()
     ? `<button class="vl-fane vl-fane-gruppe vl-fane-ny" type="button"
                data-action="apneNyRessurs">
-         <i class="bi bi-plus-lg me-1"></i>Ny ressurs
+         <i class="bi bi-plus-lg me-1"></i>Ny enhet
        </button>`
     : '';
 
@@ -399,7 +399,7 @@ function tegnPanel() {
   const gruppe = (aktivListe.grupper || [])
     .find((g) => String(g.id) === String(aktivFane));
   el.innerHTML = gruppe ? mkGruppe(gruppe)
-    : '<div class="vl-tom">Gruppa finnes ikke lenger.</div>';
+    : '<div class="vl-tom">Ressurstypen finnes ikke lenger.</div>';
 }
 
 
@@ -931,7 +931,7 @@ function mkRessurs(r, apen = true, egne = null) {
   const settKnapp = kanSetteOppSkift()
     ? `<button class="btn btn-sm btn-primary" type="button"
                data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
-         <i class="bi bi-plus-lg me-1"></i>Opprett vakt
+         <i class="bi bi-plus-lg me-1"></i>Nytt skift
        </button>` : '';
 
   // **Rollene administreres inne i ressursen**, ikke i toppen av siden.

@@ -238,7 +238,7 @@ def plasser(rom, mannskap, netter_raa, *, flytt=False) -> list:
     valgte = sorted({_natt(n) for n in netter_raa})
     for natt in valgte:
         if natt not in lovlige:
-            raise Ugyldig(f'Vakta går ikke over natta fra {natt:%d.%m}.')
+            raise Ugyldig(f'Vakten går ikke over natten fra {natt:%d.%m}.')
 
     with transaction.atomic():
         eksisterende = {
@@ -247,12 +247,12 @@ def plasser(rom, mannskap, netter_raa, *, flytt=False) -> list:
         andre_vakter = [n for n, o in eksisterende.items()
                         if o.rom.vaktliste_id != rom.vaktliste_id]
         if andre_vakter:
-            raise Ugyldig(f'{mannskap.navn} sover på en annen vakt natta fra '
+            raise Ugyldig(f'{mannskap.navn} sover på en annen vakt natten fra '
                           f'{min(andre_vakter):%d.%m}.')
         andre_rom = sorted(n for n, o in eksisterende.items() if o.rom_id != rom.pk)
         if andre_rom and not flytt:
             o = eksisterende[andre_rom[0]]
-            raise Konflikt(f'{mannskap.navn} sover i {o.rom.navn} natta fra '
+            raise Konflikt(f'{mannskap.navn} sover i {o.rom.navn} natten fra '
                            f'{andre_rom[0]:%d.%m}.', [n.isoformat() for n in andre_rom])
         ut = []
         for natt in valgte:
@@ -264,7 +264,7 @@ def plasser(rom, mannskap, netter_raa, *, flytt=False) -> list:
                 except IntegrityError:
                     # Noen andre plasserte henne i samme øyeblikk.
                     raise Ugyldig(f'{mannskap.navn} ble nettopp plassert et annet sted '
-                                  f'natta fra {natt:%d.%m}. Last siden på nytt.') from None
+                                  f'natten fra {natt:%d.%m}. Last siden på nytt.') from None
             elif o.rom_id != rom.pk:
                 o.rom = rom
                 o.save(update_fields=['rom', 'updated_at'])

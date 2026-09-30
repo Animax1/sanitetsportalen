@@ -5,6 +5,20 @@
 > `vaktliste/CLAUDE.md`, og rammeverket i `CLAUDE.md` i rota. `static/js/vaktliste-*.js`
 > ligger utenfor mappa og laster ingen av dem: les denne før du rører JS-en.
 
+## Ordene på skjermen (30. sep. 2026)
+
+**André lærer opp korpsene, så skjermen bruker hans ord:** *ressurstype* er hva slags ting
+(ambulanse, lag), *enhet* er den konkrete (Karmøy 51), *skift* er én plass med tider,
+koblingen til bilens konto heter *Koble til delt konto*, og det heter *vakten* — -en-form
+også for vaktlisten, filen, natten og gruppen. Modellene heter som før (`Ressursgruppe`,
+`Ressurs`, `Vaktpost`). Hva hvert ord het før, står i CHANGELOG 30. sep. 2026.
+
+`tests_ordboka.py` leser teksten brukeren ser — tekstnoder, synlige attributter,
+JS-strenger med mellomrom, meldingsstrenger i Python — og blir rød på et gammelt ord.
+Kode og adresser er utenfor: `/api/ressurser/` er en rute, ikke tekst.
+`tests_js_adresser.py` slår hver `/vaktliste/`-adresse i JS opp med `resolve()`; byttet
+gjorde først seks kall til `/api/enheter/`, og ingen annen test ble rød.
+
 ## Planleggingsflatene: dager, kort og faner
 
 Dagen er ytterste nivå, ressursgruppa er fanen, og ressursen er kortet inni.

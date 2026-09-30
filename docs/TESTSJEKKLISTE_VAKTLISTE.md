@@ -77,7 +77,7 @@ flere av feilene under finnes bare der.
 
 ## 3. Fanerekka
 
-- [ ] **Rekkefølgen er:** Oversikt · Mannskap · \<én fane per ressursgruppe\> · Ny ressurs ·
+- [ ] **Rekkefølgen er:** Oversikt · Mannskap · \<én fane per ressurstype\> · Ny enhet ·
       Mitt korps · Overnatting · Timeoversikt · Planlegger · Tilstede nå · Ikke plassert.
       Fanene som ikke gjelder deg eller lista, er borte: «Mitt korps» uten korps,
       «Overnatting» uten rom, «Planlegger» under leder, «Tilstede nå» utenfor drift.
@@ -94,12 +94,15 @@ flere av feilene under finnes bare der.
 
 ## 4. Ressurser og kort
 
-- [ ] **«Ny ressurs»** spør bare om navn og gruppe. Reservasjon og enhetskobling settes i
-      «Rediger».
+- [ ] **«Ny enhet»** (het «Ny ressurs» til 30. sep. 2026) spør bare om navn og ressurstype.
+      Reservasjon og kobling til delt konto settes i «Rediger enhet».
+- [ ] **Ordboka** (30. sep. 2026, se CHANGELOG): ingen steder på `/vaktliste/` står
+      «ressurs» om Karmøy 51, «gruppe» om ressurstypen, «Opprett vakt», «vakta» eller
+      «vaktlista». Velgeren øverst heter «Vaktliste»; fanen «Planlegger» heter som før.
 - [ ] **En gruppe i ett eksemplar** (Samleplass): knappen i gruppehodet **og** valget i
       nedtrekket forsvinner når den ene står der. Prøv begge.
-- [ ] **«Rediger ressurs»** (`test-vl-leder`): gruppe, reservert korps, enhet i
-      oppdragsmodulen, rekkefølge og sletting.
+- [ ] **«Rediger enhet»** (het «Rediger ressurs») (`test-vl-leder`): ressurstype, reservert
+      korps, «Koble til delt konto» (het «Enhet i oppdragsmodulen»), rekkefølge og sletting.
 - [ ] **Navnet kan endres av korps-føreren** når hun kan bemanne ressursen **eller en av
       plassene på den** — prøv med en ureservert samleplass som har én plass satt av til
       korps A. De øvrige feltene i vinduet er låst for henne.
@@ -116,9 +119,9 @@ flere av feilene under finnes bare der.
 *Dette er modulens vanskeligste grense, og den går to steder: hvem som får **sette opp** en
 plass, og hvem som får **fylle** den.*
 
-- [ ] **«Opprett vakt»** (`test-vl-full`+): antall plasser, korps, rolle, tider, probono.
+- [ ] **«Nytt skift»** (het «Opprett vakt») (`test-vl-full`+): antall plasser, korps, rolle, tider, probono.
       Plassene fødes tomme.
-- [ ] **`test-vl-fore` har ikke «Opprett vakt»** og ikke tidsfeltene i regnearket — tidene
+- [ ] **`test-vl-fore` har ikke «Nytt skift»** og ikke tidsfeltene i regnearket — tidene
       vises som **tekst**, ikke som felter hun kan skrive i uten å få lagret.
 - [ ] **`test-vl-fore` fyller en plass** som er satt av til korps A → går gjennom. Plass satt
       av til korps B → knappen tilbyr ikke hennes folk, og endepunktet sier 403.

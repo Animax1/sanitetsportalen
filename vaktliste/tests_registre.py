@@ -280,7 +280,7 @@ class RollerErGruppasTests(TestCase):
         en rad man lager og aldri finner igjen."""
         res = self._post(self.leder, navn='Sjåfør')
         self.assertEqual(res.status_code, 400)
-        self.assertIn('ressursgruppe', res.json()['message'])
+        self.assertIn('ressurstype', res.json()['message'])
 
     def test_rolle_med_ukjent_gruppe_avvises(self):
         res = self._post(self.leder, navn='Sjåfør', gruppe_id=99999)

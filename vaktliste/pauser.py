@@ -171,6 +171,6 @@ def regelpause(fra, til, *, etter_min, lengde_min, indeks=0):
     if start + lengde > til:
         raise Planleggerfeil(
             f'Pausene får ikke plass i skiftet {_klokke(fra)}–{_klokke(til)} når de '
-            f'forskyves for {indeks + 1} ressurser. Kort ned pausene, legg dem '
+            f'forskyves for {indeks + 1} enheter. Kort ned pausene, legg dem '
             f'tidligere, eller slå av forskyvningen.')
     return start, start + lengde

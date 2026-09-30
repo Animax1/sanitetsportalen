@@ -37,8 +37,8 @@
 </head>
 <body>
 <h1>Vaktliste – {{ vakt_navn }}</h1>
-<p class="meta">{% if spenn %}{{ spenn }} · {% endif %}{{ antall }} skift · fila laget {{ laget }}{% if i_drift %} · lista var i drift{% endif %}</p>
-<p class="merk">Reserve for portalen. Fila inneholder navn og telefonnumre — slett den etter vakta. Skriv ut med Ctrl+P / Cmd+P.</p>
+<p class="meta">{% if spenn %}{{ spenn }} · {% endif %}{{ antall }} skift · filen laget {{ laget }}{% if i_drift %} · listen var i drift{% endif %}</p>
+<p class="merk">Reserve for portalen. Filen inneholder navn og telefonnumre — slett den etter vakten. Skriv ut med Ctrl+P / Cmd+P.</p>
 
 {% for g in grupper %}
 <h2>{{ g.navn }}</h2>
@@ -62,7 +62,7 @@
 </table>
 {% endfor %}
 {% empty %}
-<p class="tom">Ingen er satt opp på vakta.</p>
+<p class="tom">Ingen er satt opp på vakten.</p>
 {% endfor %}
 {% if brannliste %}
 <section class="brann">

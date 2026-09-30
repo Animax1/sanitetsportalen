@@ -634,7 +634,7 @@ class ApiTests(TestCase):
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
             data={'navn': 'Noe'}, content_type='application/json')
         self.assertEqual(res.status_code, 400)
-        self.assertIn('gruppe', res.json()['message'])
+        self.assertIn('ressurstype', res.json()['message'])
 
     def test_ukjent_gruppe_avvises(self):
         vl = self._liste()

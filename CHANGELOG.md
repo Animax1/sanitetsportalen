@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste` `#ordbok` `#tekst`
+
+**Hvorfor:** Gjennomgangen 30. sep. fant at skjermen brukte portalens ord, ikke Andrés — og
+han lærer opp korpsene. André: «ressurs er ambulanse, et lag, mannskapsbil. Enhet er det
+spesifikke laget … f.eks. Karmøy 51», «Koble til delt konto», «Ikke bruk vakta. Vi bruker
+vakten», og «ja, de skal ha -en form». Skissene av før og etter ble godkjent før byttet
+(«Ellers bra, kjør på»). **Bare tekstene er byttet.** Modellene, databasen og adressene
+heter det samme; `/oppdrag/` og `/ko/` tas etterpå (TODO).
+
+**Ordboka — hva det het før:**
+
+| Begrep | Het før på skjermen | Heter nå | I koden (uendret) |
+|---|---|---|---|
+| Hva slags ting (ambulanse, lag) | Ressursgruppe, «Gruppe», «gruppa» | **Ressurstype**, «typen» | `Ressursgruppe` |
+| Den konkrete (Karmøy 51, Lag 1) | Ressurs, «ressursen» | **Enhet**, «enheten» | `Ressurs` |
+| Koblingen til bilens konto | Enhet i oppdragsmodulen | **Koble til delt konto** (+ hint) | `Ressurs.enhet` |
+| Én plass med tider | Opprett vakt / Rediger skift | **Nytt skift** / Rediger skift | `Vaktpost` |
+| Arrangementet | Vaktnavn, «vakta» | **Navn på vakten**, «vakten» | `core.Vakt` |
+| Velgeren øverst | Planlegger | **Vaktliste** (fanen «Planlegger» heter som før) | `#vaktliste-velger` |
+| Rollene på en type | Ressursroller | **Roller** | `Ressursrolle` |
+| -a-former | vaktlista, lista, fila, natta, gruppa, tavla, klokka | vaktlisten, listen, filen, natten, gruppen, tavlen, klokken | |
+
+Gjelder vinduene, fanene, tabellhodene, planleggeren, fila på e-post, portalinnstillingene,
+matrise-etiketten («setter opp vakten») og **60 linjer med meldinger og tekst fra serveren** — ellers
+hadde vinduet sagt «enhet» og feilmeldingen «ressurs». «Enheten er ikke koblet til en
+ressurs i noen vaktliste» (sentralbordets besetning) ble **«Enheten er ikke koblet til
+noen vaktliste»**: i `/oppdrag` er enheten bilen, og ordet kunne ikke bety to ting i én setning.
+
+**Byttet brakk adressene, og ingen test så det.** Verktøyet som byttet ord i
+mal-strenger, tok også `/vaktliste/api/ressurser/…` → `/api/enheter/…` i seks kall —
+lagre, fjerne, sette opp skift, pauser. Hele suiten var grønn; node-testene stubber
+`apiFetch`. Fanget ved å lese diffen, rettet, og tettet:
+- **`vaktliste/tests_js_adresser.py`**: hver `/vaktliste/`-adresse i JS slås opp med
+  `resolve()` (`${…}` → `1`, registerstiene med de ekte verdiene, et avsluttende
+  `${korps}` som spørrestreng). Mutanten med `/api/enheter/` er rød.
+- **`vaktliste/tests_ordboka.py`**: leser teksten brukeren ser — tekstnoder og
+  `title`/`placeholder`/`aria-label`, JS-strenger med mellomrom og mal-strenger utenom
+  `${…}`, meldingsstrenger i Python utenom docstrings — og blir rød på et gammelt ord. Et
+  ord inntil `/` er en sti. `models.py` er utenfor (`help_text` vises bare i Django-admin).
+  Tre mutanter («Ny ressurs» i fanerekka, «vakta» i en servermelding, «Enhet i
+  oppdragsmodulen» i malen): alle røde.
+- Verktøyet hoppet også over meldinger som fortsetter over flere linjer i parenteser
+  (`'ressurs(er) og kan ikke slettes…'`) — de ble tatt for docstrings. Rettet, og vakten
+  prøver akkurat det tilfellet.
+
+**Tester:** 21 tester krevde de gamle ordene og følger nå de nye. `docs/TESTSJEKKLISTE_VAKTLISTE.md`
+bruker de nye etikettene med det gamle navnet i parentes, og har fått punktet «Ordboka».
+Skissene: https://claude.ai/artifact/KRgfWuv1ZdetietLmBZ5m8
+
 ## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#ci` `#tester` `#vaktliste`
 
 **Hvorfor:** CI-kjøring #57 på `e81709d` feilet med tre feil, alle `InterfaceError: connection

@@ -45,7 +45,7 @@ class FilaTests(FilBasis):
         self._skift(self.res_karmoy, self.p_karmoy, fra=8, til=16)
         html = fil.bygg_fil(self.vl)
         for ventet in ('Kari', 'Ola', 'HGSD', 'Karmøy', '900 00 000', '0012345',
-                       'Lag HGSD', 'Lag Karmøy', 'slett den etter vakta', '<!doctype html>'):
+                       'Lag HGSD', 'Lag Karmøy', 'slett den etter vakten', '<!doctype html>'):
             self.assertIn(ventet, html, ventet)
         for forbudt in ('kari@example.org', 'Skal hentes', 'allergisk', 'går hjem tidlig'):
             self.assertNotIn(forbudt, html, f'«{forbudt}» skal ikke ut i en innboks')
@@ -102,7 +102,7 @@ class UtsendingTests(FilBasis):
         self.assertEqual(mimetype, 'text/html')
         self.assertIn('Kari', innhold)
         self.assertNotIn('Kari', m.body, 'kroppen bærer ingen personopplysninger')
-        self.assertIn('Slett den etter vakta', m.body)
+        self.assertIn('Slett den etter vakten', m.body)
         audit = AuditLog.objects.get(table_name='vaktliste_utsending', action='CREATE')
         self.assertIn('vaktleder@example.org', audit.new_value)
         self.assertIn('sendt', audit.new_value)
@@ -523,7 +523,7 @@ class IntervallTekstJsTests(FilknappeneJsTests):
     def test_teksten_nevner_intervallet_og_endringskravet(self):
         ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'fil_ved_drift': True,
                          'fil_intervall_min': 5, 'fil_bare_endret': True})
-        self.assertIn('sendes også ved sett i drift og hvert 5. min i drift når lista er endret.', ut)
+        self.assertIn('sendes også ved sett i drift og hvert 5. min i drift når listen er endret.', ut)
         ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'fil_ved_drift': False,
                          'fil_intervall_min': 10, 'fil_bare_endret': False})
         self.assertIn('sendes også hvert 10. min i drift.', ut)

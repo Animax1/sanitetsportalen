@@ -1974,23 +1974,23 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
 
     def test_lederen_ser_knappen_sist_i_rekka(self):
         ut = self._tegn('skriv_leder')
-        self.assertIn('Ny ressurs', ut)
-        self.assertLess(ut.index('Ambulanse'), ut.index('Ny ressurs'),
+        self.assertIn('Ny enhet', ut)
+        self.assertLess(ut.index('Ambulanse'), ut.index('Ny enhet'),
                         'knappen skal stå etter fanene, ikke foran dem')
         self.assertIn('apneNyRessurs', ut)
 
     def test_admin_ser_den_ogsaa(self):
-        self.assertIn('Ny ressurs', self._tegn('', admin=True))
+        self.assertIn('Ny enhet', self._tegn('', admin=True))
 
     def test_bemanneren_ser_den_ikke(self):
         """`skriv_full` bemanner; hva vakta består av er vaktlederens
         beslutning. Knappen ville gitt 403."""
         ut = self._tegn('skriv_full')
         self.assertIn('Ambulanse', ut, 'fanene skal fortsatt tegnes')
-        self.assertNotIn('Ny ressurs', ut)
+        self.assertNotIn('Ny enhet', ut)
 
     def test_leseren_ser_den_ikke(self):
-        self.assertNotIn('Ny ressurs', self._tegn('les'))
+        self.assertNotIn('Ny enhet', self._tegn('les'))
 
     def test_planleggerfanen_er_ledernes(self):
         """André, 15. sep. 2026: «Den skal bare admin og leder ha tilgang
@@ -2353,7 +2353,7 @@ class UtskriftslistaTests(SimpleTestCase):
         er generisk.
         """
         ut = self._ut()
-        for kolonne in ('Ressurs', 'Tid', 'Timer', 'Plasser', 'Besatt',
+        for kolonne in ('Enhet', 'Tid', 'Timer', 'Plasser', 'Besatt',
                         'Ledige', 'Totalt'):
             with self.subTest(kolonne=kolonne):
                 self.assertIn(f'<th>{kolonne}</th>', ut)
@@ -2860,7 +2860,7 @@ class NyRessursSkjemaetTests(SimpleTestCase):
           felter['ny-ressurs-gruppe'].value = '';
           await opprettRessurs();
           assert(sendtBody === null, 'en ressurs uten gruppe ble sendt til serveren');
-          assert(globalThis.feilmelding === 'Velg hvilken gruppe ressursen hører til.',
+          assert(globalThis.feilmelding === 'Velg hvilken ressurstype enheten hører til.',
                  'feil melding: ' + globalThis.feilmelding);
         """)
 
@@ -3792,7 +3792,7 @@ class PlanleggerfanenTests(SimpleTestCase):
     def test_tom_planlegger_sier_hvordan_man_begynner(self):
         """En tom flate med bare en knapp forteller ikke hva knappen lager."""
         ut = self._vis([])
-        self.assertIn('Legg til ressurs', ut)
+        self.assertIn('Legg til enhet', ut)
         self.assertIn('to vinduer', ut)
 
     def test_tre_firemannslag_gir_tolv_plasser(self):
@@ -3906,7 +3906,7 @@ class PlanleggerfanenTests(SimpleTestCase):
         vindu til vindu — hvert vindu viser sitt eget tall, raden summen."""
         ut = self._vis([self._linje(self.LAG, 3, 4,
                                     (self.FRE14, self.FRE22))])
-        self.assertIn('1 skift × 3 ressurser = 12 plasser, 96 t', ut)
+        self.assertIn('1 skift × 3 enheter = 12 plasser, 96 t', ut)
 
     def test_antall_paa_en_utelates_fra_regnestykket(self):
         """«× 1 ressurser» er et ledd som ikke gjør noe, og det er nettopp
@@ -4103,7 +4103,7 @@ class PlanleggerfanenTests(SimpleTestCase):
         ut = self._tilbake([self.RES1], [
             self._plass(11, self.FRE14, self.FRE22)], marker=True)
         self.assertIn('Lag 1', ut)
-        self.assertIn('står på lista', ut)
+        self.assertIn('står på listen', ut)
         self.assertNotIn('data-felt="gruppe_id"', ut)
         self.assertNotIn('data-felt="antall"', ut)
 
@@ -4119,7 +4119,7 @@ class PlanleggerfanenTests(SimpleTestCase):
         ut = self._vis([self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22))])
         self.assertIn('data-felt="gruppe_id"', ut)
         self.assertIn('data-felt="antall"', ut)
-        self.assertNotIn('står på lista', ut)
+        self.assertNotIn('står på listen', ut)
 
     def test_panelet_sier_hvor_mange_rader_som_rettes(self):
         ut = self._tilbake([self.RES1], [
@@ -4182,12 +4182,12 @@ class GenererbekreftelsenTests(SimpleTestCase):
 
     def test_ny_ressurs_merkes_som_ny(self):
         ut = self._vis(self._fasit([self._rad()]))
-        self.assertIn('ny ressurs', ut)
+        self.assertIn('ny enhet', ut)
 
     def test_ressurs_som_rettes_merkes_som_det(self):
         ut = self._vis(self._fasit([self._rad(finnes=True, plasser=2)]))
         self.assertIn('rettes', ut)
-        self.assertNotIn('ny ressurs', ut)
+        self.assertNotIn('ny enhet', ut)
 
     def test_ressurs_uten_endring_merkes_uendret(self):
         """Den raden er det viktigste av de tre merkene: uten den ser en

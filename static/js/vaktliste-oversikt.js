@@ -499,7 +499,7 @@ function mkOversikt() {
           </colgroup>
           <thead>
             <tr>
-              <th>Ressurs</th><th>Tid</th><th>Timer</th>
+              <th>Enhet</th><th>Tid</th><th>Timer</th>
               <th>Plasser</th><th>Besatt</th><th>Ledige</th><th>Totalt</th>
             </tr>
           </thead>
@@ -823,12 +823,12 @@ function _planleggerHode(linje) {
     return `
         <span class="vl-navn vl-pl-navn">${escapeHtml(linje.navn || '')}</span>
         <span class="vl-meta vl-pl-eneste">
-          <i class="bi bi-check2-circle me-1"></i>${escapeHtml(gruppenavn)} · står på lista
+          <i class="bi bi-check2-circle me-1"></i>${escapeHtml(gruppenavn)} · står på listen
         </span>
         <span class="vl-pl-spacer"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary"
                 data-action="planleggerFjernLinje" data-id="${escHtmlValue(linje.id)}"
-                title="Ta raden ut av oppsettet. Ressursen og plassene blir stående.">
+                title="Ta raden ut av oppsettet. Enheten og plassene blir stående.">
           <i class="bi bi-eye-slash me-1"></i>Ta ut
         </button>`;
   }
@@ -855,7 +855,7 @@ function _planleggerHode(linje) {
                  data-felt="antall" data-id="${escHtmlValue(linje.id)}"></label>`;
 
   return `
-        <label class="vl-meta">Gruppe
+        <label class="vl-meta">Ressurstype
           <select class="form-select form-select-sm"
                   data-action="planleggerSettLinje" data-hendelse="change"
                   data-felt="gruppe_id" data-id="${escHtmlValue(linje.id)}">${grupper}</select></label>
@@ -932,7 +932,7 @@ function _planleggerRegnestykke(linje, t) {
   if (!t.skift) return 'Fyll ut et gyldig tidsrom.';
   const skiftord = t.skift === 1 ? 'skift' : 'skift';
   const ledd = antall > 1
-    ? `${_tall(t.skift / antall)} ${skiftord} × ${_tall(antall)} ressurser`
+    ? `${_tall(t.skift / antall)} ${skiftord} × ${_tall(antall)} enheter`
     : `${_tall(t.skift)} ${skiftord}`;
   return `${ledd} = ${_tall(t.plasser)} plasser, ${_tall(t.timer)} t`;
 }
@@ -968,8 +968,8 @@ function mkPlanlegger() {
 
   const tomt = planleggerlinjer.length ? '' : `
     <div class="vl-kort"><div class="vl-tom">
-      Legg til en ressurs for å begynne. Et lag på fire som går 14–22 er én
-      rad med ett skiftvindu. En samleplass med seks på dagtid og to om natta
+      Legg til en enhet for å begynne. Et lag på fire som går 14–22 er én
+      rad med ett skiftvindu. En samleplass med seks på dagtid og to om natten
       er én rad med to vinduer — og et nytt vindu begynner der det forrige
       sluttet.
     </div></div>`;
@@ -984,7 +984,7 @@ function mkPlanlegger() {
   const oppsummering = planleggerlinjer.length ? `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
-        <div><b data-plantall="ressurser">${escHtmlValue(total.ressurser)}</b><span class="vl-meta">ressurser</span></div>
+        <div><b data-plantall="ressurser">${escHtmlValue(total.ressurser)}</b><span class="vl-meta">enheter</span></div>
         <div><b data-plantall="plasser">${escHtmlValue(total.plasser)}</b><span class="vl-meta">plasser</span></div>
         <div><b data-plantall="timer">${escapeHtml(_tall(total.timer))} t</b><span class="vl-meta">til sammen</span></div>
       </div>
@@ -1008,18 +1008,18 @@ function mkPlanlegger() {
     <div class="vl-pl-legg-til">
       <button type="button" class="btn btn-outline-secondary"
               data-action="planleggerNyLinje">
-        <i class="bi bi-plus-lg me-1"></i>Legg til ressurs
+        <i class="bi bi-plus-lg me-1"></i>Legg til enhet
       </button>
     </div>`;
 
   const staarTekst = staaende ? `
       <span class="vl-meta">${escHtmlValue(staaende)} av radene står allerede
-        på lista og blir <strong>rettet</strong>, ikke laget på nytt.</span>` : '';
+        på listen og blir <strong>rettet</strong>, ikke laget på nytt.</span>` : '';
 
   return mkBudsjett() + `
     <div class="vl-kort vl-kort-topp">
       <span class="vl-kort-tittel">Oppsett</span>
-      <span class="vl-meta">Én rad per ressurs. Plassene fødes som
+      <span class="vl-meta">Én rad per enhet. Plassene fødes som
         <strong>planlagt</strong> — usynlige for korpsene til du deler dem ut.</span>
       ${staarTekst}
     </div>` + utenStart + linjer + tomt + leggTil + oppsummering;
@@ -1331,7 +1331,7 @@ function mkMittKorps() {
             <col style="width: 16%"><col style="width: 18%">
           </colgroup>
           <thead>
-            <tr><th>Ressurs</th><th>Hvem</th><th>Tildelt</th><th>Rolle</th><th>Merknad</th></tr>
+            <tr><th>Enhet</th><th>Hvem</th><th>Tildelt</th><th>Rolle</th><th>Merknad</th></tr>
           </thead>
           <tbody>${rader}</tbody>
         </table>
@@ -1343,7 +1343,7 @@ function mkMittKorps() {
 function mkIkkePlassert() {
   const folk = _ikkePlassert();
   if (!folk.length) {
-    return '<div class="vl-kort"><div class="vl-tom">Alle i registeret står på lista.</div></div>';
+    return '<div class="vl-kort"><div class="vl-tom">Alle i registeret står på listen.</div></div>';
   }
   const rader = folk.map((m) => `
     <div class="vl-rad">

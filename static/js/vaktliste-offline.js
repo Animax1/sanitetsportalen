@@ -155,7 +155,7 @@ function tegnOffline() {
   if (offlineTilstand.sesjonUtgaatt) {
     tekst = 'Innloggingen har gått ut. Logg inn på nytt i en annen fane, så sendes det som venter.' + venter;
   } else if (offlineTilstand.frakoblet || offlineTilstand.kopiFra) {
-    const fra = offlineTilstand.kopiFra ? ` Viser lista slik den var ${_dag(offlineTilstand.kopiFra)} ${_kl(offlineTilstand.kopiFra)}.` : '';
+    const fra = offlineTilstand.kopiFra ? ` Viser listen slik den var ${_dag(offlineTilstand.kopiFra)} ${_kl(offlineTilstand.kopiFra)}.` : '';
     tekst = 'Serveren svarer ikke.' + fra + ' Møtt og av vakt kan fortsatt stemples; de sendes når serveren svarer.' + venter;
   } else if (antall) {
     tekst = 'Sender…' + venter;
@@ -282,7 +282,7 @@ function apneRedigerVaktpost(id) {
   _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Åpen for alle' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
-    }))), '— som ressursen —');
+    }))), '— som enheten —');
   _settVerdi('vaktpost-korps', vp.alle_korps ? 'alle' : vp.plass_korps_id);
 
   _settVerdi('vaktpost-mannskap', vp.mannskap_id);
