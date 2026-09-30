@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling, pulje F: personvernet og dokumentasjonen — «historikk over posisjoner er en ny behandling»  `#kartkobling` `#personvern` `#dokumentasjon`
+
+**Hvorfor:** `docs/PLAN_KARTKOBLING.md` §8. Posisjonen til en bil med mannskap i er en
+personopplysning, og avveiningen skal stå skrevet før noe sendes (B13).
+
+**Hva:**
+- `docs/PERSONVERN_DOKUMENTASJON.md` v1.16: ny behandling i A.6, «Posisjon og sted til
+  kart.sanitet.net» — hva som sendes og hva som ikke gjør det, formål (koordinering og
+  mannskapets sikkerhet), grunnlag (**berettiget interesse, art. 6(1)(f)**) og avveiningen:
+  hendelsesstyrt, siste posisjon, ingen historikk, synlig for mannskapet med bryteren,
+  mottakeren er korpsets eget kart. Setningen **«Historikk over posisjoner er en ny behandling
+  og krever ny vurdering.»** Kartet som mottaker i A.7, lagringstid i A.9, rad i B.8.
+- **A.1:** B13 (30. sep.) — korpset er behandlingsansvarlig for begge appene, André
+  systemansvarlig — er ført inn som merknad. TODO-punktet «Avklar hvem som er
+  behandlingsansvarlig» er besvart og slått sammen med punktet om organisasjonsnavnet i A.4,
+  som fortsatt mangler og som A.1-tabellen venter på.
+- `CLAUDE.md` (rota): kort avsnitt under «Avhengighetsretningen» om `core/kartkobling.py` —
+  den gjelder to moduler. `oppdrag/CLAUDE.md`, `templates/oppdrag/CLAUDE.md` og `ko/CLAUDE.md`
+  fikk sine deler i pulje D og E.
+- `docs/PLAN_KARTKOBLING.md`: status oppdatert.
+- **Funnet under utførelsen, i TODO:** planens §0 vil ha «én ekte stempling fra en bil på
+  staging», men B14 og §9 sier at staging-portalens `KART_URL` skal stå tom til et staging-kart
+  finnes. Prøven må tas i prod, eller kartet må få et staging-miljø.
+
 ## 2026-09-30 — Kartkobling, pulje E: lagene fra KO til kartet — «Lag 3 står på Parkscene»  `#kartkobling` `#ko` `#tavla`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §7 (B5): lagnavn og stedsnavn ved plassering på tavla,

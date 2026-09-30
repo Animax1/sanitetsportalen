@@ -1,6 +1,7 @@
 # Plan: kobling fra portalen til kart.sanitet.net
 
-Status: **besluttet, ikke påbegynt.** Skrevet 30. september 2026 etter en samtale med
+Status: **pulje A–F utført 30. september 2026** (se CHANGELOG i begge repoene); gjenstår
+Railway-variablene i §9 og den ekte prøven fra en bil. Opprinnelig status: besluttet, ikke påbegynt. Skrevet 30. september 2026 etter en samtale med
 André samme dag; beslutningene i §1 er hans, og de skal ikke tas opp igjen av den som
 bygger. Planen utføres i en **egen sesjon**, i begge repoene (`sanitetsportalen` og
 `kart.sanitet`). Arbeidslista er `TODO.md` i hvert repo, historien `CHANGELOG.md`.

@@ -650,6 +650,13 @@ to nettopp fordi hver modul skriver sitt, uten transaksjon mellom seg: en modul 
 nekter skal stoppe hele innsendingen, også portalens egne felter.
 `core/tests_registre.py` prøver begge egenskapene med oppdiktede handlere.
 
+**`core/kartkobling.py` er klienten mot kart.sanitet.net** (30. sep. 2026): oppdrag sender
+bilens posisjon ved stempling, KO lagenes sted, og ingen av dem kjenner den andre. Bare
+fra portalen til kartet, signert med HMAC, inert uten `KART_URL`, kaster aldri, lagrer ingenting.
+Kallstedet legger sendingen i `transaction.on_commit`. `posisjon` i stemplingen er det andre
+navngitte unntaket fra «`skriv_handling` leser ikke kroppen» — ikke et domenefelt, og det
+lagres aldri. Detaljene står hos modulene og i `docs/PLAN_KARTKOBLING.md`.
+
 **Modul til modul går bare én vei, og den veien er navngitt.** Sentralbordet i `oppdrag`
 viser besetningen fra vaktlista, og retningen er `vaktliste` → `oppdrag`: oppdragsmodulen
 importerer **ikke** vaktlista, gaten settes med en slug gjennom `core`, og

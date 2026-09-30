@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 29. september 2026  
-**Versjon:** 1.15  
+**Siste oppdatering:** 30. september 2026  
+**Versjon:** 1.16  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -24,6 +24,8 @@
 Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd med gjeldende personvernregelverk, herunder EUs personvernforordning (GDPR) og lov om behandling av personopplysninger (personopplysningsloven) av 2018.
 
 > **Merk om ansvarssubjekt:** Behandlingsansvaret er per i dag lagt til André Eritsland som privatperson, ikke til organisasjonen som gjennomfører sanitetsvaktene. Det innebærer at innsynskrav, avviksmelding til Datatilsynet og det rettslige ansvaret ligger hos behandlingsansvarlig personlig. Dette er et bevisst valg og bør revurderes ved den årlige revisjonen (se C.4).
+>
+> **Besluttet 30. september 2026 (André, `docs/PLAN_KARTKOBLING.md` §1, B13):** behandlingsansvarlig er **korpset**, for både portalen og kart.sanitet.net, og André Eritsland er **systemansvarlig**. Tabellen over og signaturen er ikke skrevet om ennå, fordi organisasjonsnavnet står åpent i A.4 — når det er fylt inn, skal A.1, hodet og signaturfeltet følge. Beslutningen gjelder fra datoen over; avveiningen for kartkoblingen står i A.6.
 
 ---
 
@@ -393,6 +395,48 @@ den sterkeste formen for dataminimering som finnes, og den reduserer risikoen re
 designet antar at opplæring forvitrer under press, og har derfor en sletteinngang. Se A.9
 for oppbevaringstid, sletteinngangen og forbeholdet om backupene.
 
+### Posisjon og sted til kart.sanitet.net (kartkoblingen) — 30. september 2026
+
+Portalen sender to ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
+`docs/PLAN_KARTKOBLING.md`). **Portalen lagrer ingenting av det** — ingen tabell, ingen
+revisjonsrad; den videresender og glemmer.
+
+| Hva | Innhold | Når | Kategori |
+|---|---|---|---|
+| **Enhetenes posisjon ved stempling** | Enhetens navn (`oppdrag.Enhet.navn`, f.eks. «Haugesund 56»), bredde- og lengdegrad, tidspunktet for posisjonen | Bare når mannskapet stempler en status, og bare en posisjon under to minutter gammel | Vanlig personopplysning: posisjonen er kjøretøyets, men sammen med vaktlista peker den på mannskapet i bilen |
+| **Lagenes sted** | Lagnavnet og stedsnavnet der KO har plassert laget, eller hendelsens sted — **ingen koordinater** | Når KO flytter laget, setter det på eller av en hendelse | Vanlig personopplysning på samme måte, i grovere form |
+
+**Det som ikke sendes:** status, oppdragsnummer, hendelsesnummer, hastegrad,
+problemstilling, fritekst, nøyaktighet. Ingen helseopplysning går til kartet.
+
+**Formål:** koordinering under vakt — hvor bilene sist var, og hvor lagene står — og
+mannskapets egen sikkerhet: en bil som ikke svarer på samband, kan finnes der den sist
+stemplet.
+
+**Rettslig grunnlag:** berettiget interesse, GDPR art. 6 nr. 1 bokstav f.
+
+**Avveiningen:**
+
+- *Interessen* er reell og korpsets egen: operativ oversikt over egne ressurser under et
+  arrangement, og sikkerheten til mannskapet som kjører.
+- *Nødvendigheten*: det som sendes er det minste som gir oversikten — siste posisjon ved en
+  handling mannskapet selv gjør, ikke et spor. Lagene sendes som stedsnavn, ikke koordinater.
+- *Den registrertes forventning og inngrep*: behandlingen er **hendelsesstyrt** (ved
+  stempling, ingen løpende sending), **bare siste posisjon** (én rad per enhet som
+  overskrives), **ingen historikk**, og raden slettes i kartet **24 timer** etter siste
+  melding. Den er **synlig for mannskapet**: bilskjermen sier «Posisjon sendes til kartet
+  ved stempling», og bryteren «Del posisjon» slår den av på den skjermen. Nettleseren spør
+  om lov før den gir posisjon, og et nei stopper ingenting annet enn posisjonen.
+  Stemplingen venter aldri på posisjonen.
+- *Mottakeren* er **korpsets eget kart**, med samme behandlingsansvarlige (A.1), og bare
+  medlemmer av en kartgruppe der kartets administrator har slått på «Viser enheter og lag
+  fra portalen» ser noe. Meldingene er signert (HMAC) og går over TLS; kartet returnerer
+  aldri data til portalen.
+
+Samlet veier korpsets interesse tyngre enn inngrepet, gitt grensene over.
+**Historikk over posisjoner er en ny behandling og krever ny vurdering.** Det samme gjelder
+løpende deling av posisjon, og enhver utvidelse av feltene som sendes.
+
 ### Varsler (Notification)
 
 `core.Notification` gir beskjed i portalen når en bruker tildeles eller fratas ansvar for en pasient.
@@ -451,6 +495,7 @@ Key-prefiks `pasientregistrering:` brukes for å isolere applikasjonens nøkler 
 |---|---|---|
 | Interne appbrukere (helsepersonell/frivillige med konto) | Tjenestlig behov, rollebasert tilgangsstyring | Pasientdata i henhold til tildelt rolle |
 | Railway Corp. (databehandler) | Databehandleravtale (DPA), art. 28 | All data lagret i databasen (infrastrukturtilgang, ikke applikasjonsnivå) |
+| kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling; lagets navn og stedsnavn. Ingen helseopplysninger |
 
 Det foretas **ingen videreformidling** til tredjeparter, kommersielle aktører, offentlige myndigheter (med unntak av eventuelle lovpålagte utleveringer) eller andre organisasjoner.
 
@@ -485,6 +530,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
+| **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
@@ -989,6 +1035,7 @@ Denne delen gjelder deg som logger inn i systemet og registrerer pasienter — i
 | Endringslogg: hvilke endringer du har gjort på pasientopplysninger, med tidspunkt og IP | 2 år |
 | Varsler du har fått i portalen | 30 dager |
 | Navnet ditt på pasienter du har hatt ansvar for under en arkivert vakt | Følger arkivet |
+| Kjører du en bil med enhetsskjerm: bilens posisjon når du stempler, sendt til korpsets kart (ikke lagret i portalen). Slås av med «Del posisjon» på skjermen | 24 timer i kartet, bare siste posisjon |
 
 ### Hvorfor
 
@@ -1150,9 +1197,17 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.15 – sist oppdatert 29. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.16 – sist oppdatert 30. september 2026*
 
 **Endringslogg:**
+
+- **v1.16 (30.09.2026):** **Kartkoblingen:** ny behandling i A.6 — enhetenes posisjon ved
+  stempling og lagenes sted sendes til kart.sanitet.net, med formål, grunnlag (berettiget
+  interesse, art. 6(1)(f)) og avveining; «historikk over posisjoner er en ny behandling og
+  krever ny vurdering». Kartet som mottaker i A.7, lagringstid i A.9 (portalen lagrer ikke,
+  kartet sletter etter 24 timer), og en rad i B.8. **A.1:** beslutningen fra 30. sep. om at
+  korpset er behandlingsansvarlig og André systemansvarlig (B13) er ført inn; tabellen følger
+  når organisasjonsnavnet i A.4 er fylt inn.
 
 - **v1.15 (29.09.2026):** **Sikkerhetstiltak:** krypteringsformatet offsite er `SPBK2` med
   filnavnet autentisert, og gjenopprettingen laster bare modulens egne modeller. Nytt

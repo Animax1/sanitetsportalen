@@ -42,21 +42,18 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       pluss `KART_URL=https://kart.sanitet.net` i prod-portalen. **Staging-portalens
       `KART_URL` skal stå tom** — kartet har bare ett miljø, og staging skal aldri tegne i
       prod-kartet (B14). Nøkkelen i korpsets passordbehandler. Status på
-      `/portal-admin/server-status/`, kortet «Kart.sanitet.net».
+      `/portal-admin/server-status/`, kortet «Kart.sanitet.net». **Prøven «én ekte stempling
+      fra en bil på staging» (planens §0) kan ikke gjøres slik planen står:** staging-portalen
+      skal ikke ha `KART_URL` før et staging-kart finnes. Enten et eget staging-miljø for kartet
+      (med egen nøkkel), eller prøven tas i prod etter at `main` har fått koblingen. I kartet:
+      slå på «Viser enheter og lag fra portalen» på gruppa som skal se dem.
 
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
-      behandlingsprotokollen overfor tilsynsmyndighet.
-
-- [ ] **Avklar hvem som er behandlingsansvarlig** (14. sep. 2026). A.1 legger ansvaret på
-      André som privatperson, ikke på organisasjonen som gjennomfører vaktene. Det er en
-      avgjørelse utenfor kodebasen, og den påvirker DPIA-vurderingen, hjemmelen i
-      art. 9(2)(h) og hvem som håndterer innsynskrav og avviksmelding. Behandlingsansvar
-      følger virkeligheten, ikke papiret: bestemmer foreningen formål og midler, er de
-      ansvarlig uansett hva dokumentet sier. Begrunnelsen står i
-      [`docs/NOTAT_DPIA_OG_FRITEKST.md`](./docs/NOTAT_DPIA_OG_FRITEKST.md) §5.
-      Dokumentet flagger det selv som noe for den årlige revisjonen; vurderingen er at
-      det bør opp før adresse legges inn i oppdragsmodulen
+      behandlingsprotokollen overfor tilsynsmyndighet. **Behandlingsansvarlig er besluttet**
+      (B13 i `docs/PLAN_KARTKOBLING.md`, 30. sep. 2026): korpset, for portalen og
+      kart.sanitet.net, med André som systemansvarlig. Når navnet er på plass, skrives A.1,
+      dokumenthodet og signaturfeltet om til korpset — beslutningen står alt som merknad i A.1.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
@@ -161,8 +158,6 @@ ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `v
       unntak i `FOR_STORE_I_DAG` (22 200) for pekeren til `ko/kartkobling.py`. Programmet og
       hendelsesloggen er de største seksjonene; én av dem kan flytte til en egen fil, slik
       flaten ble skilt ut i `templates/ko/CLAUDE.md` 22. sep., og unntaket strykes
-- [ ] Pulje F — personverndokumentasjonen (berettiget interesse, «historikk er en ny behandling»),
-      `CLAUDE.md`-filene, kartets `PLAN.md` §1 og §3.2
 
 ## Pågående / neste
 
