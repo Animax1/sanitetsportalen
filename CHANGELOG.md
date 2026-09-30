@@ -69,7 +69,20 @@ Nye tester: `vaktliste/tests_del_ut.py` (endepunktet, tilgangen, frigjøringen) 
 `handlinger.js` gikk over 1 800 linjer; planleggerens del-ut-hjelpere står i
 `vaktliste-oversikt.js`, ved tabellen de tegner.
 
----
+## 2026-09-30 — CI rød på pip-audit: urllib3 2.7.0 har tre CVE-er (CVE-2026-97687/-97688/-97689), låst til 2.8.0  `#ci` `#avhengigheter` `#sikkerhet`
+
+**Hvorfor:** CI-kjøring #60 på `a30bc2d` (flettingen av kartkoblingsplanen) var grønn på alle
+testene og rød på steget «Kjente sårbarheter (pip-audit)»: `urllib3 2.7.0` fikk tre
+rådgivninger publisert samme ettermiddag, mellom kjøring #59 (14:28, grønn) og #60 (19:10).
+Reprodusert lokalt med nøyaktig CI-kommandoen. Ikke knyttet til noen endring i repoet —
+det er hele poenget med steget, jf. kommentaren i `tester.yml`.
+
+**Hva:**
+- `requirements.txt`: `pip-compile --upgrade-package urllib3` under Python 3.13, som
+  headeren sier. Diffen er de tre urllib3-linjene og ingenting annet; `requirements.in` er
+  uendret (urllib3 er transitiv via botocore).
+- Verifisert: `pip-audit` grønn; `pip install --require-hashes` i et rent 3.13-venv, som på
+  Railway; `core.tests_offsite` (boto3-stien) grønn i det miljøet.
 
 ## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste` `#ordbok` `#tekst`
 
@@ -119,6 +132,22 @@ lagre, fjerne, sette opp skift, pauser. Hele suiten var grønn; node-testene stu
 **Tester:** 21 tester krevde de gamle ordene og følger nå de nye. `docs/TESTSJEKKLISTE_VAKTLISTE.md`
 bruker de nye etikettene med det gamle navnet i parentes, og har fått punktet «Ordboka».
 Skissene: https://claude.ai/artifact/KRgfWuv1ZdetietLmBZ5m8
+
+## 2026-09-30 — Kartkobling planlagt: bilens posisjon ved stempling og lagenes sted fra KO sendes til kart.sanitet.net  `#kart` `#oppdrag` `#ko` `#personvern` `#plan`
+
+**Hvorfor:** André, 30. sep.: «enhver bilressurs som bruker /oppdrag gir enhetsnavn og
+posisjon til kart.sanitet-appen», og «/ko når de plasserer lag så vil det vises litt på
+samme måte i kartet». Spørsmålet var om det skulle bygges som en modul i portalen eller mot
+det egne kartprosjektet; svaret ble **to apper, bare portal → kart, HMAC over TLS, ingen
+lagring i portalen, siste posisjon i kartet uten historikk**. Bilen sender posisjonen som
+del av stemplingen den alt sender, og kartet tegner «sist kjente», ikke live.
+
+**Hva:**
+- `docs/PLAN_KARTKOBLING.md`: beslutningene B1–B14, meldingsformatet med signaturregelen,
+  seks puljer i rekkefølge (kartet først, så `core/kartkobling.py`, oppdrag, KO, dokumentasjon),
+  Railway-variablene per miljø, og hva som ikke skal gjøres. Skrevet for en egen sesjon,
+  med hensyn til at `/vaktliste/` arbeides på samtidig.
+- Ingen kode ennå. Arbeidslista står i `TODO.md` under «Kartkobling».
 
 ## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#ci` `#tester` `#vaktliste`
 
