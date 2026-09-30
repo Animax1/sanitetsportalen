@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling planlagt: bilens posisjon ved stempling og lagenes sted fra KO sendes til kart.sanitet.net  `#kart` `#oppdrag` `#ko` `#personvern` `#plan`
+
+**Hvorfor:** André, 30. sep.: «enhver bilressurs som bruker /oppdrag gir enhetsnavn og
+posisjon til kart.sanitet-appen», og «/ko når de plasserer lag så vil det vises litt på
+samme måte i kartet». Spørsmålet var om det skulle bygges som en modul i portalen eller mot
+det egne kartprosjektet; svaret ble **to apper, bare portal → kart, HMAC over TLS, ingen
+lagring i portalen, siste posisjon i kartet uten historikk**. Bilen sender posisjonen som
+del av stemplingen den alt sender, og kartet tegner «sist kjente», ikke live.
+
+**Hva:**
+- `docs/PLAN_KARTKOBLING.md`: beslutningene B1–B14, meldingsformatet med signaturregelen,
+  seks puljer i rekkefølge (kartet først, så `core/kartkobling.py`, oppdrag, KO, dokumentasjon),
+  Railway-variablene per miljø, og hva som ikke skal gjøres. Skrevet for en egen sesjon,
+  med hensyn til at `/vaktliste/` arbeides på samtidig.
+- Ingen kode ennå. Arbeidslista står i `TODO.md` under «Kartkobling».
+
 ## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#ci` `#tester` `#vaktliste`
 
 **Hvorfor:** CI-kjøring #57 på `e81709d` feilet med tre feil, alle `InterfaceError: connection
