@@ -81,6 +81,8 @@ urlpatterns = [
     # jobben. Et eget endepunkt ville vært to steder å komme i utakt.
     path('api/vaktlister/<int:pk>/generer/', views.generer_view,
          name='vaktliste_api_generer'),
+    path('api/vaktlister/<int:pk>/del-ut/', views.del_ut_view,
+         name='vaktliste_api_del_ut'),
     path('api/grenser/', views.grenser_view, name='vaktliste_api_grenser'),
 
     # Drift (fase 4). Retningen og overgangen står i URL-en, ikke i kroppen:

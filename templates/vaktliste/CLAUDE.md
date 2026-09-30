@@ -19,6 +19,19 @@ Kode og adresser er utenfor: `/api/ressurser/` er en rute, ikke tekst.
 `tests_js_adresser.py` slår hver `/vaktliste/`-adresse i JS opp med `resolve()`; byttet
 gjorde først seks kall til `/api/enheter/`, og ingen annen test ble rød.
 
+## «Del ut» på skjermen (pulje 4, 30. sep. 2026)
+
+Tre flater, ett endepunkt (regelen står i `vaktliste/CLAUDE.md`):
+
+| Hvor | Hva | Regel |
+|---|---|---|
+| Enhetskortet | `utdelingsmerke()`: «N plasser ikke delt ut» (gult), korpset, «Åpen for alle» eller «Delt ut til N korps». Het «Ureservert», som leste som «ledig for alle» og betydde lederens kladd | Teller `_allePoster()`, ikke `vaktposter` — kladden har ikke noe korps, og korpsvelgeren ville tatt den |
+| Kortets knapp og vinduet | «Del ut …» er hovedknappen så lenge `kanDeleUt()`; `apneDelUt()`/`lagreDelUt()` | `ikkeDeltUt()` speiler `services.KLADD` |
+| Planleggeren | `mkVaktramme()` øverst (spennet, «Endre» åpner samme vindu som «Innstillinger», grensene som tekst), `mkDelUtTabell()` nederst | Valgene i `delUtValg` (JS, ikke DOM); knappen oppdateres på plass (`planleggerTegnDelUt`) |
+
+Grensene er organisasjonens og har ingen «Endre» i planleggeren — den fanen ser ut til å
+gjelde én vakt.
+
 ## Planleggingsflatene: dager, kort og faner
 
 Dagen er ytterste nivå, ressursgruppa er fanen, og ressursen er kortet inni.

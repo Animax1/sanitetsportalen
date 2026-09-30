@@ -61,6 +61,7 @@ let planleggerlinjer = [];
 //: Svaret fra `?forhaandsvis` — hva oppsettet vil lage. Nullstilles ved hver
 //: endring, så et gammelt tall aldri står under et nytt oppsett.
 let planleggerfasit = null;
+let delUtValg = {};              // planleggerens sluttsteg: ressurs-id → korps-id | 'alle'
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -174,7 +175,10 @@ function kanLede() {
 // serveren avviser, eller skjuler noe hun har lov til.
 const SKIFT_OPPSETTFELTER = ['fra_tid', 'til_tid', 'korps_id', 'alle_korps',
                              'probono', 'antall'];
-const RESSURS_OPPSETTFELTER = ['gruppe_id', 'korps_id', 'enhet_id', 'rekkefolge'];
+const RESSURS_OPPSETTFELTER = ['gruppe_id', 'enhet_id', 'rekkefolge'];
+// Reservasjonen på enheten er utdeling — `kanSetteOppSkift()`, som plassen
+// (André, 30. sep. 2026: «de kan begge ha likt»).
+const RESSURS_UTDELINGSFELTER = ['korps_id'];
 
 
 function kanSetteOppSkift() {
@@ -182,6 +186,32 @@ function kanSetteOppSkift() {
   // dele plassen ut eller fjerne den er å *sette opp* vakta; den som fører
   // sitt eget korps setter hvem og i hvilken rolle (André, 15. sep. 2026).
   return kanSkriveAlt();
+}
+
+
+function ikkeDeltUt(ressursId, poster) {
+  // **Plassene på enheten som fortsatt er lederens kladd** — speiler
+  // `services.KLADD`: ledig, ikke åpen for alle, og uten reservasjon på plassen
+  // eller enheten. `reservert_korps_id` er serverens sammenslåing av de to
+  // nivåene, så klienten slipper å gjøre den selv.
+  //
+  // Korps-brukerne får aldri kladden fra serveren, så for dem er svaret tomt.
+  return (poster || []).filter((vp) => vp.ressurs_id === ressursId && vp.ledig
+    && !vp.alle_korps && vp.reservert_korps_id == null);
+}
+
+
+function _allePoster() {
+  // Alt serveren sendte, ikke det korpsvelgeren viser: kladden har ikke noe
+  // korps, og ville forsvunnet fra tellingen så snart et korps var valgt.
+  return (aktivListe && (aktivListe.alle_vaktposter || aktivListe.vaktposter)) || [];
+}
+
+
+function kanDeleUt(ressurs) {
+  // «Del ut» vises bare når noe ligger igjen — en knapp uten noe å gjøre er en
+  // knapp man lurer på.
+  return kanSetteOppSkift() && ikkeDeltUt(ressurs.id, _allePoster()).length > 0;
 }
 
 

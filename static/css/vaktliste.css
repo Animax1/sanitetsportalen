@@ -199,6 +199,22 @@
   color: var(--text-soft);
 }
 
+/* Kladd som ligger på lederens bord (pulje 4, 30. sep. 2026). Gult, som
+   varslene: det er noe som venter på en handling, ikke en feil. */
+.vl-merkelapp.vl-ikke-delt-ut {
+  border-color: var(--vl-varsel);
+  color: var(--vl-varsel);
+}
+
+/* «Del ut»-vinduet: ett valg per rad, stort nok til en tommel. */
+.vl-del-ut-valg { display: grid; gap: 6px; }
+.vl-del-ut-valg label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px;
+  cursor: pointer;
+}
+.vl-del-ut-valg input:checked + span { font-weight: 600; }
+
 /* ── Rader ────────────────────────────────────────────────────────────── */
 .vl-rad {
   display: flex;

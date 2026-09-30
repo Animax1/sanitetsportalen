@@ -94,6 +94,12 @@ og de må ikke slås sammen.
   viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
   plass for plass, og `_korpsKropp()` oversetter nedtrekkets tre tilstander til to felt.
+- **«Del ut» er handlingen, med ett endepunkt** (pulje 4, 30. sep. 2026):
+  `POST api/vaktlister/<pk>/del-ut/` med en fordeling, fra kortets vindu og planleggerens
+  sluttsteg — `services.del_ut()`. Bare kladden røres; til et korps settes `Ressurs.korps`,
+  til alle `alle_korps` per plass. **Tømmes enhetens reservasjon, blir plassene som arvet
+  den åpne for alle** (`frigi_arvede_plasser`), ikke kladd igjen. André: «så en ser hva
+  som noen korps ikke kunne ta».
 - **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med
   behovet, og «å fylle plassen» er én feltendring. Å *opprette* et skift er
   `skriv_full` (vaktleder setter behovet), å *fylle* det krever badge og
@@ -163,11 +169,10 @@ og de må ikke slås sammen.
   som husket to av dem ville sett ut som om det virket. Hintene (`vaktpost-laast-hint`,
   `ressurs-laast-hint`) står i malen, og en test krever at de finnes — `_laasFelter()`
   tier helt når `getElementById` gir `null`.
-- **`ressurs_detalj_view` har to terskler i ett endepunkt.** Navnet krever
-  `services.kan_gi_nytt_navn()` — bilen heter «Sola 56», ikke «Ambulanse 2», og den som
-  står ved bilen er den som vet det. Gruppe, reservasjon, enhetskobling, rekkefølge og
-  sletting krever `kan_lede`: de er beslutninger om *hvem ressursen er til for*, og
-  flyttes de, flytter de tilgangen til seg selv.
+- **`ressurs_detalj_view` har tre terskler.** Navnet krever `services.kan_gi_nytt_navn()`
+  — bilen heter «Sola 56», og den som står ved bilen vet det. Reservasjonen er utdeling og
+  krever `kan_sette_opp_skift`, som plassen (`RESSURS_UTDELINGSFELTER`, 30. sep. 2026 —
+  André: «de kan begge ha likt»). Gruppe, enhetskobling, rekkefølge og sletting: `kan_lede`.
 - **Navneretten leser plassene, ikke bare ressursen** (16. sep. 2026). Porten sto på
   `kan_bemanne_ressurs` ett døgn og var i praksis stengt: **«Ny ressurs» spør bare om navn
   og gruppe**, så en fersk ressurs er ureservert, og reservasjonen settes i «Rediger» —
@@ -380,16 +385,9 @@ Tre ting er verdt å kjenne:
   ledig plass (`_plassKorps`) og probono-merkelappen prøves nå i gruppefanen. Utskrift av et
   navneark skjer derfra — utskrifts-CSS-en er generisk og skriver ut den fanen man står i.
 
-**Fanen het «Planlegging» til 16. sep. 2026**, og navnet var opptatt: `Vaktliste.status`
-har verdien «Planlegging» ved siden av «I drift», og den står som et merke øverst på siden.
-Fanen og merket sa altså samme ord om to ulike begreper — hva lista *koster i timer*, og om
-innsjekk er *åpen*. Regelen står som en test (`FanenHeterTimeoversiktTests`): **et fanenavn
-kan ikke være en statusetikett.** Den prøver regelen og ikke ordet, så en framtidig
-omdøping som gjeninnfører kollisjonen blir rød uansett hvilket ord det er.
-
-*Bare fanen ble omdøpt.* `choices.STATUS_VALG` har fortsatt «Planlegging» som statusverdi,
-og migrasjonene bærer den — et søk-og-erstatt over ordet ville døpt om statusen, som er noe
-helt annet.
+**Et fanenavn kan ikke være en statusetikett** (`FanenHeterTimeoversiktTests`): fanen het
+«Planlegging» til 16. sep. 2026, samme ord som statusmerket. Bare fanen ble omdøpt —
+`choices.STATUS_VALG` bærer ordet fortsatt, og et søk-og-erstatt ville døpt om statusen.
 
 - **Taket settes i `vaktliste_detalj_view`s PUT, sammen med start og planlagt slutt, og
   er derfor `skriv_leder`** — ikke `skriv_full`. Rekkevidden er den samme (hele vakta,
