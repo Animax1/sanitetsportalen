@@ -64,6 +64,17 @@
     <div id="avsluttet-liste"></div>
   </div>
 
+  {# Posisjon til kart.sanitet.net (30. sep. 2026). Bare når koblingen er satt #}
+  {# opp; ellers spørres nettleseren aldri. Bryteren huskes per skjerm. #}
+  <div id="posisjon-linje" class="enhet-meta posisjon-linje mt-4 d-none">
+    <i class="bi bi-geo-alt me-1"></i><span id="posisjon-tekst"></span>
+    <label class="form-check form-switch ms-auto mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="del-posisjon"
+             data-action="vekslDelPosisjon" data-hendelse="change" checked>
+      <span class="form-check-label">Del posisjon</span>
+    </label>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -82,6 +93,7 @@
   window.OPPDRAG_ALTERNATIV_NAVN = {{ alternativ_navn }};
   window.OPPDRAG_AVBRYT_FRA = {{ avbryt_fra }};
   window.OPPDRAG_BILINNSTILLINGER = {{ bilinnstillinger }};
+  window.OPPDRAG_KART_KOBLING = {{ kart_kobling_aktiv }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-enhet.js' %}"></script>

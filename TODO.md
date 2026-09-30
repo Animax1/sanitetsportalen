@@ -157,8 +157,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Planen er `docs/PLAN_KARTKOBLING.md` (30. sep. 2026); beslutningene står i §1 der og tas
 ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `vaktliste/`.
 
-- [ ] Pulje D — bilens posisjon rir på stemplingen: `posisjon` i kroppen, droppes ved feil,
-      sendes etter commit; `watchPosition`, `posisjonForStempling()`, bryteren «Del posisjon»
 - [ ] Pulje E — `ko/kartkobling.py` `meld_lag(ressurs)`: tilstand fra tavla og hendelsene,
       bare lag, kalt fra `plasser`/`avslutt`/`rett`/`fjern`/`avslutt_for_hendelse`/`sett_lag`
 - [ ] Pulje F — personverndokumentasjonen (berettiget interesse, «historikk er en ny behandling»),

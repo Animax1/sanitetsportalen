@@ -95,7 +95,7 @@ function lagNokkel() {
 }
 
 
-function koLeggTil(oppdragId, overgang, sted, stedTekst) {
+function koLeggTil(oppdragId, overgang, sted, stedTekst, posisjon) {
     // Klienttiden fryses her, ved trykket — ikke ved sendingen. Uten det
     // ville statistikken vist når dekningen kom tilbake i stedet for når
     // mannskapet faktisk meldte.
@@ -109,6 +109,10 @@ function koLeggTil(oppdragId, overgang, sted, stedTekst) {
         // Friteksten ved «Annet sted» (19. sep. 2026) følger raden i køen.
         sted_tekst: stedTekst || null,
         klienttid: new Date().toISOString(),
+        // Posisjonen fra *trykket*, ikke fra sendingen (30. sep. 2026): en
+        // stempling som sendes når dekningen kommer, skal vise hvor bilen var
+        // da mannskapet trykket. Aldri lagret andre steder enn her i køen.
+        posisjon: posisjon || null,
     };
     const ko = koLes();
     ko.push(rad);
@@ -949,6 +953,8 @@ async function synk() {
               idempotency_key: rad.nokkel,
               // Det ene domenefeltet: friteksten ved «Annet sted».
               sted_tekst: rad.sted_tekst || undefined,
+              // Ikke et domenefelt: videresendes til kartet, lagres aldri.
+              posisjon: rad.posisjon || undefined,
             }),
           });
       } catch (e) {
@@ -1032,7 +1038,7 @@ async function _stemple(id, overgang, knappId, sted, stedTekst) {
     // dekning — en knapp som ser ut til å ha virket, men ikke har det, er
     // verre enn en som feiler synlig. **Og projiser det inn i visningen**:
     // uten det sto knappen med samme tekst til serveren hadde svart.
-    koLeggTil(id, overgang, sted, stedTekst);
+    koLeggTil(id, overgang, sted, stedTekst, posisjonTilKo(Date.now()));
     mineOppdrag = projiser(mineOppdrag, koLes());
     renderAlt();
     await synk();
@@ -1043,6 +1049,102 @@ async function _stemple(id, overgang, knappId, sted, stedTekst) {
     renderAlt();
   }
 }
+
+// ════════════════════════════════════════════════════════
+// POSISJON TIL KARTET (30. sep. 2026, docs/PLAN_KARTKOBLING.md §6)
+//
+// Bilens posisjon rir på stemplingen: ingen egen sending, ingen puls, ingen
+// lagring utenfor køraden. **Stemplingen venter aldri på GPS** (B7) — finnes
+// ingen fersk fix i det mannskapet trykker, går stemplingen uten.
+// Er koblingen ikke satt opp på serveren, spørres nettleseren aldri.
+//
+// Tilstanden står på `globalThis` og leses gjennom funksjoner, av samme grunn
+// som `koNokkel()`: `build_harness` henter funksjoner, ikke toppnivå-`let`.
+// ════════════════════════════════════════════════════════
+
+//: En fix eldre enn dette i det mannskapet trykker, sendes ikke (§11).
+function posisjonMaksAlderMs() {
+  return 120 * 1000;
+}
+
+/** Fixen hvis den er fersk nok til å stå for trykket, ellers `null`. */
+function posisjonForStempling(siste, naa) {
+  if (!siste || !Number.isFinite(siste.lat) || !Number.isFinite(siste.lon)) return null;
+  const alder = naa - Date.parse(siste.tid);
+  // Math.abs: en fix med tidsstempel litt fram (telefonens klokke mot GPS-ens)
+  // er like fersk; en som er langt unna i noen retning, er ikke til å stole på.
+  if (!(Math.abs(alder) < posisjonMaksAlderMs())) return null;
+  return { lat: siste.lat, lon: siste.lon, tid: siste.tid };
+}
+
+function kartKoblingAktiv() {
+  return globalThis.OPPDRAG_KART_KOBLING === true;
+}
+
+function delPosisjonNokkel() {
+  return 'oppdrag_del_posisjon_v1';
+}
+
+/** Bryteren «Del posisjon», per skjerm. På som standard. */
+function delerPosisjon() {
+  try { return globalThis.localStorage.getItem(delPosisjonNokkel()) !== '0'; } catch (e) { return true; }
+}
+
+/** Det som legges i køraden ved et trykk. */
+function posisjonTilKo(naa) {
+  if (!kartKoblingAktiv() || !delerPosisjon()) return null;
+  return posisjonForStempling(globalThis.bilensPosisjon || null, naa);
+}
+
+/** Linja i bunnen av skjermen. Ingenting vises når koblingen er av. */
+function posisjonLinjeTekst() {
+  if (!kartKoblingAktiv()) return '';
+  if (!delerPosisjon()) return 'Posisjon deles ikke';
+  const status = globalThis.bilensPosisjonStatus;
+  if (status === 'nektet') return 'Nettleseren har ikke gitt tilgang til posisjon';
+  if (status === 'utilgjengelig') return 'Posisjon er ikke tilgjengelig på denne enheten';
+  return 'Posisjon sendes til kartet ved stempling';
+}
+
+function tegnPosisjonLinje() {
+  const linje = document.getElementById('posisjon-linje');
+  if (!linje) return;
+  linje.classList.toggle('d-none', !kartKoblingAktiv());
+  document.getElementById('posisjon-tekst').textContent = posisjonLinjeTekst();
+  const bryter = document.getElementById('del-posisjon');
+  bryter.checked = delerPosisjon();
+}
+
+function vekslDelPosisjon() {
+  const paa = document.getElementById('del-posisjon').checked;
+  try { globalThis.localStorage.setItem(delPosisjonNokkel(), paa ? '1' : '0'); } catch (e) { /* gjelder til siden lastes */ }
+  tegnPosisjonLinje();
+}
+
+function startPosisjon() {
+  if (!kartKoblingAktiv()) return;
+  if (!globalThis.navigator || !navigator.geolocation) {
+    globalThis.bilensPosisjonStatus = 'utilgjengelig';
+    tegnPosisjonLinje();
+    return;
+  }
+  // Holdes i minnet med tidspunkt, aldri i `localStorage`. En fix som er
+  // eldre enn to minutter når mannskapet trykker, blir ikke sendt.
+  navigator.geolocation.watchPosition((p) => {
+    globalThis.bilensPosisjon = {
+      lat: p.coords.latitude, lon: p.coords.longitude,
+      tid: new Date(p.timestamp || Date.now()).toISOString(),
+    };
+    globalThis.bilensPosisjonStatus = 'ok';
+    tegnPosisjonLinje();
+  }, (feil) => {
+    // Nektet → linja sier det, ingenting annet endres. Andre feil (ingen
+    // fix ennå, tidsavbrudd) er forbigående: watchPosition prøver videre.
+    if (feil && feil.code === 1) globalThis.bilensPosisjonStatus = 'nektet';
+    tegnPosisjonLinje();
+  }, { enableHighAccuracy: true, maximumAge: 30000 });
+}
+
 
 async function stempleNeste(id) {
   // `mineOppdrag` er allerede projisert med køen, så `neste_overgang` peker
@@ -1228,6 +1330,8 @@ async function pollOgSynk() {
 
 
 document.addEventListener('DOMContentLoaded', async () => {
+  tegnPosisjonLinje();
+  startPosisjon();
   await lastMine();
   visUsendt();
 

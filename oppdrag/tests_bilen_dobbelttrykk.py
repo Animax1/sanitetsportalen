@@ -17,7 +17,11 @@ from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_availab
 from .tests_runde_d import _konst
 
 HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
-                               'koFjern', 'projiser', 'synk', '_stemple')),)
+                               'koFjern', 'projiser', 'synk', '_stemple',
+                               # `_stemple` legger posisjonen i køraden (30. sep. 2026).
+                               'posisjonTilKo', 'kartKoblingAktiv', 'delerPosisjon',
+                               'delPosisjonNokkel', 'posisjonForStempling',
+                               'posisjonMaksAlderMs')),)
 
 FORSPILL = _konst(OPPDRAG_ENHET_JS, 'STEMPEL_LAAS_MS') + """
 globalThis.localStorage = (() => { const m = {}; return {

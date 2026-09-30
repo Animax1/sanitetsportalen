@@ -9,6 +9,9 @@ en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt.
 """
 from __future__ import annotations
 
+import logging
+import math
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -21,7 +24,9 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from core import kartkobling
 from core.jsonkropp import json_body, les_json
+from core.middleware import PERMISSIONS_POLICY_MED_POSISJON
 from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
@@ -39,6 +44,9 @@ from .views_common import (
     melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # ── Siden ────────────────────────────────────────────────────────────────────
@@ -66,8 +74,12 @@ def index_view(request):
             status: services.neste_i_kjeden(status)
             for status in choices.STATUS_NAVN
         }
-        return render(request, 'oppdrag/enhet.html', {
+        kart_aktiv = kartkobling.er_konfigurert()
+        svar = render(request, 'oppdrag/enhet.html', {
             'enhet': request.user.enhet,
+            # Uten kobling spørres nettleseren **aldri** om posisjon
+            # (`docs/PLAN_KARTKOBLING.md` §6).
+            'kart_kobling_aktiv': js_json(kart_aktiv),
             'neste_kjede': js_json(neste),
             'status_navn': js_json(choices.STATUS_NAVN),
             # Stedene ved «Avreist» og grovsorteringens verdier — data
@@ -84,6 +96,11 @@ def index_view(request):
             # 2026) — data fra tabellen, hentet på nytt hvert femte minutt.
             'bilinnstillinger': js_json(verdier.bilinnstillinger()),
         })
+        if kart_aktiv:
+            # Resten av portalen har `geolocation=()`; bare denne siden, og
+            # bare med koblingen satt opp, får spørre (`core/middleware.py`).
+            svar['Permissions-Policy'] = PERMISSIONS_POLICY_MED_POSISJON
+        return svar
 
     return render(request, 'oppdrag/sentral.html',
                   sentralbordkontekst(request))
@@ -928,7 +945,14 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
 #: En feltwhitelist inne i en generell PUT kan ikke testes slik — settet av
 #: felter der vokser med modellen. `sted_tekst` (19. sep. 2026) er det ene
 #: domenefeltet, og det leses bare ved «Annet sted» — se `_sted_tekst`.
-STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst'})
+#: `posisjon` (30. sep. 2026) er **ikke et domenefelt**: den lagres aldri, den
+#: videresendes til kartet — se `_posisjon` og `docs/PLAN_KARTKOBLING.md` §6.
+STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst', 'posisjon'})
+
+#: En posisjon med tidspunkt lenger fram enn dette droppes. Kartet lar nyeste
+#: tidspunkt vinne, så én bil med klokka et døgn fram ville ellers frosset sin
+#: egen markør til raden ble ryddet.
+POSISJON_MAKS_FRAM = timedelta(minutes=5)
 
 
 def _stempling_kropp(request):
@@ -1048,6 +1072,40 @@ def _sted_tekst(data, sted) -> str:
     return str(data.get('sted_tekst') or '').strip()[:120]
 
 
+def _posisjon(data):
+    """``(lat, lon, tid)`` fra `posisjon` i stemplingen, eller ``None``.
+
+    **Ugyldig eller manglende posisjon gir `None`, aldri 400** (B7): køen i
+    bilen stryker raden på 4xx, og en stempling som forsvinner på grunn av
+    GPS-søppel er verre enn en markør som mangler. Én `warning` i loggen,
+    uten verdiene. Posisjonen lagres aldri — den videresendes til kartet.
+    """
+    pos = data.get('posisjon')
+    if pos is None:
+        return None
+    try:
+        if not isinstance(pos, dict) or set(pos) != {'lat', 'lon', 'tid'}:
+            raise ValueError('formen')
+        lat, lon = pos['lat'], pos['lon']
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in (lat, lon)):
+            raise ValueError('ikke tall')
+        lat, lon = float(lat), float(lon)
+        if not (math.isfinite(lat) and math.isfinite(lon)
+                and -90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError('utenfor')
+        tid = parse_datetime(str(pos['tid']))
+        if tid is None:
+            raise ValueError('tid')
+        if timezone.is_naive(tid):
+            tid = timezone.make_aware(tid)
+        if tid > timezone.now() + POSISJON_MAKS_FRAM:
+            raise ValueError('tid fram i tid')
+    except (ValueError, TypeError) as feil:
+        logger.warning('Stempling: posisjonen droppet (%s)', feil)
+        return None
+    return lat, lon, tid
+
+
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:stempling', rate='60/m', method='POST')
@@ -1071,6 +1129,13 @@ def stempling_view(request, pk, overgang, sted=None):
     skjermen har sakket akterut», og ville enten hengt fast eller kastet en
     stempling som faktisk kom fram. Med nøkkelen svarer en avspilling `ok` med
     den opprinnelige meldingen, og køen kan trygt stryke raden.
+
+    **`posisjon` i kroppen er ikke et domenefelt** (30. sep. 2026): den lagres
+    aldri, den videresendes til kart.sanitet.net etter commit, og bare når en
+    ny melding faktisk ble skrevet — ikke ved avspilling, 409 eller 400. Navnet
+    som sendes er `Enhet.navn` fra databasen, aldri noe fra kroppen. Regelen om
+    at `skriv_handling` ikke leser kroppen har dermed to navngitte unntak:
+    `sted_tekst` og denne.
     """
     # «Avbryt» (12. sep. 2026) er en handling, ikke en status, men går
     # samme vei som en stempling: navngitt i URL-en, køet i bilen, nøklet.
@@ -1214,6 +1279,13 @@ def stempling_view(request, pk, overgang, sted=None):
 
     if idem:
         fullfor(idem, melding.pk)
+
+    posisjon = _posisjon(data)
+    if posisjon is not None:
+        navn = request.user.enhet.navn
+        # Etter commit: en stempling som rulles tilbake skal aldri vises i
+        # kartet. Klienten selv vet ingenting om transaksjoner, og kaster aldri.
+        transaction.on_commit(lambda: kartkobling.send_enhet(navn, *posisjon))
 
     # Raden leses på nytt: `sett_status` skrev på sitt eget eksemplar av den,
     # og bilen skal se statusen den nettopp stemplet, ikke den før.

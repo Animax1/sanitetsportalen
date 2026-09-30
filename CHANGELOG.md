@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling, pulje D: bilens posisjon rir på stemplingen til kartet  `#kartkobling` `#oppdrag` `#bilen` `#personvern`
+
+**Hvorfor:** `docs/PLAN_KARTKOBLING.md` §6 (André, 30. sep.): «Ved stempling, som del av samme
+forespørsel bilen alt sender. Ingen løpende sending, ingen puls. Sist kjente posisjon, ikke
+live» (B4), og «Stemplingen venter aldri på GPS» (B7). **Ingen ny rute i portalen.**
+
+**Funn underveis:** portalens `Permissions-Policy` er `geolocation=()` på **alle** sider
+(`core/middleware.py`), så nettleseren ville nektet bilskjermen posisjon uansett — planen
+forutså det ikke. Løst smalest mulig: bilskjermen setter selv `geolocation=(self)`, **bare
+når koblingen er satt opp**, og middlewarens `setdefault` lar den stå. Alle andre sider har
+fortsatt `()`. Konstantene `PERMISSIONS_POLICY` og `PERMISSIONS_POLICY_MED_POSISJON` står i
+`core/middleware.py`. CSP er ikke rørt.
+
+**Hva — serveren:**
+- `STEMPLING_TILLATTE_NOKLER` har fått `posisjon` (`{lat, lon, tid}`). `_posisjon()` validerer
+  tall i gyldig område og `tid` som ISO 8601; **ugyldig gir `None` og én `warning`, aldri 400**
+  — køen i bilen stryker raden på 4xx, og en stempling som forsvinner på grunn av GPS-søppel er
+  verre enn en manglende markør. En `tid` mer enn 5 min fram droppes (kartet lar nyeste vinne,
+  og en bil med klokka et døgn fram ville frosset sin egen markør).
+- Etter at meldingen er skrevet, i alle fire grenene og **ikke** ved avspilling, 409 eller 400:
+  `transaction.on_commit(lambda: kartkobling.send_enhet(Enhet.navn, lat, lon, tid))`. Navnet
+  kommer fra databasen, aldri fra kroppen. Posisjonen lagres ikke.
+- Docstringen til `stempling_view` og `oppdrag/CLAUDE.md`: `posisjon` er **ikke et domenefelt**,
+  og er det andre navngitte unntaket fra «`skriv_handling` leser ikke kroppen», ved `sted_tekst`.
+
+**Hva — bilskjermen (`oppdrag-enhet.js`, `enhet.html`):**
+- `OPPDRAG_KART_KOBLING` gjennom `js_json()`. Usann → nettleseren spørres **aldri** om posisjon.
+- `watchPosition` ved lasting; siste fix i minnet med tidspunkt, aldri i `localStorage`.
+- `posisjonForStempling(siste, naa)`: fixen hvis den er under 120 s, ellers `null`.
+- Ved trykk legges resultatet i **køraden** (`rad.posisjon`), så en stempling som sendes når
+  dekningen kommer, bærer posisjonen fra trykket. `synk()` sender feltet når det finnes.
+- Linja nederst: «Posisjon sendes til kartet ved stempling», bryteren **«Del posisjon»** (på som
+  standard, per skjerm) → «Posisjon deles ikke». Nektet i nettleseren → linja sier det.
+
+**Tester:** `oppdrag/tests_posisjon.py` (20): navnet fra basen etter commit; sendingen venter på
+commit; **rullet tilbake stempling sender aldri**; ugyldig posisjon (11 former) → stemplingen
+går, ingen sending, ingen koordinater i loggen; uten posisjon; alle fire grenene; avspilling,
+409 og 400 sender ikke; sentralens føring sender aldri; `Permissions-Policy` på bilskjermen med
+og uten kobling, og på sentralbordet. I node gjennom `_stemple` → køen → `synk()`: fersk, gammel
+og manglende fix, bryteren av, koblingen av, og at køraden bærer fixen fra trykket, ikke fra
+sendingen. `tests_bilen_dobbelttrykk` fikk de nye funksjonene i harnessen.
+**Mutanter (10):** aldersgrensen fjernet, `on_commit` byttet mot direkte kall, fram-i-tid-sperren,
+begge ledd i `posisjonTilKo`, kallstedet i `_stemple`, feltet i `synk()`, `Permissions-Policy`-
+gaten og områdesjekken — alle røde. «Navnet lest fra kroppen» overlevde alene fordi det lukkede
+skjemaet gir 400 på `navn` før linja nås (ekvivalent); sammen med skjemasperren fjernet er den rød.
+
 ## 2026-09-30 — Kartkobling, pulje C: `core/kartkobling.py` sender til kart.sanitet.net, signert med HMAC  `#kartkobling` `#core` `#sikkerhet`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` (André, 30. sep.): bilenes posisjon ved stempling og

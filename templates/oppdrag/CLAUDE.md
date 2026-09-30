@@ -24,6 +24,7 @@ det ble en tom side stående etter én feilet henting, og den så ut som en vakt
 | Knappene | «Neste», den andre knappen og Avbryt mot de **navngitte** stemplingsendepunktene — de leser ikke request-kroppen |
 | Offline-køen | `localStorage`. «Venter på dekning» vises først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`. Uten forsinkelsen blinket varselet ved hvert trykk på god dekning |
 | Lydvarselet | `lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()` og `lydTikk()` hvert 5. s. Web Audio, **alltid på**, vekket av det første trykket på siden (`lydErKlar()`). `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av |
+| Posisjon til kartet (30. sep.) | Bare når `OPPDRAG_KART_KOBLING` er sann — ellers spørres nettleseren aldri, og **bare da får siden `geolocation=(self)`** (resten av portalen har `()`). `watchPosition` holder siste fix i minnet; `posisjonForStempling()` gir den bare om den er under 120 s. `_stemple` legger den i **køraden**, så den som sendes er fra trykket. Bryteren «Del posisjon» per skjerm (`delerPosisjon`), på som standard. Stemplingen venter aldri på GPS |
 | Tida det måles fra | Bilens `varslet_at` — og **et usendt trykk i køen teller som svart**, ellers ville bilen pipt om et oppdrag mannskapet nettopp kvitterte ut uten dekning |
 
 **Serveren sender `neste_overgang`/`alternativ_overgang` per rad.** Kjeden og alternativene
@@ -33,6 +34,8 @@ serveren i nøyaktig det øyeblikket en overgang ble endret.
 
 **Hvorfor `_stilleLydbaerer()` finnes** står i rota, under CSP — `media-src` måtte
 åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
+
+## Ressurslista, delt med `/ko/`
 
 **Hele ressurslista er delt med `/ko/`** (18. sep. 2026). Serversiden:
 `services.enhetskort()` er den ene serialiseringen, og både `views.enheter_view` og
@@ -63,6 +66,8 @@ Innmeldingen står **i** tegnefunksjonen og ikke på toppnivå, og det er en tes
 `build_harness()` plukker ut funksjoner og kjører ikke toppnivålinjer, så et kallsted der
 kan fjernes uten at noe blir rødt. Mutanten overlevde nøyaktig sånn.
 
+## Sentralbordet i `/ko/`
+
 **Sentralbordet kjører også i `/ko/` fra pulje 4** (18. sep. 2026), og delingen går på fire
 nivåer: konteksten (`views.sentralbordkontekst`), tre malbiter (`_sentralbord_verktoy`,
 `_sentralbord_modaler`, `_sentralbord_skript`), JS-en (`oppdrag-kort.js` pluss de fire
@@ -82,6 +87,8 @@ til `'ko.Hendelse'` — strengreferanse, ingen import, og **skrives bare av
 `_tittel`) og står i ETag-en. Og nummeret skrives **`O45`**, ikke `#45`: formen bor i
 `services.oppdragsnr()` og `oppdragsnr()` i `oppdrag-kort.js` (enhetsskjermen har egen kopi),
 og `Enhetshendelse.detalj` og bjellevarselet bruker den. Eldre `detalj`-rader står med `#`.
+
+## Oppdragsvinduet og «Nytt oppdrag»
 
 **«Endre status» tilbyr «Avbrutt — trenger ny ressurs»** (23. sep. 2026) der bilen selv har
 Avbryt-knappen: `_statusvalg` leser `OPPDRAG_AVBRYT_FRA` fra `sentralbordkontekst()`, så
