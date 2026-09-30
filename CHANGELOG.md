@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling: 403 «error code: 1010» fra Cloudflare — egen User-Agent  `#kartkobling` `#feilretting` `#staging`
+
+**Hvorfor:** Første stempling mot staging-kartet ga «✗ 30.9., 23:21 (enhet, 403)» på
+server-status (André). Kartet svarer aldri 403 — alle avvisninger der er 401. Svaret kom fra
+**Cloudflare** foran `testkart.sanitet.net`: kroppen var `error code: 1010`, som er Cloudflares
+blokkering av `urllib`s standard-User-Agent «Python-urllib/3.13». Reprodusert med curl: samme
+forespørsel med den User-Agenten ga 403, med en annen 401 fra kartet.
+
+**Hva:**
+- `core/kartkobling.py` sender `User-Agent: sanitetsportalen-kartkobling/1.0` (`USER_AGENT`).
+  Prøvd med den ekte klienten mot testkart med feil nøkkel med vilje: 401 fra kartet, altså
+  forbi Cloudflare.
+- Statuskortet forklarer 403 for seg: «stoppet foran kartet (Cloudflare e.l.), ikke av kartet».
+  Uten det ville en 403 lest som en nøkkelfeil.
+
+**Tester:** `test_egen_user_agent_ikke_urllibs`, og 403-hintet i node. Mutant: headeren fjernet
+→ rød.
+
 ## 2026-09-30 — Kartkobling, pulje F: personvernet og dokumentasjonen — «historikk over posisjoner er en ny behandling»  `#kartkobling` `#personvern` `#dokumentasjon`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §8. Posisjonen til en bil med mannskap i er en

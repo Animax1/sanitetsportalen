@@ -64,6 +64,14 @@ class KartkoblingTests(SimpleTestCase):
                                       time.time()))
         self.assertEqual(self.urlopen.call_args.kwargs['timeout'], 3)
 
+    def test_egen_user_agent_ikke_urllibs(self):
+        """Cloudflare foran testkart.sanitet.net ga 403 («error code: 1010») på
+        «Python-urllib/3.13» (30. sep. 2026)."""
+        kartkobling.send_enhet('Bil', 59.4, 5.2, TID)
+        ua = self._foresporsel().get_header('User-agent')
+        self.assertEqual(ua, kartkobling.USER_AGENT)
+        self.assertNotIn('urllib', ua.lower())
+
     def test_signaturen_er_ikke_over_kroppen_alene(self):
         kartkobling.send_enhet('Haugesund 56', 59.4, 5.2, TID)
         req = self._foresporsel()
@@ -195,7 +203,9 @@ console.log(JSON.stringify([
   kartkoblingTekst({konfigurert: true, vert: 'kart.x', siste: null}).siste[0],
   kartkoblingTekst({konfigurert: true, vert: 'kart.x', siste: {ok: false, status: 401, hva: 'lag', tid: '2026-09-30T19:00:00Z'}}).hint,
   kartkoblingTekst({konfigurert: true, vert: 'kart.x', siste: {ok: true, status: 204, hva: 'enhet', tid: '2026-09-30T19:00:00Z'}}).siste[1],
+  kartkoblingTekst({konfigurert: true, vert: 'kart.x', siste: {ok: false, status: 403, hva: 'enhet', tid: '2026-09-30T19:00:00Z'}}).hint.slice(0, 4),
 ]));""")
         self.assertEqual(json.loads(ut.splitlines()[0]),
                          ['–', 'Ingen ennå',
-                          '401: nøkkelen stemmer ikke med kartets PORTAL_HMAC_NOKKEL.', 'status-ok'])
+                          '401: nøkkelen stemmer ikke med kartets PORTAL_HMAC_NOKKEL.', 'status-ok',
+                          '403:'])

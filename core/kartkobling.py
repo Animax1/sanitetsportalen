@@ -43,6 +43,11 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 TIMEOUT_S = 3
+#: Egen User-Agent, ikke urllibs «Python-urllib/3.x». Cloudflare foran kartet
+#: avviser den med 403 og «error code: 1010» før appen ser forespørselen
+#: (funnet på staging 30. sep. 2026). Kartet ser da aldri noe, og feilen er
+#: ikke nøkkelen — derfor forklarer statuskortet 403 for seg.
+USER_AGENT = 'sanitetsportalen-kartkobling/1.0'
 PAUSE_S = 60
 PAUSE_NOKKEL = 'kartkobling:pause'
 SISTE_NOKKEL = 'kartkobling:siste'
@@ -134,6 +139,7 @@ def _send(hva: str, navn: str, bygg) -> None:
         tid = str(int(time.time()))
         req = request.Request(url, data=kropp, method='POST', headers={
             'Content-Type': 'application/json',
+            'User-Agent': USER_AGENT,
             'X-Portal-Tid': tid,
             'X-Portal-Signatur': signer(settings.KART_HMAC_NOKKEL, tid, kropp),
         })

@@ -407,6 +407,7 @@ function kartkoblingTekst(k) {
     : ['✗ ' + datoKlokke(s.tid) + ' (' + s.hva + (s.status ? ', ' + s.status : '') + ')', 'status-crit'];
   const hint = k.pause ? 'Pause etter feil: sendinger hoppes over i ett minutt.'
     : s && !s.ok && s.status === 401 ? '401: nøkkelen stemmer ikke med kartets PORTAL_HMAC_NOKKEL.'
+    : s && !s.ok && s.status === 403 ? '403: stoppet foran kartet (Cloudflare e.l.), ikke av kartet — det svarer aldri 403.'
     : 'Posisjoner sendes ved stempling, lagene ved plassering. Portalen lagrer ingenting.';
   return { kobling: [k.vert || 'På', 'status-ok'], siste, hint };
 }
