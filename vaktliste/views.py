@@ -992,6 +992,55 @@ def generer_view(request, pk):
     return JsonResponse({'status': 'ok', 'data': svar})
 
 
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:del-ut', rate='60/m', method='POST')
+def del_ut_view(request, pk):
+    """**«Del ut»** (pulje 4, 30. sep. 2026): gi kladden på én eller flere
+    enheter til et korps eller til alle.
+
+    Kroppen er `{"fordeling": [{"ressurs_id": 3, "korps_id": 2},
+    {"ressurs_id": 4, "alle": true}]}`. Vinduet på enhetskortet sender én rad,
+    planleggerens sluttsteg sender alle — **samme endepunkt**, så regelen for
+    hva som deles ut finnes ett sted (`services.del_ut`).
+
+    **`kan_sette_opp_skift`**, som nedtrekket på plassen: å dele ut en hel
+    enhet og å dele ut én plass er samme handling (André: «de kan begge ha
+    likt»). **Alt eller ingenting**: en ukjent enhet eller et ukjent korps
+    stopper hele fordelingen før noe er skrevet, og skrivingen står i én
+    transaksjon — en halvt utdelt vakt er verre å rydde enn en som ikke ble det.
+    """
+    if not services.kan_sette_opp_skift(request.user):
+        return _nektet('Enhetene deles ut av den som setter opp skiftene.')
+    try:
+        vl = Vaktliste.objects.get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return json_feil('Vaktliste ikke funnet', status=404)
+
+    rader = json_body(request).get('fordeling')
+    if not isinstance(rader, list) or not rader:
+        return json_feil('Ingenting å dele ut.')
+    ressurser = {r.pk: r for r in vl.ressurser.all()}
+    plan = []
+    for rad in rader:
+        if not isinstance(rad, dict):
+            return json_feil('Ugyldig fordeling.')
+        ressurs = ressurser.get(_int(rad.get('ressurs_id')))
+        if ressurs is None:
+            return json_feil('Enheten finnes ikke på denne vaktlisten.')
+        alle = rad.get('alle') is True
+        korps_id = None if alle else _int(rad.get('korps_id'))
+        if not alle and (korps_id is None
+                         or not Korps.objects.filter(pk=korps_id).exists()):
+            return json_feil(f'Velg hvem som skal få «{ressurs.navn}».')
+        plan.append((ressurs, korps_id, alle))
+
+    with transaction.atomic():
+        delt_ut = sum(services.del_ut(r, korps_id=k, alle=a) for r, k, a in plan)
+    return JsonResponse({'status': 'ok', 'data': {'delt_ut': delt_ut}})
+
+
 # ── Planleggingstall (fase 5) ────────────────────────────────────────────────
 
 @never_cache
@@ -1295,9 +1344,9 @@ def sw_view(request):
 def ressurs_detalj_view(request, pk):
     """Rediger eller fjern en ressurs.
 
-    **To terskler i ett endepunkt** (15. sep. 2026): navnet krever badge og
-    reservasjon (`kan_bemanne_ressurs`), alt annet — gruppe, reservasjon,
-    enhetskobling, rekkefølge og sletting — krever `kan_lede`.
+    **Tre terskler i ett endepunkt**: navnet krever `kan_gi_nytt_navn`,
+    reservasjonen er utdeling og krever `kan_sette_opp_skift` (30. sep. 2026),
+    og gruppe, enhetskobling, rekkefølge og sletting krever `kan_lede`.
 
     **DELETE krever `{"confirm": true}`**, som sletting av en vaktliste. Det er
     ikke en bekreftelsesdialog flyttet til serveren — dialogen står i
@@ -1339,8 +1388,11 @@ def ressurs_detalj_view(request, pk):
 
     sperret = services.oppsettfelter(data, services.RESSURS_OPPSETTFELTER)
     if sperret and not services.kan_lede(request.user):
-        return _nektet('Ressurstype, reservasjon og kobling til delt konto settes av den '
+        return _nektet('Ressurstype og kobling til delt konto settes av den '
                        'som setter opp vakten: ' + ', '.join(sperret))
+    sperret = services.oppsettfelter(data, services.RESSURS_UTDELINGSFELTER)
+    if sperret and not services.kan_sette_opp_skift(request.user):
+        return _nektet('Enheten deles ut av den som setter opp skiftene.')
 
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
@@ -1362,8 +1414,14 @@ def ressurs_detalj_view(request, pk):
     ukjent = _ukjent_peker(Ressurs, korps=ressurs.korps_id, enhet=ressurs.enhet_id)
     if ukjent:
         return json_feil(ukjent)
+    # **Tømmes reservasjonen, blir plassene som arvet den åpne for alle** —
+    # ellers ble de kladd igjen. Se `services.frigi_arvede_plasser`. Samme
+    # transaksjon: frigjort uten at reservasjonen ble tømt er et halvt svar.
+    tommes = 'korps_id' in data and ressurs.korps_id is None
     try:
         with transaction.atomic():
+            if tommes:
+                services.frigi_arvede_plasser(Ressurs.objects.get(pk=ressurs.pk))
             ressurs.save()
     except IntegrityError:
         return json_feil(f'«{ressurs.navn}» finnes allerede på denne vaktlisten.')

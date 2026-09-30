@@ -49,6 +49,8 @@ GAMLE_ORD = {
     r'Opprett vakt': 'Nytt skift',
     r'Vaktnavn': 'Navn på vakten',
     r'Enhet i oppdragsmodulen': 'Koble til delt konto',
+    # Pulje 4: «Ureservert» leste som «ledig for alle» og betydde lederens kladd.
+    r'[Uu]reservert': 'ikke delt ut',
 }
 #: Et ord inntil `/` er en sti (`/vaktliste/api/ressurser/`), ikke tekst — den blindsonen
 #: ga byttet 30. sep. 2026 404 på hvert kall mot en enhet før gjennomgangen fanget det.

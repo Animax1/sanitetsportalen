@@ -114,6 +114,22 @@ flere av feilene under finnes bare der.
       steder.
 - [ ] **Ukoblede enheter** viser «Ikke koblet», ikke ingenting.
 
+**«Del ut» (pulje 4, 30. sep. 2026):**
+
+- [ ] **Merket på kortet** (het «Ureservert»): en fersk enhet fra planleggeren viser
+      **«N plasser ikke delt ut»** i gult (`test-vl-full`+). Delt ut plass for plass viser
+      korpset, «Åpen for alle» eller «Delt ut til N korps». Velg et korps i korpsvelgeren —
+      tallet står fortsatt.
+- [ ] **«Del ut …» er hovedknappen** så lenge noe ligger igjen, og er borte etterpå.
+      `test-vl-fore` ser den aldri.
+- [ ] **Vinduet**: «N plasser ligger på bordet ditt (T t)». Velg et korps → plassene er
+      korpsets, og `test-vl-fore` i det korpset ser dem. Velg «Åpen for alle» på en annen
+      enhet → alle korps ser dem. Plasser som alt var delt ut eller bemannet, er urørt.
+- [ ] **`test-vl-full` kan nå sette «Reservert korps»** i «Rediger enhet» (var bare leder).
+      Ressurstype og «Koble til delt konto» er fortsatt låst for henne.
+- [ ] **Tøm reservasjonen** på en enhet som er delt ut → plassene blir **åpne for alle**,
+      ikke planlagt: et annet korps ser dem og kan fylle dem. Hintet under feltet sier det.
+
 ## 5. Skift — å sette opp og å bemanne
 
 *Dette er modulens vanskeligste grense, og den går to steder: hvem som får **sette opp** en
@@ -202,6 +218,11 @@ plass, og hvem som får **fylle** den.*
       skrev sist. Rett et skift i regnearket først, og se at planleggeren følger.
 - [ ] **En ressurs utenfor oppsettet** røres ikke.
 - [ ] **Budsjettlinja står også i planleggeren**, ikke bare i «Timeoversikt».
+- [ ] **«Vakten» øverst** (pulje 4): start og slutt, og «Endre» åpner «Innstillinger» med
+      markøren i startfeltet. Grensene står som tekst, uten knapp.
+- [ ] **«Del ut» nederst**, etter «Lag grunnlaget»: én rad per enhet med kladd, «— bestem
+      senere —» som standard, og knappen teller plassene du har valgt. Del ut to enheter i
+      ett trykk → begge er delt ut, tabellen krymper.
 
 ## 9. Tall: Oversikt, Timeoversikt og budsjett
 
@@ -317,7 +338,8 @@ plass, og hvem som får **fylle** den.*
 | Rette ressursens navn | ✖ | ✖ | ✔¹ | ✔ | ✔ | ✔ |
 | Opprette/slette skift, sette tider | ✖ | ✖ | ✖ | ✔ | ✔ | ✔ |
 | Stemple møtt / av vakt | ✖ | ✖ | ✖ | ✔ | ✔ | ✔ |
-| Reservere, `alle_korps`, enhetskobling | ✖ | ✖ | ✖ | ✖ | ✔ | ✔ |
+| Dele ut: «Del ut», reservert korps på enhet og plass, `alle_korps` | ✖ | ✖ | ✖ | ✔ | ✔ | ✔ |
+| Ressurstype og «Koble til delt konto» på en enhet | ✖ | ✖ | ✖ | ✖ | ✔ | ✔ |
 | Opprette/slette ressurs, grupper, roller | ✖ | ✖ | ✖ | ✖ | ✔ | ✔ |
 | Vaktas lengde og timetak | ✖ | ✖ | ✖ | ✖ | ✔ | ✔ |
 | Slette en vaktliste, koble konto for hånd | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |

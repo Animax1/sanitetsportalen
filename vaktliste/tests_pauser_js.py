@@ -9,7 +9,7 @@ from django.test import SimpleTestCase
 from patients.js_test_utils import (PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness,
                                     node_available, run_node)
 
-RESSURS = ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift',
+RESSURS = ('mkRessurs', 'utdelingsmerke', 'ikkeDeltUt', '_allePoster', 'kanDeleUt', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift',
            'ressursErApen', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', '_rolleValg',
            'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
            '_planrad', '_plancellene', '_driftrad', 'kanBemannePlass', '_mittKorpsId',

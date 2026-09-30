@@ -17,6 +17,11 @@ from patients.js_test_utils import (
     extract_function, node_available, read_js, run_node,
 )
 
+#: `_dag()` leser konstantene på toppnivå, som `build_harness` ikke henter.
+MND_OG_DAGER = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+                "globalThis.MND = ['jan','feb','mar','apr','mai','jun','jul','aug',"
+                "'sep','okt','nov','des'];\n")
+
 HTML_BUILDERS = (
     'fyllVelger',
     'mkRolleRad',
@@ -56,6 +61,9 @@ HTML_BUILDERS = (
     # fritekst, og alt havner i `innerHTML` — også på brannlista.
     'mkOvernatting', '_nattvelger', '_brannrutineboks', '_sengerad', '_romkort',
     '_utenSengBolk', 'mkBrannliste', 'apnePlasser',
+    # «Del ut» (pulje 4, 30. sep. 2026): merket på kortet, valgene i vinduet,
+    # planleggerens sluttsteg og vakten øverst. Korps- og enhetsnavn er fritekst.
+    'utdelingsmerke', 'mkDelUtValg', 'mkDelUtTabell', 'mkVaktramme',
 )
 
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', 'escapeHtml(')
@@ -69,6 +77,10 @@ REVIEWED_INTERPOLATIONS = {
     '_utenSengBolk(natt)': 'markup fra `_utenSengBolk`, som selv skannes her',
     'mkBrannliste(utskrift)': 'markup fra `mkBrannliste`, som selv skannes her',
     'nyttRom': 'knapp bygget lokalt uten data, eller tom streng',
+    # «Del ut» (pulje 4, 30. sep. 2026).
+    'alternativer': 'options bygget lokalt i `mkDelUtTabell`, verdi og korpsnavn escapet inni',
+    'av': 'hardkodet disabled-attributt fra en ternær',
+    'grenser': 'linje bygget lokalt i `mkVaktramme`, tallene escapet inni, eller tom streng',
     'flereNetter': 'knapp bygget lokalt uten data, eller tom streng',
     'hint': 'hardkodet tekst fra en ternær, eller tom streng',
     'rom': 'romkortene fra `_romkort`, eller seksjonene bygget lokalt med navnene escapet inni',
@@ -346,7 +358,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
+        (VAKTLISTE_JS, ('mkRessurs', 'utdelingsmerke', 'ikkeDeltUt', '_allePoster', 'kanDeleUt', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_skiftrekkefolge',
@@ -2023,7 +2035,7 @@ class FanenErGruppaTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', '_overnattingsfane', '_overnatting', '_valgtNatt', 'overnattingStandardnatt', '_nattIso', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
-                        'mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
+                        'mkRessurs', 'utdelingsmerke', 'ikkeDeltUt', '_allePoster', 'kanDeleUt', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
                         '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader',
@@ -2399,7 +2411,7 @@ class EnkeltgruppeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse',
+        (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', 'utdelingsmerke', 'ikkeDeltUt', '_allePoster', 'kanDeleUt', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', '_sumTimer', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', 'opptattPaaPlassen', '_varighet', '_skifttimer', '_tall',
@@ -3447,13 +3459,18 @@ class PlanleggerfanenTests(SimpleTestCase):
                         '_planleggerStandardvindu', 'visPanelfeil',
                         'mkBudsjett', 'mkDagslinje', '_budsjettpost',
                         '_dagtekst', '_d', '_iso16', '_tall', 'kanSetteTak',
-                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin')),
+                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin',
+                        # Pulje 4 (30. sep. 2026): vakten øverst, utdelingen nederst.
+                        'mkVaktramme', '_dag', '_kl', 'mkDelUtTabell',
+                        'planleggerDelUt', '_delUtRad', '_delUtKnappTekst',
+                        'ikkeDeltUt', '_allePoster', 'kanSetteOppSkift',
+                        'kanSkriveAlt')),
     )
 
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = MND_OG_DAGER + build_harness(self.HARNESS)
 
     LAG = 1
     AMBULANSE = 2
@@ -4244,13 +4261,18 @@ class PlanleggerenTegnesMedOppsettetTests(SimpleTestCase):
                         '_vindutallTekst', '_gruppeFor',
                         'mkBudsjett', 'mkDagslinje', '_budsjettpost',
                         '_dagtekst', '_d', '_iso16', '_tall', 'kanSetteTak',
-                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin')),
+                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin',
+                        # Pulje 4 (30. sep. 2026): vakten øverst, utdelingen nederst.
+                        'mkVaktramme', '_dag', '_kl', 'mkDelUtTabell',
+                        'planleggerDelUt', '_delUtRad', '_delUtKnappTekst',
+                        'ikkeDeltUt', '_allePoster', 'kanSetteOppSkift',
+                        'kanSkriveAlt')),
     )
 
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = MND_OG_DAGER + build_harness(self.HARNESS)
 
     def test_panelet_leser_tilbake_naar_det_tegnes(self):
         import json

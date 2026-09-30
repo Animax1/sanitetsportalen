@@ -4,6 +4,73 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Vaktlista, pulje 4: «Del ut» som navngitt handling — «Ureservert» heter «N plasser ikke delt ut», og en tømt reservasjon gjør plassene åpne for alle  `#vaktliste` `#utdeling` `#tilgang`
+
+**Hvorfor:** Gjennomgangen 30. sep. fant at utdelingen fantes — å sette reservasjonen *er*
+å dele ut — men ikke sto på skjermen: den var felt nummer tre i «Rediger enhet», og kortet
+sa **«Ureservert»**, som leste som «ledig for alle» og betydde det motsatte: lederens
+kladd, usynlig for korpsene. Skissen ble lagt fram først; André svarte på fire spørsmål:
+«de kan begge ha likt» (samme nivå for enhet og plass), «greit» («ikke delt ut» på kortet),
+«er det ikke greit å ha ledig for alle slik at en ser hva som noen korps ikke kunne ta og
+dermed kan noen andre sikre seg det?» (hullet), og «ja alt» (alle fire delene).
+
+**Hva som het hva før:**
+
+| Før | Nå |
+|---|---|
+| Merket «Ureservert» på enhetskortet | **«N plasser ikke delt ut»** (gult), ellers korpset, «Åpen for alle» eller «Delt ut til N korps» |
+| Utdeling bare som «Reservert korps» i «Rediger enhet» | **«Del ut …»**-knapp på kortet (hovedknapp så lenge noe ligger igjen) og et eget vindu |
+| Nedtrekket i «Rediger enhet»: «— Ureservert —» | «— Ikke delt ut —», med hint om hva tømming gjør |
+| Planleggeren: «usynlige for korpsene til du deler dem ut», uten knapp | Sluttsteg **«Del ut»** nederst: én rad per enhet, «— bestem senere —» som standard |
+| Vaktens lengde bare i «Innstillinger» | Kort **«Vakten»** øverst i planleggeren; «Endre» åpner samme vindu. Grensene nevnes som tekst |
+
+**Ett endepunkt, tre flater.** `POST /vaktliste/api/vaktlister/<pk>/del-ut/` med
+`{"fordeling": [{ressurs_id, korps_id} | {ressurs_id, alle: true}]}` — vinduet sender én
+rad, planleggeren alle. Regelen står i `services.del_ut()`: **bare kladden røres**
+(`services.KLADD`); til et korps settes `Ressurs.korps`, så også nye skift er korpsets; til
+alle settes `alle_korps` per plass. Alt valideres før noe skrives, og skrivingen står i én
+transaksjon. Auditlogget per felt, som før.
+
+**Tilgangen på enhetens reservasjon er senket fra `skriv_leder` til `skriv_full`.** Plassens
+nedtrekk krevde `skriv_full`, enhetens `skriv_leder` — og tabellen øverst i `views.py` sa
+`skriv_full` for begge. `RESSURS_UTDELINGSFELTER = ('korps_id',)` står nå ved siden av
+`RESSURS_OPPSETTFELTER`, speilet i JS og holdt likt av `SkiftetsOppsettfelterTests`.
+Ressurstype, «Koble til delt konto», rekkefølge og sletting er fortsatt lederens.
+Tilgangsmatrisen i `docs/TESTSJEKKLISTE_VAKTLISTE.md` §16 hadde også `alle_korps` som
+lederens, som den aldri var.
+
+**Hullet: kladden kunne komme tilbake bakveien.** For én plass går «planlagt» én vei —
+serveren avviser veien tilbake. Men tømte lederen **enhetens** reservasjon, ble hver ledige
+plass som bare arvet den kladd igjen, og forsvant fra korpset som så den, uten et ord.
+Nå blir de **åpne for alle** (`services.frigi_arvede_plasser`, i samme transaksjon som
+lagringen). Plasser med eget korps står; en omreservering til et annet korps frigir
+ingenting.
+
+**Rammene:** grensene (`Belastningsgrenser`) er én rad for hele organisasjonen og ble
+**ikke** flyttet inn som vaktens — et «Endre» i planleggeren ville endret alle vaktlister fra
+en fane som ser ut til å gjelde én.
+
+**Mutasjonstestet, 25 mutanter, alle drept** — tjenestelaget og portene tungt, JS-reglene
+middels: kladd-filteret, `alle`-lagringen, frigjøringens filter, tom-sjekk og
+transaksjon, omreservering, begge tilgangsportene, vaktliste-avgrensningen, korps-sjekken,
+`ikkeDeltUt()`s ledd, korpsvelgeren, `kanDeleUt()`, valgene i sluttsteget, **kallstedene**
+i `mkPlanlegger()` og `apneRessurs()` (de fikk egne tester gjennom den ekte inngangen da
+de ble funnet udekket), silingen i `lagreRessurs()` og escaping i tabellen. **Én overlevde
+først:** transaksjonen rundt fordelingen — valideringen stopper alt før skrivingen, så
+bare en feil *midt i* den kan vise forskjellen. Den prøves nå med en `del_ut` som feiler
+på den andre enheten.
+
+**Og én lyve-mutant, fanget:** den første kjøringen ble avbrutt mens M2 (`vp.save()`
+fjernet) sto i fila, og alt etter ble målt mot mutert kode — M12 så «drept» ut av feil
+grunn. Kjøringen ble gjort om fra ren kode.
+
+Nye tester: `vaktliste/tests_del_ut.py` (endepunktet, tilgangen, frigjøringen) og
+`tests_del_ut_js.py` (kortet, vinduet, sluttsteget, vaktkortet, kallstedene).
+`handlinger.js` gikk over 1 800 linjer; planleggerens del-ut-hjelpere står i
+`vaktliste-oversikt.js`, ved tabellen de tegner.
+
+---
+
 ## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste` `#ordbok` `#tekst`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at skjermen brukte portalens ord, ikke Andrés — og

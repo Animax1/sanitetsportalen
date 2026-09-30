@@ -982,7 +982,7 @@ class MalensGatingTests(TestCase):
         harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                                'klokke')),
-            (VAKTLISTE_JS, ('mkRessurs', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
+            (VAKTLISTE_JS, ('mkRessurs', 'utdelingsmerke', 'ikkeDeltUt', '_allePoster', 'kanDeleUt', '_pauselinje', '_pauserFor', '_pausetekst', '_pauserPaaUtskrift', 'ressursErApen', '_radklasse', '_stempelknapper',
                             'kanStemple', 'iDrift', '_rolleValg',
                             'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                             '_planrad', '_plancellene', '_driftrad',
@@ -1849,7 +1849,9 @@ class SkiftetsOppsettfelterTests(SimpleTestCase):
             f"const SKIFT_OPPSETTFELTER = "
             f"{json.dumps(self._liste('SKIFT_OPPSETTFELTER'))};\n"
             f"const RESSURS_OPPSETTFELTER = "
-            f"{json.dumps(self._liste('RESSURS_OPPSETTFELTER'))};\n")
+            f"{json.dumps(self._liste('RESSURS_OPPSETTFELTER'))};\n"
+            f"const RESSURS_UTDELINGSFELTER = "
+            f"{json.dumps(self._liste('RESSURS_UTDELINGSFELTER'))};\n")
 
     def _liste(self, navn):
         """Leser konstanten ut av JS-kilden og gir den som en Python-liste.
@@ -1870,6 +1872,8 @@ class SkiftetsOppsettfelterTests(SimpleTestCase):
     def test_ressursens_liste_er_den_samme_i_js_og_python(self):
         self.assertEqual(self._liste('RESSURS_OPPSETTFELTER'),
                          list(services.RESSURS_OPPSETTFELTER))
+        self.assertEqual(self._liste('RESSURS_UTDELINGSFELTER'),
+                         list(services.RESSURS_UTDELINGSFELTER))
 
     def test_korpsforeren_sender_bare_bemanningen(self):
         """Den ene grunnen funksjonen finnes: et personbytte skal gå gjennom."""
@@ -1899,9 +1903,10 @@ class SkiftetsOppsettfelterTests(SimpleTestCase):
     def test_navnet_slipper_gjennom_paa_ressursen(self):
         from patients.js_test_utils import run_node
         run_node(self.h, self._vindu('skriv_handling') + """
-            const ut = bareTillatteFelter(
+            const ut = bareTillatteFelter(bareTillatteFelter(
                 {navn: 'Sola 56', gruppe_id: 2, korps_id: 3, enhet_id: 4},
-                RESSURS_OPPSETTFELTER, kanLede());
+                RESSURS_OPPSETTFELTER, kanLede()),
+                RESSURS_UTDELINGSFELTER, kanSetteOppSkift());
             assert(JSON.stringify(Object.keys(ut)) === JSON.stringify(['navn']),
                    'bare navnet: ' + JSON.stringify(ut));
         """)
@@ -2123,7 +2128,8 @@ class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
         konstanter = ''.join(
             'const %s = %s;\n' % (navn, re.search(navn + r'\s*=\s*(\[[^\]]*\])',
                                                   kilde).group(1))
-            for navn in ('SKIFT_OPPSETTFELTER', 'RESSURS_OPPSETTFELTER'))
+            for navn in ('SKIFT_OPPSETTFELTER', 'RESSURS_OPPSETTFELTER',
+                         'RESSURS_UTDELINGSFELTER'))
         return run_node(self.harness, (
             f"globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: '{nivaa}', "
             "admin: false } };\n" + konstanter + self.STUBB
@@ -2159,6 +2165,12 @@ class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
         sendt = self._sendt('skriv_leder', 'lagreRessurs()')
         for felt in ('navn', 'gruppe_id', 'korps_id', 'enhet_id'):
             self.assertIn(felt, sendt)
+
+    def test_ressursvinduet_sender_reservasjonen_for_vaktlederen(self):
+        """Reservasjonen er utdeling og krever `skriv_full`, som plassen
+        (30. sep. 2026). Typen og kontoen er fortsatt lederens."""
+        sendt = self._sendt('skriv_full', 'lagreRessurs()')
+        self.assertEqual(sorted(sendt), ['korps_id', 'navn'], sendt)
 
 
 class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):

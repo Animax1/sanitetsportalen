@@ -552,6 +552,10 @@
         <div class="mb-3">
           <label class="form-label" for="ressurs-korps">Reservert korps</label>
           <select id="ressurs-korps" class="form-select"></select>
+          <div class="form-text">
+            Korpset som får enheten. Tømmes feltet, blir plassene som fulgte
+            enheten åpne for alle korps — de blir ikke planlagt igjen.
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="ressurs-enhet">Koble til delt konto</label>
@@ -1084,6 +1088,33 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
         <button type="button" class="btn btn-primary" id="generer-knapp"
                 data-action="lagreGenerer">Lag grunnlaget</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# «Del ut» (pulje 4): kladden på én enhet til et korps eller alle — `mkDelUtValg()`. #}
+<div class="modal fade" id="delUtModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="del-ut-tittel">Del ut</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <p id="del-ut-tekst" class="mb-2"></p>
+        <div id="del-ut-valg" class="vl-del-ut-valg"></div>
+        <div class="form-text mt-3">
+          <i class="bi bi-info-circle me-1"></i>Når plassene er delt ut, ser korpset
+          dem og kan fylle dem. De kan ikke legges tilbake som planlagt. Vil du dele
+          ut én og én plass, gjør du det i nedtrekket på raden.
+        </div>
+        <div id="del-ut-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="del-ut-knapp"
+                data-action="lagreDelUt">Del ut</button>
       </div>
     </div>
   </div>

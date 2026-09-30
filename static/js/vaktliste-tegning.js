@@ -892,6 +892,37 @@ function _pauselinje(r, egne) {
 }
 
 
+function utdelingsmerke(r, poster) {
+  // **Hvem enheten er delt ut til — eller at den ikke er det** (pulje 4, 30.
+  // sep. 2026). Her sto «Ureservert», og det leste som «ledig for hvem som
+  // helst». Det betydde det motsatte: plassene var lederens kladd, usynlige
+  // for korpsene. Merket sier nå hva som gjenstår, i tall.
+  if (r.korps_navn) {
+    return `<span class="vl-merkelapp vl-korps">${escapeHtml(r.korps_navn)}</span>`;
+  }
+  const egne = (poster || []).filter((vp) => vp.ressurs_id === r.id);
+  const kladd = ikkeDeltUt(r.id, egne).length;
+  if (kladd) {
+    const ord = kladd === 1 ? 'plass' : 'plasser';
+    return `<span class="vl-merkelapp vl-ikke-delt-ut">${escHtmlValue(kladd)} ${escapeHtml(ord)} ikke delt ut</span>`;
+  }
+  // Delt ut plass for plass: si til hvem, uten å liste alle.
+  const korps = new Set(egne.filter((vp) => !vp.alle_korps && vp.reservert_korps_id != null)
+    .map((vp) => vp.reservert_korps_id));
+  const alle = egne.some((vp) => vp.alle_korps);
+  let tekst;
+  if (!korps.size && !alle) tekst = 'Ikke delt ut';
+  else if (!korps.size) tekst = 'Åpen for alle';
+  else if (korps.size === 1 && !alle) {
+    const k = (aktivListe?.korps || []).find((x) => korps.has(x.id));
+    tekst = k ? (k.kortnavn || k.navn) : 'Delt ut til 1 korps';
+  } else {
+    tekst = 'Delt ut til ' + korps.size + ' korps' + (alle ? ' og alle' : '');
+  }
+  return `<span class="vl-merkelapp vl-ureservert">${escapeHtml(tekst)}</span>`;
+}
+
+
 function mkRessurs(r, apen = true, egne = null) {
   // `apen` er gruppas avgjørelse, ikke ressursens — `mkGruppe()` vet hvor
   // mange søsken kortet har. Standardverdien `true` er for de stedene som
@@ -906,9 +937,7 @@ function mkRessurs(r, apen = true, egne = null) {
   // Per rad, ikke per ressurs: egen person på andres plass er egen rad
   // (`kanRoreRad`), og en ledig plass satt av til korpset er hennes å fylle.
 
-  const korpsmerke = r.korps_navn
-    ? `<span class="vl-merkelapp vl-korps">${escapeHtml(r.korps_navn)}</span>`
-    : '<span class="vl-merkelapp vl-ureservert">Ureservert</span>';
+  const korpsmerke = utdelingsmerke(r, _allePoster());
   // **Koblingen vises også når den mangler.** Merkelappen sto bare der bilen
   // *var* koblet, så den som ikke hadde koblet noe så ingenting — og kunne
   // ikke vite at koblingen finnes per bil i det hele tatt. Nå står den som en
@@ -928,8 +957,18 @@ function mkRessurs(r, apen = true, egne = null) {
   // **«Opprett vakt» er å sette opp behovet**, ikke å fylle det (André,
   // 15. sep. 2026). Knappen sto på `kanRore` — altså badgen — og da kunne
   // korps-føreren lage skift med frie tidspunkt på sin egen ressurs.
-  const settKnapp = kanSetteOppSkift()
+  // **«Del ut» er hovedknappen så lenge noe ligger igjen** (pulje 4, 30. sep.
+  // 2026). Utdelingen fantes som felt nummer tre i «Rediger enhet»; nå står
+  // den der man ser at noe mangler, og «Nytt skift» tar plassen etterpå.
+  const delUt = kanDeleUt(r);
+  const delUtKnapp = delUt
     ? `<button class="btn btn-sm btn-primary" type="button"
+               data-action="apneDelUt" data-id="${escHtmlValue(r.id)}">
+         <i class="bi bi-send me-1"></i>Del ut …
+       </button>` : '';
+  const settKlasse = delUt ? 'btn-outline-primary' : 'btn-primary';
+  const settKnapp = kanSetteOppSkift()
+    ? `<button class="btn btn-sm ${escHtmlValue(settKlasse)}" type="button"
                data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-plus-lg me-1"></i>Nytt skift
        </button>` : '';
@@ -954,7 +993,7 @@ function mkRessurs(r, apen = true, egne = null) {
                data-action="apneRessurs" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-pencil me-1"></i>Rediger
        </button>` : '';
-  const knapper = settKnapp + rolleKnapp + redigerKnapp;
+  const knapper = delUtKnapp + settKnapp + rolleKnapp + redigerKnapp;
 
   // **Tabellen har én form, og drift legger innsjekken foran.** I
   // planlegging er den et regneark: radene er skift, kolonnene er det man

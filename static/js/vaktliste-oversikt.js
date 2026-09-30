@@ -938,6 +938,149 @@ function _planleggerRegnestykke(linje, t) {
 }
 
 
+function mkVaktramme() {
+  // **Vakten: det man bestemmer én gang per vakt, øverst** (pulje 4, 30. sep.
+  // 2026). Timetaket sto i planleggeren, lengden i «Innstillinger» og grensene
+  // i «Timeoversikt». Lengden vises her og endres i samme vindu som før
+  // (`apneVaktlengde`). **Grensene nevnes, men flyttes ikke:** de er én rad for
+  // hele organisasjonen, og et «Endre» her ville endret alle vaktlister fra en
+  // fane som ser ut til å gjelde én.
+  const vl = aktivListe && aktivListe.vaktliste;
+  if (!vl) return '';
+  const start = _d(vl.startet) ? _dag(vl.startet) + ' ' + _kl(vl.startet) : '';
+  let spenn;
+  if (!start) spenn = 'Ingen starttid satt';
+  else if (vl.planlagt_slutt) {
+    spenn = start + ' – ' + _dag(vl.planlagt_slutt) + ' ' + _kl(vl.planlagt_slutt);
+  } else spenn = 'Fra ' + start + ' · ingen sluttid satt';
+  const g = belastning && belastning.grenser;
+  const grenser = g ? `
+      <span class="vl-meta">Grensene gjelder alle vaktlister:
+        ${escapeHtml(_tall(g.maks_skift_timer))} t skift,
+        ${escapeHtml(_tall(g.min_hvile_timer))} t hvile. De endres i «Timeoversikt».</span>` : '';
+  return `
+    <div class="vl-kort vl-kort-topp">
+      <span class="vl-kort-tittel">Vakten</span>
+      <span>${escapeHtml(spenn)}</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="apneVaktlengde">
+        <i class="bi bi-calendar-range me-1"></i>Endre
+      </button>
+      ${grenser}
+    </div>`;
+}
+
+
+function mkDelUtTabell() {
+  // **Sluttsteget: hvem får hva** (pulje 4, 30. sep. 2026). Oppsettet sa
+  // «usynlige for korpsene til du deler dem ut», men ingen knapp i nærheten
+  // gjorde det. Én rad per enhet som har kladd; standardvalget er «bestem
+  // senere», så ingenting deles ut ved et uhell. En samleplass med plasser til
+  // flere korps deles ut plass for plass i regnearket.
+  if (!kanSetteOppSkift() || !aktivListe) return '';
+  const poster = _allePoster();
+  const rader = (aktivListe.ressurser || [])
+    .map((r) => ({ r, n: ikkeDeltUt(r.id, poster).length }))
+    .filter((x) => x.n);
+  if (!rader.length) return '';
+  const total = rader.reduce((sum, x) => sum + x.n, 0);
+  const valg = [['', '— bestem senere —'], ['alle', 'Åpen for alle']].concat(
+    (aktivListe.korps || []).map((k) => [String(k.id), k.kortnavn || k.navn]));
+  const linjer = rader.map(({ r, n }) => {
+    const valgt = delUtValg[String(r.id)] || '';
+    const alternativer = valg.map(([verdi, tekst]) => {
+      const merke = verdi === valgt ? ' selected' : '';
+      return `<option value="${escHtmlValue(verdi)}"${merke}>${escapeHtml(tekst)}</option>`;
+    }).join('');
+    return `
+      <tr>
+        <td class="vl-navn">${escapeHtml(r.navn)}</td>
+        <td>${escHtmlValue(n)}</td>
+        <td><select class="form-select form-select-sm" data-action="velgDelUt"
+                    data-hendelse="change" data-felt="hvem"
+                    data-id="${escHtmlValue(r.id)}">${alternativer}</select></td>
+      </tr>`;
+  }).join('');
+  const { plasser } = planleggerDelUt();
+  const ligger = total === 1 ? 'plass ligger' : 'plasser ligger';
+  const av = plasser ? '' : ' disabled';
+  return `
+    <div class="vl-kort">
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">Del ut</span>
+        <span class="vl-meta">${escHtmlValue(total)} ${escapeHtml(ligger)}
+          på bordet ditt, usynlige for korpsene.</span>
+      </div>
+      <div class="vl-tabellramme">
+        <table class="vl-tabell">
+          <thead><tr><th>Enhet</th><th>Ikke delt ut</th><th>Får</th></tr></thead>
+          <tbody>${linjer}</tbody>
+        </table>
+      </div>
+      <div class="vl-pl-legg-til">
+        <button type="button" class="btn btn-primary" id="del-ut-alle-knapp"
+                data-action="lagreDelUtAlle"${av}>
+          <i class="bi bi-send me-1"></i>${escapeHtml(_delUtKnappTekst(plasser))}
+        </button>
+        <div id="del-ut-alle-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+    </div>`;
+}
+
+
+function velgDelUt(id, _felt, verdi) {
+  // Nedtrekket i planleggerens sluttsteg. Tilstanden står i JS og ikke i
+  // DOM-en, fordi panelet tegnes på nytt — samme grunn som `planleggerlinjer`.
+  if (verdi) delUtValg[String(id)] = verdi;
+  else delete delUtValg[String(id)];
+  planleggerTegnDelUt();
+}
+
+
+function planleggerDelUt() {
+  // Fordelingen som sendes, og hvor mange plasser den gir bort. Bare enheter
+  // som faktisk har kladd — et valg som står igjen på en enhet som er delt ut
+  // i en annen fane, skal ikke sendes.
+  const poster = _allePoster();
+  const fordeling = [];
+  let plasser = 0;
+  Object.entries(delUtValg).forEach(([id, hvem]) => {
+    const n = ikkeDeltUt(Number(id), poster).length;
+    if (!n) return;
+    fordeling.push(_delUtRad(Number(id), hvem));
+    plasser += n;
+  });
+  return { fordeling, plasser };
+}
+
+
+function _delUtKnappTekst(plasser) {
+  if (!plasser) return 'Velg hvem som får hva';
+  return `Del ut ${plasser} ${plasser === 1 ? 'plass' : 'plasser'}`;
+}
+
+
+function planleggerTegnDelUt() {
+  // Knappen oppdateres på plass: et nedtrekk er man ferdig med, men en
+  // omtegning ville flyttet siden under den som leser tabellen.
+  const knapp = document.getElementById('del-ut-alle-knapp');
+  if (!knapp) return;
+  const { plasser } = planleggerDelUt();
+  knapp.innerHTML = `<i class="bi bi-send me-1"></i>${escapeHtml(_delUtKnappTekst(plasser))}`;
+  knapp.disabled = !plasser;
+}
+
+
+async function lagreDelUtAlle() {
+  const { fordeling } = planleggerDelUt();
+  if (!fordeling.length) return;
+  if (await _sendDelUt(fordeling, 'del-ut-alle-knapp', 'del-ut-alle-feil')) {
+    delUtValg = {};
+    await lastListe(aktivListe.vaktliste.id);
+  }
+}
+
+
 function mkPlanlegger() {
   // **Planleggeren lager grunnlaget for vaktlista** (André, 15. sep. 2026).
   // Du sier «tre firemannslag 14–22, én ambulanse 15–03, én på åttetimers
@@ -1016,13 +1159,13 @@ function mkPlanlegger() {
       <span class="vl-meta">${escHtmlValue(staaende)} av radene står allerede
         på listen og blir <strong>rettet</strong>, ikke laget på nytt.</span>` : '';
 
-  return mkBudsjett() + `
+  return mkVaktramme() + mkBudsjett() + `
     <div class="vl-kort vl-kort-topp">
       <span class="vl-kort-tittel">Oppsett</span>
       <span class="vl-meta">Én rad per enhet. Plassene fødes som
         <strong>planlagt</strong> — usynlige for korpsene til du deler dem ut.</span>
       ${staarTekst}
-    </div>` + utenStart + linjer + tomt + leggTil + oppsummering;
+    </div>` + utenStart + linjer + tomt + leggTil + oppsummering + mkDelUtTabell();
 }
 
 

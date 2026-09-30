@@ -298,12 +298,12 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
       og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
       kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
-### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 4–5
+### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 5
 
 *En ekstern gjennomgang av `/vaktliste/` (Fable), kontrollert mot koden 30. sep. 2026. Dommen:
 mekanikken er solid; det som svikter er **begrepene** og **inngangen** for hver rolle. Pulje
-1 (rettinger uten avgjørelser), 2 (drift automatisk ved vaktens start) og 3 (ordboka på
-skjermen) er levert — CHANGELOG 30. sep. Pulje 4 og 5 bruker de nye ordene.*
+1 (rettinger uten avgjørelser), 2 (drift automatisk ved vaktens start), 3 (ordboka på
+skjermen) og 4 («Del ut») er levert — CHANGELOG 30. sep. Pulje 5 bruker de nye ordene.*
 
 - [ ] **Staging-sjekken for hele gjennomgangen — til slutt, etter siste pulje** (André,
       30. sep.: «ta med disse sjekkene til slutten av hele økten av puljer»). Punktene står
@@ -313,20 +313,17 @@ skjermen) er levert — CHANGELOG 30. sep. Pulje 4 og 5 bruker de nye ordene.*
         e-posthintet per nivå, «Ikke plassert» med korpsvelgeren.
       - **Pulje 2** (`d0c6439`): §10 — lista går i drift av seg selv ved start, én gang,
         audit uten bruker, fila én gang; en liste uten start går ikke i drift av seg selv.
-      - **Pulje 3**: §3/§4/§5 og punktet «Ordboka» — de nye ordene overalt på
+      - **Pulje 3** (`7c35f33`): §3/§4/§5 og punktet «Ordboka» — de nye ordene overalt på
         `/vaktliste/`, «Koble til delt konto» med hint, og at lagring, fjerning, skift og
         pauser på en enhet fortsatt virker (adressene ble rørt av byttet og rettet).
+      - **Pulje 4**: §4 «Del ut» og §8 «Vakten»/«Del ut» — merket og knappen på kortet,
+        vinduet, `test-vl-full` som deler ut, tømming som gjør plassene åpne for alle, og
+        sluttsteget i planleggeren. Tilgangsmatrisen §16 har en ny rad.
 - [ ] **Ordboka i `/oppdrag/` og `/ko/`.** Vaktlista fikk den 30. sep. (ressurstype, enhet,
       skift, «Koble til delt konto», -en-form). Samme ord brukes der: KOs
       «ressursoversikt», «et lag er en ressurs uten oppdragsenhet», og `oppdrag.Enhet` er
       Karmøy 51 — nå står «enhet» for to ting på tvers av sidene. `vaktliste/tests_ordboka.py`
       er mønsteret for en vakt per modul; skisser før og etter først, som for vaktlista.
-- [ ] **Pulje 4 — «Del ut» som navngitt handling.** Utdelingen finnes (å sette reservasjon
-      er å dele ut, `views.py`-tabellen øverst) men står ikke på skjermen. Forslag: en
-      «Del ut»-knapp på ressurser merket «Ureservert», og/eller et sluttsteg i planleggeren
-      som spør «hvem får hva». Skriv et kort forslag med skisse først — det endrer
-      vaktlederens arbeidsflyt. Ta samtidig **vaktas rammer**: timetaket står i
-      «Planlegger», grensene i «Timeoversikt», lengden i «Innstillinger».
 - [ ] **Pulje 5 — brukerveiledning per rolle.** `docs/BRUKERVEILEDNING_VAKTLISTE.md`: ordboka
       øverst, så én del per rolle (korps-fører, vaktleder, admin) i den rekkefølgen arbeidet
       gjøres, lenket fra `/vaktliste/`. **Etter** pulje 3. Tilgangstabellen i

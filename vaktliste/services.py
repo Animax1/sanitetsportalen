@@ -959,6 +959,66 @@ def reservert_korps(vaktpost=None, ressurs=None):
     return ressurs.korps_id if ressurs is not None else None
 
 
+def ikke_delt_ut(ressurs):
+    """Plassene på enheten som fortsatt er lederens kladd."""
+    from .models import Vaktpost
+    return Vaktpost.objects.filter(KLADD, ressurs=ressurs)
+
+
+def del_ut(ressurs, korps_id=None, alle=False) -> int:
+    """**«Del ut»** (pulje 4, 30. sep. 2026): gi kladden på én enhet til et
+    korps eller til alle. Svarer med hvor mange plasser som ble delt ut.
+
+    **Bare kladden røres.** En plass som er delt ut til noen andre, eller
+    bemannet, står — samme grense som generatoren (`generer_grunnlag`).
+
+    **Til et korps settes reservasjonen på enheten**, ikke på hver plass. Da
+    arver plassene den, og et nytt skift på enheten er korpsets fra start —
+    «Reservert korps» i «Rediger enhet» er det samme valget, lest som standard.
+    **Til alle settes `alle_korps` per plass**, fordi enheten ikke har noe
+    slikt felt: «åpen for alle» er en egenskap ved plassen.
+
+    Hver plass lagres for seg — ingen `update()` — fordi audit-signalene
+    skal se hver endring. Kalleren eier transaksjonen.
+    """
+    plasser = list(ikke_delt_ut(ressurs))
+    if not plasser:
+        return 0
+    if alle:
+        for vp in plasser:
+            vp.alle_korps = True
+            vp.save(update_fields=['alle_korps'])
+    else:
+        ressurs.korps_id = korps_id
+        ressurs.save(update_fields=['korps'])
+    return len(plasser)
+
+
+def frigi_arvede_plasser(ressurs) -> int:
+    """Enhetens reservasjon tømmes: plassene som arvet den blir **åpne for alle**.
+
+    **Uten dette kunne kladden komme tilbake via enheten.** En plass som er
+    delt ut kan ikke settes tilbake til planlagt (`vaktpost_detalj_view`), men tømte
+    lederen enhetens reservasjon, ble hver plass som bare arvet den kladd
+    igjen — og forsvant fra korpset som så den, uten et ord.
+
+    **Åpen for alle, ikke festet til det gamle korpset** (André, 30. sep.
+    2026: «er det ikke greit å ha ledig for alle slik at en ser hva som noen
+    korps ikke kunne ta og dermed kan noen andre sikre seg det?»). Å tømme
+    reservasjonen er å si at korpset ikke tar enheten; da skal de andre se det.
+
+    Kalles med enheten slik den står i basen, **før** reservasjonen tømmes —
+    de som arver er plassene uten eget korps og uten `alle_korps`.
+    """
+    if ressurs.korps_id is None:
+        return 0
+    plasser = list(ressurs.vaktposter.filter(korps__isnull=True, alle_korps=False))
+    for vp in plasser:
+        vp.alle_korps = True
+        vp.save(update_fields=['alle_korps'])
+    return len(plasser)
+
+
 def kan_bemanne_plass(user, ressurs, vaktpost=None) -> bool:
     """Reservasjonshalvdelen, lest fra plassen når den har sin egen.
 
@@ -1087,10 +1147,15 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
 SKIFT_OPPSETTFELTER = ('fra_tid', 'til_tid', 'korps_id', 'alle_korps',
                        'probono', 'antall')
 
-#: Det samme på en ressurs. **Navnet står bevisst ikke her:** det er det ene
-#: korps-føreren skal kunne rette, og reservasjonen, gruppa og
-#: enhetskoblingen er det hun ikke skal røre.
-RESSURS_OPPSETTFELTER = ('gruppe_id', 'korps_id', 'enhet_id', 'rekkefolge')
+#: Det samme på en ressurs, for `kan_lede`. **Navnet står bevisst ikke her:**
+#: det er det ene korps-føreren skal kunne rette.
+RESSURS_OPPSETTFELTER = ('gruppe_id', 'enhet_id', 'rekkefolge')
+
+#: **Reservasjonen på enheten er utdeling, og krever det samme som på plassen**
+#: — `kan_sette_opp_skift` (André, 30. sep. 2026: «de kan begge ha likt»). Den
+#: sto i lista over til da, altså `skriv_leder`, mens nedtrekket på plassen var
+#: `skriv_full` — og tabellen øverst i `views.py` sa `skriv_full` for begge.
+RESSURS_UTDELINGSFELTER = ('korps_id',)
 
 
 def oppsettfelter(data, felter) -> list[str]:

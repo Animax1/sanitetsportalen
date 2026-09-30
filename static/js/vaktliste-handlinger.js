@@ -260,13 +260,13 @@ function apneRessurs(id) {
   document.getElementById('ressurs-navn').value = r.navn;
   _settValg('ressurs-gruppe', (aktivListe.grupper || []).filter(
     (g) => g.er_aktiv || g.id === r.gruppe_id), r.gruppe_id);
-  _settValg('ressurs-korps', aktivListe.korps || [], r.korps_id, 'Ureservert');
+  _settValg('ressurs-korps', aktivListe.korps || [], r.korps_id, 'Ikke delt ut');
   _settValg('ressurs-enhet', aktivListe.enheter || [], r.enhet_id, 'Ingen');
 
   // **Vinduet viser det hun får gjøre.** For korps-føreren er navnet hele
   // vinduet: gruppa, reservasjonen og enhetskoblingen er beslutninger om hvem
   // ressursen er *til for*, og de flytter tilgangen til seg selv.
-  _laasRessursoppsett(!kanLede());
+  _laasRessursoppsett(!kanLede(), !kanSetteOppSkift());
 
   const antall = _posterFor(id).length;
   const tekst = document.getElementById('ressurs-slett-tekst');
@@ -279,12 +279,16 @@ function apneRessurs(id) {
 }
 
 
-function _laasRessursoppsett(laast) {
+function _laasRessursoppsett(laast, utdelingLaast = laast) {
   // Nedtrekkene låses framfor å skjules: står bilen reservert til Haugesund,
   // er det verdt å se — det er nettopp derfor hun får rette navnet på den.
   // Navnet står ikke i lista; det er det ene hun får endre.
-  _laasFelter(['ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet'],
-              laast, 'ressurs-laast-hint');
+  //
+  // **Reservasjonen har sin egen terskel** (30. sep. 2026): den er utdeling,
+  // og den som deler ut plassene deler ut enheten. Hintet følger oppsettet —
+  // er reservasjonen låst, er typen og kontoen det også.
+  _laasFelter(['ressurs-korps'], utdelingLaast, null);
+  _laasFelter(['ressurs-gruppe', 'ressurs-enhet'], laast, 'ressurs-laast-hint');
 }
 
 
@@ -313,12 +317,12 @@ async function lagreRessurs() {
 
     const res = await apiFetch(`/vaktliste/api/ressurser/${id}/`, {
       method: 'PUT',
-      body: JSON.stringify(bareTillatteFelter({
+      body: JSON.stringify(bareTillatteFelter(bareTillatteFelter({
         navn,
         gruppe_id: document.getElementById('ressurs-gruppe')?.value || null,
         korps_id: document.getElementById('ressurs-korps')?.value || null,
         enhet_id: document.getElementById('ressurs-enhet')?.value || null,
-      }, RESSURS_OPPSETTFELTER, kanLede())),
+      }, RESSURS_OPPSETTFELTER, kanLede()), RESSURS_UTDELINGSFELTER, kanSetteOppSkift())),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
@@ -1510,6 +1514,100 @@ async function lagreGenerer() {
     belastning = null;
     await lastListe(aktivListe.vaktliste.id);
   });
+}
+
+
+// ── Del ut (pulje 4, 30. sep. 2026) ────────────────────────────────────────
+// Utdelingen fantes — å sette reservasjonen *er* å dele ut — men sto som felt
+// nummer tre i «Rediger enhet», og ingenting sa hva som lå igjen. Vinduet på
+// kortet og sluttsteget i planleggeren sender til samme endepunkt, så regelen
+// for hva som deles ut står ett sted (`services.del_ut`).
+
+function mkDelUtValg(korps, valgt) {
+  // Ett valg per korps, og «Åpen for alle» sist: det er unntaket, ikke
+  // standarden. Radioknapper og ikke et nedtrekk — det er vinduets ene
+  // spørsmål, og svarene skal kunne leses uten å åpne noe.
+  const rad = (verdi, tekst) => {
+    const merke = String(verdi) === String(valgt) ? ' checked' : '';
+    return `
+    <label>
+      <input type="radio" name="del-ut-hvem" value="${escHtmlValue(verdi)}"${merke}>
+      <span>${escapeHtml(tekst)}</span>
+    </label>`;
+  };
+  return (korps || []).map((k) => rad(k.id, k.navn)).join('')
+    + rad('alle', 'Åpen for alle korps');
+}
+
+
+function _delUtRad(ressursId, hvem) {
+  // Nedtrekkets og radioens verdi til én rad i fordelingen.
+  return hvem === 'alle' ? { ressurs_id: ressursId, alle: true }
+                         : { ressurs_id: ressursId, korps_id: Number(hvem) };
+}
+
+
+async function _sendDelUt(fordeling, knappId, feilId) {
+  _skjulFeil(feilId);
+  let ok = false;
+  await withSubmitGuard(knappId, async () => {
+    const res = await apiFetch(
+      `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/del-ut/`,
+      { method: 'POST', body: JSON.stringify({ fordeling }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil(feilId, d.message || 'Kunne ikke dele ut.');
+      return;
+    }
+    ok = true;
+  });
+  return ok;
+}
+
+
+function apneDelUt(id) {
+  const r = aktivListe?.ressurser.find((x) => x.id === id);
+  if (!r) return;
+  const kladd = ikkeDeltUt(id, _allePoster());
+  const modal = document.getElementById('delUtModal');
+  modal.dataset.ressurs = String(id);
+  _skjulFeil('del-ut-feil');
+  const tittel = document.getElementById('del-ut-tittel');
+  if (tittel) tittel.textContent = `Del ut ${r.navn}`;
+  const ord = kladd.length === 1 ? 'plass ligger' : 'plasser ligger';
+  const tekst = document.getElementById('del-ut-tekst');
+  if (tekst) {
+    tekst.textContent = `${kladd.length} ${ord} på bordet ditt `
+      + `(${_tall(_sumTimer(kladd))} t). Hvem skal få dem?`;
+  }
+  const valg = document.getElementById('del-ut-valg');
+  if (valg) valg.innerHTML = mkDelUtValg(aktivListe.korps, null);
+  const knapp = document.getElementById('del-ut-knapp');
+  if (knapp) knapp.textContent = `Del ut ${kladd.length} ${kladd.length === 1 ? 'plass' : 'plasser'}`;
+  _apneModal('delUtModal');
+}
+
+
+async function lagreDelUt() {
+  const id = Number(document.getElementById('delUtModal')?.dataset.ressurs);
+  const valgt = document.querySelector('input[name="del-ut-hvem"]:checked');
+  if (!id) return;
+  if (!valgt) { _visFeil('del-ut-feil', 'Velg hvem som skal få plassene.'); return; }
+  if (await _sendDelUt([_delUtRad(id, valgt.value)], 'del-ut-knapp', 'del-ut-feil')) {
+    _lukkModal('delUtModal');
+    await lastListe(aktivListe.vaktliste.id);
+  }
+}
+
+
+function apneVaktlengde() {
+  // «Endre» på vaktens kort i planleggeren åpner det samme vinduet som
+  // «Innstillinger» — ett skjema for lengden, ikke to som kan gli fra
+  // hverandre. Fokus flyttes til feltet, så man ikke må lete i vinduet.
+  // Bootstrap setter fokus på vinduet når det er vist, så feltet får det etterpå.
+  document.getElementById('vaktModal')?.addEventListener('shown.bs.modal',
+    () => document.getElementById('vakt-start')?.focus(), { once: true });
+  apneVakt();
 }
 
 
