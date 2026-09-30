@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — CI rød på pip-audit: urllib3 2.7.0 har tre CVE-er (CVE-2026-97687/-97688/-97689), låst til 2.8.0  `#ci` `#avhengigheter` `#sikkerhet`
+
+**Hvorfor:** CI-kjøring #60 på `a30bc2d` (flettingen av kartkoblingsplanen) var grønn på alle
+testene og rød på steget «Kjente sårbarheter (pip-audit)»: `urllib3 2.7.0` fikk tre
+rådgivninger publisert samme ettermiddag, mellom kjøring #59 (14:28, grønn) og #60 (19:10).
+Reprodusert lokalt med nøyaktig CI-kommandoen. Ikke knyttet til noen endring i repoet —
+det er hele poenget med steget, jf. kommentaren i `tester.yml`.
+
+**Hva:**
+- `requirements.txt`: `pip-compile --upgrade-package urllib3` under Python 3.13, som
+  headeren sier. Diffen er de tre urllib3-linjene og ingenting annet; `requirements.in` er
+  uendret (urllib3 er transitiv via botocore).
+- Verifisert: `pip-audit` grønn; `pip install --require-hashes` i et rent 3.13-venv, som på
+  Railway; `core.tests_offsite` (boto3-stien) grønn i det miljøet.
+
 ## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste` `#ordbok` `#tekst`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at skjermen brukte portalens ord, ikke Andrés — og
