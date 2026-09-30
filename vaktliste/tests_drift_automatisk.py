@@ -189,6 +189,19 @@ class FilaVedAutomatiskDriftTests(TestCase):
         self.assertEqual(0, self._driftfiler())
 
 
+def _kjor_klokka():
+    """Kjør middlewarens klokke i testens tråd.
+
+    `_kjor()` lukker databasetilkoblingen til slutt — riktig i prod, der den går
+    i sin egen tråd. Her er det testens tilkobling: på PostgreSQL ble den lukket,
+    og de neste testene i samme arbeider fikk «connection already closed» (CI
+    30. sep. 2026, `e81709d`). SQLite ignorerer lukkingen inne i en
+    transaksjon, så feilen viste seg ikke lokalt."""
+    from . import middleware
+    with patch.object(middleware, 'connection'):
+        middleware._kjor()
+
+
 class KallstedeneTests(TilgangsBasis):
     """Gjennom de ekte inngangene. Kaller testen bare funksjonen, kan et kallsted
     forsvinne uten at noe blir rødt — regel 3 i `CLAUDE.md`."""
@@ -227,17 +240,15 @@ class KallstedeneTests(TilgangsBasis):
         self.assertTrue(rad['i_drift'])
 
     def test_middlewarens_klokke(self):
-        from . import middleware
         with patch.object(fil, 'send_planlagte', return_value=[]):
-            middleware._kjor()
+            _kjor_klokka()
         self.assertEqual(choices.DRIFT, self._status())
 
     def test_middlewarens_klokke_overlever_en_feil_i_drift(self):
         """En feil i den ene skal ikke stoppe den andre."""
-        from . import middleware
         with patch.object(services, 'sett_forfalte_i_drift', side_effect=RuntimeError('boom')), \
                 patch.object(fil, 'send_planlagte', return_value=[]) as sp:
-            middleware._kjor()
+            _kjor_klokka()
         sp.assert_called_once()
 
 

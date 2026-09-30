@@ -457,11 +457,15 @@ class FilutsendingMiddlewareTests(FilBasis):
     def test_traaden_kaller_send_planlagte_og_slipper_laasen(self):
         from unittest.mock import patch
         from . import middleware
-        with patch.object(fil, 'send_planlagte', return_value=[]) as sp:
+        # `connection` stubbes: `_kjor()` lukker tilkoblingen, og her er det
+        # testens (se `tests_drift_automatisk._kjor_klokka`, 30. sep. 2026).
+        with patch.object(middleware, 'connection'), \
+                patch.object(fil, 'send_planlagte', return_value=[]) as sp:
             middleware._kjor()
             sp.assert_called_once()
         self.assertFalse(middleware._kjorer)
-        with patch.object(fil, 'send_planlagte', side_effect=RuntimeError('boom')):
+        with patch.object(middleware, 'connection'), \
+                patch.object(fil, 'send_planlagte', side_effect=RuntimeError('boom')):
             middleware._kjor()      # kaster ikke
         self.assertFalse(middleware._kjorer)
 

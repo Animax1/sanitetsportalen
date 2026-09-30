@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#ci` `#tester` `#vaktliste`
+
+**Hvorfor:** CI-kjøring #57 på `e81709d` feilet med tre feil, alle `InterfaceError: connection
+already closed`, mens hele suiten var grønn lokalt. André: «Sjekk ci, den mislyktes. Når du
+pusher skal du vente på ci svar før du er ferdig med noe.»
+
+**Årsaken:** `vaktliste.middleware._kjor()` avslutter med `connection.close()` — riktig i
+prod, der klokka går i sin egen tråd med egen tilkobling. Testene kjørte `_kjor()` i
+testens tråd, og lukket dermed **testens** tilkobling. **SQLite ignorerer en lukking inne i
+en transaksjon; PostgreSQL gjør det ikke** — og de neste testene i samme arbeider arvet den
+døde tilkoblingen (`test_velgeren_aapner_den` feilet allerede i `setUp`). Samme skjulte feil
+sto i `FilutsendingMiddlewareTests` fra 13. sep., og slapp unna fordi den testen ikke rører
+databasen etterpå.
+
+**Hva:**
+- `tests_drift_automatisk._kjor_klokka()` og `tests_fil` stubber `middleware.connection`.
+  Middlewaren er uendret.
+- **Reprodusert og verifisert mot PostgreSQL lokalt**: de samme tre feilene før, grønt
+  etter; hele suiten (4 176 + 1 045) og `verifiser_migrasjoner` mot PostgreSQL, samme
+  oppdeling og `--parallel 4` som CI. Mutanten som fjerner klokka fra middlewaren er
+  fortsatt rød.
+- **`CLAUDE.md`, arbeidsflyten:** en push er ikke ferdig før CI er grønn på SHA-en, og
+  suiten kjøres mot en lokal PostgreSQL før push. For å holde rota under taket er
+  historikken om at to-grener-regelen bare sto i deploy-guiden til 17. sep. tatt ut.
+
 ## 2026-09-30 — Vaktlista, pulje 2: lista settes i drift av seg selv ved vaktas start — «Sett i drift» er overstyringen  `#vaktliste` `#drift` `#audit`
 
 **Hvorfor:** André, 14. sep.: «fjern i drift-knappen og heller ha det slik at når vaktlisten

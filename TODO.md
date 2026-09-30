@@ -312,7 +312,7 @@ som skal byttes.*
       - **Pulje 1** (`902f918`): §3 — `test-vl-fore` lander på «Mitt korps»; §7 —
         kompetansene som avkryssinger (prøv på telefon, AFØR + VFØR overlever en lagring),
         e-posthintet per nivå, «Ikke plassert» med korpsvelgeren.
-      - **Pulje 2**: §10 — lista går i drift av seg selv ved start, én gang, audit uten
+      - **Pulje 2** (`e81709d`, CI-rettet i neste commit): §10 — lista går i drift av seg selv ved start, én gang, audit uten
         bruker, fila én gang; en liste uten start går ikke i drift av seg selv.
 - [ ] **Pulje 3 — ordboka på skjermen, i vaktlista først.** André, 30. sep.: «vi starter med
       vaktlisten». Hans egen bruk: **ressurs** er typen (ambulanse, lag, mannskapsbil),

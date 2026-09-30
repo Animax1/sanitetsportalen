@@ -27,10 +27,11 @@ nettopp gikk ut.
 **To grener, to miljøer** (`docs/DEPLOY_GUIDE.md` §9): `staging` er staging,
 `main` er produksjon, og Railway auto-deployer fra begge. Arbeidet går på en egen gren,
 derfra til `staging` (het `rollemodell` til 25. sep. 2026), og til `main` **bare når
-André har sagt fra**. Regelen sto bare i
-deploy-guiden til 17. sep. 2026 — altså i en fil som ikke lastes med mindre noen åpner den,
-mens avsnittet rett over allerede sa «staging/prod» som om det var kjent. Byggnummeret i
-footeren skal stemme med commit-en som ble pushet; det er slik verifiseringen gjøres.
+André har sagt fra**. Byggnummeret i footeren skal stemme med commit-en som ble pushet.
+
+**En push er ikke ferdig før CI er grønn på den SHA-en** (André, 30. sep. 2026: «vent på
+ci svar før du er ferdig»). `e81709d` var grønn på SQLite og rød i CI, som er PostgreSQL.
+Kjør suiten mot en lokal PostgreSQL før push.
 
 **Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Regelen sto her fra
 14. sep. 2026, da det var **to**. 16. sep. var det **23** — seks av dem ting som ventet på
