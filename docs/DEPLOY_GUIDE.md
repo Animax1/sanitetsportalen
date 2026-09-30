@@ -110,6 +110,21 @@ Volumets navn er likegyldig; mount path (`/data`) er det som teller.
 
 ---
 
+### 2e. Kobling til kart.sanitet.net (valgfritt)
+
+Bilenes posisjon ved stempling og lagenes sted sendes til kartet
+(`core/kartkobling.py`, `docs/PLAN_KARTKOBLING.md`). Uten variablene er koblingen **inert**.
+
+| Variabel | Verdi | Merknad |
+|---|---|---|
+| `KART_URL` | `https://kart.sanitet.net` | Kartet **i samme miljø**. Står tom på staging til staging-kartet finnes |
+| `KART_HMAC_NOKKEL` | 32 tilfeldige byte som hex | Samme verdi som `PORTAL_HMAC_NOKKEL` i kartet, i samme miljø |
+
+**Egen nøkkel per miljø** (B14): staging-portalen skal aldri kunne tegne i prod-kartet.
+Nøkkelen skal også i korpsets passordbehandler. Rotasjon: den gamle settes i
+`PORTAL_HMAC_NOKKEL_FORRIGE` i kartet, den nye i begge, og `_FORRIGE` tømmes etter en dag.
+Siste sending, og om den gikk, står på `/portal-admin/server-status/`.
+
 ## 3. Første deploy og verifisering
 
 ### Procfile

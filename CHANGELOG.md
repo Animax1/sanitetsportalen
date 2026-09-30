@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling, pulje C: `core/kartkobling.py` sender til kart.sanitet.net, signert med HMAC  `#kartkobling` `#core` `#sikkerhet`
+
+**Hvorfor:** `docs/PLAN_KARTKOBLING.md` (André, 30. sep.): bilenes posisjon ved stempling og
+lagenes sted skal vises i kart.sanitet.net. Både oppdrag og KO skal sende, og ingen av dem
+får kjenne den andre, så klienten ligger i `core`. Pulje A og B er i kartets repo
+(`35a6305`, `96490e0` på `main`): mottaket med HMAC og kartlaget «Biler og lag fra portalen».
+
+**Hva:**
+- `send_enhet(navn, lat, lon, tidspunkt)` og `send_lag(navn, sted, tidspunkt)`. Kroppen er
+  nøyaktig feltene i planens §2 — ikke status, ikke oppdragsnummer, ikke nøyaktighet.
+  `X-Portal-Tid` + `X-Portal-Signatur: sha256=<HMAC over "tid." + kropp>`.
+- **Inert uten oppsett:** `KART_URL` og `KART_HMAC_NOKKEL` i `settings.py`, tomme som standard.
+  Samme idiom som `core/offsite.py`. `urllib` fra standardbiblioteket, ingen ny pakke.
+- **Kaster aldri:** timeout 3 s; feil blir én `warning` med navn og statuskode, **aldri
+  kroppen** (posisjonen). Også et ugyldig tidspunkt og en død cache svelges.
+- **Pause etter feil:** 60 s der sendinger hoppes over, så en bil som stempler mens kartet er
+  nede ikke venter tre sekunder per trykk.
+- **Bare `http(s)`:** `urllib` åpner også `file://`; en skrivefeil i `KART_URL` skal ikke kunne
+  lese en fil på serveren.
+- **Kortet «Kart.sanitet.net»** på `/portal-admin/server-status/`: verten, siste sending (tid,
+  ok/feil, statuskode, enhet/lag), pause, og «401: nøkkelen stemmer ikke …». «–» når koblingen
+  ikke er satt opp. Siste utfall ligger i cachen, ikke i `AppSetting` — det ville gitt en
+  auditrad per stempling. Portalen lagrer ellers ingenting (B9).
+- `.env.example`, `docs/DEPLOY_GUIDE.md` §2e og miljøtabellen i `CLAUDE.md`.
+  `ROT_TEGNGRENSE` hevet til 67 800, bevisst: klienten er rammeverk for to moduler.
+
+**Tester:** `core/tests_kartkobling.py` (19). Signaturen verifiseres med kartets regel skrevet
+uavhengig av klientens `signer()`. **Mutanter (8, alle røde):** signatur over kroppen alene;
+pausen fjernet; pausen aldri satt; et felt lagt til i kroppen; `except Exception` bort;
+`except HTTPError` bort; sjekken av skjemaet i URL-en fjernet; inert-sjekken fjernet.
+
+**Krever André:** nøklene i Railway (TODO, toppseksjonen). Ingenting sendes før de er satt.
+
 ## 2026-09-30 — CI rød på pip-audit: urllib3 2.7.0 har tre CVE-er (CVE-2026-97687/-97688/-97689), låst til 2.8.0  `#ci` `#avhengigheter` `#sikkerhet`
 
 **Hvorfor:** CI-kjøring #60 på `a30bc2d` (flettingen av kartkoblingsplanen) var grønn på alle

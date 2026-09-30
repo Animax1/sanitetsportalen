@@ -84,7 +84,13 @@ ROT = Path(settings.BASE_DIR)
 #: (`core/vaktstatistikk.py`). Hver statistikkhandler fryses nå ved avslutning, og
 #: `statistikk_versjon` er en regel for alle moduler — den hører hjemme i rota.
 #: Én tabellrad og fire linjer.
-ROT_TEGNGRENSE = 67_000
+#:
+#: **Hevet til 67 800 den 30. sep. 2026, bevisst:** `core/kartkobling.py` er en
+#: klient i rammeverket som både oppdrag (bilene) og KO (lagene) sender gjennom,
+#: og ingen av dem får kjenne den andre — samme grunn som registrene. Én rad i
+#: miljøtabellen og ett kort avsnitt under «Avhengighetsretningen»
+#: (`docs/PLAN_KARTKOBLING.md` §8). Hvordan hver modul bruker den står hos modulen.
+ROT_TEGNGRENSE = 67_800
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer

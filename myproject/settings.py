@@ -465,6 +465,15 @@ OFFSITE_S3_ACCESS_KEY = os.environ.get('OFFSITE_S3_ACCESS_KEY', '')
 OFFSITE_S3_SECRET_KEY = os.environ.get('OFFSITE_S3_SECRET_KEY', '')
 OFFSITE_BACKUP_KEY = os.environ.get('OFFSITE_BACKUP_KEY', '')
 
+# Kobling til kart.sanitet.net (core/kartkobling.py, docs/PLAN_KARTKOBLING.md):
+# bilenes posisjon ved stempling og lagenes sted. Inert når én av dem er tom.
+# **Egen nøkkel og egen kartadresse per Railway-miljø** (B14): staging-portalen
+# skal aldri kunne tegne i prod-kartet, så `KART_URL` står tom på staging til
+# staging-kartet finnes. Nøkkelen er den samme som `PORTAL_HMAC_NOKKEL` i
+# kartet i samme miljø, og skal også ligge i passordbehandleren.
+KART_URL = os.environ.get('KART_URL', '').strip()
+KART_HMAC_NOKKEL = os.environ.get('KART_HMAC_NOKKEL', '').strip()
+
 # Rekkefølgen er en prioritering, ikke en tilfeldighet: HTTP-API-et først fordi
 # det er det eneste som faktisk kommer ut av containeren. SMTP beholdes fordi
 # det virker i offline-modus og lokalt, der ingen brannmur står i veien.

@@ -35,6 +35,15 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Nøklene til kart.sanitet.net i Railway** (`docs/PLAN_KARTKOBLING.md` §9, 30. sep.
+      2026). Kartets mottak og portalens klient er pushet; uten nøklene er begge inerte.
+      Generér én nøkkel for prod (`python -c "import secrets; print(secrets.token_hex(32))"`)
+      og sett den som `PORTAL_HMAC_NOKKEL` i kartet og `KART_HMAC_NOKKEL` i prod-portalen,
+      pluss `KART_URL=https://kart.sanitet.net` i prod-portalen. **Staging-portalens
+      `KART_URL` skal stå tom** — kartet har bare ett miljø, og staging skal aldri tegne i
+      prod-kartet (B14). Nøkkelen i korpsets passordbehandler. Status på
+      `/portal-admin/server-status/`, kortet «Kart.sanitet.net».
+
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet.
@@ -148,18 +157,12 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Planen er `docs/PLAN_KARTKOBLING.md` (30. sep. 2026); beslutningene står i §1 der og tas
 ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `vaktliste/`.
 
-- [ ] Pulje A — kartet tar imot: app `portal/`, to signerte endepunkter, `Gruppe.viser_portalen`,
-      `GET /api/portal/markorer`, opprydding etter 24 t (`kart.sanitet`)
-- [ ] Pulje B — kartet viser: laget «Portalen», markører med alder, lag per teig og «Ukjent sted» (`kart.sanitet`)
-- [ ] Pulje C — `core/kartkobling.py`: HMAC-klient, inert uten `KART_URL`/`KART_HMAC_NOKKEL`,
-      kaster aldri, pause etter feil, kort på server-status
 - [ ] Pulje D — bilens posisjon rir på stemplingen: `posisjon` i kroppen, droppes ved feil,
       sendes etter commit; `watchPosition`, `posisjonForStempling()`, bryteren «Del posisjon»
 - [ ] Pulje E — `ko/kartkobling.py` `meld_lag(ressurs)`: tilstand fra tavla og hendelsene,
       bare lag, kalt fra `plasser`/`avslutt`/`rett`/`fjern`/`avslutt_for_hendelse`/`sett_lag`
 - [ ] Pulje F — personverndokumentasjonen (berettiget interesse, «historikk er en ny behandling»),
       `CLAUDE.md`-filene, kartets `PLAN.md` §1 og §3.2
-- [ ] Railway-variablene i planens §9 settes av André når A og C er pushet; nøklene i korpsets passordbehandler
 
 ## Pågående / neste
 

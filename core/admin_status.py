@@ -465,6 +465,17 @@ def _get_epost():
     return ut
 
 
+def _get_kartkobling():
+    """Siste sending til kart.sanitet.net, fra cachen — portalen lagrer ellers
+    ingenting om den (B9). Uten kortet er «hvorfor vises ikke bilen» umulig å
+    svare på. Aldri nøkkelen, bare verten."""
+    try:
+        from core.kartkobling import status
+        return status()
+    except Exception as exc:
+        return {'error': _scrub_secrets(str(exc))[:200]}
+
+
 def _get_innlogging(minutter=60):
     """Innloggingsbildet siste time, fra `LoginEvent`: feilede forsøk,
     hvor mange brukernavn og IP-er de kom fra, og feilede MFA-koder. Mange
@@ -731,6 +742,7 @@ def _build_status_payload():
         'cron': _get_cron(),
         'backupklokke': _get_backupklokke(),
         'epost': _get_epost(),
+        'kartkobling': _get_kartkobling(),
     }
 
 

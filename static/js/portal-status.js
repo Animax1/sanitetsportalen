@@ -149,6 +149,7 @@ function render(d) {
   renderCron(d.cron || {});
   renderBackupklokke(d.backupklokke || {});
   renderEpost(d.epost || {});
+  renderKartkobling(d.kartkobling || {});
 
   // Oppdater JSON-preview
   document.getElementById('json-preview').textContent =
@@ -392,6 +393,29 @@ function renderEpost(e) {
     t === 'ahasend' ? 'AHASend HTTP-API — transporten i prod. Railway sperrer SMTP.' :
     t === 'console' ? 'Konsoll: ingenting sendes. I prod mangler AHASEND_API_KEY/ACCOUNT_ID.' :
     t === 'smtp' ? 'SMTP virker bare lokalt — Railway sperrer utgående SMTP.' : (e.error || '');
+}
+
+/** Kortet for kart.sanitet.net. «–» når koblingen ikke er satt opp. */
+function kartkoblingTekst(k) {
+  if (k.error) return { kobling: ['Feil', 'status-crit'], siste: ['–', ''], hint: k.error };
+  if (!k.konfigurert) {
+    return { kobling: ['–', ''], siste: ['–', ''], hint: 'Ikke satt opp: KART_URL og KART_HMAC_NOKKEL er tomme.' };
+  }
+  const s = k.siste;
+  const siste = !s ? ['Ingen ennå', '']
+    : s.ok ? ['✓ ' + datoKlokke(s.tid) + ' (' + s.hva + ')', 'status-ok']
+    : ['✗ ' + datoKlokke(s.tid) + ' (' + s.hva + (s.status ? ', ' + s.status : '') + ')', 'status-crit'];
+  const hint = k.pause ? 'Pause etter feil: sendinger hoppes over i ett minutt.'
+    : s && !s.ok && s.status === 401 ? '401: nøkkelen stemmer ikke med kartets PORTAL_HMAC_NOKKEL.'
+    : 'Posisjoner sendes ved stempling, lagene ved plassering. Portalen lagrer ingenting.';
+  return { kobling: [k.vert || 'På', 'status-ok'], siste, hint };
+}
+
+function renderKartkobling(k) {
+  const t = kartkoblingTekst(k);
+  setVal('kart-kobling', t.kobling[0], t.kobling[1]);
+  setVal('kart-siste', t.siste[0], t.siste[1]);
+  document.getElementById('kart-hint').textContent = t.hint;
 }
 
 // ── Sesjonshåndtering ─────────────────────────────────────────

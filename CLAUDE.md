@@ -1053,6 +1053,7 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 | `EMAIL_TIMEOUT` | Tidsgrense for utsending, default 10 s. Må aldri være `None` |
 | `OFFSITE_S3_BUCKET`, `OFFSITE_S3_REGION`, `OFFSITE_S3_ENDPOINT`, `OFFSITE_S3_ACCESS_KEY`, `OFFSITE_S3_SECRET_KEY` | Scaleway Object Storage for offsite backup (`core/offsite.py`). Bare prod |
 | `OFFSITE_BACKUP_KEY` | Krypteringsnøkkelen for offsite-backupene. Skal også ligge i en passordbehandler utenfor Railway |
+| `KART_URL`, `KART_HMAC_NOKKEL` | kart.sanitet.net i **samme** miljø og nøkkelen dit (`core/kartkobling.py`). Tom = av |
 
 ## Deployment
 
