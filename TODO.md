@@ -143,6 +143,24 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       avlesning 25. sep. 2026 var fra **staging** og viste ingen manglende indekser;
       bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
+## Kartkobling — portalen sender til kart.sanitet.net
+
+Planen er `docs/PLAN_KARTKOBLING.md` (30. sep. 2026); beslutningene står i §1 der og tas
+ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `vaktliste/`.
+
+- [ ] Pulje A — kartet tar imot: app `portal/`, to signerte endepunkter, `Gruppe.viser_portalen`,
+      `GET /api/portal/markorer`, opprydding etter 24 t (`kart.sanitet`)
+- [ ] Pulje B — kartet viser: laget «Portalen», markører med alder, lag per teig og «Ukjent sted» (`kart.sanitet`)
+- [ ] Pulje C — `core/kartkobling.py`: HMAC-klient, inert uten `KART_URL`/`KART_HMAC_NOKKEL`,
+      kaster aldri, pause etter feil, kort på server-status
+- [ ] Pulje D — bilens posisjon rir på stemplingen: `posisjon` i kroppen, droppes ved feil,
+      sendes etter commit; `watchPosition`, `posisjonForStempling()`, bryteren «Del posisjon»
+- [ ] Pulje E — `ko/kartkobling.py` `meld_lag(ressurs)`: tilstand fra tavla og hendelsene,
+      bare lag, kalt fra `plasser`/`avslutt`/`rett`/`fjern`/`avslutt_for_hendelse`/`sett_lag`
+- [ ] Pulje F — personverndokumentasjonen (berettiget interesse, «historikk er en ny behandling»),
+      `CLAUDE.md`-filene, kartets `PLAN.md` §1 og §3.2
+- [ ] Railway-variablene i planens §9 settes av André når A og C er pushet; nøklene i korpsets passordbehandler
+
 ## Pågående / neste
 
 ### Sikkerhetsgjennomgangen 28. sep. 2026 — alle fire puljer levert, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
