@@ -33,6 +33,7 @@ from datetime import timedelta
 
 from core.sortering import Norsk
 
+from .kartkobling import meld_lag
 from .models import HENDELSE_APEN, HendelseLag, PlanlagtPause, Tavleplassering
 from .services import Ugyldig, systemlinje
 
@@ -188,6 +189,7 @@ def plasser(vakt, ressurs, *, bruker, lokasjon=None, pause=False, naa=None) -> T
         raise Ugyldig(f'{ressurs.navn} ble flyttet av noen andre. Prøv igjen.')
     _logg(vakt, ressurs.navn, til=_stedsnavn(ny), fra=_stedsnavn(forrige),
           naa=naa, bruker=bruker)
+    meld_lag(ressurs)
     return ny
 
 
@@ -203,6 +205,7 @@ def avslutt(vakt, ressurs, *, bruker, naa=None) -> Tavleplassering:
     forrige.til = naa
     forrige.save(update_fields=['til'])
     _logg(vakt, ressurs.navn, til='', fra=_stedsnavn(forrige), naa=naa, bruker=bruker)
+    meld_lag(ressurs)
     return forrige
 
 
@@ -219,6 +222,8 @@ def avslutt_for_hendelse(ressurs_id, naa) -> None:
     «Lag 3 registrert på H14» står alt. Kalles fra `services.sett_lag`."""
     Tavleplassering.objects.filter(
         ressurs_id=ressurs_id, til__isnull=True).update(til=naa)
+    # Den nye tilstanden er hendelsens sted — `meld_lag` regner det ut selv.
+    meld_lag(ressurs_id)
 
 
 def skriv_hendelsestid(rad: HendelseLag, til) -> None:
@@ -314,6 +319,9 @@ def rett(plassering, *, fra, til=None, bruker, naa=None) -> Tavleplassering:
     plassering.save(update_fields=['fra', 'til'])
     from . import systemlinjer
     systemlinje(plassering.vakt, systemlinjer.TAVLE_RETTET, data, tidspunkt=naa, bruker=bruker)
+    # En retting av en lukket rad endrer ikke hvor laget står nå, men den kan
+    # ha gjeldt den åpne. `meld_lag` sender tilstanden, ikke rettingen.
+    meld_lag(plassering.ressurs_id)
     return plassering
 
 
@@ -328,9 +336,11 @@ def fjern(plassering, *, bruker, naa=None) -> None:
             'fra_foer': _klokke(plassering.fra), 'til_foer': _klokke(plassering.til),
             'fjernet': True}
     vakt = plassering.vakt
+    ressurs_id = plassering.ressurs_id
     plassering.delete()
     from . import systemlinjer
     systemlinje(vakt, systemlinjer.TAVLE_RETTET, data, tidspunkt=naa, bruker=bruker)
+    meld_lag(ressurs_id)
 
 
 # ── Planlagt slutt (23. sep. 2026) ────────────────────────────────────────────

@@ -157,8 +157,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Planen er `docs/PLAN_KARTKOBLING.md` (30. sep. 2026); beslutningene står i §1 der og tas
 ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `vaktliste/`.
 
-- [ ] Pulje E — `ko/kartkobling.py` `meld_lag(ressurs)`: tilstand fra tavla og hendelsene,
-      bare lag, kalt fra `plasser`/`avslutt`/`rett`/`fjern`/`avslutt_for_hendelse`/`sett_lag`
+- [ ] **Del `ko/CLAUDE.md`** — den sto 24 tegn under `MODUL_TEGNGRENSE` 30. sep. 2026, og fikk et
+      unntak i `FOR_STORE_I_DAG` (22 200) for pekeren til `ko/kartkobling.py`. Programmet og
+      hendelsesloggen er de største seksjonene; én av dem kan flytte til en egen fil, slik
+      flaten ble skilt ut i `templates/ko/CLAUDE.md` 22. sep., og unntaket strykes
 - [ ] Pulje F — personverndokumentasjonen (berettiget interesse, «historikk er en ny behandling»),
       `CLAUDE.md`-filene, kartets `PLAN.md` §1 og §3.2
 

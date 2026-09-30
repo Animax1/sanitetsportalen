@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling, pulje E: lagene fra KO til kartet — «Lag 3 står på Parkscene»  `#kartkobling` `#ko` `#tavla`
+
+**Hvorfor:** `docs/PLAN_KARTKOBLING.md` §7 (B5): lagnavn og stedsnavn ved plassering på tavla,
+og hendelsens sted når laget går på en hendelse; tomt når laget tas av tavla, settes i pause,
+eller hendelsen lukkes. KO vet det allerede — dette er en flate over tavla, ikke en ny mekanisme.
+
+**Hva:**
+- `ko/kartkobling.py` med én inngang, `meld_lag(ressurs)`. **Send tilstand, ikke hendelser:**
+  stedet regnes ut **etter commit** (`sted_naa`) — åpen hendelse → hendelsens `lokasjon_navn`
+  (opptatt har forrang, som på tavla), åpen plassering på et sted → `lokasjon_navn`, ellers `""`.
+  En flytting som rulles tilbake sender ingenting, og det som sendes er det som faktisk står.
+- **Bare lag:** en ressurs med `Ressurs.enhet` er en bil og sendes ved stempling (pulje D);
+  herfra også ville den stått to ganger i kartet. **KO slått av → ingen sending.**
+- Kallstedene: `tavle.plasser`, `avslutt`, `rett`, `fjern`, `avslutt_for_hendelse`;
+  `services.sett_lag` (lag av), `lukk_hendelse`, `gjenapne_hendelse` og **nytt sted i
+  `rediger_hendelse`** — de tre siste står ikke i planens tabell, men endrer tilstanden, og det
+  er poenget med å sende tilstand. `start_pause` går gjennom `plasser`.
+- Kaster aldri: en feil i sendingen blir en `warning`, og flyttingen står.
+
+**Tester:** `ko/tests_kartkobling.py` (15), gjennom de ekte inngangene: plassering, pause, av
+tavla, på hendelse (fra en annen plassering), av hendelsen, lukket og gjenåpnet, nytt sted på
+hendelsen, hendelse uten sted, bil sender ingenting, retting av en lukket rad sender den åpne
+tilstanden, fjernet plassering, KO av, rullet tilbake, sendefeil, inert uten oppsett.
+**Mutanter (15):** bilfilteret, hendelsesgrenen, kallstedet i `avslutt_for_hendelse` og de åtte
+andre kallstedene, KO-sjekken, `on_commit` → direkte, åpen-hendelse-filteret — 14 røde.
+`pause=False` i plasseringsoppslaget overlevde og er ekvivalent: en pause har aldri lokasjon.
+
+**Dokumentasjon:** `ko/CLAUDE.md` sto 24 tegn under `MODUL_TEGNGRENSE`, så pekeren i tavle-raden
+fikk et bevisst unntak i `FOR_STORE_I_DAG` (22 200) og et TODO-punkt om å dele fila.
+
 ## 2026-09-30 — Kartkobling, pulje D: bilens posisjon rir på stemplingen til kartet  `#kartkobling` `#oppdrag` `#bilen` `#personvern`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §6 (André, 30. sep.): «Ved stempling, som del av samme

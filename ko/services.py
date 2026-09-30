@@ -17,6 +17,7 @@ from django.utils import timezone
 from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt
 
+from .kartkobling import meld_lag
 from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
@@ -836,6 +837,8 @@ def sett_lag(hendelse, ressurs_ider, *, bruker, naa=None, logg=True):
             # Tida på hendelsen blir historikk på tavla, og laget står uten plass.
             tavle.skriv_hendelsestid(rad, naa)
             rad.delete()
+            # Laget står uten plass nå; kartet skal vite det.
+            meld_lag(ressurs_id)
     if logg:
         for navn in lagt_til:
             data = _hendelsesdata(hendelse)
@@ -918,6 +921,10 @@ def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
         sett_lag(hendelse, lag, bruker=bruker)
     hendelse.versjon += 1
     hendelse.save(update_fields=endret + ['versjon'])
+    if sett_lokasjon and not hendelse.er_lukket:
+        # Nytt sted på hendelsen flytter lagene som står på den.
+        for rad in hendelse.lag.all():
+            meld_lag(rad.ressurs_id)
     bli_med(hendelse, bruker)
     return hendelse
 
@@ -976,6 +983,8 @@ def lukk_hendelse(hendelse, *, bruker, confirm=False, naa=None) -> Hendelse:
     # de sto på hendelsen blir historikk der.
     for rad in hendelse.lag.all():
         tavle.skriv_hendelsestid(rad, tid)
+        # Lagene står uten sted når hendelsen lukkes.
+        meld_lag(rad.ressurs_id)
     data = _hendelsesdata(hendelse)
     data['apne_oppdrag'] = apne
     systemlinje(hendelse.vakt, _kode('HENDELSE_LUKKET'), data, tidspunkt=tid,
@@ -997,6 +1006,9 @@ def gjenapne_hendelse(hendelse, *, bruker, naa=None) -> Hendelse:
     hendelse.versjon += 1
     hendelse.save(update_fields=['status', 'lukket_at', 'lukket_av',
                                  'lukket_av_navn', 'versjon'])
+    # Lagene som sto på den, står på den igjen — og dermed på stedet.
+    for rad in hendelse.lag.all():
+        meld_lag(rad.ressurs_id)
     systemlinje(hendelse.vakt, _kode('HENDELSE_GJENAPNET'), _hendelsesdata(hendelse),
                 tidspunkt=naa or timezone.now(), bruker=bruker, hendelse=hendelse)
     return hendelse

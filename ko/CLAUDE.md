@@ -34,7 +34,7 @@ uten at noen rykket ut.
 | «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
 | **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
-| **Tavla**: plasseringene, forrangen, historikken fra hendelsene | `ko.Tavleplassering`, `ko/tavle.py`, `bil_rykket_ut` i `ko/signals.py` |
+| **Tavla**: plasseringene, forrangen, historikken fra hendelsene | `ko.Tavleplassering`, `ko/tavle.py`, `bil_rykket_ut` i `ko/signals.py`; til kartet: `ko/kartkobling.py` |
 | **Programmet**: konsertene, beredskapsnivå, behov, «følger konserten» | `ko/program.py`, `ko.Programpost`, `Programbehov` |
 
 ## Retningen: KO er øverste lag
