@@ -339,8 +339,10 @@ Generér én nøkkel per miljø (32 tilfeldige byte som hex) og legg den i **beg
 
 Nøklene skal også i korpsets passordbehandler. Rotasjon: sett den gamle i
 `PORTAL_HMAC_NOKKEL_FORRIGE` i kartet, ny i begge, og tøm `_FORRIGE` etter en dag.
-Kartet har i dag bare ett Railway-miljø; da finnes staging-kartet ikke, og `KART_URL`
-skal stå **tom** på staging-portalen til det gjør (B14).
+Staging-kartet finnes fra 30. september 2026: `testkart.sanitet.net`, eget Railway-miljø med
+egen nøkkel S. Staging-portalen peker dit, og prøven i §0 tas der; prod får nøkkel P først når
+koblingen går til `main`. Cloudflare står foran kartet og avviser `urllib`s standard-User-Agent
+med 403 («error code: 1010»); klienten sender derfor sin egen (`core/kartkobling.py`).
 
 ---
 

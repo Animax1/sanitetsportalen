@@ -35,18 +35,13 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Nøklene til kart.sanitet.net i Railway** (`docs/PLAN_KARTKOBLING.md` §9, 30. sep.
-      2026). Kartets mottak og portalens klient er pushet; uten nøklene er begge inerte.
-      Generér én nøkkel for prod (`python -c "import secrets; print(secrets.token_hex(32))"`)
-      og sett den som `PORTAL_HMAC_NOKKEL` i kartet og `KART_HMAC_NOKKEL` i prod-portalen,
-      pluss `KART_URL=https://kart.sanitet.net` i prod-portalen. **Staging-portalens
-      `KART_URL` skal stå tom** — kartet har bare ett miljø, og staging skal aldri tegne i
-      prod-kartet (B14). Nøkkelen i korpsets passordbehandler. Status på
-      `/portal-admin/server-status/`, kortet «Kart.sanitet.net». **Prøven «én ekte stempling
-      fra en bil på staging» (planens §0) kan ikke gjøres slik planen står:** staging-portalen
-      skal ikke ha `KART_URL` før et staging-kart finnes. Enten et eget staging-miljø for kartet
-      (med egen nøkkel), eller prøven tas i prod etter at `main` har fått koblingen. I kartet:
-      slå på «Viser enheter og lag fra portalen» på gruppa som skal se dem.
+- [ ] **Bekreft kartkoblingen på staging** (`docs/PLAN_KARTKOBLING.md` §0 og §9). Staging-kartet
+      finnes fra 30. sep. 2026 (`testkart.sanitet.net`, eget Railway-miljø), og staging-portalen
+      har `KART_URL`. Første stempling ga 403 fra Cloudflare foran kartet, rettet i `0210494`
+      (egen User-Agent). Etter deployen: stemple fra en bil, se «✓ … (enhet)» på kortet
+      «Kart.sanitet.net» på `/portal-admin/server-status/` og markøren i staging-kartet. Står det
+      401, er `KART_HMAC_NOKKEL` (portal, staging) og `PORTAL_HMAC_NOKKEL` (kart, staging) ulike.
+      I staging-kartet: gruppa må ha «Viser enheter og lag fra portalen», og du må være medlem.
 
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
@@ -154,6 +149,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Planen er `docs/PLAN_KARTKOBLING.md` (30. sep. 2026); beslutningene står i §1 der og tas
 ikke opp igjen her. Utføres i en egen sesjon, i begge repoene, uten å røre `vaktliste/`.
 
+- [ ] Prod, når koblingen skal til `main` (André bestemmer når): egen nøkkel P, satt som
+      `PORTAL_HMAC_NOKKEL` i prod-kartet og `KART_HMAC_NOKKEL` i prod-portalen, pluss
+      `KART_URL=https://kart.sanitet.net`. Aldri samme nøkkel som staging (B14)
 - [ ] **Del `ko/CLAUDE.md`** — den sto 24 tegn under `MODUL_TEGNGRENSE` 30. sep. 2026, og fikk et
       unntak i `FOR_STORE_I_DAG` (22 200) for pekeren til `ko/kartkobling.py`. Programmet og
       hendelsesloggen er de største seksjonene; én av dem kan flytte til en egen fil, slik

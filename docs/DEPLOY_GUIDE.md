@@ -117,7 +117,7 @@ Bilenes posisjon ved stempling og lagenes sted sendes til kartet
 
 | Variabel | Verdi | Merknad |
 |---|---|---|
-| `KART_URL` | `https://kart.sanitet.net` | Kartet **i samme miljø**. Står tom på staging til staging-kartet finnes |
+| `KART_URL` | `https://kart.sanitet.net` | Kartet **i samme miljø**. Staging: `https://testkart.sanitet.net` |
 | `KART_HMAC_NOKKEL` | 32 tilfeldige byte som hex | Samme verdi som `PORTAL_HMAC_NOKKEL` i kartet, i samme miljø |
 
 **Egen nøkkel per miljø** (B14): staging-portalen skal aldri kunne tegne i prod-kartet.

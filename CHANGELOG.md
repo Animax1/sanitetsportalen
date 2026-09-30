@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-30 — Kartkobling: dokumentasjonen kjenner staging-kartet (testkart.sanitet.net)  `#kartkobling` `#dokumentasjon` `#staging`
+
+**Hvorfor:** André satte opp et eget staging-miljø for kartet 30. sep. («vi skal kjøre dette på
+staging»), og la `KART_URL` inn i staging-portalen. Planen, TODO, `DEPLOY_GUIDE.md`,
+`settings.py` og docstringen i `core/kartkobling.py` sa fortsatt at staging-kartet ikke fantes og
+at `KART_URL` skulle stå tom på staging.
+
+**Hva:** planens §9 beskriver staging-kartet og Cloudflare-fella; `DEPLOY_GUIDE.md` §2e har
+staging-adressen. TODO-punktet øverst er nå «Bekreft kartkoblingen på staging» — det som faktisk
+blokkerer — og prod-nøkkelen står som et vanlig punkt under kartkoblingen, siden prod venter på
+at André sier fra om `main`.
+
 ## 2026-09-30 — Kartkobling: 403 «error code: 1010» fra Cloudflare — egen User-Agent  `#kartkobling` `#feilretting` `#staging`
 
 **Hvorfor:** Første stempling mot staging-kartet ga «✗ 30.9., 23:21 (enhet, 403)» på

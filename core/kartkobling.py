@@ -8,8 +8,8 @@ dem får kjenne den andre.
 Fem regler:
 
 - **Inert uten oppsett.** Er `KART_URL` eller `KART_HMAC_NOKKEL` tom, gjør
-  funksjonene ingenting — samme idiom som `core/offsite.py`. Staging-portalen
-  har tom `KART_URL` til staging-kartet finnes (B14).
+  funksjonene ingenting — samme idiom som `core/offsite.py`. Hvert Railway-miljø
+  har sitt eget kart og sin egen nøkkel (B14): staging sender til testkart.sanitet.net.
 - **Kaster aldri.** Kartet er et hjelpemiddel; en stempling i en bil skal aldri
   feile fordi kartet er nede. Enhver feil blir én `warning` med navn og
   statuskode — **aldri kroppen**, som bærer posisjonen.

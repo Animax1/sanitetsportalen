@@ -468,8 +468,8 @@ OFFSITE_BACKUP_KEY = os.environ.get('OFFSITE_BACKUP_KEY', '')
 # Kobling til kart.sanitet.net (core/kartkobling.py, docs/PLAN_KARTKOBLING.md):
 # bilenes posisjon ved stempling og lagenes sted. Inert når én av dem er tom.
 # **Egen nøkkel og egen kartadresse per Railway-miljø** (B14): staging-portalen
-# skal aldri kunne tegne i prod-kartet, så `KART_URL` står tom på staging til
-# staging-kartet finnes. Nøkkelen er den samme som `PORTAL_HMAC_NOKKEL` i
+# skal aldri kunne tegne i prod-kartet, så staging peker på staging-kartet
+# (testkart.sanitet.net). Nøkkelen er den samme som `PORTAL_HMAC_NOKKEL` i
 # kartet i samme miljø, og skal også ligge i passordbehandleren.
 KART_URL = os.environ.get('KART_URL', '').strip()
 KART_HMAC_NOKKEL = os.environ.get('KART_HMAC_NOKKEL', '').strip()
