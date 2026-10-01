@@ -47,7 +47,7 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
-from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
+from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe, korpskonflikt,
                      Ressursrolle)
 from . import services
 from core.jsonkropp import json_body, json_feil
@@ -519,6 +519,11 @@ def mannskap_view(request):
                 notat=(data.get('notat') or '').strip(),
             )
             _koble_paa_epost(request, person)
+            # Kontoens korps og radens korps skal være like (1. okt. 2026) —
+            # både når admin kobler for hånd og når e-posten kobler av seg selv.
+            konflikt = korpskonflikt(person.user_id, person.korps_id, mannskap=person)
+            if konflikt:
+                return json_feil(konflikt, status=409)
             person.save()
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
     except IntegrityError:
@@ -611,6 +616,12 @@ def mannskap_detalj_view(request, pk):
             return json_feil(ADMINKONTO_MELDING)
         person.user_id = _int(data['user_id'])
     _koble_paa_epost(request, person)
+    # Tre veier inn, én regel: en ny kobling for hånd, en ny kobling via
+    # e-posten, og en koblet person som flyttes til et annet korps. Kontoens
+    # korps og radens korps skal være like (1. okt. 2026).
+    konflikt = korpskonflikt(person.user_id, person.korps_id, mannskap=person)
+    if konflikt:
+        return json_feil(konflikt, status=409)
 
     try:
         with transaction.atomic():

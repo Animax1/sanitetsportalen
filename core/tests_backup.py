@@ -2049,6 +2049,9 @@ class BrukerpekereStrippesEllerBegrunnesTests(SimpleTestCase):
         Bruker = django_apps.get_model(dj_settings.AUTH_USER_MODEL)
         strip = {k.lower(): {f.lower() for f in v}
                  for k, v in handler.get_strip_fields().items()}
+        # En rad i `uten_konto_droppes` droppes når kontoen mangler — det er
+        # også et tatt valg, bare for en peker som ikke kan være tom.
+        droppes = {m.lower() for m in handler.uten_konto_droppes}
         ekskludert = {e.lower() for e in handler.collect_exclude()}
 
         ut = []
@@ -2068,7 +2071,8 @@ class BrukerpekereStrippesEllerBegrunnesTests(SimpleTestCase):
                 for felt in modell._meta.concrete_fields:
                     if not felt.is_relation or felt.related_model is not Bruker:
                         continue
-                    strippet = felt.name.lower() in strip.get(etikett.lower(), set())
+                    strippet = (felt.name.lower() in strip.get(etikett.lower(), set())
+                                or etikett.lower() in droppes)
                     ut.append((f'{etikett}.{felt.name}', strippet))
         return ut
 
@@ -2169,3 +2173,22 @@ class NullstillManglendeBrukereTests(TestCase):
         raw = self._fil({'model': 'patients.patient', 'pk': 1, 'fields': {'pasientnummer': 1}})
         self.assertIs(nullstill_manglende_brukere(raw, slug='patients'), raw)
         self.assertIs(nullstill_manglende_brukere(b'ikke json', slug='patients'), b'ikke json')
+
+
+class UtenKontoDroppesErEkteTests(TestCase):
+    """En skrivefeil i `uten_konto_droppes` ville vært en stille ikke-dropping —
+    og da feiler hele fila i en tom base, akkurat som før lista fantes."""
+
+    def test_hver_oppfoering_er_en_modell_med_en_kontopeker_som_ikke_kan_vaere_tom(self):
+        from django.apps import apps as django_apps
+        from django.conf import settings as dj_settings
+        registrer_alle_moduler()
+        Bruker = django_apps.get_model(dj_settings.AUTH_USER_MODEL)
+        for handler in all_handlers():
+            for etikett in handler.uten_konto_droppes:
+                with self.subTest(handler=handler.slug, modell=etikett):
+                    modell = django_apps.get_model(etikett)
+                    self.assertIn(modell._meta.app_label, handler.collect_apps())
+                    self.assertTrue(any(
+                        f.is_relation and f.related_model is Bruker and not f.null
+                        for f in modell._meta.concrete_fields))

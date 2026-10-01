@@ -417,6 +417,107 @@ class Mannskap(BaseTimeStampedModel):
     def __str__(self) -> str:
         return f'{self.navn} ({self.korps.kortnavn or self.korps.navn})'
 
+    def save(self, *args, **kwargs):
+        # Siste skranke for regelen «kontoens korps og radens korps er like»
+        # (1. okt. 2026). Viewene sjekker først og svarer 409 med begge navnene;
+        # dette stopper en vei som ikke finnes ennå. `loaddata` går utenom
+        # `save()` og stoppes ikke.
+        feil = korpskonflikt(self.user_id, self.korps_id, mannskap=self)
+        if feil:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(feil)
+        super().save(*args, **kwargs)
+
+
+class Kontokorps(BaseTimeStampedModel):
+    """Korpset en **konto** fører — satt av global admin på brukersiden.
+
+    **Hvorfor den finnes** (André, 1. okt. 2026): til da fikk en konto korps
+    bare gjennom mannskapsraden den var koblet til. En korpsleder som ikke selv
+    går vakt, er ikke mannskap — og å lage en mannskapsrad bare for å flytte
+    korpset over på kontoen er en omvei rundt koden, ikke en modell. Korps er
+    en del av tilgangen («Per har `skriv_handling` og fører Haugesund»), og
+    tilgang settes i brukeradministrasjonen.
+
+    **To ting, én regel.** Kontoen sier hvilket korps du *fører*; mannskapsraden
+    hvilket korps du *tilhører* som mannskap. Har en konto begge, **må de være
+    like** — `korpskonflikt()` — og ingen av dem vinner i stillhet. Uten
+    kontokorps gjelder mannskapsraden som før (`services.brukerens_korps`).
+
+    **Korpset er ikke et nivå.** Det betyr noe for `les` (ser bare dette) og
+    `skriv_handling` (fører dette). For `les_alle` og oppover er det for ordens
+    skyld, og gir i tillegg fanen «Mitt korps».
+
+    Ligger i vaktlista, ikke i `accounts`: kontoappen kjenner ingen modul ved
+    navn (`core/kontokobling.py`).
+    """
+
+    # CASCADE: raden er bare et svar på «hvilket korps fører denne kontoen»,
+    # og uten kontoen finnes ikke spørsmålet.
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kontokorps',
+        verbose_name='Konto',
+    )
+    # PROTECT, som `Mannskap.korps`: et korps noen fører skal ikke forsvinne
+    # under dem.
+    korps = models.ForeignKey(
+        Korps,
+        on_delete=models.PROTECT,
+        related_name='kontoer',
+        verbose_name='Korps',
+    )
+
+    class Meta:
+        verbose_name = 'Kontoens korps'
+        verbose_name_plural = 'Kontoenes korps'
+
+    def __str__(self) -> str:
+        return f'{self.user} fører {self.korps}'
+
+    def save(self, *args, **kwargs):
+        feil = korpskonflikt(self.user_id, self.korps_id)
+        if feil:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(feil)
+        super().save(*args, **kwargs)
+
+
+def korpskonflikt(user_id, korps_id, *, mannskap=None) -> str:
+    """Tom streng, eller hvorfor kontoen og mannskapsraden er uenige om korpset.
+
+    **Regelen** (André, 1. okt. 2026): kontoens korps og korpset på
+    mannskapsraden den er koblet til, skal være like. Begge veier inn sjekkes:
+
+    - Fra mannskapsraden (`mannskap` gitt): raden `user_id` peker på, får ikke
+      stå i et annet korps enn kontoen fører.
+    - Fra kontoen (`mannskap` ikke gitt): kontoen får ikke føre et annet korps
+      enn mannskapsraden den er koblet til.
+
+    Meldingen bærer begge navnene, fordi det er den som skal rettes — og den
+    som får den, vet ikke nødvendigvis hvilken av de to som er feil.
+    """
+    if not user_id or not korps_id:
+        return ''
+    if mannskap is not None:
+        kk = Kontokorps.objects.filter(user_id=user_id).select_related('korps', 'user').first()
+        if kk is None or kk.korps_id == korps_id:
+            return ''
+        radkorps = Korps.objects.filter(pk=korps_id).first()
+        return (f'Kontoen {kk.user} fører {kk.korps.navn}, men {mannskap.navn} står i '
+                f'{radkorps.navn if radkorps else "et annet korps"}. Korpset på kontoen og '
+                f'på mannskapsraden må være like — rett det ene av dem først. Kontoens '
+                f'korps settes i brukeradministrasjonen.')
+    rad = Mannskap.objects.filter(user_id=user_id).select_related('korps', 'user').first()
+    if rad is None or rad.korps_id == korps_id:
+        return ''
+    nytt = Korps.objects.filter(pk=korps_id).first()
+    return (f'Kontoen {rad.user} er koblet til mannskapsraden {rad.navn} i {rad.korps.navn}, '
+            f'og kan derfor ikke føre {nytt.navn if nytt else "et annet korps"}. Korpset på '
+            f'kontoen og på mannskapsraden må være like — flytt personen i '
+            f'mannskapsregisteret først, eller velg {rad.korps.navn}.')
+
 
 # ── Oppsettet (fase 2) ───────────────────────────────────────────────────────
 

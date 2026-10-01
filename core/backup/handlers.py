@@ -57,6 +57,16 @@ class BaseBackupHandler:
     #: restore. Feltet må derfor tåle å være tomt (``null=True`` e.l.).
     strip_fields: ClassVar[dict[str, list[str]]] = {}
 
+    #: Modeller der en rad **ikke betyr noe uten kontoen den peker på**, og
+    #: derfor droppes ved gjenoppretting når kontoen ikke finnes
+    #: (`service.nullstill_manglende_brukere`). Format: ``'app_label.Modell'``.
+    #:
+    #: For en *nullbar* peker trengs ingenting — den settes til ``null``. Dette
+    #: er for den som ikke er nullbar, der raden *er* et svar om kontoen
+    #: (vaktlistas `Kontokorps`: «hvilket korps fører denne kontoen»). Uten
+    #: listen feiler hele fila i en tom base, med DeserializationError.
+    uten_konto_droppes: ClassVar[list[str]] = []
+
     def collect_apps(self) -> list[str]:
         """Returner apps til dumpdata. Default: self.apps."""
         if not self.apps:

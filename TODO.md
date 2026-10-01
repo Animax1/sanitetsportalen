@@ -115,9 +115,11 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       22. aug. 2026, og `core/tests_error_reporting.py` vokter det. Den testen er dermed
       ikke bare en personvernfinesse; den holder oss innenfor en kontraktsforpliktelse.
 
-- [ ] **Etter deploy til prod: gå gjennom tilgangsmatrisen.** Alle som hadde `les` ser nå
-      bare sitt eget korps — den som skal samordne må få `les_alle`. Og kontoer med
-      `les`/`skriv_handling` uten mannskapsrad ser ingenting før de er koblet.
+- [ ] **Når vaktlistetilgang deles ut i prod: gi hver konto riktig nivå og korps.** `les` ser
+      bare sitt eget korps — den som skal samordne må ha `les_alle`. En konto med `les` eller
+      `skriv_handling` uten korps ser eller fører ingenting: sett korpset i kortet
+      «Vaktlisten: korps» på brukersiden (fra 1. okt. 2026, krever at `staging` har gått til
+      `main`), eller koble kontoen til en mannskapsrad.
 
 - [ ] **Backup: test de fem handlerne på staging**, så «Backup tatt — push til main», og
       prodtest 8.2/8.3 etter deployen.

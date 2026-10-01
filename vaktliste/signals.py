@@ -35,7 +35,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import (Belastningsgrenser, Kompetanse, Korps, Mannskap, Overnatting,
+from .models import (Belastningsgrenser, Kompetanse, Kontokorps, Korps, Mannskap, Overnatting,
                      Overnattingsrom, Pause, Ressurs, Ressursgruppe, Ressursrolle, Utsending,
                      Vaktliste, Vaktpost)
 
@@ -322,6 +322,32 @@ def ressurs_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Ressurs)
 def ressurs_post_delete(sender, instance, **kwargs):
     _logg_slettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')
+
+
+# ── Kontoens korps (1. okt. 2026) ────────────────────────────────────────────
+#
+# Korpset avgjør hva `les` ser og hva `skriv_handling` fører — det er tilgang,
+# og en endring i tilgang skal stå i loggen med hvem som gjorde den.
+
+KONTOKORPS_TABELLNAVN = 'vaktliste_kontokorps'
+
+
+@receiver(pre_save, sender=Kontokorps)
+@ikke_under_loaddata
+def kontokorps_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Kontokorps, instance, KONTOKORPS_TABELLNAVN)
+
+
+@receiver(post_save, sender=Kontokorps)
+@ikke_under_loaddata
+def kontokorps_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, KONTOKORPS_TABELLNAVN, str(instance))
+
+
+@receiver(post_delete, sender=Kontokorps)
+def kontokorps_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, KONTOKORPS_TABELLNAVN, f'{instance.user_id} fører {instance.korps}')
 
 
 # ── Pausene (23. sep. 2026) ──────────────────────────────────────────────────

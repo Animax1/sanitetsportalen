@@ -28,7 +28,7 @@ from django.test import SimpleTestCase
 ROT = Path(settings.BASE_DIR)
 FILER = (
     ['templates/vaktliste/index.html', 'templates/vaktliste/fil.html',
-     'templates/vaktliste/veiledning.html',
+     'templates/vaktliste/veiledning.html', 'templates/vaktliste/kontokobling.html',
      'vaktliste/templates/vaktliste/portalinnstillinger.html']
     + sorted(str(p.relative_to(ROT)) for p in (ROT / 'static/js').glob('vaktliste-*.js'))
     + sorted(str(p.relative_to(ROT)) for p in (ROT / 'vaktliste').glob('*.py')

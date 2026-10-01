@@ -10,7 +10,7 @@ arkiveres med `arkivert_at` og slettes med vakta. Se `docs/BESLUTNING_VAKTLISTE.
 
 | Regel | Hvor |
 |---|---|
-| Badgen på personen | `Mannskap.korps`, arvet av kontoen via `Mannskap.user` |
+| Badgen på kontoen | `Kontokorps` (admin, brukersiden), ellers `Mannskap.korps` via `Mannskap.user` |
 | Reservasjonen på ressursen | `Ressurs.korps` — tom betyr **vaktlederens bord**, ikke fritt fram |
 | Reservasjonen på plassen | `Vaktpost.korps` — overstyrer ressursens, `services.reservert_korps()` |
 | Begge halvdelene sjekkes samlet | `services.kan_sette_vaktpost()` |
@@ -31,6 +31,10 @@ nivåene *betyr* i vaktlista, og de to halvdelene som må sjekkes samlet.
   `skriv_handling` betyr her «fører sitt eget korps» (avgrenset av badgen, ingen
   innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
   modul per nivå (§4.5) før nivået deles ut.
+- **Kontoen kan føre et korps uten å være mannskap** (`Kontokorps`, 1. okt. 2026): satt av
+  global admin i kortet «Vaktlisten: korps» på brukersiden, og lest *før* mannskapsraden i
+  `services.brukerens_korps`. Har kontoen begge, **må de være like** —
+  `models.korpskonflikt()`, i viewene (409 med begge navnene) og i `save()`.
 - **Den doble regelen er skrevet som én funksjon**, `kan_sette_vaktpost()`, nettopp for
   at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen.
 - **Reservasjonen finnes på to nivåer, og plassen vinner** (30. aug. 2026).

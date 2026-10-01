@@ -1,0 +1,36 @@
+{% comment %}
+Vaktlistas kort på /portal-admin/brukere/<pk>/: hvilket korps kontoen fører
+(1. okt. 2026). Inkluderes gjennom `core/kontokobling.py`; skjemaet slås opp på
+modulens egen slug. Se `vaktliste/kontokobling.py` og `models.Kontokorps`.
+
+**Korpset er ikke et nivå.** Det sier *hvilket* korps `les` ser og
+`skriv_handling` fører. Nivået settes i matrisen lenger opp.
+{% endcomment %}
+{% with skjema=kontokoblinger.vaktliste %}
+  <div class="card mb-3" id="vaktliste-kontokorps">
+    <div class="card-header"><strong><i class="bi bi-people me-2"></i>Vaktlisten: korps</strong></div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="sett_vaktliste_korps">
+        <label class="form-label small" for="{{ skjema.korps.id_for_label }}">Korpset kontoen fører</label>
+        {{ skjema.korps }}
+        {% for feil in skjema.korps.errors %}
+          <div class="small text-danger mt-1" id="vaktliste-kontokorps-feil">{{ feil }}</div>
+        {% endfor %}
+        <div class="small mt-2" style="color:#cbd5e1;">
+          Med <em>Lese: eget korps</em> ser kontoen bare dette korpset, og med
+          <em>Skrive: eget korps</em> fører den det. For høyere nivåer er det for
+          ordens skyld, og gir fanen «Mitt korps».
+        </div>
+        {% if skjema.mannskapsrad %}
+          <div class="small mt-2" style="color:#cbd5e1;" id="vaktliste-kontokorps-mannskap">
+            Koblet til mannskapsraden <strong>{{ skjema.mannskapsrad.navn }}</strong> i
+            {{ skjema.mannskapsrad.korps.navn }}. Korpset her må være det samme.
+          </div>
+        {% endif %}
+        <button type="submit" class="btn btn-sm btn-primary mt-2">Lagre</button>
+      </form>
+    </div>
+  </div>
+{% endwith %}

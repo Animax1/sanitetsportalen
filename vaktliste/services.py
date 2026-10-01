@@ -19,7 +19,7 @@ from core.auth_decorators import er_global_admin, har_tilgang
 from core.sortering import Norsk, norsk_nokkel
 
 from . import choices, intervaller, pauser
-from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
+from .models import Belastningsgrenser, Kontokorps, Mannskap, Ressurs, Vaktliste
 
 
 # ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
@@ -785,13 +785,21 @@ def stemple(vaktpost, handling, naa=None):
 
 
 def brukerens_korps(user):
-    """Korpset kontoen arver fra mannskapsraden sin, eller ``None``.
+    """Korpset kontoen fører, eller ``None``.
 
-    Badgen (§4). Koblingen `Mannskap.user` gir i seg selv ingen tilgang —
-    den sier bare hvem du er, som `Enhet.user` i oppdragsmodulen.
+    Badgen (§4). **Kontoens eget korps først** (`Kontokorps`, 1. okt. 2026) —
+    satt av admin på brukersiden, for den som fører et korps uten selv å være
+    mannskap. Ellers korpset fra mannskapsraden kontoen er koblet til, som før.
+    Har kontoen begge, er de like: `models.korpskonflikt()` sørger for det.
+
+    Koblingen gir i seg selv ingen tilgang — nivået gjør det. Korpset sier
+    bare *hvilket* korps `les` ser og `skriv_handling` fører.
     """
     if not getattr(user, 'is_authenticated', False):
         return None
+    kk = Kontokorps.objects.filter(user=user).select_related('korps').first()
+    if kk is not None:
+        return kk.korps
     mannskap = Mannskap.objects.filter(user=user).select_related('korps').first()
     return mannskap.korps if mannskap else None
 

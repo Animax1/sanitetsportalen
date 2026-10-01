@@ -229,18 +229,22 @@ def fjern_utgaatte(raw: bytes) -> bytes:
 #
 # Regelen: en **nullbar** peker til en konto som ikke finnes, settes til `null`
 # og loggføres. Finnes kontoen, beholdes koblingen — det er det `strip_fields`
-# ikke kan. En peker som **ikke** er nullbar røres ikke, og feiler høyt som før:
-# der er raden meningsløs uten kontoen.
+# ikke kan. En peker som **ikke** er nullbar røres ikke, og feiler høyt som før —
+# **unntatt** i modellene handleren har ført opp i `uten_konto_droppes`: der er
+# raden et svar om kontoen, og uten kontoen droppes den (loggført).
 
 
 def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
-    """Sett nullbare FK-er til kontoer som ikke finnes i basen, til `null`.
+    """Sett nullbare FK-er til kontoer som ikke finnes i basen, til `null`, og
+    dropp radene i handlerens `uten_konto_droppes` som peker på en slik konto.
 
     Den hele fila røres ikke — brukerne er med i den. Kaster aldri: er fila
     ødelagt, skal den feile i `loaddata`, med den feilmeldingen.
     """
     if slug == 'full':
         return raw
+    handler = get_handler(slug)
+    droppes = {m.lower() for m in getattr(handler, 'uten_konto_droppes', None) or ()}
     try:
         from django.apps import apps as django_apps
         from django.contrib.auth import get_user_model
@@ -267,7 +271,8 @@ def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
             else:
                 felt_per_modell[etikett] = [
                     f.name for f in modell._meta.concrete_fields
-                    if f.is_relation and f.related_model is Bruker and f.null]
+                    if f.is_relation and f.related_model is Bruker
+                    and (f.null or etikett in droppes)]
         for navn in felt_per_modell[etikett]:
             verdi = objekt['fields'].get(navn)
             if verdi is not None:
@@ -282,7 +287,7 @@ def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
     ).values_list(Bruker.USERNAME_FIELD, flat=True)) if brukernavn else set()
     finnes_pk = set(Bruker.objects.filter(pk__in=pker).values_list('pk', flat=True)) if pker else set()
 
-    nullstilt = []
+    nullstilt, droppet = [], set()
     for objekt, navn, verdi in pekere:
         if isinstance(verdi, list):
             mangler = not verdi or verdi[0] not in finnes_navn
@@ -290,13 +295,22 @@ def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
             mangler = verdi not in finnes_pk
         else:
             continue   # ukjent form — la loaddata si fra
-        if mangler:
+        if not mangler:
+            continue
+        if str(objekt.get('model', '')).lower() in droppes:
+            droppet.add(id(objekt))
+        else:
             objekt['fields'][navn] = None
             nullstilt.append(f"{objekt.get('model')}.{navn}")
-    if not nullstilt:
+    if not nullstilt and not droppet:
         return raw
-    logger.warning('core.backup: %d brukerpeker(e) til kontoer som ikke finnes ble satt til '
-                   'null: %s', len(nullstilt), ', '.join(sorted(set(nullstilt))))
+    if nullstilt:
+        logger.warning('core.backup: %d brukerpeker(e) til kontoer som ikke finnes ble satt til '
+                       'null: %s', len(nullstilt), ', '.join(sorted(set(nullstilt))))
+    if droppet:
+        logger.warning('core.backup: %d rad(er) som bare gjelder en konto som ikke finnes, '
+                       'ble ikke lastet (uten_konto_droppes)', len(droppet))
+        objekter = [o for o in objekter if id(o) not in droppet]
     return json.dumps(objekter).encode('utf-8')
 
 

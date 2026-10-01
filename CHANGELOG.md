@@ -4,6 +4,63 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — Vaktlisten: korps på kontoen — «bruker med tilgang til /vaktliste kan og bli satt på korps» — kortet «Vaktlisten: korps» på brukersiden  `#vaktliste/tilgang` `#core/tilgang` `#core/backup`
+
+**Hvorfor:** André: «Kan vi gjøre det slik at bruker med tilgang til /vaktliste kan og bli
+satt på korps? Hvis de og legger seg mannskap hvordan vil det da bli?» Til nå fikk en konto
+korps **bare** gjennom mannskapsraden den var koblet til (`Mannskap.user`). En korpsleder som
+ikke selv går vakt hadde ingen vei inn — med `les` så kontoen ingenting, med `skriv_handling`
+førte den ingenting. Det gjelder 8–10 personer.
+
+**Veien dit:** Første forslag var å bruke det som fantes — en mannskapsrad med «Aktiv» av —
+og deretter et eget merke «Ikke vaktgående» på mannskapsraden. André: «dette virker ikke
+logisk». Han hadde rett: en korpsleder som ikke går vakt *er* ikke mannskap, og å lage en
+mannskapsrad for å flytte korpset over på kontoen var en omvei rundt koden, ikke en modell.
+Korps er en del av tilgangen («Per har `skriv_handling` og fører Haugesund»), og tilgang
+settes i brukeradministrasjonen. **Bare global admin** foreløpig (André: «Admin foreløpig
+ja»).
+
+**Hva:**
+
+| | |
+|---|---|
+| `vaktliste.Kontokorps` | `user` (1:1, CASCADE) og `korps` (PROTECT). Migrasjon `0029`, ren tilføyelse |
+| `services.brukerens_korps` | Kontoens korps **først**, ellers mannskapsradens som før. Ingen eksisterende konto endres |
+| Kortet «Vaktlisten: korps» | `vaktliste/kontokobling.py` gjennom `core/kontokobling.py` — kontoappen kjenner fortsatt ingen modul. Inaktive korps tilbys ikke, men det kontoen alt fører blir stående |
+| Audit | `vaktliste_kontokorps`: opprettet, endret, fjernet — med hvem |
+
+**Korpset er ikke et nivå.** Det betyr noe for `les` (ser bare dette) og `skriv_handling`
+(fører dette). For `les_alle`, `skriv_full` og `skriv_leder` er det for ordens skyld — de
+beholder tilgangen de har (André: «de som har høyere tilgang kan vel og settes korps for
+ordens skyld men de har den tilgangen de har i modulen»), og får fanen «Mitt korps», som de
+alt fikk om kontoen var koblet til en mannskapsrad.
+
+**Regelen — svaret på «hvis de og legger seg mannskap»:** kontoens korps og korpset på
+mannskapsraden den er koblet til, **må være like**. Ingen av dem vinner i stillhet.
+`models.korpskonflikt()` sjekkes:
+- i kortet (skjemafeil med begge navnene),
+- når en person opprettes eller redigeres i mannskapsregisteret — kobling for hånd, kobling
+  via e-posten, og en koblet person som flyttes til et annet korps (409 med begge navnene),
+- og i `save()` på begge modellene, som siste skranke for en vei som ikke finnes ennå
+  (`loaddata` går utenom).
+
+**Backup:** `Kontokorps` ligger i vaktlistefila. Pekeren til kontoen kan ikke være tom, så
+`nullstill_manglende_brukere()` kunne ikke nullstille den — og en tom base ville feilet hele
+fila, samme feil som `verifiser_backup` fant i dag. Handleren har fått
+`uten_konto_droppes`: raden er et svar om én konto, og uten kontoen **droppes** den
+(loggført). Finnes kontoen, kommer korpset tilbake. `UtenKontoDroppesErEkteTests` krever at
+hver oppføring er en ekte modell med en kontopeker som ikke kan være tom, så en skrivefeil
+ikke blir en stille ikke-dropping.
+
+`vaktliste/tests_ordboka.py` leser nå kortets mal også — den fant «vaktlista» i
+suksessmeldingen før noen andre gjorde det.
+
+**Mutasjonstestet, 17 mutanter, alle drept:** kontokorpset ikke lest, begge skrankene i
+`save()`, begge grenene i `korpskonflikt()` snudd og funksjonen tømt, sjekken ved
+opprettelse og ved redigering, skjemaets sjekk, bytte og fjerning i kortet, det inaktive
+korpset som faller ut, `uten_konto_droppes` tom, droppefeltene og selve droppingen i
+`service.py`, auditraden, og registreringen av kortet.
+
 ## 2026-10-01 — `verifiser_backup` feilet i prod: «CustomUser matching query does not exist» på `Helsepersonell.user` — brukerpekere til kontoer som mangler settes nå til `null` ved gjenoppretting  `#core/backup`
 
 **Hvorfor:** André kjørte `verifiser_backup` i prod (runbook §8b). Portalfila lastet, så

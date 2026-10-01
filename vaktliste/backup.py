@@ -59,6 +59,13 @@ class VaktlisteBackupHandler(BaseBackupHandler):
         'vaktliste.Utsending': ['sendt_av'],
     }
 
+    #: `Kontokorps` er et svar om én konto — «hvilket korps fører den» — og
+    #: pekeren kan ikke være tom. Den strippes derfor ikke: finnes kontoen ved
+    #: gjenoppretting, kommer korpset tilbake; finnes den ikke, droppes raden
+    #: (`core.backup.service.nullstill_manglende_brukere`), i stedet for at hele
+    #: fila feiler i en tom base (1. okt. 2026).
+    uten_konto_droppes = ['vaktliste.Kontokorps']
+
 
 def register_handlers() -> None:
     """Kalles fra `VaktlisteConfig.ready()`."""

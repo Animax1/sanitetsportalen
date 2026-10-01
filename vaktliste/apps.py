@@ -46,3 +46,8 @@ class VaktlisteConfig(AppConfig):
         # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
         from .vaktsletting import register_handlers as register_vaktsletting
         register_vaktsletting()
+
+        # Kortet «Vaktlista: korps» på brukersiden (1. okt. 2026). Se
+        # `core/kontokobling.py` — kontoappen kjenner ikke modulen ved navn.
+        from .kontokobling import register_handlers as register_kontokobling
+        register_kontokobling()
