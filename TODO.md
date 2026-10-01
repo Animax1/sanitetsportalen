@@ -99,6 +99,16 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       `Oppdragsenhet` og `ArkivertOppdrag`, og tabellen `Vaktmodusperiode`. Ingen
       eksisterende rad endres, og ingenting av det vises før flaggene er krysset av.
 
+- [ ] **Feilvarslene til `admin@sanitet.net`, ikke til privat Gmail** (André, 1. okt. 2026).
+      Railway, sanitetsportalen, **production** (og staging): `ADMINS` =
+      `Sanitetsportalen:admin@sanitet.net`. Sjekk etterpå med
+      `railway ssh --service web -- python manage.py verifiser_feilvarsel` at varselet
+      kommer fram. Varselet bærer
+      brukernavn, rolle, klient-IP, URL og traceback — med en privat Gmail-konto har korpset
+      ingen databehandleravtale for innboksen. **Noter hvem som leverer e-posten til
+      `sanitet.net`** (Google Workspace, Microsoft 365, domeneleverandøren …): det er den som
+      skal stå i A.2, og den trenger en avtale.
+
 - [ ] **Prøv gjenopprettingen fra Scaleway én gang** (variablene står i prod):
       `railway ssh --service web -- python manage.py hent_offsite --list`, hent én fil,
       og se at den dukker opp under `/portal-admin/backup/`. En backup som aldri er
@@ -925,10 +935,13 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
 Besluttet 14. aug. 2026: invitasjon som registreringsvei, selvbetjent passord-reset for
 personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
-- [ ] **AHASend og Google inn i `PERSONVERN_DOKUMENTASJON.md` A.2.** Selve avtalen er på
-      plass (over), men dataflyten er fortsatt ikke dokumentert. Tas i
-      dokumentgjennomgangen. Merk at C.3 linje 711 sier «Ingen andre databehandlere er
-      for øyeblikket i bruk» — det er direkte feil i dag.
+- [ ] **AHASend og e-postleverandøren til `sanitet.net` inn i `PERSONVERN_DOKUMENTASJON.md`
+      A.2.** AHASend-avtalen er på plass, og kontoen står på EØS-infrastruktur (André,
+      1. okt. 2026), men dataflyten er ikke dokumentert. Mottakeren flyttes fra privat Gmail
+      til `admin@sanitet.net` (se «Krever Andre»), og det er leverandøren av den innboksen
+      som skal stå her — ikke Google, med mindre domenet ligger hos Google Workspace. Tas i
+      dokumentgjennomgangen. Avkrysningen «Ingen andre databehandlere er for øyeblikket i
+      bruk» i C.3 kan ikke krysses av så lenge AHASend er i bruk.
 
 - [ ] **Vis hvilket miljø portalen kjører i.** Utløst 29. aug. 2026: en arbeidsøkt gikk
       med til å feilsøke en innlogging som feilet fordi forsøkene gikk mot prod mens
@@ -1081,12 +1094,12 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
         faktisk skjer. Funnet 23. aug. 2026 da tre testpasienter ble slettet.
         Docstringen i `views_patients.py` som påsto det samme er allerede rettet
       - **E-postvarsling ved feil er ikke omtalt i dokumentet i det hele tatt.** Det er
-        en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og Google
-        (mottakerens innboks) — og begge er databehandlere som hører hjemme i A.2.
+        en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og
+        leverandøren av `admin@sanitet.net` (mottakerens innboks) — og begge hører hjemme i A.2.
         Varselet inneholder, etter slankingen 22. aug.: brukernavn og rolle på den som
         opplevde feilen, klient-IP, forespurt URL og traceback. **Ingen kliniske
         opplysninger** — skjemadata, cookies, settings og lokale variabler er utelatt,
-        og `core/tests_error_reporting.py` vokter det. Lagringstid styres av Gmail,
+        og `core/tests_error_reporting.py` vokter det. Lagringstid styres av innboksen,
         ikke av applikasjonen, på samme måte som Railway-backupen i A.2
       - Bump versjonsnummer og dato når noe endres
 

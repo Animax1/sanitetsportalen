@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — Feilvarslene skal til `admin@sanitet.net`, ikke privat Gmail — «Google» var aldri en databehandler i portalen  `#core/dokumentasjon` `#core/drift`
+
+**Hvorfor:** André spurte «på hvilken måte bruker vi google?». Svaret, kontrollert i koden:
+**ingen integrasjon.** TODO kalte Google en databehandler fordi feilvarslene (`ADMINS`) gikk
+til en privat Gmail-adresse — AHASend sender, Gmail tar imot. Med en privat konto har
+korpset ingen databehandleravtale for innboksen. André: «jeg kan bytte fra min privat mail
+til admin@sanitet.net».
+
+**Hva:**
+- TODO, «Krever Andre»: nytt punkt om å sette `ADMINS` = `Sanitetsportalen:admin@sanitet.net`
+  i Railway og prøve med `verifiser_feilvarsel` — og å notere hvem som leverer e-posten til
+  `sanitet.net`, for det er den som skal stå i A.2.
+- TODO, «AHASend og Google inn i A.2» skrevet om til AHASend og leverandøren av
+  `admin@sanitet.net`, og at AHASend står på EØS. Påstanden om «C.3 linje 711» var feil på
+  to måter: linja er 1127, og den er en **uavkrysset** sjekkliste, ikke en påstand — men den
+  kan ikke krysses av så lenge AHASend er i bruk.
+- `.env.example`: eksempelet på `ADMINS` bruker korpsadressen.
+
+Ingen kodeendring — `ADMINS` leses fra miljøet (`settings.py`).
+
 ## 2026-10-01 — TODO ryddet: elleve punkter som var gjort eller besvart er slettet — Scaleway-nøklene, AHASend i EU, server-status grønn  `#core/dokumentasjon`
 
 **Hvorfor:** En gjennomgang av hele `TODO.md` for å rangere det som gjenstår viste at flere
