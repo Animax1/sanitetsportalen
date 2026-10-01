@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — `verifiser_backup` feilet i prod: «CustomUser matching query does not exist» på `Helsepersonell.user` — brukerpekere til kontoer som mangler settes nå til `null` ved gjenoppretting  `#core/backup`
+
+**Hvorfor:** André kjørte `verifiser_backup` i prod (runbook §8b). Portalfila lastet, så
+stoppet det på pasientfila fra 14. sep.:
+
+    CommandError: Gjenopprettingen feilet og ble rullet tilbake: DeserializationError:
+    CustomUser matching query does not exist.: (patients.helsepersonell:pk=4)
+    field_value was '['andre']'
+
+Det er nøyaktig det TODO-punktet «Fire brukerpekere i backup er ikke vurdert» (17. sep.)
+advarte om: serialiseringen kjører med `natural_foreign`, så `Helsepersonell.user` lagres
+som brukernavnet, og i en tom base — der man står den dagen Railway er borte — avviser
+`loaddata` **hele** fila. Ikke bare den ene raden. Prøven var den som fant det.
+
+**Hvorfor ikke bare `strip_fields`:** den virker når fila *skrives*. Filene som alt ligger på
+volumet og 730 dager offsite bærer brukernavnet uansett, og ville fortsatt feilet. Og den
+kaster koblingen også når kontoen finnes.
+
+**Hva:** `core.backup.service.nullstill_manglende_brukere()`, kalt i `restore_backup()` ved
+siden av `oversett_modellnavn()` og `fjern_utgaatte()` — samme form, samme sted, kaster aldri:
+- En **nullbar** FK til kontomodellen som peker på en konto som ikke finnes, settes til
+  `null`, og det loggføres hvilke felt det gjaldt.
+- **Finnes kontoen, beholdes koblingen** — det `strip_fields` ikke kan.
+- En peker som **ikke** er nullbar (`ModulTilgang.bruker`) røres ikke og feiler høyt som før.
+- Den hele fila røres ikke: brukerne er med i den.
+- Både naturlig nøkkel (`['andre']`) og primærnøkkel forstås.
+
+De fire pekerne i `IKKE_STRIPPET` (`Forstehjelper.user`, `Helsepersonell.user`,
+`Vaktmodusperiode.satt_av`, `Enhetshendelse.kvittert_av`) har fått begrunnelsen i stedet for
+«ikke vurdert», og TODO-punktet er slettet. `Mannskap.user` står fortsatt i `strip_fields` —
+det er ikke feil, bare ikke nødvendig lenger.
+
+**Prod har ikke rettingen før `staging` går til `main`.** `verifiser_backup` står i TODO for
+å kjøres igjen etter det. Samme kjøring viste «Ingen fil for: ko, park, backlog» og at de
+nyeste filene er fra 14. sep. — ført i TODO som eget spørsmål om backupplanen i prod.
+
+TODO: «Nøkkel til kart.sanitet.net i prod» og «Verifiser pulje 2 i prod» er slettet — André:
+«Punkt 5 og 6 er gjort».
+
+**Mutasjonstestet, 8 mutanter, alle drept:** kallstedet i `restore_backup` fjernet,
+null-kravet fjernet, unntaket for den hele fila fjernet, navnesjekken snudd, pk-grenen død,
+nullstillingen fjernet, loggen fjernet, og oppslaget av eksisterende kontoer tomt. Testene
+går gjennom `create_backup` → slett kontoen → `restore_backup`, ikke bare funksjonen.
+
 ## 2026-10-01 — Offsite: endepunktet var bucketens egen adresse — `NoSuchKey` på `hent_offsite --list`, filene under `sanitetsportalen/backups/`, og konfigsjekken sa «konfigurert»  `#core/backup` `#core/drift`
 
 **Hvorfor:** André kjørte `hent_offsite --list` i prod for å prøve gjenopprettingen fra

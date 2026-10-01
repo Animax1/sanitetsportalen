@@ -214,6 +214,92 @@ def fjern_utgaatte(raw: bytes) -> bytes:
     return json.dumps(beholdt).encode('utf-8')
 
 
+# ── Brukerpekere til kontoer som ikke finnes ────────────────────────────────
+#
+# Den tredje måten en fil kan gå fra basen på. Serialiseringen kjører med
+# `natural_foreign`, så en FK til en konto lagres som brukernavnet — og finnes
+# ikke kontoen der fila lastes, avviser `loaddata` **hele** fila med
+# «CustomUser matching query does not exist».
+#
+# **Funnet i prod 1. okt. 2026** av `verifiser_backup`: pasientfila fra 14. sep.
+# lot seg ikke laste i en tom base fordi `Helsepersonell.user` pekte på «andre».
+# Det er nøyaktig den dagen backupen trengs — Railway er borte og basen tom —
+# og `strip_fields` hjelper ikke filene som alt ligger 730 dager offsite,
+# fordi den virker når fila *skrives*.
+#
+# Regelen: en **nullbar** peker til en konto som ikke finnes, settes til `null`
+# og loggføres. Finnes kontoen, beholdes koblingen — det er det `strip_fields`
+# ikke kan. En peker som **ikke** er nullbar røres ikke, og feiler høyt som før:
+# der er raden meningsløs uten kontoen.
+
+
+def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
+    """Sett nullbare FK-er til kontoer som ikke finnes i basen, til `null`.
+
+    Den hele fila røres ikke — brukerne er med i den. Kaster aldri: er fila
+    ødelagt, skal den feile i `loaddata`, med den feilmeldingen.
+    """
+    if slug == 'full':
+        return raw
+    try:
+        from django.apps import apps as django_apps
+        from django.contrib.auth import get_user_model
+        Bruker = get_user_model()
+        objekter = json.loads(raw.decode('utf-8'))
+        if not isinstance(objekter, list):
+            return raw
+    except Exception as feil:   # noqa: BLE001 — se docstring
+        logger.warning('core.backup: kunne ikke lese fila for brukerpekere: %s', feil)
+        return raw
+
+    # (rad, feltnavn, nøkkel) for hver nullbar brukerpeker med en verdi.
+    pekere = []
+    felt_per_modell: dict[str, list[str]] = {}
+    for objekt in objekter:
+        if not isinstance(objekt, dict) or not isinstance(objekt.get('fields'), dict):
+            continue
+        etikett = str(objekt.get('model', '')).lower()
+        if etikett not in felt_per_modell:
+            try:
+                modell = django_apps.get_model(etikett)
+            except (LookupError, ValueError):
+                felt_per_modell[etikett] = []
+            else:
+                felt_per_modell[etikett] = [
+                    f.name for f in modell._meta.concrete_fields
+                    if f.is_relation and f.related_model is Bruker and f.null]
+        for navn in felt_per_modell[etikett]:
+            verdi = objekt['fields'].get(navn)
+            if verdi is not None:
+                pekere.append((objekt, navn, verdi))
+    if not pekere:
+        return raw
+
+    brukernavn = {v[0] for _o, _n, v in pekere if isinstance(v, list) and v}
+    pker = {v for _o, _n, v in pekere if isinstance(v, int)}
+    finnes_navn = set(Bruker.objects.filter(
+        **{f'{Bruker.USERNAME_FIELD}__in': brukernavn}
+    ).values_list(Bruker.USERNAME_FIELD, flat=True)) if brukernavn else set()
+    finnes_pk = set(Bruker.objects.filter(pk__in=pker).values_list('pk', flat=True)) if pker else set()
+
+    nullstilt = []
+    for objekt, navn, verdi in pekere:
+        if isinstance(verdi, list):
+            mangler = not verdi or verdi[0] not in finnes_navn
+        elif isinstance(verdi, int):
+            mangler = verdi not in finnes_pk
+        else:
+            continue   # ukjent form — la loaddata si fra
+        if mangler:
+            objekt['fields'][navn] = None
+            nullstilt.append(f"{objekt.get('model')}.{navn}")
+    if not nullstilt:
+        return raw
+    logger.warning('core.backup: %d brukerpeker(e) til kontoer som ikke finnes ble satt til '
+                   'null: %s', len(nullstilt), ', '.join(sorted(set(nullstilt))))
+    return json.dumps(objekter).encode('utf-8')
+
+
 def get_backup_dir() -> Path:
     """Returnerer Path til backup-mappen, opprett ved behov."""
     path = Path(os.environ.get('BACKUP_DIR', settings.BASE_DIR / 'backups'))
@@ -609,6 +695,7 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     # kontrollen under ser dagens modellnavn — ellers måtte den kjenne begge.
     raw = oversett_modellnavn(raw)
     raw = fjern_utgaatte(raw)
+    raw = nullstill_manglende_brukere(raw, slug=backup.module_slug)
 
     # Er fila det den gir seg ut for? Før sikkerhetsnettet: en fil som avvises,
     # skal ikke koste et øyeblikksbilde, og ingenting er rørt (28. sep. 2026).

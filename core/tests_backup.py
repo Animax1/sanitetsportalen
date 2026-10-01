@@ -429,6 +429,39 @@ class RestoreBackupTests(TestCase):
         self.assertEqual(p_after.problemstilling, 'Original')
         self.assertFalse(Patient.objects.filter(pasientnummer=99).exists())
 
+    def test_en_konto_som_er_borte_stopper_ikke_gjenopprettingen(self) -> None:
+        """**Feilen `verifiser_backup` fant i prod 1. okt. 2026.**
+
+        Pasientfila fra 14. sep. bar `Helsepersonell.user = ['andre']`, og i en
+        tom base avviste `loaddata` hele fila: «CustomUser matching query does
+        not exist». Det er dagen backupen trengs. Pekeren skal bli `null`, og
+        resten av fila skal lastes.
+        """
+        andre = CustomUser.objects.create_user(username='andre', password='x',
+                                               must_change_password=False)
+        Helsepersonell.objects.filter(name='HP-Test').update(user=andre)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='patients', kind=KIND_MANUAL, user=self.admin)
+            andre.delete()
+            with self.assertLogs('core.backup', level='WARNING') as logg:
+                restore_backup(backup, user=self.admin)
+        hp = Helsepersonell.objects.get(name='HP-Test')
+        self.assertIsNone(hp.user)
+        self.assertEqual(Patient.objects.get(pasientnummer=10).helsepersonell_ref, hp)
+        self.assertTrue(any('patients.helsepersonell.user' in linje for linje in logg.output),
+                        'nullstillingen skal stå i loggen, ikke skje i stillhet')
+
+    def test_en_konto_som_finnes_beholder_koblingen(self) -> None:
+        """Det `strip_fields` ikke kan: finnes kontoen, kommer koblingen tilbake."""
+        andre = CustomUser.objects.create_user(username='andre', password='x',
+                                               must_change_password=False)
+        Helsepersonell.objects.filter(name='HP-Test').update(user=andre)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='patients', kind=KIND_MANUAL, user=self.admin)
+            Helsepersonell.objects.filter(name='HP-Test').update(user=None)
+            restore_backup(backup, user=self.admin)
+        self.assertEqual(Helsepersonell.objects.get(name='HP-Test').user, andre)
+
     def test_restore_unknown_handler_raises(self) -> None:
         """En backup med ukjent module_slug skal feile tydelig."""
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -1989,22 +2022,23 @@ class BrukerpekereStrippesEllerBegrunnesTests(SimpleTestCase):
     med i den, så den er selvbærende og har ingen konto å savne.
     """
 
-    #: Brukerpekere som **ikke** strippes i dag, med status.
+    #: Brukerpekere som **ikke** strippes, med begrunnelse.
     #:
-    #: **De fire under er ikke vurdert.** De ble funnet av denne testen den
-    #: dagen den ble skrevet, i moduler arbeidet ikke gjaldt, og å stryke dem
-    #: fra en dump er et valg om hva en gjenoppretting skal gi tilbake — det
-    #: hører til den som eier modulen. Ført i `TODO.md`.
+    #: **Avgjort 1. okt. 2026, etter at `verifiser_backup` i prod feilet på
+    #: `Helsepersonell.user`.** Alle fire er nullbare, og
+    #: `core.backup.service.nullstill_manglende_brukere()` setter dem til `null`
+    #: ved gjenoppretting når kontoen ikke finnes. Da får man koblingen tilbake
+    #: når kontoen *finnes* — det `strip_fields` aldri kan — og en tom base laster
+    #: likevel. Og den virker på filene som alt ligger 730 dager offsite, fordi
+    #: den virker ved lasting og ikke ved skriving.
     #:
-    #: Alle fire er `null=True` med `SET_NULL`, altså teknisk strippbare.
-    #: Spørsmålet er om koblingen er verdt mer enn gjenopprettbarheten:
-    #: `Forstehjelper.user` og `Helsepersonell.user` er kontokoblinger av samme
-    #: slag som `Mannskap.user`, som vaktlista **valgte** å stryke.
+    #: `Mannskap.user` i vaktlista står fortsatt i `strip_fields` — det var et
+    #: valg modulen tok, og det er ikke feil. Det er bare ikke nødvendig lenger.
     IKKE_STRIPPET: dict[str, str] = {
-        'patients.Forstehjelper.user': 'ikke vurdert — se TODO.md',
-        'patients.Helsepersonell.user': 'ikke vurdert — se TODO.md',
-        'oppdrag.Vaktmodusperiode.satt_av': 'ikke vurdert — se TODO.md',
-        'oppdrag.Enhetshendelse.kvittert_av': 'ikke vurdert — se TODO.md',
+        'patients.Forstehjelper.user': 'kontokobling — nullstilles ved lasting om kontoen mangler',
+        'patients.Helsepersonell.user': 'kontokobling — nullstilles ved lasting om kontoen mangler',
+        'oppdrag.Vaktmodusperiode.satt_av': 'hvem som satte modus — nullstilles ved lasting om kontoen mangler',
+        'oppdrag.Enhetshendelse.kvittert_av': 'hvem som kvitterte — nullstilles ved lasting om kontoen mangler',
     }
 
     def _brukerpekere(self, handler):
@@ -2085,3 +2119,53 @@ class BrukerpekereStrippesEllerBegrunnesTests(SimpleTestCase):
         self.assertTrue(any(strippet for _, strippet in alle),
                         'ingen peker regnes som strippet — leser testen '
                         '`strip_fields` riktig?')
+
+
+class NullstillManglendeBrukereTests(TestCase):
+    """Grensene for `nullstill_manglende_brukere()` — det den *ikke* skal røre."""
+
+    def _fil(self, *objekter):
+        return json.dumps(list(objekter)).encode('utf-8')
+
+    def _last(self, raw):
+        return json.loads(raw.decode('utf-8'))
+
+    def test_en_peker_som_ikke_er_nullbar_roeres_ikke(self):
+        """`ModulTilgang.bruker` er `CASCADE` uten `null` — raden er meningsløs
+        uten kontoen, og skal feile høyt i `loaddata` som før."""
+        from core.backup.service import nullstill_manglende_brukere
+        raw = self._fil({'model': 'accounts.modultilgang', 'pk': 1,
+                         'fields': {'bruker': ['finnes-ikke'], 'modul_slug': 'patients'}})
+        self.assertEqual(self._last(nullstill_manglende_brukere(raw, slug='patients'))[0]
+                         ['fields']['bruker'], ['finnes-ikke'])
+
+    def test_den_hele_fila_roeres_ikke(self):
+        """Brukerne er med i den — kontoen «mangler» bare fordi den ikke er lastet ennå."""
+        from core.backup.service import nullstill_manglende_brukere
+        raw = self._fil({'model': 'patients.helsepersonell', 'pk': 1,
+                         'fields': {'name': 'X', 'user': ['finnes-ikke']}})
+        self.assertEqual(nullstill_manglende_brukere(raw, slug='full'), raw)
+
+    def test_primaernokkelform_og_naturlig_nokkel(self):
+        from core.backup.service import nullstill_manglende_brukere
+        finnes = CustomUser.objects.create_user(username='finnes', password='x')
+        raw = self._fil(
+            {'model': 'patients.helsepersonell', 'pk': 1,
+             'fields': {'name': 'A', 'user': ['finnes']}},
+            {'model': 'patients.helsepersonell', 'pk': 2,
+             'fields': {'name': 'B', 'user': ['borte']}},
+            {'model': 'patients.forstehjelper', 'pk': 3,
+             'fields': {'name': 'C', 'user': finnes.pk}},
+            {'model': 'patients.forstehjelper', 'pk': 4,
+             'fields': {'name': 'D', 'user': finnes.pk + 999}},
+            {'model': 'patients.forstehjelper', 'pk': 5,
+             'fields': {'name': 'E', 'user': None}},
+        )
+        ut = [o['fields']['user'] for o in self._last(nullstill_manglende_brukere(raw, slug='patients'))]
+        self.assertEqual(ut, [['finnes'], None, finnes.pk, None, None])
+
+    def test_ingenting_aa_gjoere_gir_fila_uendret(self):
+        from core.backup.service import nullstill_manglende_brukere
+        raw = self._fil({'model': 'patients.patient', 'pk': 1, 'fields': {'pasientnummer': 1}})
+        self.assertIs(nullstill_manglende_brukere(raw, slug='patients'), raw)
+        self.assertIs(nullstill_manglende_brukere(b'ikke json', slug='patients'), b'ikke json')

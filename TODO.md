@@ -35,17 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Nøkkel til kart.sanitet.net i prod** (`docs/PLAN_KARTKOBLING.md` §9). Koblingen går til
-      `main` 30. sep. 2026 og er virkningsløs i prod til dette er gjort. Staging er prøvd og virker.
-      1. Lag en **ny** nøkkel (aldri samme som staging, B14):
-         `python -c "import secrets; print(secrets.token_hex(32))"`
-      2. Legg den i korpsets passordbehandler som «Kartkobling prod».
-      3. Railway, kart.sanitet, **production**: `PORTAL_HMAC_NOKKEL` = nøkkelen.
-      4. Railway, sanitetsportalen, **production**: `KART_HMAC_NOKKEL` = samme nøkkel, og
-         `KART_URL` = `https://kart.sanitet.net` (eller Railway-adressen til prod-kartet til DNS er på plass).
-      5. I prod-kartet: Administrasjon → Grupper → kryss av «Viser enheter og lag fra portalen» på
-         gruppa som skal se bilene. Sjekk kortet «Kart.sanitet.net» på `/portal-admin/server-status/`.
-
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet. **Behandlingsansvarlig er besluttet**
@@ -101,15 +90,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
          sletterett, med vilje — det må gjøres der.
       3. Sjekk staging også, hvis den har offsite-variabler.
 
-- [ ] **Verifiser pulje 2 i prod** (bygg `a7239c5`, deployet 16. sep. 2026). Sju punkter,
-      i CHANGELOG under «Pulje 2, andre halvdel» — kort versjon: sett flaggene på
-      «Spesialressurs» i Valglister, sett en lege passiv, varsle henne, og se at brikka
-      sier «(passiv vakt)» også etter at hun er satt aktiv igjen. Og: at hver enhet i
-      ressurslista viser rent navn, uten `[object Object]`.
-      Migrasjon `0026` er rene tillegg — to felter på `Enhetstype`, ett på `Enhet`,
-      `Oppdragsenhet` og `ArkivertOppdrag`, og tabellen `Vaktmodusperiode`. Ingen
-      eksisterende rad endres, og ingenting av det vises før flaggene er krysset av.
-
 - [ ] **Feilvarslene til `admin@sanitet.net`, ikke til privat Gmail** (André, 1. okt. 2026).
       Railway, sanitetsportalen, **production** (og staging): `ADMINS` =
       `Sanitetsportalen:admin@sanitet.net`. Sjekk etterpå med
@@ -162,10 +142,21 @@ Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`), 3 (backup og offsite) 
 gjennomfører angrepet, og mutasjoner på nivået i `CLAUDE.md`. Puljene gjøres ferdig før
 `staging` går til `main` (André: «vi har tid til å gjøre oss ferdig med disse puljene først»).
 
-- [ ] **Etter deploy til `main`: kjør `verifiser_backup` i prod** (runbook §8b). Sperrene i
-      gjenopprettingen fra pulje 3 er skrevet for å slippe gjennom hver ekte fil, også de
-      eldre; prøven på det er filene som faktisk ligger på prod-volumet. Og se at
-      `/portal-admin/backup/` ikke viser advarselen om at `OFFSITE_BACKUP_KEY` er for kort.
+- [ ] **Kjør `verifiser_backup` i prod igjen etter neste push til `main`** (runbook §8b).
+      Første kjøring 1. okt. 2026 feilet på pasientfila: `Helsepersonell.user` pekte på
+      «andre», og i en tom base avviste `loaddata` hele fila. Rettet på `staging` samme dag
+      (`nullstill_manglende_brukere()`) — men prod har ikke rettingen før `staging` går til
+      `main`, og det venter på Andrés klarsignal. Se også at `/portal-admin/backup/` ikke
+      viser advarselen om at `OFFSITE_BACKUP_KEY` er for kort.
+
+- [ ] **Hvorfor er de nyeste backupfilene i prod fra 14. sep. 2026, og ingen for KO, Lag og
+      backlog?** `verifiser_backup` fant `backup-portal-manual-20260914-…` og
+      `backup-patients-manual-20260914-…` som de nyeste, og «Ingen fil for: ko, park,
+      backlog». Med modus «ved endring» skriver klokka ingenting når ingenting er endret, så
+      pasientfila kan være riktig — men en modul som *aldri* har hatt en fil, burde fått sin
+      første ved første tikk. Se på `/portal-admin/backup/`: modus, «sist sjekket» og «sist
+      fil» per modul, og om standardplanen står på «av». Står «sist sjekket» gammel, er
+      klokka død; står modus «av», er det et valg som må tas bevisst.
 
 ### Avslutt vakt, arkiv og tidligere vakter i statistikken — steg 1–3 levert 28. sep. 2026
 
@@ -727,27 +718,6 @@ status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CL
 - [ ] **Del ut tilgang til de som skal bruke den.** Ingen har en `ModulTilgang`-rad på
       `backlog` i dag, så bare global admin ser modulen. Tre nivåer i matrisen: «ser
       backloggen», «melder inn, retter sitt eget», «leder backloggen, setter løst».
-
-- [ ] **Fire brukerpekere i backup er ikke vurdert** (funnet 17. sep. 2026, ved
-      mutasjonstesting av backlog-modulen): `patients.Forstehjelper.user`,
-      `patients.Helsepersonell.user`, `oppdrag.Vaktmodusperiode.satt_av` og
-      `oppdrag.Enhetshendelse.kvittert_av` står i `IKKE_STRIPPET` i
-      `core/tests_backup.py`.
-
-      **Hva det betyr:** serialiseringen kjører med `natural_foreign`, så en FK til en
-      konto lagres som brukernavnet. Er kontoen slettet i mellomtiden, feiler **hele**
-      gjenopprettingen av den fila med `DeserializationError` — ikke bare den ene raden,
-      og akkurat den dagen man trenger backupen.
-
-      **Det er ikke gitt at de skal strippes.** Å beholde pekeren er et gyldig valg når
-      koblingen er verdt mer enn gjenopprettbarheten. Alle fire er `null=True` med
-      `SET_NULL`, altså teknisk strippbare. `Forstehjelper.user` og `Helsepersonell.user`
-      er kontokoblinger av samme slag som `Mannskap.user`, som vaktlista **valgte** å
-      stryke — der settes koblingen på nytt via e-postadressen. Finnes den veien i
-      pasientmodulen også, er svaret sannsynligvis det samme.
-
-      Valget hører til den som eier modulen, og skal stå skrevet enten i `strip_fields`
-      eller i `IKKE_STRIPPET` med en begrunnelse.
 
 - [ ] **VURDER: skal typene kunne omsorteres?** `rekkefolge` finnes på `Innspilltype` og
       settes automatisk til opprettelsesrekkefølgen, men det er ingen flate for å endre
