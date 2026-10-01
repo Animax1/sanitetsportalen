@@ -13,6 +13,7 @@ from . import views, views_registre
 
 urlpatterns = [
     path('', views.index_view, name='vaktliste_index'),
+    path('veiledning/', views.veiledning_view, name='vaktliste_veiledning'),
     # Service workeren for offline drift (13. sep. 2026). Må ligge under
     # `/vaktliste/` — en worker styrer bare stier under sin egen.
     path('sw.js', views.sw_view, name='vaktliste_sw'),

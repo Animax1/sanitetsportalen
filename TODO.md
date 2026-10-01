@@ -302,12 +302,12 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
       og reglene i `oppdrag-sentral-oppdrag.js` (`_verdiKanEndres`, `_verdiForesporsel`)
       kan gjenbrukes; det som mangler er en tegning som tåler pollingen.
 
-### Vaktlista: gjennomgangen 30. sep. 2026 — pulje 5
+### Vaktlista: gjennomgangen 30. sep. 2026 — staging-sjekken som gjenstår
 
 *En ekstern gjennomgang av `/vaktliste/` (Fable), kontrollert mot koden 30. sep. 2026. Dommen:
 mekanikken er solid; det som svikter er **begrepene** og **inngangen** for hver rolle. Pulje
 1 (rettinger uten avgjørelser), 2 (drift automatisk ved vaktens start), 3 (ordboka på
-skjermen) og 4 («Del ut») er levert — CHANGELOG 30. sep. Pulje 5 bruker de nye ordene.*
+skjermen), 4 («Del ut») og 5 (veiledningen) er levert — CHANGELOG 30. sep. og 1. okt.*
 
 - [ ] **Staging-sjekken for hele gjennomgangen — til slutt, etter siste pulje** (André,
       30. sep.: «ta med disse sjekkene til slutten av hele økten av puljer»). Punktene står
@@ -320,19 +320,16 @@ skjermen) og 4 («Del ut») er levert — CHANGELOG 30. sep. Pulje 5 bruker de n
       - **Pulje 3** (`7c35f33`): §3/§4/§5 og punktet «Ordboka» — de nye ordene overalt på
         `/vaktliste/`, «Koble til delt konto» med hint, og at lagring, fjerning, skift og
         pauser på en enhet fortsatt virker (adressene ble rørt av byttet og rettet).
-      - **Pulje 4**: §4 «Del ut» og §8 «Vakten»/«Del ut» — merket og knappen på kortet,
+      - **Pulje 4** (`6cec714`): §4 «Del ut» og §8 «Vakten»/«Del ut» — merket og knappen på kortet,
         vinduet, `test-vl-full` som deler ut, tømming som gjør plassene åpne for alle, og
         sluttsteget i planleggeren. Tilgangsmatrisen §16 har en ny rad.
+      - **Pulje 5**: §1 «Veiledningen» — lenken i vaktlinjen, egen del pekt ut per rolle,
+        og at den leses på telefon.
 - [ ] **Ordboka i `/oppdrag/` og `/ko/`.** Vaktlista fikk den 30. sep. (ressurstype, enhet,
       skift, «Koble til delt konto», -en-form). Samme ord brukes der: KOs
       «ressursoversikt», «et lag er en ressurs uten oppdragsenhet», og `oppdrag.Enhet` er
       Karmøy 51 — nå står «enhet» for to ting på tvers av sidene. `vaktliste/tests_ordboka.py`
       er mønsteret for en vakt per modul; skisser før og etter først, som for vaktlista.
-- [ ] **Pulje 5 — brukerveiledning per rolle.** `docs/BRUKERVEILEDNING_VAKTLISTE.md`: ordboka
-      øverst, så én del per rolle (korps-fører, vaktleder, admin) i den rekkefølgen arbeidet
-      gjøres, lenket fra `/vaktliste/`. **Etter** pulje 3. Tilgangstabellen i
-      `docs/TESTSJEKKLISTE_VAKTLISTE.md` §16 er den beste forklaringen som finnes i dag.
-      Krympingen av `vaktliste/CLAUDE.md` (punktet lenger ned) tas samtidig.
 
 ### Vaktlista: nedtrekket i «Rediger skift» — bevisst ufiltrert (14. sep. 2026)
 
@@ -550,19 +547,13 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       etter. Det er den eneste måten å gjøre en slik omstokking uten å risikere at en
       regel forsvinner i redigeringen.
 
-- [ ] **Vurder om `vaktliste/CLAUDE.md` kan krympes — seksjon for seksjon.** Fila er
-      strukturert (17. sep. 2026) og delt (23. sep.: flaten til
-      `templates/vaktliste/CLAUDE.md`), men ikke kortet ned; den er 44 641 tegn og står
-      fortsatt pinnet i `FOR_STORE_I_DAG` — taket ble hevet 800 tegn 25. sep. for
-      overnattingen, med begrunnelsen i testen. Kutt var **ikke** riktig den dagen, og grunnen bør
-      stå: hvert avsnitt bærer en regel *og* feilen som lærte oss den, og det er
-      begrunnelsen som får reglene til å feste seg. En kortere fil med dårligere
-      dokumentasjon er ikke en forbedring.
-
-      Det som *nå* er mulig, og som ikke var det før, er å vurdere én seksjon om gangen
-      mot CHANGELOG: står hele hendelsesforløpet der, kan modulfila nøye seg med regelen
-      og den ene setningen som gjør den huskbar. De tre største er «Plassen og skiftet»
-      (7 802), «Planleggeren» (6 229) og «Belastning, budsjett og timeoversikt» (5 736).
+- [ ] **Vurder om `vaktliste/CLAUDE.md` kan krympes videre — seksjon for seksjon.** 1. okt.
+      2026 (pulje 5) ble «Plassen og skiftet» og «Belastning» skrevet om til reglene, og fila
+      gikk fra 44 733 til 37 624 tegn; taket i `FOR_STORE_I_DAG` fulgte ned. Kontroller først
+      at hendelsesforløpet står i CHANGELOG, og behold regelen og den ene setningen som gjør
+      den huskbar. Den største igjen er «Planleggeren» (6 229), men den er for det meste
+      tabeller som allerede er korte. Målet er under `MODUL_TEGNGRENSE` (22 000), og det er
+      ikke sikkert det er verdt det — en fil med dårligere begrunnelser er ikke en forbedring.
 
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene

@@ -82,117 +82,49 @@ nivåene *betyr* i vaktlista, og de to halvdelene som må sjekkes samlet.
 
 ## Plassen og skiftet — hvem får røre hva
 
-Skillet mellom å **sette opp** en plass og å **fylle** den går gjennom hele
-modulen. De to spørsmålene er `kan_sette_vaktpost()` og `kan_rore_vaktpost()`,
-og de må ikke slås sammen.
+Skillet mellom å **sette opp** en plass og å **fylle** den går gjennom hele modulen:
+`kan_sette_vaktpost()` og `kan_rore_vaktpost()`, og de må ikke slås sammen. Hvordan hver
+regel ble funnet, står i CHANGELOG på datoen.
 
-- **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
-  (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
-  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som ingen under `skriv_full`
-  ser eller kan fylle (`services.KLADD`, C2). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
-  og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
-  viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
-  universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
-  plass for plass, og `_korpsKropp()` oversetter nedtrekkets tre tilstander til to felt.
-- **«Del ut» er handlingen, med ett endepunkt** (pulje 4, 30. sep. 2026):
-  `POST api/vaktlister/<pk>/del-ut/` med en fordeling, fra kortets vindu og planleggerens
-  sluttsteg — `services.del_ut()`. Bare kladden røres; til et korps settes `Ressurs.korps`,
-  til alle `alle_korps` per plass. **Tømmes enhetens reservasjon, blir plassene som arvet
-  den åpne for alle** (`frigi_arvede_plasser`), ikke kladd igjen. André: «så en ser hva
-  som noen korps ikke kunne ta».
-- **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med
-  behovet, og «å fylle plassen» er én feltendring. Å *opprette* et skift er
-  `skriv_full` (vaktleder setter behovet), å *fylle* det krever badge og
-  reservasjon som ellers — de to spørsmålene er `services.kan_sette_vaktpost()`
-  og `services.kan_rore_vaktpost()`, og de må ikke slås sammen.
-- **Å bemanne er å fylle en plass noen andre har satt opp** (15. sep. 2026, André:
-  «Det eneste de skal få lov til er å legge inn folk, rolle, og redigere ressursens
-  navn — men ikke gruppe, reservering, enhet i oppdragsmodulen og sletting»).
-  Korps-føreren setter **hvem**, **i hvilken rolle** og **merknaden** på raden, og
-  retter **ressursens navn**. Tidene, antallet plasser, reservasjonen, `alle_korps`,
-  `probono` og sletting er oppsett — `services.kan_sette_opp_skift()`, som er et kall
-  videre til `kan_skrive_alt` og finnes for at beslutningen skal ha et sted, som
-  `kan_stemple`.
-
-  **Merknaden sto blant oppsettfeltene ett døgn, og André tok den ut igjen** (16. sep.
-  2026). «Det eneste de skal få lov til» ble lest strengt, og det var feil sted å trekke
-  grensen: «Kommer 17:30» er en beskjed om *denne raden*, og den som setter personen på
-  plassen er den som vet det. Den følger derfor `kan_rore_vaktpost`, som person og rolle —
-  hun når bare radene som er hennes. **`probono` ble stående**, og det er et annet
-  spørsmål: det sier hva vakta *koster*, og tallet leses av budsjettlinja for hele lista.
-
-  **Og porten på `mannskap_id` gjelder overgangen, ikke innsendingen** (16. sep. 2026).
-  Vinduet sender hele skjemaet, så feltet står i kroppen også når ingen har rørt
-  nedtrekket. På en **ledig plass** er det `null` over `null` — og
-  `kan_sette_vaktpost(..., mannskap=None)` er `skriv_full`, fordi *å la en plass stå tom*
-  er å sette opp et behov. Regelen er riktig; den fyrte bare på en endring som ikke
-  skjedde, og korps-føreren fikk 403 på å skrive «mangler sjåfør» i en plass hun har lov
-  til å fylle. Viewet sammenligner derfor `ny_id != vaktpost.mannskap_id` først: **en
-  skriving som ikke endrer noe, trenger ingen tillatelse til å endre det.**
-
-  **Regelen står som to lister, ikke som en `if` per felt:**
-  `services.SKIFT_OPPSETTFELTER` og `RESSURS_OPPSETTFELTER`, lest av
-  `services.oppsettfelter(data, felter)`. Fram til da sto `korps_id` og `alle_korps`
-  som hver sin `if` ute i viewene, mens `fra_tid`/`til_tid` gikk rett gjennom — og
-  det var hullet: dokumentasjonen sa «å opprette en ledig plass er `skriv_full`»
-  mens koden bare sjekket badgen. En regel med to lesere skrives én gang.
-
-  **Ett felt hun ikke får sette, velter hele forespørselen** — med vilje, så en
-  halvlagret rad ikke finnes. Derfor må klienten sile *før* den sender:
-  `bareTillatteFelter()` i `vaktliste-kjerne.js`, med listene speilet fra `services`
-  og holdt like av `SkiftetsOppsettfelterTests`. Uten silingen ville et personbytte
-  korps-føreren har lov til gitt 403, fordi vinduet alltid sendte alle feltene.
-
-  **Og markupen må si det samme:** «Opprett vakt» og tidsfeltene i regnearket sto på
-  `kanBemanne()` — altså badgen — så knappene førte til en vegg. De står nå på
-  `kanSetteOppSkift()`. Tidene *vises* fortsatt, som tekst: et felt man kan skrive i
-  og ikke lagre er verre enn en tekst, for det ser ut som om endringen gikk igjennom.
-
-  **Et låst felt i et vindu låses med `disabled`, aldri med `readOnly`** (16. sep. 2026,
-  meldt fra staging). HTML-standarden lar `readonly` gjelde felter man taster fritt i; på
-  `date`, `time`, `datetime-local`, `color`, `file` og avkryssinger er attributtet **uten
-  virkning**. Velgeren åpnet seg på iPhone, segmentene lot seg dra, verdien endret seg på
-  skjermen — og ble så filtrert bort ved lagring. Det er verre enn å ikke kunne røre
-  feltet: man tror man har gjort noe, og ser etterpå at man ikke har.
-  `LaaseneVirkerPaaAlleFeltformeneTests` håndhever at `_laasOppsettfelter()` og
-  `_laasRessursoppsett()` bruker `disabled`.
-
-  **Og et låst felt skal se låst ut uten å bli uleselig** (André, 16. sep. 2026).
-  `disabled` alene gjør det motsatte: Bootstrap demper feltet, nettleseren demper det én
-  gang til, og **Safari ignorerer `color` på et deaktivert felt** — den leser
-  `-webkit-text-fill-color`. `.vl-laast` gir stiplet kant, dempet flate og full
-  tekstkontrast tilbake. Stiplet framfor en ny farge, fordi fargene i modulen alt betyr
-  noe (gult varsler, grønt er tilstede) og en strek leses også i gråtoner.
-
-  **Låsen er tre ting samtidig, og derfor én funksjon:** `_laasFelter()` i
-  `vaktliste-kjerne.js` setter `disabled`, klassen og hintet som sier *hvorfor*. Et vindu
-  som husket to av dem ville sett ut som om det virket. Hintene (`vaktpost-laast-hint`,
-  `ressurs-laast-hint`) står i malen, og en test krever at de finnes — `_laasFelter()`
-  tier helt når `getElementById` gir `null`.
-- **`ressurs_detalj_view` har tre terskler.** Navnet krever `services.kan_gi_nytt_navn()`
-  — bilen heter «Sola 56», og den som står ved bilen vet det. Reservasjonen er utdeling og
-  krever `kan_sette_opp_skift`, som plassen (`RESSURS_UTDELINGSFELTER`, 30. sep. 2026 —
-  André: «de kan begge ha likt»). Gruppe, enhetskobling, rekkefølge og sletting: `kan_lede`.
-- **Navneretten leser plassene, ikke bare ressursen** (16. sep. 2026). Porten sto på
-  `kan_bemanne_ressurs` ett døgn og var i praksis stengt: **«Ny ressurs» spør bare om navn
-  og gruppe**, så en fersk ressurs er ureservert, og reservasjonen settes i «Rediger» —
-  som er lederens. Regelen slapp derfor bare gjennom de bilene lederen alt hadde delt ut,
-  og knappen var borte akkurat der korps-føreren står. `kan_gi_nytt_navn()` spør derfor
-  om hun kan bemanne ressursen **eller noen av plassene på den** — samme to nivåer som
-  `reservert_korps()`: en samleplass kan stå ureservert og likevel ha fire plasser som er
-  Haugesunds. Å navngi er fortsatt ikke å dele ut; oppsettfeltene leser `kan_lede` hver
-  for seg.
-- **Sletting av et skift er `skriv_full`, også når raden er fylt** (15. sep. 2026).
-  Sperren sto bare på de ledige, fordi et hull i bemanningen ikke skal kunne skjules
-  ved å slette raden som viste det. Argumentet gjelder ordrett på en fylt rad: sletter
-  korps-føreren skiftet framfor å melde forfall, forsvinner plassen og ikke bare
-  personen, og lista ser dekket ut. Hun tømmer raden i stedet (`mannskap_id: null`),
-  og da står behovet.
-- **Et skift redigeres i et vindu, ikke ved å settes opp på nytt.**
-  `apneRedigerVaktpost()` endrer mannskap, rolle, tider og merknad i én PUT;
-  serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
-  bytte person ved å slette raden mistet tidene og rollen som sto der.
-  Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+- **En ledig plass er en `Vaktpost` uten `mannskap`, i én av tre tilstander** (11.–12.
+  sep.): tildelt ett korps (`Vaktpost.korps`/ressursens), **åpen for alle**
+  (`alle_korps`, vinner over `korps`), eller **planlagt** — lederens kladd, usynlig under
+  `skriv_full` (`services.KLADD`). **Planlagt går én vei:** viewet avviser veien tilbake,
+  og nedtrekket tilbyr «Planlagt» bare mens plassen står der. «Mitt korps»
+  (`mkMittKorps`) viser korpsets og de åpne plassene; `kanBemannePlass()` speiler serveren.
+- **«Del ut» er handlingen, med ett endepunkt** (pulje 4, 30. sep.):
+  `POST api/vaktlister/<pk>/del-ut/`, fra kortets vindu og planleggerens sluttsteg —
+  `services.del_ut()`. Bare kladden røres; til et korps settes `Ressurs.korps`, til alle
+  `alle_korps` per plass. **Tømmes enhetens reservasjon, blir plassene som arvet den åpne
+  for alle** (`frigi_arvede_plasser`), ikke kladd igjen — André: «så en ser hva som noen
+  korps ikke kunne ta».
+- **Å bemanne er å fylle en plass noen andre har satt opp** (15. sep., André: «legge inn
+  folk, rolle, og redigere ressursens navn»). Korps-føreren setter **hvem**, **rollen** og
+  **merknaden** (16. sep.: «kommer 17:30» er en beskjed om raden), og retter **navnet**.
+  Tider, antall, reservasjon, `alle_korps`, `probono` og sletting er oppsett —
+  `kan_sette_opp_skift()`. `probono` sier hva vakten *koster*, og hører derfor ikke til raden.
+- **Regelen står som lister, ikke som en `if` per felt:** `SKIFT_OPPSETTFELTER`,
+  `RESSURS_OPPSETTFELTER` og `RESSURS_UTDELINGSFELTER`, lest av `services.oppsettfelter()`.
+  **Ett felt hun ikke får sette, velter hele forespørselen**, så klienten siler først
+  (`bareTillatteFelter()`, listene speilet og holdt like av `SkiftetsOppsettfelterTests`).
+- **Porten på `mannskap_id` gjelder overgangen, ikke innsendingen** (16. sep.): vinduet
+  sender `null` over `null` på en ledig plass. **En skriving som ikke endrer noe, trenger
+  ingen tillatelse til å endre det** — `ny_id != vaktpost.mannskap_id` først.
+- **Markupen sier det samme som serveren:** knapper og tidsfelt står på
+  `kanSetteOppSkift()`, ikke på badgen, og tidene vises som tekst for den som ikke får
+  endre dem — et felt man kan skrive i og ikke lagre, ser ut som en endring som gikk igjennom.
+- **Et låst felt låses med `disabled`, aldri `readOnly`** (16. sep., iPhone): `readonly`
+  virker ikke på `datetime-local`, avkryssinger m.fl. **`.vl-laast`** gir stiplet kant og
+  full kontrast tilbake (Safari leser `-webkit-text-fill-color`). `_laasFelter()` setter
+  `disabled`, klassen og hintet i ett; hintene står i malen, og en test krever dem.
+- **`ressurs_detalj_view` har tre terskler.** Navnet krever `kan_gi_nytt_navn()` — som
+  spør om hun kan bemanne enheten **eller en av plassene på den**, ellers var navneretten
+  stengt på hver fersk enhet (16. sep.). Reservasjonen er utdeling: `kan_sette_opp_skift`
+  (30. sep., André: «de kan begge ha likt»). Type, kobling, rekkefølge og sletting: `kan_lede`.
+- **Sletting av et skift er `skriv_full`, også når raden er fylt** (15. sep.): ellers kan
+  et hull skjules ved å slette raden som viste det. Korps-føreren tømmer raden i stedet.
+- **Et skift redigeres i et vindu** (`apneRedigerVaktpost()`, én PUT, den doble regelen
+  sjekket på nytt) — å bytte person ved å slette raden mistet tidene og rollen.
 
 ## Vakta, tidene og skrivingene
 
@@ -351,79 +283,37 @@ ressursene **uten** enhet og **på vakt nå** fra `api/ressurser/uten-enhet/` �
 
 ## Belastning, budsjett og timeoversikt
 
-**Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
-regner ut timer, skift, lengste skift, korteste hvile og **overlapp** per person;
-`Belastningsgrenser` (én rad) bærer grensene varslene måles mot.
+**Planleggingstall (fase 5) varsler, de sperrer ikke.** `services` regner timer, skift,
+lengste skift, korteste hvile og **overlapp** per person mot `Belastningsgrenser` (én rad,
+organisasjonens — `skriv_leder` flytter dem for *alle* vaktlister). Fargen er gul
+(`--vl-varsel`), ikke rød: noen ganger må noen ta et langt skift, og da skal listen si det høyt.
 
-**Vaktas budsjett står øverst i «Planlegger»** (15. sep. 2026,
-`docs/FORSLAG_PLANLEGGERFANE.md` steg 2–3): `services.planleggingstall()` gir
-`satt_opp`, `bemannet` og `probono` **side om side**, fordi hvert av dem alene lyver litt
-— ingen betaler for en tom plass, og «bemannet» står på null når lista er halvt satt opp.
-Avstanden mellom de to første er arbeidslista. `Vaktliste.timetak` er **denne** vaktas
-budsjett (`Belastningsgrenser` er organisasjonens og gjelder alle), `igjen` måles mot
-**satt opp** og ikke mot bemannet, og `_dagbolker()` bryter ned per dag uten egne tak.
-
-**«Timeoversikt» er lista regnet sammen** (`les`), **«Planlegger» er stedet grunnlaget
-lages** (`kan_lede`) — og budsjettet hører til den siste (CHANGELOG 15. sep. 2026).
-
-**«Oversikt» er en talltabell, ikke en personliste** (16. sep. 2026, André: «Den viser mye
-av det som allerede er i de respektive ressursfanene. Må være en faktisk oversikt»). Én rad
-per **ressurs per tidsblokk**, med kolonnene Ressurs, Tid, Timer, Plasser, Besatt, Ledige og
-Totalt, og en sumrad per dag. Navn, korps, rolle og merknad sto her til da — altså nøyaktig
-de fire kolonnene man alt hadde lest i gruppefanen.
-
-Tre ting er verdt å kjenne:
-
-- **Totalt bruker `_sumTimer`, ikke `timer × plasser`.** Probono-skift teller null (11. sep.
-  2026), og et skift uten gyldig spenn teller null. Regner man i stedet lengden ganger
-  antallet, blir totalen et annet tall enn budsjettlinja og enn `belastning_per_person` —
-  tre steder som skal si det samme.
-- **Sumraden teller de ledige plassenes timer med.** De er planlagt, og et budsjettall som
-  stille utelot dem ville sett rimelig ut og vært for lavt. Regelen sto udekket til en
-  mutant fant den.
-- **Personopplysningene er ikke borte, de har flyttet dit de gjelder.** Reservasjonen på en
-  ledig plass (`_plassKorps`) og probono-merkelappen prøves nå i gruppefanen. Utskrift av et
-  navneark skjer derfra — utskrifts-CSS-en er generisk og skriver ut den fanen man står i.
-
-**Et fanenavn kan ikke være en statusetikett** (`FanenHeterTimeoversiktTests`): fanen het
-«Planlegging» til 16. sep. 2026, samme ord som statusmerket. Bare fanen ble omdøpt —
-`choices.STATUS_VALG` bærer ordet fortsatt, og et søk-og-erstatt ville døpt om statusen.
-
-- **Taket settes i `vaktliste_detalj_view`s PUT, sammen med start og planlagt slutt, og
-  er derfor `skriv_leder`** — ikke `skriv_full`. Rekkevidden er den samme (hele vakta,
-  ikke ett korps' del), og én forespørsel kan ikke ha to tilgangsnivåer inni seg.
-- **Budsjettallene sendes bare til den som `ser_alle_korps`.** De filtreres aldri på
-  korps — taket gjelder lista — så for en `les` med badge ville de vært et aggregat over
-  skift hun ikke får se. `belastning_view` sender `planlegging: null`, og klienten tegner
-  ingenting; en tom ramme ville sagt «her er noe du ikke får se».
-- **`kanSetteTak()` leser serverens `kan_sette_tak`**, ikke `MODUL_TILGANG`. Regnes den
-  ut i klienten, kan knappen og endepunktet komme i utakt.
-
-- **Grensene er organisasjonens**, ikke portalens — derfor data og ikke tall i
-  en `if`. `skriv_leder` flytter dem: det endrer hva *alle* vaktlister varsler
-  om.
-- **Ingenting avvises.** Noen ganger må noen ta et langt skift, og da skal
-  lista si det høyt. Fargen er gul (`--vl-varsel`), ikke rød.
-- **Overlappende skift gir hvile 0**, ikke et negativt tall — et negativt tall
-  i en «korteste hvile»-kolonne ser ut som en regnefeil. **Null der betyr to ulike ting**
-  (skift som henger sammen, og skift som overlapper), og det er derfor
-  `_overlappstimer()` finnes ved siden av: sum minus union, så
-  `timer - overlapp` er faktisk tilstedeværelse. **Summen korrigeres ikke, den
-  navngis** — et tall som stille retter seg selv ville skjult dobbeltbookingen.
-  Probono teller med her selv om den ikke teller i `timer`: kroppen skiller ikke på lønn.
-  Overlappet har **ingen grense å måle mot**, med vilje — én person kan ikke stå to
-  steder uansett hva `Belastningsgrenser` sier.
-- **Faktisk tid regnes bare av ferdige skift** (både `mott_at` og
-  `av_vakt_at`). Et pågående skift ville gitt et tall som endrer seg mens man
-  ser på det.
-- `_hviletider()` **sorterer selv**, selv om `Vaktpost.Meta.ordering` gjør det
-  også: en hjelper skal ikke hvile på at den som kaller den har sortert. Uten
-  den egne sorteringen målte testene modellens ordering. **`_dagbolker()` er skilt ut av
-  `planleggingstall()` av nøyaktig samme grunn** (15. sep. 2026, funnet på nytt ved
-  mutasjonstesting) — og den regner dagen i **lokal tid**: et skift som begynner 00:30
-  norsk tid er 22:30 UTC dagen før, så `.date()` rett på tidspunktet legger hver eneste
-  nattevakt på feil dag. En test med falske skift må derfor bære **UTC**, som ORM-en
-  gjør; bærer den norsk tid, går mutanten grønn.
+- **Budsjettet står øverst i «Planlegger»** (15. sep., `FORSLAG_PLANLEGGERFANE.md`):
+  `planleggingstall()` gir `satt_opp`, `bemannet` og `probono` side om side, fordi hvert av
+  dem alene lyver litt; avstanden mellom de to første er arbeidslisten. `Vaktliste.timetak`
+  er *denne* vaktens tak, `igjen` måles mot **satt opp**. Taket settes i
+  `vaktliste_detalj_view`s PUT med start og slutt, og er derfor `skriv_leder`.
+- **Budsjettallene sendes bare til den som `ser_alle_korps`** — for en `les` ville de vært
+  et aggregat over skift hun ikke får se. Ellers `planlegging: null`, og klienten tegner
+  ingenting. `kanSetteTak()` leser serverens `kan_sette_tak`, ikke `MODUL_TILGANG`.
+- **«Oversikt» er en talltabell** (16. sep., André: «Må være en faktisk oversikt»): én rad
+  per enhet per tidsblokk, med sumrad per dag. **Totalt bruker `_sumTimer`**, ikke
+  `timer × plasser` (probono og ugyldige spenn teller null — ellers tre steder som skal si
+  det samme, med tre tall), og **sumraden teller de ledige plassene** (en mutant fant at
+  den ikke gjorde det). Navnene står i typefanen, og utskriften skriver ut fanen man står i.
+- **Et fanenavn kan ikke være en statusetikett** (`FanenHeterTimeoversiktTests`): fanen het
+  «Planlegging» til 16. sep., samme ord som statusmerket. `choices.STATUS_VALG` bærer ordet
+  fortsatt — et søk-og-erstatt ville døpt om statusen.
+- **Overlappende skift gir hvile 0**, og `_overlappstimer()` (sum minus union) står ved
+  siden av, så `timer - overlapp` er tilstedeværelse. **Summen korrigeres ikke, den
+  navngis** — et tall som stille retter seg selv ville skjult dobbeltbookingen. Probono
+  teller her: kroppen skiller ikke på lønn. Overlappet har ingen grense å måle mot.
+- **Faktisk tid regnes bare av ferdige skift** — et pågående skift ville gitt et tall som
+  endrer seg mens man ser på det.
+- **`_hviletider()` og `_dagbolker()` sorterer og regner selv**, uten å hvile på kalleren
+  (begge funnet ved mutasjonstesting). `_dagbolker()` regner dagen i **lokal tid**: 00:30
+  norsk tid er 22:30 UTC dagen før. En test med falske skift må derfor bære **UTC**, som
+  ORM-en gjør; bærer den norsk tid, går mutanten grønn.
 
 ## Innsjekk, stempling og drift
 

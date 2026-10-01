@@ -1,0 +1,198 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Veiledning – Vaktliste – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Brukerveiledningen (pulje 5, 1. okt. 2026). En side i portalen og ikke en fil i
+  `docs/`: korpsene har ikke tilgang til kodebasen, og to kopier av samme
+  veiledning ville gått i utakt. Ordene er de samme som på skjermen —
+  `vaktliste/tests_ordboka.py` leser denne malen også, og `tests_veiledning.py`
+  krever at knappene og fanene den nevner, finnes.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/vaktliste.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3 vl-veiledning">
+
+  <p><a href="{% url 'vaktliste_index' %}"><i class="bi bi-arrow-left me-1"></i>Tilbake til vaktlisten</a></p>
+  <h1 class="h3">Veiledning for vaktlisten</h1>
+
+  <div class="vl-veil-du" id="din-rolle">
+    {% if din_rolle == 'admin' %}
+      Du er <strong>administrator</strong> og kan alt under. Det som bare du kan, står i
+      <a href="#admin">den siste delen</a>.
+    {% elif din_rolle == 'leder' %}
+      Du er <strong>leder</strong> — du setter opp vakten. Begynn med
+      <a href="#leder">din del</a>; alt vaktlederen og korps-føreren gjør, kan du også.
+    {% elif din_rolle == 'vaktleder' %}
+      Du er <strong>vaktleder</strong> — du deler ut og bemanner alle korps. Begynn med
+      <a href="#vaktleder">din del</a>; alt korps-føreren gjør, kan du også.
+    {% elif din_rolle == 'korpsforer' %}
+      Du er <strong>korps-fører</strong> — du fører ditt eget korps. Begynn med
+      <a href="#korpsforer">din del</a>.
+    {% else %}
+      Du kan <strong>se</strong> vaktlisten. Hva du ser, står i <a href="#leser">din del</a>.
+    {% endif %}
+  </div>
+
+  <nav class="vl-veil-innhold" aria-label="Innhold">
+    <a href="#ord">Ordene</a> · <a href="#hvem">Hvem gjør hva</a> ·
+    <a href="#leder">Leder</a> · <a href="#vaktleder">Vaktleder</a> ·
+    <a href="#korpsforer">Korps-fører</a> · <a href="#leser">Leser</a> ·
+    <a href="#drift">Under vakten</a> · <a href="#admin">Administrator</a>
+  </nav>
+
+  <section id="ord">
+    <h2 class="h5">Ordene</h2>
+    <dl class="vl-veil-ord">
+      <dt>Vakten</dt>
+      <dd>Arrangementet, med start og slutt — for eksempel Sjøfartsdagene. Én vakt har én vaktliste.</dd>
+      <dt>Ressurstype</dt>
+      <dd>Hva slags ting: ambulanse, lag, mannskapsbil, samleplass, KO. Hver type er en fane.</dd>
+      <dt>Enhet</dt>
+      <dd>Den konkrete: Karmøy 51, Lag 1. Hver enhet er et kort under sin type.</dd>
+      <dt>Skift</dt>
+      <dd>Én plass på en enhet, med fra- og til-tid. Er det ingen navn på, er plassen ledig.</dd>
+      <dt>Ikke delt ut</dt>
+      <dd>Plasser lederen har satt opp, men ikke gitt til noen ennå. Korpsene ser dem ikke.
+        I nedtrekket på raden heter det «Planlagt».</dd>
+      <dt>Delt ut</dt>
+      <dd>Plassen er gitt til ett korps, eller er <em>Åpen for alle</em> — da kan alle korps fylle den.</dd>
+      <dt>Koble til delt konto</dt>
+      <dd>Kobler enheten til bilens konto i oppdragsmodulen, så sentralbordet ser hvem som sitter på.</dd>
+      <dt>I drift</dt>
+      <dd>Vakten er i gang: «Møtt» og «Av vakt» kan trykkes, og fanen «Tilstede nå» vises.</dd>
+      <dt>Probono</dt>
+      <dd>Et skift som ikke telles i timene.</dd>
+      <dt>Ditt korps</dt>
+      <dd>Kommer fra raden din i mannskapsregisteret. Uten den kobler kontoen din til et korps, er listen tom.</dd>
+    </dl>
+  </section>
+
+  <section id="hvem">
+    <h2 class="h5">Hvem gjør hva</h2>
+    <div class="vl-tabellramme">
+      <table class="vl-tabell">
+        <thead>
+          <tr><th>Handling</th><th>Leser</th><th>Korps-fører</th><th>Vaktleder</th><th>Leder</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Se eget korps</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+          <tr><td>Se alle korps</td><td>med «alle korps»</td><td>✔</td><td>✔</td><td>✔</td></tr>
+          <tr><td>Fylle plasser i eget korps, og de åpne for alle</td><td></td><td>✔</td><td>✔</td><td>✔</td></tr>
+          <tr><td>Legge til folk i eget korps</td><td></td><td>✔</td><td>✔</td><td>✔</td></tr>
+          <tr><td>Rette navnet på en enhet du bemanner</td><td></td><td>✔</td><td>✔</td><td>✔</td></tr>
+          <tr><td>Fylle plasser i andre korps</td><td></td><td></td><td>✔</td><td>✔</td></tr>
+          <tr><td>Nytt skift, tider, probono, slette skift</td><td></td><td></td><td>✔</td><td>✔</td></tr>
+          <tr><td>Del ut: korps på enhet og plass, åpen for alle</td><td></td><td></td><td>✔</td><td>✔</td></tr>
+          <tr><td>Møtt og Av vakt, Sett i drift, filen på e-post</td><td></td><td></td><td>✔</td><td>✔</td></tr>
+          <tr><td>Korps og kompetanser</td><td></td><td></td><td>✔</td><td>✔</td></tr>
+          <tr><td>Ny vaktliste, planleggeren, ny enhet, ressurstyper, roller</td><td></td><td></td><td></td><td>✔</td></tr>
+          <tr><td>Koble til delt konto, fjerne enhet, pauser, rom</td><td></td><td></td><td></td><td>✔</td></tr>
+          <tr><td>Vaktens start og slutt, timetak, grenser</td><td></td><td></td><td></td><td>✔</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="vl-veil-merk">Ser du ikke en knapp, er det fordi du ikke har lov — ikke fordi noe er galt.</p>
+  </section>
+
+  <section id="leder" class="{% if din_rolle == 'leder' %}vl-veil-din{% endif %}">
+    <h2 class="h5">Leder — setter opp vakten</h2>
+    <ol>
+      <li><strong>«Ny vaktliste»</strong> (øverst til høyre): navn på vakten, start og planlagt slutt.
+        «Kopier oppsett fra» tar med enhetene fra en tidligere vakt — aldri personene.
+        Vakten påvirker ikke den vakten som pågår nå.</li>
+      <li>Fanen <strong>«Planlegger»</strong>. Øverst står <em>Vakten</em> med start og slutt, og
+        timetaket. Under «Oppsett» legger du til én rad per enhet, med ressurstype og
+        skiftvinduer: «tre firemannslag 14–22» er én rad med antall 3, ett vindu 14–22 og fire
+        plasser per skift.
+        Regnestykket under raden viser hva det blir.</li>
+      <li><strong>«Lag grunnlaget»</strong>. Enhetene og de tomme plassene lages. Plassene er
+        <em>ikke delt ut</em> ennå — korpsene ser dem ikke. Du kan kjøre det på nytt; plasser som er
+        delt ut eller har navn på, blir stående.</li>
+      <li><strong>«Del ut»</strong>, nederst i planleggeren: velg hvem som får hver enhet, eller
+        «— bestem senere —». Det samme kan gjøres med «Del ut …» på hvert kort.</li>
+      <li><strong>«Rediger enhet»</strong>: ressurstype, reservert korps og «Koble til delt konto»
+        for bilene som har en konto i oppdragsmodulen. «Roller» på kortet lager rollene for typen
+        (lagleder, sjåfør); de blir tilgjengelige på hver enhet av samme type.</li>
+      <li><strong>Pauser</strong>: en regel per rad i planleggeren, eller «Pause» på kortet.</li>
+      <li>Fanen <strong>«Overnatting»</strong>: rom og brannrutine. Folk plasseres av vaktleder og
+        korps-førerne.</li>
+      <li><strong>Grensene</strong> for skiftlengde og hvile står i «Timeoversikt» og gjelder
+        <em>alle</em> vaktlister. Endrer du dem, endrer du dem for alle.</li>
+    </ol>
+  </section>
+
+  <section id="vaktleder" class="{% if din_rolle == 'vaktleder' %}vl-veil-din{% endif %}">
+    <h2 class="h5">Vaktleder — deler ut og bemanner alle korps</h2>
+    <ol>
+      <li><strong>Del ut</strong> det lederen har satt opp. Et kort med gult merke,
+        «4 plasser ikke delt ut», har knappen «Del ut …»: velg et korps, eller «Åpen for alle».
+        Én og én plass deles ut i nedtrekket på raden — en samleplass kan ha plasser til flere korps.
+        Det som er delt ut, kan ikke legges tilbake som planlagt.</li>
+      <li><strong>Tømmer du reservert korps</strong> i «Rediger enhet», blir plassene som fulgte
+        enheten <em>åpne for alle</em> — da ser alle korps hva ingen tok, og kan sikre seg det.</li>
+      <li><strong>«Nytt skift»</strong> på kortet: antall plasser, korps, rolle og tider.
+        Tider og probono endres i raden eller i «Rediger skift».</li>
+      <li>Fanen <strong>«Mannskap»</strong>: alle korps. Korps og kompetanser legges inn under
+        «Innstillinger».</li>
+      <li><strong>«Ikke plassert»</strong> viser hvem i registeret som ikke står på listen.
+        <strong>«Timeoversikt»</strong> varsler om lange skift og kort hvile — den stopper ingenting.</li>
+      <li><strong>Overnatting</strong>: plasser folk i rommene. Brannlisten skrives ut derfra.</li>
+    </ol>
+  </section>
+
+  <section id="korpsforer" class="{% if din_rolle == 'korpsforer' %}vl-veil-din{% endif %}">
+    <h2 class="h5">Korps-fører — fører ditt eget korps</h2>
+    <ol>
+      <li><strong>«Mitt korps»</strong> åpner seg først. Her står plassene som er delt ut til korpset
+        ditt, og de som er åpne for alle, på tvers av enhetene.</li>
+      <li><strong>«Mannskap»</strong>: legg til folk i ditt korps, med telefon, kompetanser og e-post.
+        Kontoen kobles til personen av lederen.</li>
+      <li><strong>Fyll en plass</strong>: velg person og rolle i raden, og skriv en merknad
+        («kommer 17:30»). Tidene og antallet plasser setter vaktlederen.</li>
+      <li><strong>Forfall</strong>: tøm raden — ikke slett skiftet. Da står behovet, og noen andre kan ta det.</li>
+      <li><strong>Navnet på enheten</strong> kan du rette når du bemanner den («Rediger»).</li>
+      <li><strong>Overnatting</strong>: plasser folkene dine i rommene.</li>
+    </ol>
+    <p class="vl-veil-merk">Du ser alle korps, men fører bare ditt eget.</p>
+  </section>
+
+  <section id="leser" class="{% if din_rolle == 'leser' %}vl-veil-din{% endif %}">
+    <h2 class="h5">Leser</h2>
+    <p>Du ser ditt eget korps — eller alle korps, hvis du har fått det. Plasser som ikke er delt ut,
+      vises ikke. «Skriv ut vaktlisten» under «Innstillinger» skriver ut fanen du står i.</p>
+  </section>
+
+  <section id="drift">
+    <h2 class="h5">Under vakten</h2>
+    <ul>
+      <li><strong>Vakten går i drift av seg selv</strong> når den starter, hvis vaktlisten ble laget
+        før start. «Sett i drift» under «Innstillinger» er for å gjøre det før, eller for hånd.</li>
+      <li><strong>«Møtt»</strong> og <strong>«Av vakt»</strong> trykkes på raden (vaktleder).
+        «Tilstede nå» teller hvem som er her — bruk den ved brann.</li>
+      <li><strong>Uten nett</strong>: siste kopi av listen vises, og Møtt og Av vakt kan trykkes.
+        De sendes når serveren svarer igjen. En kopi eldre enn ett døgn vises ikke.</li>
+      <li><strong>Filen på e-post</strong> er reserven hvis portalen er nede: «Last ned som fil» og
+        «Send på e-post» under «Innstillinger».</li>
+    </ul>
+  </section>
+
+  <section id="admin" class="{% if din_rolle == 'admin' %}vl-veil-din{% endif %}">
+    <h2 class="h5">Administrator</h2>
+    <ul>
+      <li><strong>«Arkiver vaktlisten»</strong> når vakten er over; arkiverte lister kan hentes tilbake.
+        Sletting er bare for administrator.</li>
+      <li><strong>Koble en konto for hånd</strong> i mannskapsregisteret. Ellers kobles kontoen av seg
+        selv når lederen har skrevet samme e-post som kontoen har.</li>
+      <li><strong>Portalinnstillinger</strong>: hvem som får filen på e-post, om den sendes ved drift
+        og hvor ofte, og om pausene står på utskriften.</li>
+    </ul>
+  </section>
+
+</div>
+{% endblock %}

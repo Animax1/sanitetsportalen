@@ -1644,3 +1644,18 @@ button.vl-pause:hover { border-style: solid; }
   .vl-brannliste-tabell tr { break-inside: avoid; }
   .vl-hake { width: 2rem; text-align: center !important; }
 }
+
+/* ── Veiledningen (pulje 5, 1. okt. 2026) ─────────────────────────────── */
+.vl-veiledning { max-width: 60rem; }
+.vl-veiledning section { margin-top: 1.75rem; }
+.vl-veiledning ol li, .vl-veiledning ul li { margin-bottom: .4rem; }
+.vl-veil-du, .vl-veil-din {
+  border-left: 4px solid var(--vl-varsel);
+  padding: .5rem .9rem;
+  background: var(--surface-2);
+  border-radius: 0 6px 6px 0;
+}
+.vl-veil-innhold { margin: 1rem 0; }
+.vl-veil-ord dt { margin-top: .5rem; }
+.vl-veil-ord dd { margin-left: 0; color: var(--text-soft); }
+.vl-veil-merk { color: var(--text-soft); margin-top: .5rem; }

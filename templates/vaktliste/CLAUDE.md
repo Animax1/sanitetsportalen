@@ -19,6 +19,14 @@ Kode og adresser er utenfor: `/api/ressurser/` er en rute, ikke tekst.
 `tests_js_adresser.py` slår hver `/vaktliste/`-adresse i JS opp med `resolve()`; byttet
 gjorde først seks kall til `/api/enheter/`, og ingen annen test ble rød.
 
+## Veiledningen (pulje 5, 1. okt. 2026)
+
+`/vaktliste/veiledning/` (`veiledning.html`, lenket fra vaktlinjen): ordene, hvem som gjør
+hva, og én del per rolle i den rekkefølgen arbeidet gjøres. Brukerens egen del pekes ut
+(`_veiledningsrolle`). **En side og ikke en fil i `docs/`:** korpsene har ikke tilgang til
+kodebasen. **Skjermnavn står i «»**, og `tests_veiledning.py` krever at hvert av dem finnes i
+malen eller JS-en — døpes en knapp om, blir veiledningen rød. `tests_ordboka` leser den også.
+
 ## «Del ut» på skjermen (pulje 4, 30. sep. 2026)
 
 Tre flater, ett endepunkt (regelen står i `vaktliste/CLAUDE.md`):

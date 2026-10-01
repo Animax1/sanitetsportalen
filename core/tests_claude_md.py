@@ -129,7 +129,12 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # over. Å finne dem ved å stryke begrunnelser i andre seksjoner er nettopp
     # vekslingen over advarer mot — den ekte rettingen er punktet i `TODO.md`
     # om å krympe fila seksjon for seksjon mot CHANGELOG.
-    'vaktliste/CLAUDE.md': 44_750,
+    #
+    # **Krympet 1. okt. 2026 (pulje 5), fra 44 733 til 37 624 tegn.** «Plassen og
+    # skiftet» og «Belastning» ble skrevet om til reglene og én setning hver som gjør
+    # dem huskbare; hendelsesforløpet sto alt i CHANGELOG og ble kontrollert der
+    # først. Taket følger ned med samme slakk.
+    'vaktliste/CLAUDE.md': 38_500,
     # 22 615 tegn 21. sep. 2026, og `ko/CLAUDE.md` 22 249. **Begge var på
     # taket, og det er taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
     # og `oppdrag/CLAUDE.md` 11, så kvelden med sju punkter fra André kostet

@@ -58,6 +58,14 @@ flere av feilene under finnes bare der.
 - [ ] **Sida kommer tilbake til lista du sto på** etter en sidelasting. Slett den lista som
       admin, last på nytt → øverste liste, ingen feil.
 
+**Veiledningen (pulje 5, 1. okt. 2026):**
+
+- [ ] **«Veiledning»** i vaktlinjen åpner `/vaktliste/veiledning/`. Hver testkonto får sin
+      egen del pekt ut øverst (`test-vl-les` leser, `test-vl-fore` korps-fører, `test-vl-full`
+      vaktleder, `test-vl-leder` leder, admin administrator), og delen er markert.
+- [ ] Les den på **telefon**: tabellen «Hvem gjør hva» ruller sidelengs, teksten gjør det ikke.
+- [ ] Les delen for din rolle mot skjermen: står knappene der den sier, i den rekkefølgen?
+
 ## 2. Vaktlister
 
 - [ ] **«Ny vaktliste»** (`test-vl-leder`): tidsfeltene er **fylt ut** når vinduet åpnes —

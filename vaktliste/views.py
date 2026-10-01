@@ -289,6 +289,25 @@ def index_view(request):
                   _tilgangskontekst(request.user))
 
 
+def _veiledningsrolle(user):
+    """Hvilken del av veiledningen som er brukerens. Visning, ikke tilgang."""
+    from core.auth_decorators import nivaa_for
+    if er_global_admin(user):
+        return 'admin'
+    return {'skriv_leder': 'leder', 'skriv_full': 'vaktleder',
+            'skriv_handling': 'korpsforer'}.get(nivaa_for(user, 'vaktliste'), 'leser')
+
+
+@modul_kreves('vaktliste', 'les')
+@require_http_methods(['GET'])
+def veiledning_view(request):
+    """Brukerveiledningen (pulje 5, 1. okt. 2026). Én side for alle roller, med
+    brukerens egen del pekt ut — en korps-fører skal kunne se hva vaktlederen
+    gjør, men begynne med sitt eget."""
+    return render(request, 'vaktliste/veiledning.html',
+                  {'din_rolle': _veiledningsrolle(request.user)})
+
+
 # ── Vaktlister ───────────────────────────────────────────────────────────────
 
 @never_cache

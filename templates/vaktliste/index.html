@@ -101,6 +101,10 @@
             data-action="apneVakt">
       <i class="bi bi-sliders me-1"></i>Innstillinger
     </button>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'vaktliste_veiledning' %}"
+       title="Veiledning: hvem gjør hva, og i hvilken rekkefølge">
+      <i class="bi bi-question-circle me-1"></i>Veiledning
+    </a>
     {% comment %}
       Å planlegge en vakt lager en core.Vakt — skriv_leder fra 30. aug. 2026.
       JS skjuler knappen, se vaktliste.js::gateKnapper().

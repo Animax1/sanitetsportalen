@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — Vaktlista, pulje 5: «Veiledning» på `/vaktliste/` — ordene, hvem gjør hva, og én del per rolle — og `vaktliste/CLAUDE.md` krympet fra 44 733 til 37 624 tegn  `#vaktliste` `#veiledning` `#dokumentasjon`
+
+**Hvorfor:** Gjennomgangen 30. sep. fant at det som sviktet var **inngangen** for hver
+rolle: tilgangstabellen i `docs/TESTSJEKKLISTE_VAKTLISTE.md` §16 var den beste
+forklaringen som fantes, og den leser ingen korps-fører. André: «Kjør pulje 5».
+
+**En side i portalen, ikke en fil i `docs/`** — det var TODO-ens forslag, og det holdt
+ikke: korpsene har ikke tilgang til kodebasen, og to kopier av samme veiledning ville glidd
+fra hverandre. `/vaktliste/veiledning/` (`les`), lenket med **«Veiledning»** i vaktlinjen
+ved «Innstillinger». Innhold:
+
+| Del | Hva |
+|---|---|
+| Ordene | Vakten, ressurstype, enhet, skift, ikke delt ut / delt ut, Koble til delt konto, i drift, probono, ditt korps |
+| Hvem gjør hva | Leser · korps-fører · vaktleder · leder, i rader som følger koden (verifisert mot hver tilgangsport) |
+| Leder | Ny vaktliste → Planlegger → Lag grunnlaget → Del ut → Rediger enhet → pauser → rom → grenser |
+| Vaktleder | Del ut, tømming gir åpen for alle, Nytt skift, Mannskap, Ikke plassert, overnatting |
+| Korps-fører | Mitt korps først, mannskap, fylle en plass, forfall = tøm raden, navnet på enheten |
+| Leser, Under vakten, Administrator | Utskrift; drift av seg selv, Møtt/Av vakt, uten nett, filen; arkivering, kobling for hånd, portalinnstillinger |
+
+**Brukerens egen del pekes ut** øverst og markeres (`_veiledningsrolle`: admin, leder,
+vaktleder, korps-fører, leser) — alle delene står, fordi en korps-fører skal kunne se hva
+vaktlederen gjør, men begynne med sitt eget.
+
+**Veiledningen kan ikke gli fra skjermen uten at noe blir rødt.** Hvert skjermnavn står i
+«», og `vaktliste/tests_veiledning.py` krever at hvert sitat finnes i `index.html` eller
+JS-en; det som er eksempler («tre firemannslag 14–22», «kommer 17:30») står i
+`IKKE_SKJERMNAVN` med grunnen. `tests_ordboka.py` leser malen også. Testen fant én feil
+før den ble skrevet ferdig: utkastet sa at tre firemannslag er tre rader — det er **én rad
+med antall 3**.
+
+**`vaktliste/CLAUDE.md` krympet 7 109 tegn**, uten at en regel forsvant: «Plassen og
+skiftet» (8 234 → ~3 500) og «Belastning, budsjett og timeoversikt» (5 020 → ~2 700) er
+skrevet om til regelen og den ene setningen som gjør den huskbar. Hendelsesforløpet for
+hver av dem ble kontrollert i CHANGELOG først. Taket i `FOR_STORE_I_DAG` fulgte ned til
+38 500; det resterende krympepunktet står i TODO med «Planleggeren» som den største.
+
+**Mutasjonstestet, 4 mutanter, alle drept:** dekoratøren, rollekartet (leder og vaktleder
+byttet, admin-grenen fjernet) og lenken fra vaktlisten.
+
+Ruten teller: 211 endepunkter, 38 under `/vaktliste/` (`docs/TEKNISK_DOKUMENTASJON.md`,
+`scripts/sikkerhetsruter.json`).
+
 ## 2026-09-30 — Kartkobling prøvd på staging — «Det fungerte!» — og `ko/CLAUDE.md` er under taket igjen  `#kartkobling` `#staging` `#dokumentasjon`
 
 **Hvorfor:** André stemplet fra en bil i staging-portalen og så markøren i
