@@ -492,3 +492,140 @@ class PrefiksRutingTests(TestCase):
         self.assertFalse(offsite.PREFIKS.startswith(offsite.PREFIKS_FULL))
         self.assertEqual(set(offsite.FORVENTET_DAGER), set(offsite.ALLE_PREFIKS),
                          'en frist uten prefiks, eller et prefiks uten frist')
+
+
+#: Verdien som sto i prod 1. okt. 2026 — bucketens egen adresse som endepunkt.
+BUCKETADRESSE = 'https://sanitetsportalen.s3.nl-ams.scw.cloud/'
+
+
+@override_settings(**{**KONFIG, 'OFFSITE_S3_BUCKET': 'sanitetsportalen'})
+class OppsettfeilTests(SimpleTestCase):
+    """**Endepunktet sto som bucketens egen adresse i prod** (1. okt. 2026).
+
+    Opplastingen virket — filene havnet under `sanitetsportalen/backups/…` —
+    mens `hent_offsite --list` svarte `NoSuchKey` og oppbevaringsreglene traff
+    ingenting. Konfigsjekken sa «konfigurert». Disse prøvene krever at oppsettet
+    avvises *før* noe går ut på nettet, og at det sier hva som er riktig.
+    """
+
+    def test_tjenesteadressen_er_riktig(self):
+        for endepunkt in ('https://s3.nl-ams.scw.cloud', 'https://s3.nl-ams.scw.cloud/',
+                          'https://s3.fr-par.scw.cloud', ''):
+            with override_settings(OFFSITE_S3_ENDPOINT=endepunkt):
+                self.assertEqual(offsite.oppsettfeil(), '', endepunkt)
+
+    def test_bucketens_egen_adresse_avvises_og_riktig_verdi_foreslaas(self):
+        for endepunkt in (BUCKETADRESSE, 'https://SanitetsPortalen.s3.nl-ams.scw.cloud'):
+            with override_settings(OFFSITE_S3_ENDPOINT=endepunkt):
+                feil = offsite.oppsettfeil()
+                self.assertIn('https://s3.nl-ams.scw.cloud', feil, endepunkt)
+                self.assertIn('egen adresse', feil)
+
+    def test_bucketnavnet_alene_som_vert_avvises(self):
+        with override_settings(OFFSITE_S3_ENDPOINT='https://sanitetsportalen'):
+            self.assertIn('egen adresse', offsite.oppsettfeil())
+
+    def test_en_annen_bucket_med_likt_prefiks_er_ikke_feil(self):
+        """`sanitetsportalen-staging.s3…` er en annen vert, ikke denne bucketen."""
+        with override_settings(OFFSITE_S3_BUCKET='sanitet'):
+            with override_settings(OFFSITE_S3_ENDPOINT='https://sanitetx.s3.nl-ams.scw.cloud'):
+                self.assertEqual(offsite.oppsettfeil(), '')
+
+    def test_endepunkt_uten_https_sier_det_og_ikke_noe_annet(self):
+        """Uten skjema leser `urlsplit` hele adressen som en sti — meldingen skal
+        si hva som mangler, ikke «har en sti»."""
+        for endepunkt in ('s3.nl-ams.scw.cloud', 'sanitetsportalen.s3.nl-ams.scw.cloud'):
+            with override_settings(OFFSITE_S3_ENDPOINT=endepunkt):
+                feil = offsite.oppsettfeil()
+                self.assertIn('https://', feil, endepunkt)
+                self.assertNotIn('sti', feil, endepunkt)
+
+    def test_sti_i_endepunktet_avvises(self):
+        with override_settings(OFFSITE_S3_ENDPOINT='https://s3.nl-ams.scw.cloud/sanitetsportalen'):
+            self.assertIn('sti', offsite.oppsettfeil())
+
+    def test_adresse_eller_skraastrek_i_bucketnavnet_avvises(self):
+        for bucket in ('sanitetsportalen/backups', 'https://sanitetsportalen.s3.nl-ams.scw.cloud'):
+            with override_settings(OFFSITE_S3_BUCKET=bucket):
+                self.assertIn('bare navnet', offsite.oppsettfeil(), bucket)
+
+    def test_uten_bucket_er_det_mangler_som_svarer(self):
+        with override_settings(OFFSITE_S3_BUCKET='', OFFSITE_S3_ENDPOINT=BUCKETADRESSE):
+            self.assertEqual(offsite.oppsettfeil(), '')
+
+    def test_klienten_lages_ikke(self):
+        """Sperra sitter i `_klient()`, så hver vei ut — opplasting, listing,
+        henting, livssyklus — stoppes på samme sted."""
+        with override_settings(OFFSITE_S3_ENDPOINT=BUCKETADRESSE):
+            with patch('boto3.client') as boto:
+                with self.assertRaisesMessage(ValueError, 'egen adresse'):
+                    offsite._klient()
+                boto.assert_not_called()
+        with override_settings(OFFSITE_S3_ENDPOINT='https://s3.nl-ams.scw.cloud'):
+            with patch('boto3.client') as boto:
+                offsite._klient()
+                boto.assert_called_once()
+
+
+@override_settings(**{**KONFIG, 'OFFSITE_S3_BUCKET': 'sanitetsportalen',
+                      'OFFSITE_S3_ENDPOINT': BUCKETADRESSE})
+class OppsettfeilGjennomInngangeneTests(TestCase):
+    """Gjennom de ekte inngangene, uten å bytte ut `_klient` — det er den som sperrer."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self._env = patch.dict(os.environ, {'BACKUP_DIR': self._tmp.name})
+        self._env.start()
+        # En klient som svarer tomt — slipper sperra gjennom, skal ingenting
+        # henge eller sendes; at boto aldri kalles er det testene krever.
+        self._boto = patch('boto3.client')
+        self.boto = self._boto.start()
+        self.boto.return_value.list_objects_v2.return_value = {'IsTruncated': False}
+
+    def tearDown(self):
+        self._boto.stop()
+        self._env.stop()
+        self._tmp.cleanup()
+
+    def test_opplastingen_feiler_hoylytt_og_sender_ingenting(self):
+        create_backup('patients', KIND_MANUAL)
+        kopi = OffsiteKopi.objects.get()
+        self.assertIn('egen adresse', kopi.feil)
+        self.assertIsNone(kopi.sendt_at)
+        self.boto.assert_not_called()
+
+    def test_listingen_gir_en_lesbar_linje(self):
+        with self.assertRaises(CommandError) as cm:
+            call_command('hent_offsite', '--list', stdout=StringIO())
+        self.assertIn('Listing feilet', str(cm.exception))
+        self.assertIn('https://s3.nl-ams.scw.cloud', str(cm.exception))
+
+    def test_konfigsjekken_er_roed_og_sier_hvorfor(self):
+        from core.admin_status import _get_konfig_sjekk
+        rad = {r['nokkel']: r for r in _get_konfig_sjekk()['rader']}['Offsite backup']
+        self.assertFalse(rad['ok'])
+        self.assertIn('egen adresse', rad['verdi'])
+        with override_settings(OFFSITE_S3_ENDPOINT='https://s3.nl-ams.scw.cloud'):
+            rad = {r['nokkel']: r for r in _get_konfig_sjekk()['rader']}['Offsite backup']
+            self.assertTrue(rad['ok'])
+
+    def test_backupsiden_viser_feilen(self):
+        from accounts.models import CustomUser
+        from django.test import Client
+        adm = CustomUser.objects.create_user(username='adm_oppsett', password='x', role='admin',
+                                             must_change_password=False)
+        c = Client(); c.force_login(adm)
+        with override_settings(SECURE_SSL_REDIRECT=False):
+            html = c.get('/portal-admin/backup/').content.decode()
+        self.assertIn('id="offsite-oppsettfeil"', html)
+        self.assertIn('egen adresse', html)
+
+
+@override_settings(**KONFIG)
+class ListingFeilerLesbartTests(SimpleTestCase):
+    def test_en_feil_fra_scaleway_blir_en_linje(self):
+        with patch('core.offsite.list_objekter', side_effect=RuntimeError('NoSuchKey: borte')):
+            with self.assertRaises(CommandError) as cm:
+                call_command('hent_offsite', '--list', stdout=StringIO())
+        self.assertIn('Listing feilet: RuntimeError: NoSuchKey: borte', str(cm.exception))

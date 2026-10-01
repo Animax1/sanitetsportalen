@@ -375,8 +375,7 @@ def _get_konfig_sjekk():
         {'nokkel': 'E-post', 'verdi': epost['transport'], 'ok': epost['transport'] == 'ahasend'},
         {'nokkel': 'ADMINS (feilvarsel)', 'verdi': f'{len(settings.ADMINS)} mottaker(e)',
          'ok': bool(settings.ADMINS)},
-        {'nokkel': 'Offsite backup', 'verdi': 'konfigurert' if _offsite_konfigurert() else 'ikke konfigurert',
-         'ok': _offsite_konfigurert()},
+        _offsiterad(),
         _migrasjonsrad(),
     ]
     return {'rader': rader, 'alle_ok': all(r['ok'] for r in rader),
@@ -426,12 +425,23 @@ def _migrasjonsrad():
     return {'nokkel': 'Migrasjoner', 'verdi': f'{len(ukjorte)} ikke kjørt: {vist}', 'ok': False}
 
 
-def _offsite_konfigurert():
+def _offsiterad():
+    """Konfigurert *og* riktig satt opp — `core.offsite.oppsettfeil()`.
+
+    «Konfigurert» alene sto grønt i prod 1. okt. 2026 mens endepunktet var
+    bucketens egen adresse og filene havnet under feil navn.
+    """
     try:
         from core import offsite
-        return offsite.er_konfigurert()
-    except Exception:
-        return False
+        if not offsite.er_konfigurert():
+            return {'nokkel': 'Offsite backup', 'verdi': 'ikke konfigurert', 'ok': False}
+        feil = offsite.oppsettfeil()
+        if feil:
+            return {'nokkel': 'Offsite backup', 'verdi': feil, 'ok': False}
+        return {'nokkel': 'Offsite backup', 'verdi': 'konfigurert', 'ok': True}
+    except Exception as exc:   # noqa: BLE001 — kortet skal tegnes uansett
+        return {'nokkel': 'Offsite backup', 'verdi': _scrub_secrets(f'kunne ikke sjekkes: {exc}'),
+                'ok': False}
 
 
 def _epost_transport():

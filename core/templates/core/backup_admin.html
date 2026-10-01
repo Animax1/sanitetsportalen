@@ -283,6 +283,9 @@ Målt mot siste kopi som ville overlevd at Railway forsvant.
           {{ offsite.siste_feil.created_at|date:"d.m.Y H:i" }}: {{ offsite.siste_feil.feil }}
         </div>
       {% endif %}
+      {% if offsite.oppsettfeil %}
+        <div class="small text-danger mt-1" id="offsite-oppsettfeil">{{ offsite.oppsettfeil }}</div>
+      {% endif %}
       {% if offsite.nokkel_advarsel %}
         <div class="small text-warning mt-1" id="offsite-nokkel-advarsel">{{ offsite.nokkel_advarsel }}</div>
       {% endif %}

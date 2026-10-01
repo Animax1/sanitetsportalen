@@ -29,7 +29,10 @@ class Command(BaseCommand):
             raise CommandError(
                 'Offsite-backup er ikke konfigurert. Mangler: ' + ', '.join(offsite.mangler()))
         if opts['list']:
-            objekter = offsite.list_objekter()
+            try:
+                objekter = offsite.list_objekter()
+            except Exception as exc:   # noqa: BLE001 — én lesbar linje, ikke en traceback
+                raise CommandError(f'Listing feilet: {exc.__class__.__name__}: {exc}') from exc
             if not objekter:
                 self.stdout.write('Bucketen er tom.')
                 return

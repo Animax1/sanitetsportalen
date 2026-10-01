@@ -84,11 +84,22 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       forventer dem. Ha `docs/RUNBOOK_VAKT.md` framme; §10a har nå **to**
       arkivknapper å krysse av ved vaktslutt.
 
-- [ ] **Scaleway-kortet på `/portal-admin/backup/` skal stå grønt i prod.**
-      `_prefiks()` leste ikke `Filter.And.Prefix`, og meldte «filene blir liggende for
-      alltid» om en livssyklusregel som sto helt riktig (rettet 15.–16. sep. 2026).
-      Er kortet fortsatt rødt, bærer meldinga nå **koden Scaleway faktisk svarte** — og
-      den avgjør om det er rettigheter eller vår kode.
+- [ ] **Scaleway-kortet på `/portal-admin/backup/` skal stå grønt i prod.** Trolig rødt til
+      1. okt. 2026 av samme grunn som listingen: `OFFSITE_S3_ENDPOINT` var bucketens egen
+      adresse, og spørringen etter livssyklusreglene ble da lest som et objektoppslag
+      (`NoSuchKey`). Endepunktet er rettet. Står kortet fortsatt rødt, bærer meldinga
+      **koden Scaleway faktisk svarte** — og den avgjør om det er rettigheter eller vår kode.
+
+- [ ] **Rydd de feilplasserte offsite-filene i Scaleway-konsollen.** Så lenge endepunktet var
+      bucketens egen adresse, havnet opplastingene under `sanitetsportalen/backups/…` og
+      `sanitetsportalen/full/…` i stedet for `backups/…` og `full/…` — og
+      oppbevaringsreglene filtrerer på de to siste, så **disse filene slettes aldri**. Den
+      hele basen med passordhasher og TOTP-hemmeligheter skulle vært borte etter 90 dager.
+      1. Kjør en backup (eller vent på klokka), og se at den nye fila står under `backups/`
+         med `hent_offsite --list`.
+      2. Slett mappa `sanitetsportalen/` i Scaleway-konsollen. Portalens nøkkel har ikke
+         sletterett, med vilje — det må gjøres der.
+      3. Sjekk staging også, hvis den har offsite-variabler.
 
 - [ ] **Verifiser pulje 2 i prod** (bygg `a7239c5`, deployet 16. sep. 2026). Sju punkter,
       i CHANGELOG under «Pulje 2, andre halvdel» — kort versjon: sett flaggene på
@@ -109,9 +120,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       `sanitet.net`** (Google Workspace, Microsoft 365, domeneleverandøren …): det er den som
       skal stå i A.2, og den trenger en avtale.
 
-- [ ] **Prøv gjenopprettingen fra Scaleway én gang** (variablene står i prod):
-      `railway ssh --service web -- python manage.py hent_offsite --list`, hent én fil,
-      og se at den dukker opp under `/portal-admin/backup/`. En backup som aldri er
+- [ ] **Hent én fil tilbake fra Scaleway.** Listingen virker i prod fra 1. okt. 2026, etter at
+      endepunktet ble rettet. Igjen: `railway ssh --service web -- python manage.py
+      hent_offsite <objektnavn fra --list>`, og se at fila dukker opp under
+      `/portal-admin/backup/`. En backup som aldri er
       hentet tilbake er en antakelse, ikke en backup.
 
 - [ ] **Vurder å slå av lagring av e-postinnhold hos AHASend.** Avtalen sier det kan

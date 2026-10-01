@@ -107,6 +107,47 @@ def er_konfigurert() -> bool:
     return bool(k['bucket'] and k['access_key'] and k['secret_key'] and k['nokkel'])
 
 
+def oppsettfeil() -> str:
+    """Hva som er galt med endepunktet og bucketnavnet, eller tom streng.
+
+    **Funnet i prod 1. okt. 2026:** `OFFSITE_S3_ENDPOINT` sto som bucketens egen
+    adresse, `https://sanitetsportalen.s3.nl-ams.scw.cloud/` — det Scaleway viser
+    på bucketsiden. boto3 setter selv bucketnavnet på, så Scaleway leste det ene
+    som bucket og det andre som objekt. Opplastingen *virket* — filene havnet
+    under `sanitetsportalen/backups/…` — mens `hent_offsite --list` svarte
+    `NoSuchKey` og oppbevaringsreglene på `backups/` og `full/` traff ingenting.
+
+    Det er den verste formen for feil: det ser ut som det virker, og det som
+    ikke virker er det man først trenger den dagen Railway er borte. Derfor
+    nekter `_klient()` å lage en klient så lenge dette ikke er tomt, og feilen
+    havner i `OffsiteKopi.feil`, på `/portal-admin/backup/` og i konfigsjekken.
+    """
+    from urllib.parse import urlsplit
+    k = konfig()
+    bucket, endepunkt = k['bucket'].strip(), (k['endpoint'] or '').strip()
+    if not bucket:
+        return ''
+    if '/' in bucket or ':' in bucket:
+        return (f'OFFSITE_S3_BUCKET er «{bucket}» — bare navnet skal stå der, uten '
+                f'adresse og uten skråstrek.')
+    if not endepunkt:
+        return ''
+    deler = urlsplit(endepunkt)
+    if deler.scheme not in ('http', 'https'):
+        return (f'OFFSITE_S3_ENDPOINT er «{endepunkt}» — den må begynne med https://, '
+                f'for eksempel https://s3.nl-ams.scw.cloud.')
+    vert = deler.hostname or ''   # `hostname` er alltid små bokstaver
+    if vert == bucket.lower() or vert.startswith(bucket.lower() + '.'):
+        rett = vert[len(bucket) + 1:] or 's3.<region>.scw.cloud'
+        return (f'OFFSITE_S3_ENDPOINT er bucketens egen adresse ({endepunkt}). Sett den til '
+                f'https://{rett} — bucketnavnet legges på av klienten, og står det i '
+                f'adressen også, havner filene under feil navn.')
+    if deler.path.strip('/'):
+        return (f'OFFSITE_S3_ENDPOINT har en sti ({deler.path}). Bare adressen til '
+                f'tjenesten skal stå der, for eksempel https://s3.nl-ams.scw.cloud.')
+    return ''
+
+
 def mangler() -> list[str]:
     """Hvilke variabler som mangler — for oversikten og for kommandoen."""
     k = konfig()
@@ -168,6 +209,9 @@ def dekrypter(blob: bytes, hemmelighet: str, *, objekt: str) -> bytes:
 # ── S3 ───────────────────────────────────────────────────────────────────────
 
 def _klient():
+    feil = oppsettfeil()
+    if feil:
+        raise ValueError(feil)
     import boto3
     from botocore.config import Config
     k = konfig()
@@ -484,6 +528,7 @@ def status() -> dict:
         'bucket': konfig()['bucket'],
         'antall': OffsiteKopi.objects.filter(feil='').count(),
         'nokkel_advarsel': nokkel_advarsel(),
+        'oppsettfeil': oppsettfeil(),
         'siste_ok': siste_ok,
         'siste_feil': siste if siste is not None and siste.feil else None,
         'livssyklus': livssyklus(),

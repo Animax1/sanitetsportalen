@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — Offsite: endepunktet var bucketens egen adresse — `NoSuchKey` på `hent_offsite --list`, filene under `sanitetsportalen/backups/`, og konfigsjekken sa «konfigurert»  `#core/backup` `#core/drift`
+
+**Hvorfor:** André kjørte `hent_offsite --list` i prod for å prøve gjenopprettingen fra
+Scaleway — og fikk en traceback som endte i `botocore.errorfactory.NoSuchKey: An error
+occurred (NoSuchKey) when calling the ListObjectsV2 operation`. En listing spør etter en
+bucket, ikke et objekt, så det svaret skal ikke kunne komme. `OFFSITE_S3_ENDPOINT` sto som
+`https://sanitetsportalen.s3.nl-ams.scw.cloud/` — adressen Scaleway viser på bucketsiden.
+boto3 setter selv bucketnavnet på, så Scaleway leste det ene som bucket og det andre som
+objekt. André rettet variabelen til `https://s3.nl-ams.scw.cloud`, og listingen «svarte
+korrekt».
+
+**Det verste var at det så ut som det virket.** Opplastingen lyktes — filene havnet under
+`sanitetsportalen/backups/…` og `sanitetsportalen/full/…` — og «Offsite backup» i
+konfigsjekken sto grønn, fordi den bare spurte om variablene *fantes*. Det som ikke virket,
+var det man først trenger: å hente filene tilbake, og at oppbevaringsreglene (som filtrerer
+på `backups/` og `full/`) traff dem. Den hele basen med passordhasher skulle vært borte
+etter 90 dager. Prøven i TODO — «en backup som aldri er hentet tilbake er en antakelse» — er
+den som fant det.
+
+**Hva:**
+- `core.offsite.oppsettfeil()` avviser et endepunkt der verten er bucketnavnet eller begynner
+  med `<bucket>.`, et endepunkt uten `https://` eller med sti, og et bucketnavn med `/` eller `:`. Meldingen sier
+  hva som er riktig (`https://s3.nl-ams.scw.cloud`). `sanitetx.s3…` mot bucketen `sanitet` er
+  *ikke* en feil — punktumet er med i sammenligningen.
+- **Sperra sitter i `_klient()`**, så hver vei ut — opplasting, listing, henting, livssyklus —
+  stoppes på samme sted, før noe går på nettet. Opplastingen kaster fortsatt ikke: feilen
+  står i `OffsiteKopi.feil`, som før.
+- `/portal-admin/backup/` viser feilen i rødt (`#offsite-oppsettfeil`), og konfigsjekken på
+  server-status er rød med meldingen — `_offsiterad()` erstatter `_offsite_konfigurert()`.
+- `hent_offsite --list` gir én linje (`Listing feilet: NoSuchKey: …`), ikke en traceback.
+  Hentingen av én fil gjorde det alt.
+
+**TODO:** nytt punkt under «Krever Andre» om å slette mappa `sanitetsportalen/` i
+Scaleway-konsollen når en ny fil står under `backups/` — portalens nøkkel har ikke
+sletterett, med vilje. «Prøv gjenopprettingen» krympet til å hente én fil; listingen virker.
+Scaleway-kortet var trolig rødt av samme grunn.
+
+**Testene går gjennom de ekte inngangene uten å bytte ut `_klient`** — det er den som
+sperrer, og en test som mocket den ville ikke sett at kallstedet forsvant.
+
+**Mutasjonstestet, 12 mutanter, 11 drept, én no-op fjernet fra koden:** sperra i `_klient`
+fjernet, skjemasjekken fjernet, `startswith` fjernet, punktumet i `<bucket>.` fjernet, stisjekken og
+skråstreksjekken fjernet, `oppsettfeil` ute av `status()`, konfigsjekken grønn tross feil og
+uten å spørre, malen uten feltet, og listingen uten `try`. Den som overlevde var `.lower()`
+på verten — `urlsplit().hostname` gir alltid små bokstaver, så mutanten endret ingenting
+(løgn nr. 2 i `CLAUDE.md`), og kallet er tatt ut. Den andre mutanten hang først i en evig
+løkke: en `MagicMock` svarer sant på `IsTruncated`. Klienten i testen svarer nå tomt.
+
 ## 2026-10-01 — Feilvarslene skal til `admin@sanitet.net`, ikke privat Gmail — «Google» var aldri en databehandler i portalen  `#core/dokumentasjon` `#core/drift`
 
 **Hvorfor:** André spurte «på hvilken måte bruker vi google?». Svaret, kontrollert i koden:
