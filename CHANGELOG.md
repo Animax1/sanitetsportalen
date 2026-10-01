@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — TODO ryddet: elleve punkter som var gjort eller besvart er slettet — Scaleway-nøklene, AHASend i EU, server-status grønn  `#core/dokumentasjon`
+
+**Hvorfor:** En gjennomgang av hele `TODO.md` for å rangere det som gjenstår viste at flere
+punkter beskrev arbeid som var gjort — kontrollert mot koden samme økt, ikke husket. Og
+André svarte på tre av punktene øverst: «scaleway nøklene er på plass, vært det en god
+stund. Ahasend vi bruker eu sine, serverstatus ser bra ut.»
+
+**Besvart av André, slettet fra «Krever Andre»:**
+- **Scaleway IAM-applikasjon** — nøklene og variablene står i prod. «Prøv gjenopprettingen
+  fra Scaleway én gang» står igjen: at nøklene virker for skriving sier ikke at en fil kan
+  hentes tilbake.
+- **AHASend-kontoen står på EØS-infrastruktur**, ikke Hetzner US. SCC-sporet utløses
+  altså ikke, og A.2 trenger ingen tredjelandsoverføring. «Slå av lagring av e-postinnhold»
+  står igjen — det er et annet spørsmål.
+- **`/portal-admin/server-status/` i prod ser bra ut** (konfigsjekk, offsite, cron).
+
+**Gjort i koden, slettet:**
+
+| Punkt | Hva koden viser |
+|---|---|
+| Statistikkmodulen komponerer ikke tilgang (§5) | `statistikk/views.py` `lesbare_kilder()` — bare kilder brukeren kan lese i kildemodulen |
+| Tilgangstabellen i `BESLUTNING_STATISTIKK.md` | Står alt på modulnivåer (`statistikk: les` **og** `patients: les`) |
+| Forutsetning før migrasjonen (`kan_redigere_pasienter`) | Flaggene er borte (deploy 3); spørsmålet kan ikke stilles lenger |
+| Vakt som scope, ikke år (hele seksjonen) | `core.Vakt` og `core/vakt.py`; `get_active_year` står bare igjen i en migrasjon og én hjelper |
+| Park som egen modell, og lenken uten innlogging | Levert som `/lag/` 27.–28. sep. |
+| Vaktlistemodulen med tre beslutninger | Bygget. Matallergi lagres ikke (`vaktliste/models.py`), `notat` logges uten verdi (`vaktliste/signals.py`) |
+| Flytt arkiveringen til `/portal-admin/` | «Avslutt vakt» er `core/vaktslutt.py` med register; arkivene grupperes på `AbstractArkiv.vakt` |
+
+**Skrevet om:**
+- «Rate-limit arkivstatistikken» krympet til det som faktisk gjenstår: statistikkens
+  arkivendepunkt har bøtta (`statistikk:arkiv-full-stats`), men `arkiv_detalj_view` i
+  `patients` og `oppdrag` begrenser bare DELETE, ikke GET.
+- Rollemodellens «stigen står som opprinnelig besluttet: ingen → les → skriv:handling →
+  skriv:full» var to trinn bak; peker nå på `CLAUDE.md`.
+- Avsnittet under «Framtidige moduler» om at `kan_redigere_*` «fjernes nå» og at
+  statistikk gates på `Module.min_rolle` er slettet — begge deler er historie.
+
+**Ikke rørt, med vilje:** alt som henger på behandlingsansvar og signering (A.4, A.1,
+DPIA-kjeden, personvern for `/lag/`) — André: «signeringer med behandlingsansvar så venter
+vi med det».
+
 ## 2026-10-01 — Vaktlista, pulje 5: «Veiledning» på `/vaktliste/` — ordene, hvem gjør hva, og én del per rolle — og `vaktliste/CLAUDE.md` krympet fra 44 733 til 37 624 tegn  `#vaktliste` `#veiledning` `#dokumentasjon`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at det som sviktet var **inngangen** for hver

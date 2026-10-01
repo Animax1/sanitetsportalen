@@ -99,21 +99,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       `Oppdragsenhet` og `ArkivertOppdrag`, og tabellen `Vaktmodusperiode`. Ingen
       eksisterende rad endres, og ingenting av det vises før flaggene er krysset av.
 
-- [ ] **André: Scaleway IAM-applikasjon.** Policy med
-      ObjectStorageObjectsWrite/Read og BucketsRead — **ikke delete**, fristene skal
-      håndheves av bucketens livssyklusregel og ikke av oss. API-nøkkel,
-      `OFFSITE_BACKUP_KEY` i en passordbehandler *utenfor* Railway, og de seks
-      variablene på prod-tjenesten.
-
-- [ ] **Prøv gjenopprettingen fra Scaleway én gang** når variablene står:
+- [ ] **Prøv gjenopprettingen fra Scaleway én gang** (variablene står i prod):
       `railway ssh --service web -- python manage.py hent_offsite --list`, hent én fil,
       og se at den dukker opp under `/portal-admin/backup/`. En backup som aldri er
       hentet tilbake er en antakelse, ikke en backup.
-
-- [ ] **André: bekreft at AHASend-kontoen ikke står på US-infrastruktur.** Standard er
-      EØS, men Hetzner US er tilgjengelig «upon request». Er den valgt, utløses
-      SCC-sporet og A.2 i personverndokumentasjonen må beskrive en tredjelands­overføring.
-      Ett blikk i AHASend-konsollen.
 
 - [ ] **Vurder å slå av lagring av e-postinnhold hos AHASend.** Avtalen sier det kan
       deaktiveres. Feilvarslene inneholder brukernavn, rolle, klient-IP, URL og
@@ -127,11 +116,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [ ] **Etter deploy til prod: gå gjennom tilgangsmatrisen.** Alle som hadde `les` ser nå
       bare sitt eget korps — den som skal samordne må få `les_alle`. Og kontoer med
       `les`/`skriv_handling` uten mannskapsrad ser ingenting før de er koblet.
-
-- [ ] **Etter deploy: åpne `/portal-admin/server-status/` i prod** og se at
-      konfigsjekk-kortet sier «alt OK» og at offsite står grønt. Cron-radene står «Aldri»
-      til hver jobb har kjørt én gang etter deployen — sjekk igjen dagen etter at de tre
-      viser ✓.
 
 - [ ] **Backup: test de fem handlerne på staging**, så «Backup tatt — push til main», og
       prodtest 8.2/8.3 etter deployen.
@@ -971,43 +955,10 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
       `sjekk_brukernavn` nevner muligheten når ingenting annet blokkerer innlogging.
 
-### Vakt som scope, ikke år — se `docs/BESLUTNING_VAKT_SOM_SCOPE.md`
-
-- [ ] **Premiss fastslått av André 29. aug. 2026: portalen tenker i *vakter*, ikke i år.**
-      Den skal brukes på forskjellige arrangementer, ikke på det samme én gang i året.
-      Ingenting er bygget på dette ennå — punktet står her for at premisset ikke skal
-      gå tapt, og fordi et docs-punkt som ikke står i TODO ikke blir gjort.
-
-      **Dagens scope er `year`, og det stikker dypt.** Kartlagt 29. aug.:
-      `Patient.year`, `Oppdrag.year`, `VaktArkiv.year_snapshot`, 73 kallesteder på
-      `get_active_year`/`active_year` i 8 filer, tellerne `next_patient_nr` og
-      `next_oppdrag_nr_<år>`, og statistikkens gruppering.
-
-      **Konsekvensen er allerede synlig i kode som nettopp ble skrevet.**
-      `oppdragsnummer` restarter per *år*. Kjøres tre vakter i 2026, teller numrene
-      1–40 tvers gjennom alle tre — «oppdrag 14» blir da tvetydig neste gang, som er
-      nettopp det nummeret skulle løse. Under vakt-scoping skal det restarte per vakt.
-
-      **Vaktnavnet finnes allerede halvveis:** `AppSetting['event_name']`, og
-      `VaktArkiv` fryser `arrangement_navn` på seg selv. `patients/services.py` noterer
-      dessuten at en `event_name_<år>`-mekanisme fantes og ble slettet 13. aug. som
-      ubrukt — den ble skrevet for et behov som nå har meldt seg på ordentlig.
-
-      **Spørsmål som må avgjøres før kode:**
-      - Blir `Vakt` en modell, eller er det `event_name` som får bære det?
-      - Hva skjer med data som allerede er scopet på år? Prod har 273 importerte
-        pasienter på 2026, og staging har oppdrag.
-      - Kan to vakter være åpne samtidig, eller er det én aktiv om gangen som i dag?
-      - Har en vakt start og slutt, eller lukkes den ved arkivering?
-      - Hvordan spiller det mot fase 7, som allerede fryser `arrangement_navn`?
-      - Skal statistikken sammenligne vakter i stedet for år?
-
-      - **Fase 6 og 7 er ikke lenger blokkert** — scopet er levert; de grupperer
-        og arkiverer på `Vakt`.
-
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
-**Stigen står som opprinnelig besluttet:** `ingen → les → skriv:handling → skriv:full`.
+**Stigen** er `les` < `les_alle` < `skriv_handling` < `skriv_full` < `skriv_leder` — se
+«Tilgangskontroll» i `CLAUDE.md`, som er fasiten.
 
 - [ ] **VURDER: `leder`-nivå («admin light»).** Utsatt 28. aug. 2026 — bruken finnes,
       behovet gjør ikke. En vaktleder som skal kunne arkivere en vakt, se arkivet og
@@ -1021,21 +972,6 @@ Et femte trinn `leder` ble lagt til 28. aug. og reversert samme dag — begrunne
 et nytt nivå senere ville koste en migrasjon, og det stemmer ikke (`choices` er en
 `non_db_attr`, migrasjonen er `-- (no-op)`). Se §3.1 i notatet. Innføres når noe faktisk
 skal ligge der.
-
-**Leveranse 1 er levert (28. aug. 2026):**
-
-- [ ] **Forutsetning før migrasjonen skrives — kontrolleres i prod:** hvor mange kontoer
-      har `role` ≥ `read_write` men `kan_redigere_pasienter=False`? Det er kontoene som i
-      dag har en tilgang de ikke var ment å ha. Tallet avgjør hvor stor oppryddingen blir
-      etter deploy 1.
-
-- [ ] **Statistikkmodulen komponerer ikke tilgang (§5).** Den gates på statistikktilgang
-      alene, så den viser pasienttall til alle som har den — også en bruker uten
-      `patients: les`. Kravet «viser kun kilder brukeren har minst `les` på i
-      kildemodulen» er ikke innført. Uten det er statistikk en bakvei rundt
-      modultilgangen, og det er den eneste grunnen til at punktet ikke er en detalj.
-- [ ] **Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til
-      modulnivåer.** Den beskriver fortsatt `role`-verdier som ikke finnes.
 
 ### Oppdragsmodulen: `skriv_handling` for bilkontoer
 
@@ -1056,52 +992,6 @@ skal ligge der.
 
 Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 
-- [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
-      liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
-- [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
-      `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
-      og responsen returnerer kvittering — aldri data.
-      **Endret 27. sep. 2026** (`docs/FORSLAG_PARK.md` B5, André: «best practice går
-      fremst»): tilfeldig token med hash i basen, ikke `django.core.signing` — en signatur
-      alene kan ikke trekkes tilbake, og dør når `SECRET_KEY` roteres.
-
-- [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
-      29. aug. 2026, **besluttet samme dag** i to avklaringsrunder — alle ti
-      avklaringene er besvart, kun små restpunkter avgjøres underveis (§11).
-      Personelloversikt sortert på korps med kompetanse og rolle; ressurser
-      (samleplass, biler, lag, KO) som reserveres til korps og bemannes av korpsene
-      selv, med skifttider; drift som reversibel innsjekk-port med møtt/av vakt;
-      «Tilstede nå» med utskrift (brukes av brannsikkerhetshensyn ved overnatting);
-      planleggingstall (timer, hviletid, bemanningskurve, varsler); besetningspanel i
-      `/oppdrag`. Sju faser, 37–49 t.
-      - [ ] **Matallergi lagres ikke i portalen.** Besluttet fordi det er en
-            helseopplysning (art. 9) og ville krevd fem mekanismer for én kolonne.
-            Samles inn utenfor. Konsekvensen er ærlig: lista kan ikke brukes til
-            matbestilling.
-      - [ ] **`notat` på `Mannskap` er fritekst**, og fritekst er der
-            helseopplysninger havner når det ikke finnes et felt for dem. Unntas
-            verdilogging i audit, som `Oppdrag.fritekst`.
-      - [ ] **Registeret blir portalens tredje personregister**, uten kobling til de
-            to i pasientmodulen (§9). De svarer på «hvem behandlet pasienten», ikke
-            «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
-            additiv migrasjon den dagen behovet melder seg.
-
-- [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den** — og vaktas livssyklus med den
-      («Avslutt vakt», «Tidligere vakter», «Gjenåpne», i dag `patients/views_patients.py`). De
-      kan ikke bare flyttes til `core`: «Avslutt vakt» sletter pasientene, og `core` får ikke
-      importere `patients`. Det trengs et register der modulene melder hva som skjer når en
-      vakt avsluttes — samme idiom som `core/opprydding.py`. Vurdert og utsatt under G1
-      26. sep. 2026: det er et design, på den mest destruktive knappen i portalen. Utsatt 28. aug. 2026 —
-      se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
-      for frysing, verifisering og kollaps, men **opprettelsen** (`arkiver_aktiv_vakt()` i
-      `patients/services.py` — handler-kontrakten har ingen `opprett_arkiv`) og **knappen**
-      ligger fortsatt i pasientmodulen. En vakt er ikke en pasientting.
-      - [ ] Krever en `Vaktarkivering`-rad i `core` som grupperer modulenes arkiver. Én
-            knapp som lager to urelaterte arkivrader er verre enn to knapper — da tror man
-            de hører sammen.
-      - [ ] Signaturene overlever: handleren bestemmer selv hva som går inn i
-            `sha_payload()`, så en nullbar FK den ikke nevner endrer ingenting.
-            `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver får `NULL`.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
@@ -1118,12 +1008,6 @@ tre vil treffe på nytt: **stilarket** (`style.css` lastes kun av pasientmodulen
 variablene dens finnes ikke i `base_portal.html`) og **JS-primitivene**
 (`patients-utils.js` kaster på en side uten pasientskjemaene). Begge er løst — `portal-utils.js`
 og et stilark per modul — men de var usynlige til noen faktisk skrev modul nummer to.
-
-De fem `kan_redigere_*`-flaggene på `CustomUser` ble pre-registrert i én migrasjon nettopp
-for å slippe én migrasjon per ny modul. **De fjernes nå** — se «Rollemodellen» over;
-beslutningen ble tatt 24. aug. 2026, og `ModulTilgang` erstatter dem. `statistikk` bruker
-derfor ingen av dem: den gates midlertidig på `Module.min_rolle` inntil `ModulTilgang`
-finnes.
 
 - [ ] Integrasjon med produksjonsdatabase
 - [ ] Lage Locus-klone, hente sted via enhetens GPS
@@ -1253,13 +1137,11 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       én backupmappe og rører det globale handlerregisteret. Feilen kommer ut som
       «cannot pickle 'traceback' object», som ikke ligner det den er. Så lenge den står,
       må `core` kjøres serielt for seg — se kommandoblokka i `CLAUDE.md`.
-- [ ] **Rate-limit arkivstatistikken.** Tre endepunkter kjører nå samme tunge beregning
-      som live-statistikken uten å ha fått en bøtte i S3:
-      `/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/` (flyttet dit i fase 6),
-      `/pasienter/api/innstillinger/arkiv/<pk>/` og — fra fase 7 —
-      `/oppdrag/api/arkiv/<pk>/`. Alle er admin-only, uten auto-refresh, og leser rader
-      som ikke endres, så eksponeringen er lav. Én linje per view når noen er i filene
-      uansett.
+- [ ] **Rate-limit GET på pasient- og oppdragsarkivet.** `arkiv_detalj_view` i
+      `patients/views_arkiv.py` og `oppdrag/views_arkiv.py` regner full statistikk ved
+      GET, men bøtta der gjelder bare DELETE. Statistikkens arkivendepunkt fikk sin
+      (`statistikk:arkiv-full-stats`). Begge er admin-only og leser rader som ikke endres,
+      så eksponeringen er lav — én linje per view.
 - [ ] Flytte sesjonsdelen til en admin-side
 - [ ] Testene er massive, kan vi komprimere dem? (kjøretiden er løst: 500 s → 15 s via
       PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)
