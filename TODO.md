@@ -73,23 +73,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       forventer dem. Ha `docs/RUNBOOK_VAKT.md` framme; §10a har nå **to**
       arkivknapper å krysse av ved vaktslutt.
 
-- [ ] **Scaleway-kortet på `/portal-admin/backup/` skal stå grønt i prod.** Trolig rødt til
-      1. okt. 2026 av samme grunn som listingen: `OFFSITE_S3_ENDPOINT` var bucketens egen
-      adresse, og spørringen etter livssyklusreglene ble da lest som et objektoppslag
-      (`NoSuchKey`). Endepunktet er rettet. Står kortet fortsatt rødt, bærer meldinga
-      **koden Scaleway faktisk svarte** — og den avgjør om det er rettigheter eller vår kode.
-
-- [ ] **Rydd de feilplasserte offsite-filene i Scaleway-konsollen.** Så lenge endepunktet var
-      bucketens egen adresse, havnet opplastingene under `sanitetsportalen/backups/…` og
-      `sanitetsportalen/full/…` i stedet for `backups/…` og `full/…` — og
-      oppbevaringsreglene filtrerer på de to siste, så **disse filene slettes aldri**. Den
-      hele basen med passordhasher og TOTP-hemmeligheter skulle vært borte etter 90 dager.
-      1. Kjør en backup (eller vent på klokka), og se at den nye fila står under `backups/`
-         med `hent_offsite --list`.
-      2. Slett mappa `sanitetsportalen/` i Scaleway-konsollen. Portalens nøkkel har ikke
-         sletterett, med vilje — det må gjøres der.
-      3. Sjekk staging også, hvis den har offsite-variabler.
-
 - [ ] **Feilvarslene til `admin@sanitet.net`, ikke til privat Gmail** (André, 1. okt. 2026).
       Railway, sanitetsportalen, **production** (og staging): `ADMINS` =
       `Sanitetsportalen:admin@sanitet.net`. Sjekk etterpå med
@@ -144,21 +127,11 @@ Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`), 3 (backup og offsite) 
 gjennomfører angrepet, og mutasjoner på nivået i `CLAUDE.md`. Puljene gjøres ferdig før
 `staging` går til `main` (André: «vi har tid til å gjøre oss ferdig med disse puljene først»).
 
-- [ ] **Kjør `verifiser_backup` i prod igjen etter neste push til `main`** (runbook §8b).
-      Første kjøring 1. okt. 2026 feilet på pasientfila: `Helsepersonell.user` pekte på
-      «andre», og i en tom base avviste `loaddata` hele fila. Rettet på `staging` samme dag
-      (`nullstill_manglende_brukere()`) — men prod har ikke rettingen før `staging` går til
-      `main`, og det venter på Andrés klarsignal. Se også at `/portal-admin/backup/` ikke
-      viser advarselen om at `OFFSITE_BACKUP_KEY` er for kort.
-
-- [ ] **Hvorfor er de nyeste backupfilene i prod fra 14. sep. 2026, og ingen for KO, Lag og
-      backlog?** `verifiser_backup` fant `backup-portal-manual-20260914-…` og
-      `backup-patients-manual-20260914-…` som de nyeste, og «Ingen fil for: ko, park,
-      backlog». Med modus «ved endring» skriver klokka ingenting når ingenting er endret, så
-      pasientfila kan være riktig — men en modul som *aldri* har hatt en fil, burde fått sin
-      første ved første tikk. Se på `/portal-admin/backup/`: modus, «sist sjekket» og «sist
-      fil» per modul, og om standardplanen står på «av». Står «sist sjekket» gammel, er
-      klokka død; står modus «av», er det et valg som må tas bevisst.
+- [ ] **Bekreft at standardplanen for modulene står på «Ved endring»** på `/portal-admin/backup/`.
+      Modulfilene i prod sto stille fra 16. sep. 2026, og KO, Lag og backlog hadde aldri hatt en
+      fil — klokka lager den første fila for en modul uansett, så planen sto trolig på «Av».
+      1. okt. fikk alle ni en fil (manuelt og av klokka). Står den fortsatt på «Av», blir det
+      ingen nye filer før noen trykker.
 
 ### Avslutt vakt, arkiv og tidligere vakter i statistikken — steg 1–3 levert 28. sep. 2026
 

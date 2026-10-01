@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-01 — Backupen prøvd i prod: `verifiser_backup` grønn på alle ni moduler (21 modeller), offsite på riktig sted, de feilplasserte filene slettet  `#core/backup`
+
+**Hvorfor:** Prøvene fra i dag, gjort av André i prod på bygg `5be8258`, etter de tre
+rettingene (endepunktet, brukerpekerne, korpset).
+
+**Hva prøvene viste:**
+- `verifiser_backup` lastet **portal, ko, patients, arkiv, oppdrag, oppdrag_arkiv, vaktliste,
+  park og backlog** inn i en engangsbase: «21 modell(er) kom tilbake med nøyaktig samme antall
+  rader». Pasientfila som i morges feilet på `Helsepersonell.user`, lastes. `oppdrag_arkiv`
+  er tom, og det er riktig — ingen oppdragsvakt er arkivert ennå.
+- `hent_offsite --list` viste 15 filer under `backups/` og `full/`, alle fra etter at
+  endepunktet ble rettet. **De 38 opplastingene fra før lå under `sanitetsportalen/…`** og var
+  usynlige for `hent_offsite` og for oppbevaringsreglene — også de hele basene med
+  passordhasher, som skulle vært borte etter 90 dager. André slettet mappa i
+  Scaleway-konsollen. Kortet leser reglene `backups/` 730 dager og `full/` 90 dager riktig.
+- **Modulfilene hadde stått stille siden 16. sep.**, og KO, Lag og backlog hadde aldri hatt en
+  fil. Klokka lager den første fila for en modul uansett modus, så standardplanen sto trolig på
+  «Av». «Ta backup av alle nå» ga alle ni en fil, og klokka skrev automatiske filer samme
+  minutt. Om planen faktisk sto på «Av», står som et spørsmål i TODO.
+- «Verste tilfelle hvis Railway forsvinner nå» gikk fra 24 497 min (17 dager) til 0. Merk at
+  tallet før var for *optimistisk*: det stolte på opplastinger som lå på feil sted.
+
+**TODO:** «Scaleway-kortet skal stå grønt», «Rydd de feilplasserte offsite-filene» og «Kjør
+`verifiser_backup` igjen» er slettet. Spørsmålet om backupfilene fra 14. sep. er krympet til å
+bekrefte standardplanen. «Hent én fil tilbake fra Scaleway» står igjen — listingen er ikke en
+henting.
+
 ## 2026-10-01 — Vaktlisten: korps på kontoen — «bruker med tilgang til /vaktliste kan og bli satt på korps» — kortet «Vaktlisten: korps» på brukersiden  `#vaktliste/tilgang` `#core/tilgang` `#core/backup`
 
 **Hvorfor:** André: «Kan vi gjøre det slik at bruker med tilgang til /vaktliste kan og bli
