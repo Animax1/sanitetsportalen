@@ -83,12 +83,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       `sanitet.net`** (Google Workspace, Microsoft 365, domeneleverandøren …): det er den som
       skal stå i A.2, og den trenger en avtale.
 
-- [ ] **Hent én fil tilbake fra Scaleway.** Listingen virker i prod fra 1. okt. 2026, etter at
-      endepunktet ble rettet. Igjen: `railway ssh --service web -- python manage.py
-      hent_offsite <objektnavn fra --list>`, og se at fila dukker opp under
-      `/portal-admin/backup/`. En backup som aldri er
-      hentet tilbake er en antakelse, ikke en backup.
-
 - [ ] **Vurder å slå av lagring av e-postinnhold hos AHASend.** Avtalen sier det kan
       deaktiveres. Feilvarslene inneholder brukernavn, rolle, klient-IP, URL og
       traceback — jo mindre som ligger lagret hos databehandleren, jo bedre.

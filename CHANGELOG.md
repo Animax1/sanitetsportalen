@@ -4,6 +4,15 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-02 — Backup hentet tilbake fra Scaleway i prod  `#core/backup`
+
+**Hvorfor:** André har verifisert at en backup lar seg hente tilbake fra Scaleway
+(`hent_offsite`), meldt 2. okt. 2026. Det var den siste prøven av offsite-kjeden: lagring og
+listing var prøvd 1. okt., henting ikke. «En backup som aldri er hentet tilbake er en
+antakelse, ikke en backup.»
+
+**TODO:** «Hent én fil tilbake fra Scaleway» er slettet.
+
 ## 2026-10-01 — Backupen prøvd i prod: `verifiser_backup` grønn på alle ni moduler (21 modeller), offsite på riktig sted, de feilplasserte filene slettet  `#core/backup`
 
 **Hvorfor:** Prøvene fra i dag, gjort av André i prod på bygg `5be8258`, etter de tre
