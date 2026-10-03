@@ -301,6 +301,25 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 .ko-prio-gruppe .btn.aktiv-gronn { background: #16a34a; border-color: #16a34a; color: #fff; }
 .ko-prio-gruppe .btn.aktiv-drift { background: #2563eb; border-color: #2563eb; color: #fff; }
 .ko-prio-gruppe .btn.aktiv-plassering { background: #7e22ce; border-color: #7e22ce; color: #fff; }
+
+/* **Hendelsen skal få plass i sin egen rute, også på telefon** (André, 3. okt.
+   2026: «deler av ui utenfor boks i /ko — på mobil»). Seks prioritetsknapper
+   i en `btn-group` er ~450 px som ikke brekker, og ruta ved siden av sidebaren
+   er ~240 px på en telefon — ruta rullet vannrett, og tittelen og knappene sto
+   kuttet i begge kanter. Grensen er rutas bredde, ikke skjermens: den samme
+   trangheten oppstår når sidebaren dras bred på en PC. */
+.ko-h-visning > .ko-detalj { container-type: inline-size; }
+.ko-prio-gruppe { flex-wrap: wrap; }
+@container (max-width: 34rem) {
+  /* Brutt over to linjer ser en sammenføyd gruppe ut som et rutenett med hull;
+     løse knapper med mellomrom leses som det de er. */
+  .ko-prio-gruppe { gap: 4px; }
+  .ko-prio-gruppe > .btn { margin-left: 0 !important; border-radius: var(--bs-border-radius-sm) !important; }
+}
+/* Et nedtrekk er så bredt som det lengste valget — «Knytt» lister oppdrag med
+   hele problemstillingen. */
+.ko-detalj .input-group { max-width: 100%; }
+.h-hode-tittel { overflow-wrap: anywhere; }
 /* «Lukk hendelse» skal være godt synlig (André, 18. sep. 2026). */
 .ko-lukk-knapp { font-weight: 700; }
 

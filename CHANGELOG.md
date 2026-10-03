@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-03 — KO på mobil: hendelsen, verktøylinja og oppdragshodet holder seg innenfor boksen  `#ko`
+
+**Hvorfor:** André, 3. okt. 2026, skjermbilde fra telefon: «Her går deler av ui utenfor boks
+i /ko — på mobil». Hendelsen åpnet ved siden av sidebaren sto kuttet i begge kanter
+(«Tur med le doge» uten T, «Plasseri», «kk hendelse»), med en vannrett rullefelt i ruta.
+
+**Hva som var bredere enn plassen** (målt i Chromium på 390 px, før → etter):
+- **Prioritetsknappene** (Viktig · Rød · Gul · Grønn · Drift · Plassering) er en `btn-group`,
+  som ikke brekker: ~450 px i en rute på 241 px. Detaljruta: 365 → 241 px innhold.
+- **Verktøylinja øverst** (Ansvar · Pålogget · Oppsett) manglet `flex-wrap`, og var 400 px
+  på en 390 px skjerm — **hele siden** rullet sidelengs (432 → 390 px).
+- **Knappene i Oppdragsliste-hodet** (filtrene, Nytt oppdrag, Historikk) manglet `flex-wrap`
+  på sin egen `span` — hodet var 337 px i 324.
+
+**Rettingen:** `flex-wrap` på de to i `templates/ko/index.html`. I `ko.css` får
+detaljruta `container-type: inline-size`, prioritetsgruppa brekker, og **under 34rem rutebredde**
+blir knappene løse med mellomrom i stedet for et sammenføyd rutenett med hull. Grensen er
+rutas bredde, ikke skjermens, så det samme gjelder når sidebaren dras bred på PC. Nedtrekkene
+«Knytt» og «Legg til lag» kappes til rutebredden (et nedtrekk er så bredt som det lengste
+valget), og en lang hendelsestittel får brekke.
+
+**Prøvd:** skjermbilder på 390 px og 1600 px — på PC er raden uendret og sammenføyd.
+Hendelseslista (tabellen) ruller fortsatt vannrett *inne i vinduet* på telefon, med vilje:
+den ruller på beholderen, ikke på siden. Ingen mutanter — CSS og mal, der øyet er raskere.
+
 ## 2026-10-02 — Backup hentet tilbake fra Scaleway i prod  `#core/backup`
 
 **Hvorfor:** André har verifisert at en backup lar seg hente tilbake fra Scaleway
