@@ -3179,14 +3179,20 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
         """Den skarpe kanten: en vakt planlegges måneder i forveien, så
         `new Date()` ville satt feil år i hvert eneste skift."""
         run_node(self.harness, self.OPPSETT + """
+            // Vakta starter om ~400 dager, regnet fra kjøringen og ikke skrevet
+            // av: annen dag *og* annet år. Datoen sto fast som 2026-10-03, og
+            // testen ble rød akkurat den dagen (CI på 176fdbb, 3. okt. 2026) —
+            // «med mindre man er uheldig» var en dato i kalenderen.
+            const om = new Date(Date.now() + 400 * 864e5);
+            const p = (n) => String(n).padStart(2, '0');
+            const dag = om.getFullYear() + '-' + p(om.getMonth() + 1) + '-' + p(om.getDate());
+            aktivListe.vaktliste.startet = dag + 'T08:00:00';
             apneVaktpost(10);
-            // Vakta starter 3. oktober. Kjoerer testen en annen dag — og det
-            // gjoer den alltid, med mindre man er uheldig — vil et felt som
-            // foelger klokka ha en annen dato enn denne.
-            const idag = new Date().toISOString().slice(0, 10);
-            assert(idag !== '2026-10-03', 'testen kan ikke skille i dag');
-            assert(felter['ny-vaktpost-fra'].value.startsWith('2026-10-03'),
-                   'fra fulgte ikke vakta: ' + felter['ny-vaktpost-fra'].value);
+            const idag = new Date();
+            const idagTekst = idag.getFullYear() + '-' + p(idag.getMonth() + 1) + '-' + p(idag.getDate());
+            assert(idagTekst !== dag, 'testen kan ikke skille i dag');
+            assert(felter['ny-vaktpost-fra'].value.startsWith(dag),
+                   'fra fulgte ikke vakta: ' + felter['ny-vaktpost-fra'].value + ' (vakta: ' + dag + ')');
         """)
 
     def test_vinduet_baerer_ikke_forrige_ressurs_tider(self):

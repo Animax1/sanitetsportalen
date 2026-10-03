@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-03 — Tidsbombe i vaktlistetesten: «testen kan ikke skille i dag»  `#vaktliste` `#ci`
+
+**Hvorfor:** CI ble rød på `176fdbb` (KO-rettingen under, som bare rører CSS og mal):
+`NyVaktpostFyllerDatoenTests.test_datoen_er_vaktas_og_ikke_dagens` — `ASSERT: testen kan ikke
+skille i dag`. Vakta sto fast som **2026-10-03**, og testen sjekket at kjøringen ikke var den
+dagen; kommentaren sa «med mindre man er uheldig». I dag var den dagen, så `staging` ville
+vært rød uansett commit.
+
+**Rettingen:** vaktas dato regnes ut fra kjøringen, ~400 dager fram — annen dag *og* annet
+år, som er feilen testen skal fange (`new Date()` ville satt feil år). Ingen produksjonskode
+endret.
+
 ## 2026-10-03 — KO på mobil: hendelsen, verktøylinja og oppdragshodet holder seg innenfor boksen  `#ko`
 
 **Hvorfor:** André, 3. okt. 2026, skjermbilde fra telefon: «Her går deler av ui utenfor boks
