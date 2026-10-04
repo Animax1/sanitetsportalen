@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-04 — Lastplanen for en 48-timers vakt: web-laget holder, databasen måles  `#drift` `#dokumentasjon`
+
+**Hvorfor:** André, 4. okt. 2026: «Jeg kjenner litt usikkerhet igjen på om vi har nailet
+planen for skalering av server for håndtering av alt belastning på nettsiden. På den
+helgevakten som varer 48 timer.» Lasten han beskrev: noen på `/vaktliste/` og `/ko/` nesten
+hele tiden, 1–10 biler på `/oppdrag/`, 10–15 på `/pasienter/`, 8–10 på `/ko/`, og `/lag/`
+som varierer voldsomt. Ingen kode — gjennomgangen av runbooken, Procfile, settings og
+pollingløkkene, og det den fant, er skrevet inn der det hører hjemme.
+
+**Svaret:** web-laget har stor margin. Med runbookens målte kostnad per fane (§3d) blir det
+rundt **ti små forespørsler i sekundet i ro** mot vakt-modus 2 × 4 — kapasiteten ligger
+mellom 100 og 300. Trinnene i §2 er reaktive, og det er riktig; ingenting skal skaleres opp
+på forhånd.
+
+**Det som ikke var sett: pollet hvert 2,5 s skriver sesjonsraden.** Sesjonene ligger i
+databasen (ingen `SESSION_ENGINE` er satt) og `SESSION_SAVE_EVERY_REQUEST=True` lagrer
+sesjonen ved **hver** forespørsel — også `/api/endringer/`, som runbooken §3c kaller «et
+lite tall». Hvert poll er sesjonsoppslag, brukeroppslag, `session_timeout_hours`, én
+`ModulTilgang`-spørring per område i gaten, og én `UPDATE django_session`. Med ~20 KO- og
+sentralbordfaner er det ~8 sesjonsskrivinger i sekundet, over en million radversjoner på én
+liten tabell gjennom 48 timer. Postgres tåler det, og runbooken §2 sier selv at flere
+workers ikke hjelper når basen er treg — men dette er der den blir det først, og det var
+ikke med i regnestykket.
+
+- **`TODO.md`, «Skalering mot 2027»:** énlinjeren «Vurder `cached_db`-sesjoner» er skrevet
+  om til en vurdering som bærer tallene, og som sier at `cached_db` alene ikke fjerner
+  skrivingen — `SESSION_SAVE_EVERY_REQUEST` skriver til basen uansett backend. Veien som
+  gjør det er å ikke røre sesjonen på pollforespørsler; `BrukerAktivitetMiddleware` har alt
+  60 s oppløsning av den grunnen, og `DynamicSessionTimeoutMiddleware` kaller `set_expiry`
+  ved hver forespørsel og må med. Målingen i generalprøven tas **før** noe velges.
+- **`docs/GENERALPROVE.md`:** oppsettet krever staging i vakt-modus («Samlet fra 2
+  workers») og `pg_stat_reset()` før start. §8 «Under belastning» er bygget ut til den ene
+  lastmålingen før vakta: det reelle antallet faner (10 KO, 15 pasienter, 10 biler) i én
+  time, hva som leses av — P95, databasekortet, døde rader på `django_session` og
+  `last_autovacuum`, `pg_stat_activity` etter tilstand, CPU mot P95 — hvilke tall som er
+  friske, og at tallene føres inn i runbooken der det står «Mål på staging». Nytt punkt om
+  sesjonslengden: vakta er 48 timer og sesjonen 8; avgjøres før vakta, særlig for bilenes
+  delte kontoer.
+
+**Resten av samtalen** — ingen failover på én Postgres-instans, Redis må være «Active» før
+vakta, hvem som ser på server-status klokka tre om natta, og staging som øvingsmiljø med
+øvelsesmerke, stengt-side med adminunntak i stedet for redirect, og kontoer opprettet i prod
+med samme innlogging før øvingen — er innspill André har fått muntlig og ikke bestilt. De
+føres inn i `TODO.md` den dagen han bestemmer noe.
+
+---
+
 ## 2026-10-04 — Runbooken tar med kart.sanitet.net, serverless og Better Stack  `#drift` `#kart`
 
 **Hvorfor:** André, 4. okt. 2026: «Disse to appene skal brukes i tandem til en sanitetsvakt.

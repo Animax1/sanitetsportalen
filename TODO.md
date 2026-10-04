@@ -189,7 +189,9 @@ virkeligheten, og rekkefølgen under følger av det.*
 - [ ] **Generalprøve på staging, 3–4 uker før vakta** —
       [`docs/GENERALPROVE.md`](./docs/GENERALPROVE.md). Ekte folk og telefoner, hovedvekt
       på flere biler per oppdrag. Testsjekklistene for KO og vaktlista kjøres i forkant.
-      Funn går i `/backlog/`.
+      Funn går i `/backlog/`. **Og lastmålingen i §8** (4. okt. 2026): det reelle antallet
+      faner i en time, og tallene inn i `docs/RUNBOOK_VAKT.md` der det står «Mål på
+      staging» — se «Skalering mot 2027» under Ideer.
 - [ ] **Etter vakta:** arkivering, deretter G6b, og G6c i en *senere* `main`-push (se under).
 - [ ] **G2 (store filer) før frysingen, men ikke `oppdrag/services.py` før G6b** — ellers
       skrives samme fil om to ganger med vakta imellom. `accounts/views.py`
@@ -956,8 +958,29 @@ skal ligge der.
 
 Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 
-- [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
-      én UPDATE per request. Krever Redis, altså vakt-modus.
+- [ ] **Vurder: sesjonsskrivingen ved hvert poll — databasen er den første flaskehalsen,
+      ikke gunicorn** (André, 4. okt. 2026: «usikkerhet igjen på om vi har nailet planen
+      for skalering»; gjennomgang av lasten på en 48-timers vakt). Sesjonene ligger i
+      databasen (ingen `SESSION_ENGINE` er satt), og `SESSION_SAVE_EVERY_REQUEST=True`
+      gjør at **hvert** `/api/endringer/`-kall hvert 2,5 s skriver en rad til
+      `django_session` — i tillegg til sesjonsoppslag, brukeroppslag,
+      `session_timeout_hours` og én `ModulTilgang`-spørring per område i gaten. Pollet
+      runbooken §3c kaller «et lite tall» er fire til seks spørringer, én av dem en
+      skriving. Med ~20 KO- og sentralbordfaner er det ~8 sesjonsskrivinger i sekundet i
+      48 timer, over en million radversjoner på én liten tabell. Postgres tåler det, men
+      runbooken §2 sier selv at flere workers ikke hjelper når basen er treg — og dette er
+      der den blir det først. Web-laget har stor margin (~10 forespørsler/s i ro mot 2 × 4).
+      - **Mål før du velger** — generalprøven §8 (`docs/GENERALPROVE.md`): døde rader på
+        `django_session`, tilkoblinger og svartid med det reelle antallet faner åpne i en
+        time. Er tallene friske der, er dette en forbedring og ikke en forutsetning.
+      - **To veier, og `cached_db` alene er ikke nok:** `cached_db` fjerner lesingene (på
+        Redis, altså vakt-modus), men `SESSION_SAVE_EVERY_REQUEST` skriver fortsatt til
+        basen ved hver lagring. Den som fjerner skrivingen er å **ikke røre sesjonen på
+        pollforespørsler** — la utløpet fornyes av sidelastinger og handlinger, ikke av
+        tallet. `BrukerAktivitetMiddleware` har alt 60 s oppløsning av akkurat den grunnen;
+        `DynamicSessionTimeoutMiddleware` kaller `set_expiry` ved hver forespørsel og
+        markerer dermed sesjonen endret, så den må med i vurderingen.
+      - Ikke før vakta om målingen er grønn: fastfrysingen gjelder.
 
 ### Framtidige moduler
 

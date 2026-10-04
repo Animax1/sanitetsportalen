@@ -49,6 +49,11 @@ annet.
 - **Ta manuelle backuper** på `/portal-admin/backup/` før dere begynner (modulene dere
   bruker, eller den hele), så staging kan settes tilbake etterpå.
 - `/portal-admin/server-status/` er grønn: konfig, offsite og databasen.
+- **Staging står i vakt-modus** (`docs/RUNBOOK_VAKT.md` §1: 2 workers × 4 tråder, Redis).
+  Kortet «Responstid» skal si «Samlet fra 2 workers». Ellers måler §8 et annet oppsett enn
+  det som kjører på vakta, og tallene kan ikke føres inn i runbooken.
+- **Nullstill databasetellerne** rett før dere begynner: `SELECT pg_stat_reset();` i
+  `psql` mot staging (runbooken §8a, steg 2). Uten det kan ikke §8 si hva øvelsen kostet.
 
 ---
 
@@ -137,9 +142,39 @@ til sentralbordet og bilene:
 
 ## 8. Under belastning (hele tiden)
 
+**Dette er den eneste lastmålingen før vakta** (4. okt. 2026). Runbooken sier «Mål på
+staging» tre steder (§3c og §3d), og tallene den regner med for KO er anslag. Web-laget har
+stor margin — rundt ti små forespørsler i sekundet i ro, mot 2 × 4 workers — så det som skal
+måles er **databasen**: hvert poll hvert 2,5 s skriver sesjonsraden
+(`SESSION_SAVE_EVERY_REQUEST`, DB-sesjoner), og med 20 faner er det rundt åtte skrivinger i
+sekundet i 48 timer. Se «Skalering mot 2027» i `TODO.md`.
+
+- [ ] **Det reelle antallet faner, ikke de åtte rollene.** Åpne i tillegg det vakta vil ha:
+      **10 faner på `/ko/`** (fem operatører × to skjermer), **15 på `/pasienter/`** og
+      **10 bilskjermer** på `/oppdrag/`. Gjenbruk PC-er og telefoner, flere faner i hver
+      nettleser teller — pollene går uansett. La dem stå **én time** mens resten av prøven
+      pågår, synlige (en skjult fane poller ikke).
 - [ ] Admin holder `/portal-admin/server-status/` oppe: beredskapstrinnet, P95, feil (5xx),
       databasen og sesjonene, med hvem som faktisk er aktiv.
+- [ ] **Les av og noter, midt i timen og på slutten:**
+      - P95 og forespørsler/s («Responstid siste 5 min»), og trinnet. Forventet: grønt,
+        under 300 ms.
+      - **Databasekortet:** svartid, tilkoblinger, «henger», «venter på lås». Forventet:
+        alt grønt, tilkoblinger rundt 12 (runbooken §3c: workers × (tråder + 2)).
+      - I `psql` (runbooken §8a, steg 3): størrelsen, cache-treff, og **døde rader på
+        `django_session`** — den tabellen skal ligge øverst i lista over `n_dead_tup`, og
+        `last_autovacuum` skal ha en dato innenfor timen. Står den uten dato mens døde
+        rader vokser, holder ikke autovacuum følge, og det er funnet.
+      - Tilkoblinger etter tilstand: `SELECT count(*), state FROM pg_stat_activity WHERE
+        datname = current_database() GROUP BY state;` — `idle in transaction` skal være 0.
+      - CPU og minne for web-tjenesten i Railway → Metrics, samtidig som P95. Lav CPU og
+        høy P95 er basen, høy CPU og høy P95 er Python (runbooken §2).
+- [ ] **Før tallene inn** i `docs/RUNBOOK_VAKT.md` §3c og §3d der det står «Mål på
+      staging», med dato og antall faner. Da regner neste runbook på målinger, ikke anslag.
 - [ ] **Ingen 5xx** i løpet av øvelsen. Dukker det opp én, noter tid og hva som ble gjort.
+- [ ] **Sesjonslengden:** vakta er 48 timer og sesjonen 8. Avgjør før vakta om
+      `session_timeout_hours` skal opp (admin kan sette inntil 24), særlig for bilenes delte
+      kontoer — en bil som logges ut midt i et oppdrag er verre enn en lengre sesjon.
 
 ## 9. Avslutningen — like viktig som resten (20 min)
 
