@@ -1092,6 +1092,14 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 ### Løse punkter
 
+- [ ] **Reservenettet for backup-klokka hører ikke på `BACKUP_KLOKKE=av`** (funnet 4. okt.
+      2026, da prod skulle settes i dvale i fire måneder). Variabelen stopper bare tråden;
+      `BackupSchedulerMiddleware` kaller `kanskje_kjor()` ved hver forespørsel uansett, tar
+      backup av planer som er aktive, og sender det kritiske varselet «Backup-klokka har
+      stoppet». Med alle planer på «Av» er det ufarlig, fordi ingenting er forfalt og
+      vakthunden er tom. Står én plan på, og variabelen er satt, får hver admin et rødt varsel
+      ved første sidevisning. Vurder: la `kanskje_kjor()` se på samme bryter, eller vis
+      «klokka er slått av» på backupsiden i stedet for «svarer ikke».
 - [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
       (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er
       riktig for det den prøver, men prisen betales av hver eneste kjøring. Vurder et

@@ -92,6 +92,18 @@ def _restore_patients_handler() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _lagret_for(plan, siden: timedelta) -> None:
+    """Flytt planens `updated_at` bakover — som om skjemaet ble lagret da.
+
+    `auto_now` setter feltet til nå ved hver `save()`, og vakthunden regner
+    fristen fra siste lagring. En test som lager en plan og så venter en
+    alarm, må si at lagringen var lenge siden; ellers prøver den
+    nådetiden etter «Lagre plan», ikke en død klokke.
+    """
+    Backupplan.objects.filter(pk=plan.pk).update(
+        updated_at=timezone.now() - siden)
+
+
 class HandlerRegistryTests(TestCase):
     """Tester for register/get_handler/all_handlers/clear_registry."""
 
@@ -910,11 +922,90 @@ class BackupAdminViewTests(TestCase):
         plan.intervall_verdi, plan.intervall_enhet = 10, 'minutt'
         plan.sist_sjekket_at = timezone.now() - timedelta(hours=5)
         plan.save()
+        _lagret_for(plan, timedelta(hours=5))
 
         client = Client()
         client.force_login(self.admin)
         resp = client.get('/portal-admin/backup/')
         self.assertContains(resp, 'Backup-klokka svarer ikke')
+
+    def test_lagre_paa_en_plan_som_har_staatt_av_gir_ikke_alarm(self) -> None:
+        """Skjermbildet fra 4. okt. 2026, gjennom den ekte inngangen: arkiv
+        hadde stått av i 23 timer, ble lagret med haken «Følg standardplanen»,
+        og siden sa «Backup-klokka svarer ikke» med det samme."""
+        Backupplan.standardplanen()
+        plan = Backupplan.hent('arkiv')
+        Backupplan.objects.filter(slug__in=['arkiv', 'standard']).update(
+            sist_sjekket_at=timezone.now() - timedelta(hours=23),
+            updated_at=timezone.now() - timedelta(hours=23))
+        Backupplan.objects.filter(slug='arkiv').update(modus='av')
+        client = Client()
+        client.force_login(self.admin)
+        client.post('/portal-admin/backup/plan/arkiv/', data={
+            'arkiv-folger_standard': 'on', 'arkiv-modus': 'av',
+            'arkiv-intervall_verdi': plan.intervall_verdi,
+            'arkiv-intervall_enhet': plan.intervall_enhet,
+            'arkiv-behold': plan.behold,
+        })
+        resp = client.get('/portal-admin/backup/')
+        self.assertNotContains(resp, 'Backup-klokka svarer ikke')
+
+    def test_av_med_haken_paa_sier_fra(self) -> None:
+        """«Av» i nedtrekket med haken på lagres, men slår ingenting av."""
+        Backupplan.standardplanen()
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.post('/portal-admin/backup/plan/patients/', data={
+            'patients-folger_standard': 'on', 'patients-modus': 'av',
+            'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
+            'patients-behold': '50',
+        }, follow=True)
+        self.assertEqual(Backupplan.hent('patients').modus_effektiv, 'ved_endring')
+        tekster = [str(m) for m in resp.context['messages']]
+        self.assertTrue(any('følger standardplanen, så tar den backup ved endring'
+                            in t and '«Av» gjelder først' in t for t in tekster),
+                        tekster)
+
+    def test_av_uten_haken_sier_ikke_fra(self) -> None:
+        Backupplan.standardplanen()
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.post('/portal-admin/backup/plan/patients/', data={
+            'patients-folger_standard': '', 'patients-modus': 'av',
+            'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
+            'patients-behold': '50',
+        }, follow=True)
+        self.assertEqual(Backupplan.hent('patients').modus_effektiv, 'av')
+        self.assertFalse(any('følger standardplanen' in str(m)
+                             for m in resp.context['messages']))
+
+    def test_haken_paa_med_samme_modus_som_standarden_sier_ikke_fra(self) -> None:
+        """Ingenting overstyres når nedtrekket og standarden sier det samme."""
+        Backupplan.standardplanen()
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.post('/portal-admin/backup/plan/patients/', data={
+            'patients-folger_standard': 'on', 'patients-modus': 'ved_endring',
+            'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
+            'patients-behold': '50',
+        }, follow=True)
+        self.assertTrue(Backupplan.hent('patients').arver)
+        self.assertFalse(any('følger standardplanen' in str(m)
+                             for m in resp.context['messages']))
+
+    def test_meldingen_sier_staar_av_naar_standarden_er_av(self) -> None:
+        from core.views_backup import overstyrt_modus_melding
+
+        standard = Backupplan.standardplanen()
+        standard.modus = 'av'
+        standard.save()
+        plan = Backupplan.hent('patients')
+        plan.folger_standard = True
+        plan.modus = 'alltid'
+        plan.save()
+        self.assertTrue(plan.eget_modusvalg_overstyres)
+        self.assertIn('så står den av', overstyrt_modus_melding(plan))
+        self.assertIn('«Alltid» gjelder først', overstyrt_modus_melding(plan))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1107,7 +1198,136 @@ class VakthundTests(TestCase):
         plan.sist_sjekket_at = timezone.now() - timedelta(
             minutes=10 * VAKTHUND_FAKTOR + 1)
         plan.save()
+        _lagret_for(plan, timedelta(days=1))
         self.assertIn('patients', [r['slug'] for r in vakthund()])
+
+    def _aktiv_egen_plan(self, *, vurdert_for, lagret_for) -> Backupplan:
+        plan = Backupplan.hent('patients')
+        plan.folger_standard = False
+        plan.modus = Backupplan.MODUS_VED_ENDRING
+        plan.intervall_verdi, plan.intervall_enhet = 10, 'minutt'
+        plan.sist_sjekket_at = (None if vurdert_for is None
+                                else timezone.now() - vurdert_for)
+        plan.save()
+        _lagret_for(plan, lagret_for)
+        Backupplan.standardplanen()
+        _lagret_for(Backupplan.standardplanen(), timedelta(days=2))
+        return plan
+
+    def test_nettopp_slaatt_paa_gir_ikke_utslag(self) -> None:
+        """Står planen av, fryser `sist_sjekket_at`. Å slå den på igjen er
+        ikke et tegn på at klokka er død."""
+        from core.backup.klokke import vakthund
+
+        self._aktiv_egen_plan(vurdert_for=timedelta(hours=23),
+                              lagret_for=timedelta(seconds=5))
+        self.assertNotIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_slaar_ut_tre_intervaller_etter_lagringen(self) -> None:
+        """Fristen flyttes av lagringen, den forsvinner ikke."""
+        from core.backup.klokke import VAKTHUND_FAKTOR, vakthund
+
+        self._aktiv_egen_plan(vurdert_for=timedelta(hours=23),
+                              lagret_for=timedelta(minutes=10 * VAKTHUND_FAKTOR + 1))
+        self.assertIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_fersk_lagring_teller_ikke_naar_vurderingen_er_nyere(self) -> None:
+        """Det seneste av de to vinner — ikke lagringen alene."""
+        from core.backup.klokke import vakthund
+
+        self._aktiv_egen_plan(vurdert_for=timedelta(minutes=1),
+                              lagret_for=timedelta(days=1))
+        self.assertNotIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_aldri_vurdert_og_nettopp_laget_gir_ikke_utslag(self) -> None:
+        from core.backup.klokke import vakthund
+
+        self._aktiv_egen_plan(vurdert_for=None, lagret_for=timedelta(seconds=5))
+        self.assertNotIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_aldri_vurdert_og_gammel_slaar_ut(self) -> None:
+        from core.backup.klokke import vakthund
+
+        self._aktiv_egen_plan(vurdert_for=None, lagret_for=timedelta(days=1))
+        rader = [r for r in vakthund() if r['slug'] == 'patients']
+        self.assertEqual(len(rader), 1)
+        self.assertIsNone(rader[0]['sist_sjekket_at'])
+
+    def test_varselet_utelater_planer_som_aldri_er_vurdert(self) -> None:
+        """Visningen vil se «aldri», varselet vil ikke: «har aldri kjørt» og
+        «har sluttet å kjøre» er to tilstander, og bare den andre er en feil."""
+        from core.backup.klokke import vakthund
+
+        self._aktiv_egen_plan(vurdert_for=None, lagret_for=timedelta(days=1))
+        self.assertIn('patients', [r['slug'] for r in vakthund()])
+        self.assertNotIn('patients', [r['slug'] for r in
+                                      vakthund(krev_tidligere_kjoring=True)])
+
+    def test_standarden_slaatt_paa_gir_ikke_utslag_hos_folgerne(self) -> None:
+        """Alle som arver en standard som har stått av, fryser samtidig.
+        Slås standarden på, er det standardens lagring som teller."""
+        from core.backup.klokke import vakthund
+
+        Backupplan.hent('patients')
+        Backupplan.objects.filter(slug='patients').update(
+            folger_standard=True,
+            sist_sjekket_at=timezone.now() - timedelta(hours=5),
+            updated_at=timezone.now() - timedelta(hours=5))
+        standard = Backupplan.standardplanen()
+        standard.modus = Backupplan.MODUS_VED_ENDRING
+        standard.intervall_verdi, standard.intervall_enhet = 10, 'minutt'
+        standard.save()
+        self.assertNotIn('patients', [r['slug'] for r in vakthund()])
+
+        self.assertTrue(Backupplan.hent('patients').arver)
+        _lagret_for(standard, timedelta(hours=5))
+        self.assertIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_folger_med_av_i_eget_nedtrekk_vaktes_naar_standarden_er_aktiv(self) -> None:
+        """Arkiv-tilfellet fra 4. okt. 2026: «Av» i nedtrekket, haken på. Det
+        er standarden som gjelder, og en stille klokke skal da meldes."""
+        from core.backup.klokke import vakthund
+
+        Backupplan.standardplanen()
+        Backupplan.hent('patients')
+        Backupplan.objects.filter(slug='patients').update(
+            folger_standard=True, modus=Backupplan.MODUS_AV,
+            sist_sjekket_at=timezone.now() - timedelta(days=1),
+            updated_at=timezone.now() - timedelta(days=1))
+        _lagret_for(Backupplan.standardplanen(), timedelta(days=1))
+        self.assertIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_folger_av_en_standard_som_er_av_vaktes_ikke(self) -> None:
+        """Eget nedtrekk på «Ved endring» betyr ingenting når standarden er av."""
+        from core.backup.klokke import vakthund
+
+        standard = Backupplan.standardplanen()
+        standard.modus = Backupplan.MODUS_AV
+        standard.save()
+        Backupplan.hent('patients')
+        Backupplan.objects.filter(slug='patients').update(
+            folger_standard=True, modus=Backupplan.MODUS_VED_ENDRING,
+            sist_sjekket_at=timezone.now() - timedelta(days=1),
+            updated_at=timezone.now() - timedelta(days=1))
+        _lagret_for(standard, timedelta(days=1))
+        self.assertNotIn('patients', [r['slug'] for r in vakthund()])
+
+    def test_grensen_er_den_styrende_planens(self) -> None:
+        """En følger måles mot standardens intervall, ikke sitt eget."""
+        from core.backup.klokke import VAKTHUND_FAKTOR, vakthund
+
+        Backupplan.hent('patients')
+        Backupplan.objects.filter(slug='patients').update(
+            folger_standard=True, intervall_verdi=1, intervall_enhet='dogn',
+            sist_sjekket_at=timezone.now() - timedelta(days=1),
+            updated_at=timezone.now() - timedelta(days=1))
+        standard = Backupplan.standardplanen()
+        standard.intervall_verdi, standard.intervall_enhet = 10, 'minutt'
+        standard.save()
+        _lagret_for(standard, timedelta(days=1))
+        self.assertTrue(Backupplan.hent('patients').arver)
+        rad = [r for r in vakthund() if r['slug'] == 'patients']
+        self.assertEqual(rad[0]['grense_min'], 10 * VAKTHUND_FAKTOR)
 
     def test_to_ganger_intervallet_er_ikke_nok(self) -> None:
         """En deploy eller restart hopper legitimt over et tikk eller to."""

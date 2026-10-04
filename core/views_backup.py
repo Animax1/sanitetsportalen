@@ -61,6 +61,8 @@ def backup_admin_plan_view(request, slug: str):
     if form.is_valid():
         form.save()
         messages.success(request, f'Backupplanen for «{slug}» er lagret.')
+        if plan.eget_modusvalg_overstyres:
+            messages.warning(request, overstyrt_modus_melding(plan))
     else:
         # Feltfeilene går tapt i omdirigeringen, så de skrives ut her. Et
         # skjema som stille ikke lagret er verre enn en melding. Etiketten
@@ -70,6 +72,25 @@ def backup_admin_plan_view(request, slug: str):
             etikett = form.fields[felt].label if felt in form.fields else felt
             messages.error(request, f'{etikett}: {" ".join(feil)}')
     return redirect('portaladmin:backup_admin')
+
+
+def overstyrt_modus_melding(plan) -> str:
+    """Hva som faktisk gjelder når haken overstyrer nedtrekket.
+
+    Sier både hva som skjer nå og hvordan valget tas i bruk. «Lagret» alene
+    var sant, men lot «Av» se ut som om det virket.
+    """
+    from core.models import Backupplan
+
+    standard = plan.gjeldende()
+    if standard.modus == Backupplan.MODUS_AV:
+        naa = 'står den av'
+    else:
+        naa = (f'tar den backup {standard.get_modus_display().lower()}, '
+               f'{standard.intervall_tekst()}')
+    return (f'«{plan.slug}» følger standardplanen, så {naa}. Valget '
+            f'«{plan.get_modus_display()}» gjelder først når «Følg '
+            f'standardplanen» er tatt av.')
 
 
 @admin_required

@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
+
+**Hvorfor:** André, 4. okt. 2026, med to skjermbilder fra telefon: «Når jeg skal sette
+planen av så får jeg av og til dette». Rett etter «Backupplanen for «arkiv» er lagret» sto
+det rødt: *Backup-klokka svarer ikke. arkiv er ikke vurdert siden 03.10.2026 08:29 — grensen
+er 30 min.* Og for patients: *ikke vurdert noen gang — grensen er 180 min.* Prod skulle i
+dvale i fire måneder, og alle planene skulle av.
+
+**To feil, og den ene skjulte den andre.** Begge er gjenskapt mot en engangsbase, med
+nøyaktig de grensene skjermbildene viser.
+
+1. **Haken «Følg standardplanen» overstyrer nedtrekket «Modus» uten å si fra.** Arkiv ble
+   lagret med haken på og «Av» i nedtrekket. Skjemaet lagret «Av» på raden, men standarden
+   gjaldt: ved endring, hvert 10. minutt. Planen som skulle av, ble slått **på**.
+2. **Vakthunden målte fra `sist_sjekket_at`, som fryser mens en plan er av.** Klokka hopper
+   over planer som står av. Ble planen aktiv igjen, direkte, med haken, eller ved at
+   standarden slås på, sto den som død fra første sidevisning og forsvant ved neste tikk.
+   Derfor «av og til»: varselet kom bare når lagringen faktisk gjorde en plan aktiv. Den
+   sanne beskjeden, at planen nå var på, ble levert som en falsk, at klokka var død.
+
+**Rettingen:**
+- Lagring med haken på og en annen modus enn standardens gir nå en advarsel: *«arkiv»
+  følger standardplanen, så tar den backup ved endring, hvert 10. minutt. Valget «Av»
+  gjelder først når «Følg standardplanen» er tatt av.* Regelen er
+  `Backupplan.eget_modusvalg_overstyres`, egen egenskap så den lar seg prøve.
+- `vakthund()` regner fristen fra **det seneste av siste vurdering, siste lagring av planen
+  og siste lagring av standarden den arver**. `updated_at` flyttes bare av skjemaet, ikke
+  av klokka, så den er et ærlig mål. En død klokke meldes fortsatt, tre intervaller etter
+  lagringen. Av-sjekken og grensen leses nå fra den styrende planen én gang.
+
+**Testene som måtte endres, og hvorfor:** to tester lagret planen med `save()` og ventet
+alarm. Det prøvde nådetiden etter «Lagre plan», ikke en død klokke. `_lagret_for()` flytter
+`updated_at` bakover. Testbasen har dessuten `patients` med egen plan fra migrasjon 0009,
+så testene som trenger arv setter haken selv.
+
+**Mutasjonstesting:** 11 mutanter, alle drept. Tre overlevde første runde og fikk tester:
+av-sjekken lest fra egen modus i stedet for den styrende (arkiv-tilfellet, med «Av» i
+nedtrekket og aktiv standard, var udekket), meldingsregelen redusert til `self.arver`, og
+`krev_tidligere_kjoring` fjernet, som ingen test i repoet nevnte. Ikke prøvd: reserveverdien
+i `_fristen_regnes_fra()` når alle tider mangler. Den er utilgjengelig i drift, fordi
+`updated_at` alltid er satt på en lagret rad.
+
+**Funnet underveis, ikke rettet:** reservenettet i middlewaren hører ikke på
+`BACKUP_KLOKKE=av`. Står i TODO under «Løse punkter».
+
 ## 2026-10-03 — Tidsbombe i vaktlistetesten: «testen kan ikke skille i dag»  `#vaktliste` `#ci`
 
 **Hvorfor:** CI ble rød på `176fdbb` (KO-rettingen under, som bare rører CSS og mal):

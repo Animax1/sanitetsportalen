@@ -231,6 +231,19 @@ def vakthund(*, krev_tidligere_kjoring: bool = False) -> list[dict]:
     et varsel om dem ville vært støy. Tre ganger intervallet, ikke én, fordi en
     deploy eller en restart legitimt hopper over et tikk eller to.
 
+    **Fristen regnes fra det seneste av siste vurdering og siste lagring** —
+    av planen selv, og av standardplanen når den arves (4. okt. 2026). Klokka
+    hopper over en plan som står av, så `sist_sjekket_at` fryser mens den er
+    av. Slås planen på igjen, direkte eller ved at haken «Følg standardplanen»
+    settes, så den arver en aktiv standard, var den «død» fra første
+    sidevisning: «Backup-klokka svarer ikke» sto rødt rett etter lagringen,
+    og forsvant ved neste tikk. En alarm som går hver gang noen trykker
+    «Lagre plan», lærer den som ser den å overse den.
+    `updated_at` settes når raden opprettes og når skjemaet lagrer den —
+    klokka skriver med `update_fields` og `.update()`, som ikke rører den — så
+    den er et ærlig mål på når planen sist ble endret. En klokke som faktisk er død,
+    meldes fortsatt, bare tre intervaller etter lagringen og ikke med én gang.
+
     ``krev_tidligere_kjoring`` utelater planer som aldri er vurdert. Visningen
     vil ha dem med — «aldri» er verdt å se — men et *varsel* om dem ville
     fyrt ved hver eneste førstegangsoppstart, før klokka rakk sitt første
@@ -244,18 +257,31 @@ def vakthund(*, krev_tidligere_kjoring: bool = False) -> list[dict]:
     for plan in Backupplan.objects.all():
         if plan.slug == Backupplan.STANDARD_SLUG:
             continue
-        if plan.modus_effektiv == Backupplan.MODUS_AV:
+        styrende = plan.gjeldende()
+        if styrende.modus == Backupplan.MODUS_AV:
             continue
         if plan.sist_sjekket_at is None and krev_tidligere_kjoring:
             continue
-        grense = timedelta(minutes=plan.intervall_min_effektiv * VAKTHUND_FAKTOR)
-        if plan.sist_sjekket_at is None or na - plan.sist_sjekket_at > grense:
+        grense = timedelta(minutes=styrende.intervall_min * VAKTHUND_FAKTOR)
+        if na - _fristen_regnes_fra(plan, styrende) > grense:
             ut.append({
                 'slug': plan.slug,
                 'sist_sjekket_at': plan.sist_sjekket_at,
                 'grense_min': int(grense.total_seconds() // 60),
             })
     return ut
+
+
+def _fristen_regnes_fra(plan, styrende):
+    """Det seneste av siste vurdering, siste lagring av planen, og siste
+    lagring av planen som styrer den. Se `vakthund()` for hvorfor."""
+    tider = [t for t in (plan.sist_sjekket_at, plan.updated_at,
+                         styrende.updated_at) if t is not None]
+    if not tider:
+        # Ulagret rad uten noen tid: ingenting å regne fra, og «aldri» er
+        # svaret vakthunden ga før fristen fikk et startpunkt.
+        return timezone.now() - timedelta(days=36500)
+    return max(tider)
 
 
 def varsle_stoppet_klokke() -> int:

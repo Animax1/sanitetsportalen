@@ -306,6 +306,18 @@ class Backupplan(models.Model):
         return self.gjeldende().behold
 
     @property
+    def eget_modusvalg_overstyres(self) -> bool:
+        """Står det en annen modus i nedtrekket enn den som faktisk gjelder?
+
+        Skjemaet lagrer radens egen modus også når haken «Følg standardplanen»
+        står på, og da gjelder standardens. Velger man «Av» med haken på,
+        lagres «Av» uten at noe slås av — og ingenting sa fra (André, 4. okt.
+        2026: «når jeg skal sette planen av så får jeg av og til dette»).
+        Egen funksjon og ikke en `if` i viewet, så regelen lar seg prøve.
+        """
+        return self.arver and self.modus != self.gjeldende().modus
+
+    @property
     def skriver_alltid(self) -> bool:
         """«Alltid» betyr at hash-skippet slås av for denne planen."""
         return self.modus_effektiv == self.MODUS_ALLTID
