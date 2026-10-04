@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-04 — Hvem deler posisjon: KO ser det ikke, og det er besluttet at den skal  `#oppdrag` `#ko` `#kart` `#personvern`
+
+**Hvorfor:** André, 4. okt. 2026: «Bil enhetene har mulighet til å slå av sporing, men /ko
+har vel ingen oversikt over hvem som har slått av sporing? Det er vel noe som kan være
+nyttig å vite for å skille mellom bevisst valg, teknisk funksjon og neglekt på å følge
+prosedyre.» Lest mot koden: bilskjermen skiller selv mellom seks tilstander
+(`posisjonLinjeTekst()`), serveren får bare «posisjon eller ingen» (`_posisjon()` gir
+`None` for alle fem, etter B7), kartet svarer aldri tilbake (B2) og vet ikke hvem som skulle
+sendt. Fra KO ser alle seks likt ut. Ingen kode — beslutningene står i `TODO.md`, ny seksjon
+«Oppdrag og KO: hvem deler posisjon».
+
+**Besluttet (André):** deling er **forventet på vakt**, bryteren er for unntak, og
+avveiningen i `docs/PERSONVERN_DOKUMENTASJON.md` A.6 skal skrives om i samme commit som
+flaten — i dag bruker den bryteren som argument for at inngrepet er lite. **Nåtilstand,
+ikke historikk:** ett felt på `oppdrag.Enhet`, overskrives, unntatt audit. **Følger
+`pa_vakt`:** «noen biler skal være av vakt og ikke vises» — kortene filtrerer alt på
+`pa_vakt`, men bilskjermen kjenner ikke flagget i dag og må få det i pollet; passiv vakt er
+på vakt og uproblematisk fordi tilstanden ikke bærer koordinater.
+
+To funn underveis som gjelder uansett: bryteren «Del posisjon» ligger i `localStorage` per
+skjerm og **overlever fra forrige vakt** (en delt iPad slått av i mai står av i september og
+ser ut som neglekt), og «nektet» i nettleseren kan ikke rettes fra siden — teksten bør si
+hvor.
+
+---
+
 ## 2026-10-04 — Lastplanen for en 48-timers vakt: web-laget holder, databasen måles  `#drift` `#dokumentasjon`
 
 **Hvorfor:** André, 4. okt. 2026: «Jeg kjenner litt usikkerhet igjen på om vi har nailet

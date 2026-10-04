@@ -947,6 +947,73 @@ skal ligge der.
       nøkler (`klienttid`, `idempotency_key`), og alt annet gir 400. Det er testbart ved
       uttømming, i motsetning til «husk å utelate fritekst».
 
+### Oppdrag og KO: hvem deler posisjon — tilstanden bilen alt kjenner, vist der bilene vises
+
+*Besluttet av André 4. okt. 2026, ikke påbegynt. Kartkoblingen er
+`docs/PLAN_KARTKOBLING.md`; dette er en flate over den, ikke en ny mekanisme.*
+
+André: «/ko har vel ingen oversikt over hvem som har slått av sporing? Det er vel noe som
+kan være nyttig å vite for å skille mellom bevisst valg, teknisk funksjon og neglekt på å
+følge prosedyre.» Han har rett, og det er verre enn ingen oversikt: bilskjermen skiller
+selv mellom **seks** tilstander (`posisjonLinjeTekst()` i `oppdrag-enhet.js`) — bryter av,
+nettleser nektet, ingen geolokasjon, fix eldre enn 120 s ved trykket, kobling ikke satt opp,
+og alt i orden — og viser dem bare på sin egen skjerm. Serveren får bare resultatet:
+`_posisjon()` gir `None` for de fem første (B7, med rette), kartet sletter raden etter 24 t
+og svarer aldri tilbake (B2), og kartet vet ikke hvilke biler som *skulle* sendt. Fra KO ser
+alle seks likt ut: ingen markør. Den naturlige tolkningen blir den minst velvillige.
+
+**Tre beslutninger (André, 4. okt. 2026):**
+
+1. **Deling er forventet på vakt.** Bryteren «Del posisjon» blir stående, men er for unntak
+   (privat kjøring, ikke på vakt), og at KO ser tilstanden er del av den berettigede
+   interessen. **Avveiningen i `docs/PERSONVERN_DOKUMENTASJON.md` A.6 skrives om** i samme
+   commit — i dag bruker den bryteren som argument for at inngrepet er lite, og det blir
+   usant den dagen KO ser hvem som har slått av. Prosedyren for mannskapet skal si det samme.
+2. **Nåtilstand, ikke historikk.** Ett felt på `oppdrag.Enhet` (tilstand + tidspunkt),
+   overskrives ved hver melding, som B10 for kartet. Ingen logg over når noen slo av og på —
+   «historikk er en ny behandling» (A.6) gjelder i ånden også her. Feltet er maskinskrevet
+   og **unntas auditloggen** i `oppdrag/signals.py`, ellers én auditrad per poll — samme
+   felle som tellerne i `AppSetting` (`nokkel_logges()`).
+3. **Følger `pa_vakt`.** «Noen biler skal være av vakt og ikke vises.» Sentralbordet og KO
+   filtrerer alt på `pa_vakt` (`oppdrag-kort.js`), så en bil av vakt har ikke noe kort å
+   vise tilstanden på — det er riktig som det er. Men bilskjermen kjenner ikke `pa_vakt` i
+   dag (ingen treff i `oppdrag-enhet.js`), og det må den: av vakt skal den **ikke melde
+   tilstand og ikke legge posisjon i køraden**, og linja nederst skal si «Av vakt — posisjon
+   deles ikke». `pa_vakt` kan ri på svaret bilen alt poller (`/oppdrag/api/oppdrag/` hvert
+   15 s). **Passiv vakt er på vakt** (`Enhet.passiv_vakt`, 16. sep. 2026): tilstanden
+   meldes, og det er uproblematisk fordi tilstanden ikke bærer koordinater — posisjon går
+   fortsatt bare ved stempling, altså når bilen faktisk arbeider.
+
+**Hvordan, når det tas opp:**
+
+- Bilen melder tilstanden **på pollet hvert 15 s** som en header, og i køraden ved
+  stempling (så en stempling gjort uten nett bærer tilstanden fra trykket). Ingen ny
+  forespørsel, ingen ny rute, `tallfasit` uendret. Bare ved stempling var alternativet, men
+  da er en bil som ikke har stemplet «ukjent», og det er i starten av vakta glemt prosedyre
+  viser seg.
+- Verdimengden er lukket og liten: `deler`, `av` (valgt), `nektet`, `utilgjengelig`,
+  `ukjent`. «Gammel fix» hører hjemme i `deler`: forbigående, ikke noe KO skal handle på.
+  Ukjent verdi fra klienten lagres som `ukjent`, aldri 400 — samme regel som `_posisjon()`.
+- **Enhetskortet** (`oppdrag-kort.js`, delt av `/oppdrag/` og `/ko/`): et lite ikon med
+  fire tilstander — deler, av, kan ikke (nektet eller ingen GPS), ukjent (ikke hørt fra
+  siden lasting). Skillet mellom «av» og «kan ikke» er hele poenget: det ene er samtalen
+  «hvorfor har du slått av», det andre «la meg hjelpe deg». Gates på `MODUL_TILGANG` som
+  resten av kortet.
+- **Bryteren nullstilles til på ved overgangen av → på vakt**, slik bilen ser den i
+  pollet. Den ligger i `localStorage` per skjerm og overlever fra forrige vakt: en delt iPad
+  der noen slo den av i mai står av i september, og ser ut som neglekt. Et «av» skal alltid
+  være et valg tatt på denne vakta.
+- **«Nektet» kan ikke rettes fra siden.** Teksten på bilskjermen skal si hvor det rettes
+  (iOS: Innstillinger → Safari → Posisjon; Chrome: nettstedets tillatelser), så KO kan
+  lese den opp over samband.
+- Tester: tilstanden i node gjennom `pollOgSynk`-stien og køraden med `pa_vakt` på og av;
+  viewet med ukjent verdi; signalet med unntaket (mutant: unntaket fjernet → rødt);
+  kortet tegnet for hver av de fire og for en bil av vakt (ingen kort).
+
+**Åpent, ikke blokkerende:** om kartet også skal få tilstanden (så en markør kan tegnes
+grå for «av»). Det er en melding til, og kartet er et eget repo; tas opp når flaten i
+portalen er prøvd på en vakt.
+
 ### Pasientmodulen — småting
 
 - [ ] **Skal tavla og lista dele «mine»-tilstand?** `mineOnly` og `boardMineFilter` er
