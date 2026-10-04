@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-04 — Runbooken tar med kart.sanitet.net, serverless og Better Stack  `#drift` `#kart`
+
+**Hvorfor:** André, 4. okt. 2026: «Disse to appene skal brukes i tandem til en sanitetsvakt.
+Jeg trenger at runbook.md i sanitetsportal repoet også tar med seg kart.sanitet. Vær obs at
+betterstack ikke sjekker prod av sanitetsportalen og kart.sanitet men sjekker staging
+miljøene, fordi prod på begge apper er serverless. Legg og til dette med workers ift
+kart.sanitet.» `docs/RUNBOOK_VAKT.md` nevnte ikke kartet med ett ord, og ikke serverless
+heller — det sto bare i kartets egen TODO, som ingen har framme under vakt.
+
+**Endret i `docs/RUNBOOK_VAKT.md`:**
+- **Innledningen og §1:** to apper, én vakt. Kodefrys i **begge** repoene (kartet deployer
+  til prod ved hver push til `main`), kartet åpent i egen fane, serverless av på begge.
+- **§1b:** ny kolonne «Serverless (prod)» — på i lavkostnad, av i vakt-modus — og hva
+  serverless og kald start er.
+- **§1c steg 0: slå av serverless på portalen og kartet.** Begrunnelsen er tallene i
+  `core/kartkobling.py`: portalen venter 3 s på kartet, en kald start tar lengre tid,
+  sendingen gir opp, og portalen tar 60 s pause fra kartet. Posisjonene fra de
+  stemplingene er tapt — ingenting sendes på nytt. Og backup-klokka tikker ikke i en
+  prosess som sover.
+- **§1d (ny): kartet i vakt-modus.** `WEB_CONCURRENCY=2` × `GUNICORN_THREADS=4`, og **at
+  navnene ikke er portalens** (`WEB_WORKERS`/`WEB_THREADS`) — `WEB_WORKERS=2` på kartet gjør
+  ingenting og sier ikke fra. Hvorfor tråder (kartet venter på MET og THREDDS), hvorfor
+  prosess nummer to er en reserve og ikke kapasitet, hvorfor kartet ikke trenger Redis
+  (kildecachen ligger i Postgres), at et radarbilde på 46 s er normalt, og når man velger
+  flere tråder (lav CPU) framfor flere prosesser (høy CPU). Verifisering: `/healthz`,
+  `Using worker: gthread` og to `Booting worker` i loggen, og en ekte stempling som gir ✓ på
+  kortet «Kart.sanitet.net».
+- **§1e (ny): Better Stack overvåker staging, ikke prod.** En monitor mot prod holder den
+  våken og opphever serverless. Grønt i Better Stack sier derfor ingenting om prod; under
+  vakt er det server-status, kartets `/healthz` og Railway-loggen. Prod-monitorer er
+  valgfrie mens serverless er av, og **pauses før serverless slås på igjen**.
+- **§8e (ny): kartet er nede eller tregt.** Tabell fra tegn til årsak (sovende tjeneste,
+  503 fra `/healthz`, treg MET/THREDDS, MapTiler-kvoten, kapasitet, koblingen), tilbakerulling
+  uten staging-gren, og at vakta går videre på portalen alene.
+- **§10b steg 5 og 6:** kartet tilbake til én prosess, og prod-monitorene av **før**
+  serverless på.
+- **§12:** kartets adresser, staging, Railway-prosjekt og Better Stack.
+
+Kartets filer omtales uten sti i runbooken: `core/tests_dokumentråte.py` sjekker hver sti mot
+*dette* repoet, og kartets `bin/start.sh` eller `PLAN.md` finnes ikke her.
+
 ## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
 
 **Hvorfor:** André, 4. okt. 2026, med to skjermbilder fra telefon: «Når jeg skal sette

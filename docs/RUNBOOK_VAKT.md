@@ -3,6 +3,12 @@
 Konkrete handlingsregler når pasientregistreringssystemet er under belastning.
 **Ingen improvisasjon under stress** – følg tabellen nedenfor.
 
+**To apper, én vakt** (4. okt. 2026). Portalen og **kart.sanitet.net** brukes sammen: bilene
+stempler i portalen, og posisjonen havner i kartet (`core/kartkobling.py`). De er to
+Railway-tjenester med hver sin database, hver sin deploy og hver sin helsesjekk, og **begge
+må være i vakt-modus**. Det som gjelder kartet står i §1d, §1e og §8e; resten av runbooken
+gjelder portalen der ikke annet står.
+
 ---
 
 ## 1. Første ting før vakten starter
@@ -13,17 +19,28 @@ Konkrete handlingsregler når pasientregistreringssystemet er under belastning.
 4. Sjekk at dashbordet oppdaterer seg (grønn pulserende prikk, "Oppdaterer hvert 10. sek")
 5. Bekreft at "Siste backup" er < 30 min gammel
 6. Noter start-tidspunkt og bakgrunns-rps som baseline (typisk 0.1–0.3 req/s ved oppstart)
-7. **Ingen deploy fra nå til vakta er over.** Noter byggnummeret i footeren, så du vet hva
-   som kjører hvis noe ser rart ut. Må du likevel deploye: §8c
+7. **Ingen deploy fra nå til vakta er over** — i **begge** repoene. Kartet deployer til prod
+   ved hver push til sin `main`, uten staging-gren imellom. Noter byggnummeret i footeren, så
+   du vet hva som kjører hvis noe ser rart ut. Må du likevel deploye: §8c
+8. **Kartet åpent i egen fane** (`https://kart.sanitet.net`), innlogget, med bilene og lagene
+   synlige. Kortet «Kart.sanitet.net» på server-status skal vise siste sending med ✓ (§1d steg 4)
+9. **Serverless er av på begge prod-tjenestene** (§1c steg 0). Better Stack sier ingenting om
+   prod — den overvåker staging (§1e)
 
 ### 1b. Driftsmodus — lavkostnad mellom vakter, vakt-modus før vakt
 
 Appen kjøres i to ulike modus styrt av én env-variabel: `REDIS_URL`. Standardtilstand mellom vakter er **lavkostnad-modus** (1 worker, Redis frakoblet, LocMemCache). Før hver vakt veksles til **vakt-modus** (Railway Pro, 2 workers × 4 tråder, Redis aktivt). Etter vakt veksles tilbake.
 
-| Modus | `REDIS_URL` | `WEB_WORKERS` × `WEB_THREADS` | Cache | Plan | Når |
-|---|---|---|---|---|---|
-| **Lavkostnad** (default) | tom / fjernet | 1 × 4 | LocMemCache | Hobby | Mellom vakter |
-| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | **2 × 4** | RedisCache | **Pro** | Før og under vakt |
+| Modus | `REDIS_URL` | `WEB_WORKERS` × `WEB_THREADS` | Cache | Plan | Serverless (prod) | Når |
+|---|---|---|---|---|---|---|
+| **Lavkostnad** (default) | tom / fjernet | 1 × 4 | LocMemCache | Hobby | **på** | Mellom vakter |
+| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | **2 × 4** | RedisCache | **Pro** | **av** | Før og under vakt |
+
+**Serverless** er Railways innstilling som lar en tjeneste sove når den ikke har trafikk, og
+vekker den ved neste forespørsel. Prod står slik mellom vakter, for både portalen og kartet:
+ingen bruker dem da, og en sovende tjeneste koster nesten ingenting. Prisen er **kald start**
+— den første forespørselen etter dvalen venter mens containeren starter. Det er greit for én
+person som tester en tirsdag, og galt under vakt (§1c steg 0). Kartets modus står i §1d.
 
 **Vakt-modus er grunnlinja tiltakene i §2 regnes fra** (24. sep. 2026). Til da regnet
 tabellen fra 1 worker, og «oransje: oppgrader til 2 workers» var et tiltak som alt var
@@ -33,6 +50,19 @@ sier «Vakt-modus: 2 workers, Redis OK», og rødt hvis det står 2+ workers ute
 Kodebasen bytter automatisk — ingen kodeendring, ingen migrasjon. Detaljer i `TEKNISK_DOKUMENTASJON.md` §8E.
 
 ### 1c. Aktiver vakt-modus (gjør dagen før eller minst 1 time før vakt-start)
+
+#### Steg 0: Slå av serverless — på portalen og på kartet
+
+Railway → prod-miljøet → **web**-tjenesten → **Settings** → **Serverless** → av. Gjør det
+samme på kart-tjenesten i kartets prosjekt. Endringen redeployer tjenesten.
+
+**Hvorfor begge, og hvorfor først:** en sovende portal gir første bruker en kald start, og
+backup-klokka (en tråd i web-prosessen, `core/backup/klokke.py`) tikker ikke mens prosessen
+står. Et sovende kart er verre enn det ser ut: portalen venter **3 sekunder** på kartet
+(`TIMEOUT_S` i `core/kartkobling.py`), og en kald start tar lengre tid. Sendingen gir opp,
+portalen tar **60 sekunders pause** fra kartet, og posisjonen fra den stemplingen — og fra
+alle andre i pausen — er tapt. Ingen ny sending skjer før bilen stempler igjen. Stemplingen
+selv går gjennom; det er bare kartet som står uten bilen.
 
 #### Steg 1: Slå på Redis-tjenesten på Railway
 
@@ -91,6 +121,96 @@ etter vakt (§10c, proratert billing).
 #### Steg 6: Nullstill databasestatistikken
 
 `SELECT pg_stat_reset();` i prod-basen, så tallene etter vakta gjelder bare den (§8a steg 2).
+
+### 1d. Kartet (kart.sanitet.net) i vakt-modus
+
+Kartet er en egen Django-app i et eget Railway-prosjekt, med egen Postgres. Det har **ingen
+Redis og ingen server-status-side**, og trenger ingen av delene for vakt-modus. Fasiten for
+kartets oppsett er kartets eget repo (README og PLAN.md §1, «Gunicorn»); stegene står her
+fordi det er her man er under vakt.
+
+| Modus | `WEB_CONCURRENCY` × `GUNICORN_THREADS` | Serverless | Når |
+|---|---|---|---|
+| **Lavkostnad** | 1 × 4 (standard, variablene kan stå tomme) | **på** | Mellom vakter |
+| **Vakt-modus** | **2 × 4** | **av** | Fra uka før vakt og ut vakta |
+
+**Variabelnavnene er ikke de samme som i portalen.** Portalen leser `WEB_WORKERS` og
+`WEB_THREADS` (Procfile); kartet leser `WEB_CONCURRENCY` og `GUNICORN_THREADS` (start-skriptet
+i kartets `bin/`). Settes `WEB_WORKERS=2` på kart-tjenesten, skjer ingenting — og ingenting
+sier fra.
+
+**Workerne i kartet — hva de er og hvorfor 2 × 4.** Gunicorn kjører med trådworkere
+(`gthread`). Kartet venter mest på andre: MET, THREDDS (radar og vindfelt), Kartverket og
+sin egen Postgres. En tråd som venter slipper GIL-en, så de andre trådene svarer imens. Med
+de gamle sync-workerne kunne to trege radarhentinger låse hele appen for alle (rettet 4. okt.
+2026).
+
+- **Prosess nummer to er en reserve, ikke kapasitet.** Fire tråder holder for 5–10 brukere.
+  Den andre prosessen er der for at én prosess som henger eller går tom for minne ikke tar
+  med seg hele kartet.
+- **Ingen Redis trengs for 2 prosesser.** Kildecachen (værsvar, radarbilder) ligger i
+  kartets Postgres og deles av alle prosessene. Det eneste som er per prosess, er grensen
+  per bruker mot MET-endepunktene — med 2 prosesser blir den litt romsligere, og det er
+  akseptert i kartets kode. Her skiller kartet seg fra portalen, der 2 workers uten Redis er
+  rødt på dashbordet (§4).
+- **Lange forespørsler er normale.** Et radarbilde kan ta ca. 46 sekunder når THREDDS er
+  treg, og gunicorn venter 120 sekunder før den dreper en worker. En treg radar er ikke et
+  tegn på at kartet er nede.
+- **Mer kapasitet under vakt:** se på CPU i Railway → kart-tjenesten → Metrics. Er CPU-en
+  **lav** mens kartet er tregt, venter trådene på kildene — `GUNICORN_THREADS=8` gir flere
+  som kan vente samtidig. Er CPU-en **høy**, hjelper bare flere prosesser:
+  `WEB_CONCURRENCY=3`. Samme regel som portalens §5, og samme forbehold: én endring av
+  gangen, og hver endring er en redeploy på ca. ett minutt.
+
+#### Steg 1: Uka før vakt
+
+1. Kartets Railway-prosjekt → prod → kart-tjenesten → **Variables**: `WEB_CONCURRENCY` = `2`.
+   `GUNICORN_THREADS` står tom eller på `4`.
+2. **Settings** → **Serverless** → av (samme som §1c steg 0).
+3. Kodefrys i kartets repo fra nå: en push til `main` er en deploy til prod og en omstart.
+
+#### Steg 2: Koblingen fra portalen
+
+Står i `docs/DEPLOY_GUIDE.md` §2e. Kort: `KART_URL` og `KART_HMAC_NOKKEL` på portalens prod,
+**samme** nøkkel som `PORTAL_HMAC_NOKKEL` på kartets prod, og egen nøkkel per miljø — staging-
+portalen sender til testkart.sanitet.net og skal aldri kunne tegne i prod-kartet.
+
+#### Steg 3: Verifiser kartet
+
+1. `https://kart.sanitet.net/healthz` svarer `ok` (200). Den sjekker databasen og at alle
+   migreringer er kjørt; 503 betyr at en av dem ikke er i orden.
+2. Railway → kart-tjenesten → **Logs** etter siste deploy: `Using worker: gthread`, og
+   **to** linjer `Booting worker with pid`. Én linje betyr at `WEB_CONCURRENCY` ikke er lest.
+3. Logg inn i kartet på en enhet fra vakta og se at bakgrunnskart og vær lastes.
+
+#### Steg 4: Verifiser koblingen ende til ende
+
+1. Stemple én gang fra en bilkonto i portalen (prod) med posisjon slått på.
+2. Server-status → kortet **«Kart.sanitet.net»**: «Siste sending» skal ha ✓ og klokkeslettet
+   for stemplingen. ✗ med 401 er nøkkelen (ikke samme verdi i begge apper, eller satt i feil
+   miljø); ✗ med 403 er Cloudflare foran kartet, ikke kartet selv. ✗ uten kode er tidsavbrudd
+   eller nettverk — sover kartet (§1c steg 0)? Kortet forklarer koden i linja under.
+3. Bilen skal stå i kartet, i en gruppe med flagget «Viser enheter og lag fra portalen».
+
+### 1e. Better Stack overvåker staging, ikke prod
+
+**Better Stack sjekker staging-miljøene til begge appene — ikke prod.** Grunnen er
+serverless: en monitor som spør prod hvert par minutter er trafikk, og trafikk holder
+tjenesten våken. Prod ville aldri sovnet, og poenget med lavkostnad-modus forsvinner. Og
+sovnet den likevel, ville hver kalde start sett ut som et utfall.
+
+Det betyr:
+
+- **Grønt i Better Stack sier ingenting om prod.** Det sier at koden som står på staging,
+  starter og svarer. Under vakt er det portalens server-status (§13), kartets `/healthz` og
+  Railway-loggen som forteller om prod.
+- **En rød staging-monitor under vakt er ikke et prod-utfall** — men sjekk prod med en gang,
+  fordi det kan være noe begge deler, som Railway selv, Cloudflare eller DNS.
+- **Valgfritt under vakt:** når serverless er av, koster en prod-monitor ingenting ekstra.
+  Legg til (eller slå på igjen) monitorer for `https://<portal-domenet>/healthz/` og
+  `https://kart.sanitet.net/healthz` i Better Stack fra §1c, og **pause dem i §10b** før
+  serverless slås på igjen. Glemmes det, holder de prod våken og koster penger hver time.
+  Merk skråstreken: portalens helsesjekk slutter på `/healthz/`, kartets på `/healthz`.
 
 ---
 
@@ -859,6 +979,39 @@ Den avslutter også alle sesjoner og skriver en auditrad.
 
 ---
 
+## 8e. Kartet er nede eller tregt
+
+**Portalen merker det ikke, og skal ikke gjøre det.** Stemplingen går gjennom uansett;
+kartkoblingen kaster aldri og lagrer ingenting. Det som går tapt, er bilenes og lagenes
+plass i kartet mens det står. Ingenting sendes på nytt når kartet er tilbake — en bil
+dukker opp igjen først når den stempler neste gang, og et lag når KO flytter det.
+
+### Steg 1: Hva er det?
+
+| Tegn | Sannsynlig årsak | Gjør |
+|---|---|---|
+| `kart.sanitet.net/healthz` svarer ikke, eller sidene laster i lang tid etter stille periode | Serverless står på, og tjenesten sov | Slå det av (§1c steg 0). Første forespørsel vekker den |
+| `/healthz` gir 503 | Databasen svarer ikke, eller migreringer mangler etter en deploy | Railway → kart-tjenesten → Logs; Postgres-tjenesten i kartets prosjekt. Har det vært en deploy: rull tilbake som i §8c |
+| Kartet svarer, men radar, vind eller farevarsler står tomme eller gamle | Kilden (MET, THREDDS) er treg eller nede. Kartet viser da siste gode svar | Ingenting i Railway hjelper. Bakgrunnskart og objektene virker |
+| Flyfoto blir grått, topo virker | MapTiler-kvoten er brukt opp | Bytt bakgrunn i kartet til «Topografisk» eller «Satellitt, oversikt» (Sentinel-2, reserven) |
+| Alt er tregt for alle | Kapasitet | §1d, «Mer kapasitet under vakt» |
+| Bilene kommer ikke, kartet ellers fint | Koblingen | Server-status → kortet «Kart.sanitet.net» (§1d steg 4) |
+
+### Steg 2: Rull tilbake
+
+Kartet har **ingen staging-gren**: hver push til kartets `main` går rett i prod. En dårlig
+deploy rulles tilbake på samme måte som portalens (§8c steg 2): kart-tjenesten →
+**Deployments** → siste som virket → **⋮** → **Redeploy**. Sjekk migrasjonen først, som i §8c
+steg 3 — kartet kjører `migrate` både i pre-deploy og ved oppstart.
+
+### Steg 3: Når kartet ikke kommer tilbake
+
+KO og bilene kjører videre på portalen alene: oppdragene, tavla og lagenes sted står der.
+Kartet er et hjelpemiddel, og vakta stopper ikke av at det er borte. Meld fra på samband at
+kartet er nede, så ingen stoler på en bilposisjon som er gammel.
+
+---
+
 ## 9. Hvis alt annet feiler: last-shed
 
 Som absolutt siste utvei hvis systemet er utilgjengelig:
@@ -926,6 +1079,22 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
    - Metrikk-kort: `source = 'local'` (forventet siden Redis er av)
 3. Prøv en vanlig pasient-flow (login, opprett dummy, slett) for å bekrefte at appen fungerer i lavkostnad-modus
 
+#### Steg 5: Kartet tilbake til lavkostnad
+
+1. Kartets Railway-prosjekt → prod → kart-tjenesten → **Variables**: `WEB_CONCURRENCY` = `1`
+   (eller slett den — standard er 1). Står `GUNICORN_THREADS` på noe annet enn 4 etter et
+   tiltak under vakta, slett den også.
+2. Etter deployen: Logs viser **én** `Booting worker with pid`, og `/healthz` svarer `ok`.
+3. Kodefrysen i kartets repo oppheves.
+
+#### Steg 6: Prod-monitorene av, serverless på — i den rekkefølgen
+
+1. Lagt til prod-monitorer i Better Stack (§1e)? **Pause dem først.** Står de på, holder de
+   prod våken, og serverless sparer ingenting.
+2. Railway → **web**-tjenesten (portalen) → **Settings** → **Serverless** → på.
+3. Samme på kart-tjenesten.
+4. Staging-monitorene i Better Stack blir stående som de er.
+
 ### 10c. Andre opprydding
 
 1. Sett variabler tilbake til default hvis du endret noe:
@@ -992,6 +1161,11 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 | Innloggingslogg | `https://<din-app>.railway.app/portal-admin/innloggingslogg/` |
 | Reserve | `docs/TEKNISK_DOKUMENTASJON.md` §11 |
 | Deploy-guide | `DEPLOY_GUIDE.md` i repoet |
+| Kartet (prod) | `https://kart.sanitet.net` · helsesjekk `https://kart.sanitet.net/healthz` (uten skråstrek til slutt) |
+| Kartet (staging) | `https://testkart.sanitet.net` |
+| Kartets Railway-prosjekt | Eget prosjekt i Railway, med egen Postgres. Kart-tjenesten → Logs / Metrics / Deployments |
+| Kartets oppsett og beslutninger | Kartets repo: README (variablene) og PLAN.md §1 |
+| Better Stack | Overvåker **staging** av begge appene, ikke prod (§1e) |
 
 ---
 
