@@ -113,6 +113,10 @@ function koLeggTil(oppdragId, overgang, sted, stedTekst, posisjon) {
         // stempling som sendes når dekningen kommer, skal vise hvor bilen var
         // da mannskapet trykket. Aldri lagret andre steder enn her i køen.
         posisjon: posisjon || null,
+        // Og hva skjermen gjorde med posisjonen da (4. okt. 2026) — deler, av,
+        // nektet, utilgjengelig — så KO får tilstanden fra trykket, ikke fra
+        // sendingen. `null` når koblingen er av eller bilen er av vakt.
+        posisjonsdeling: posisjonsdelingTilstand(),
     };
     const ko = koLes();
     ko.push(rad);
@@ -955,6 +959,8 @@ async function synk() {
               sted_tekst: rad.sted_tekst || undefined,
               // Ikke et domenefelt: videresendes til kartet, lagres aldri.
               posisjon: rad.posisjon || undefined,
+              // Tilstanden ved trykket (4. okt. 2026), skrevet på enheten.
+              posisjonsdeling: rad.posisjonsdeling || undefined,
             }),
           });
       } catch (e) {
@@ -1090,20 +1096,74 @@ function delerPosisjon() {
   try { return globalThis.localStorage.getItem(delPosisjonNokkel()) !== '0'; } catch (e) { return true; }
 }
 
+function paVaktNokkel() {
+  return 'oppdrag_pa_vakt_v1';
+}
+
+/** Er bilen på vakt, slik serveren sist sa det? Ukjent regnes som på vakt:
+ *  `pa_vakt` er sann som standard, og en skjerm som ennå ikke har hørt fra
+ *  serveren skal ikke oppføre seg som av vakt. */
+function erPaVakt() {
+  try { return globalThis.localStorage.getItem(paVaktNokkel()) !== '0'; } catch (e) { return true; }
+}
+
+/** Serverens svar på om bilen er på vakt, fra headeren på pollet (4. okt. 2026).
+ *
+ *  **Overgangen av → på nullstiller bryteren «Del posisjon» til på.** Bryteren
+ *  ligger i `localStorage` per skjerm og overlever fra forrige vakt: en delt
+ *  iPad noen slo av i mai sto av i september, og så ut som neglekt. Et «av»
+ *  skal alltid være et valg tatt på *denne* vakta. Huskes i `localStorage`
+ *  også, så en sidelasting ikke mister hvor vi var. */
+function notePaVakt(verdi) {
+  if (verdi !== '0' && verdi !== '1') return;
+  const foer = erPaVakt();
+  const naa = verdi === '1';
+  try {
+    globalThis.localStorage.setItem(paVaktNokkel(), verdi);
+    if (naa && !foer) globalThis.localStorage.setItem(delPosisjonNokkel(), '1');
+  } catch (e) { /* gjelder til siden lastes */ }
+  if (naa !== foer) tegnPosisjonLinje();
+}
+
+/** Det skjermen gjør med posisjonen nå — det KO får se (4. okt. 2026).
+ *  `null` når det ikke er noe å melde: koblingen er av, eller bilen er av
+ *  vakt (kortet vises ikke da, og en tilstand ingen ser skal ikke sendes).
+ *  «Gammel fix» er ikke en egen tilstand: forbigående, ligger i `deler`. */
+function posisjonsdelingTilstand() {
+  if (!kartKoblingAktiv() || !erPaVakt()) return null;
+  if (!delerPosisjon()) return 'av';
+  const status = globalThis.bilensPosisjonStatus;
+  if (status === 'nektet') return 'nektet';
+  if (status === 'utilgjengelig') return 'utilgjengelig';
+  return 'deler';
+}
+
 /** Det som legges i køraden ved et trykk. */
 function posisjonTilKo(naa) {
-  if (!kartKoblingAktiv() || !delerPosisjon()) return null;
+  if (!kartKoblingAktiv() || !delerPosisjon() || !erPaVakt()) return null;
   return posisjonForStempling(globalThis.bilensPosisjon || null, naa);
 }
 
-/** Linja i bunnen av skjermen. Ingenting vises når koblingen er av. */
+/** Linja i bunnen av skjermen. Ingenting vises når koblingen er av.
+ *  Mannskapet skal vite at KO ser tilstanden — det er del av avveiningen i
+ *  personverndokumentasjonen (A.6), ikke en detalj. «Nektet» kan ikke rettes
+ *  fra siden, så teksten sier hvor. */
 function posisjonLinjeTekst() {
   if (!kartKoblingAktiv()) return '';
-  if (!delerPosisjon()) return 'Posisjon deles ikke';
+  if (!erPaVakt()) return 'Av vakt. Posisjon deles ikke, og bryteren gjelder fra neste vakt.';
+  if (!delerPosisjon()) return 'Posisjon deles ikke. KO ser at den er slått av.';
   const status = globalThis.bilensPosisjonStatus;
-  if (status === 'nektet') return 'Nettleseren har ikke gitt tilgang til posisjon';
-  if (status === 'utilgjengelig') return 'Posisjon er ikke tilgjengelig på denne enheten';
-  return 'Posisjon sendes til kartet ved stempling';
+  if (status === 'nektet') {
+    return 'Nettleseren har ikke gitt tilgang til posisjon. iPhone: Innstillinger → Safari → Posisjon. '
+      + 'Android: hengelåsen i adressefeltet → Tillatelser → Posisjon.';
+  }
+  if (status === 'utilgjengelig') return 'Posisjon er ikke tilgjengelig på denne enheten.';
+  return 'Posisjon sendes til kartet ved stempling. KO ser at den deles.';
+}
+
+/** Bryteren er grå når den ikke kan virke: av vakt, eller uten GPS. */
+function bryterSperret() {
+  return !erPaVakt() || globalThis.bilensPosisjonStatus === 'utilgjengelig';
 }
 
 function tegnPosisjonLinje() {
@@ -1113,6 +1173,7 @@ function tegnPosisjonLinje() {
   document.getElementById('posisjon-tekst').textContent = posisjonLinjeTekst();
   const bryter = document.getElementById('del-posisjon');
   bryter.checked = delerPosisjon();
+  bryter.disabled = bryterSperret();
 }
 
 function vekslDelPosisjon() {
@@ -1295,12 +1356,18 @@ function harNyDelt(liste, naa) {
 async function lastMine() {
   let res;
   try {
-    res = await apiFetch('/oppdrag/api/oppdrag/', {
-      headers: etagMine ? { 'If-None-Match': etagMine } : {},
-    });
+    // Hvem deler posisjon (4. okt. 2026): tilstanden rir på pollet som en
+    // header. Ingen ny forespørsel; serveren skriver bare når den endres.
+    const headers = etagMine ? { 'If-None-Match': etagMine } : {};
+    const tilstand = posisjonsdelingTilstand();
+    if (tilstand) headers['X-Posisjonsdeling'] = tilstand;
+    res = await apiFetch('/oppdrag/api/oppdrag/', { headers });
   } catch (e) {
     return;   // nettbrudd midt i en poll — forrige visning står til neste
   }
+  // Om bilen er på vakt kommer i en header, så det følger også 304 — 113
+  // setter flagget, og det endrer ikke ETag-en.
+  notePaVakt(res.headers && res.headers.get ? res.headers.get('X-Enhet-Pa-Vakt') : null);
   if (res.status === 304) {
     if (harNyDelt(mineOppdrag)) renderAlt();
     return;

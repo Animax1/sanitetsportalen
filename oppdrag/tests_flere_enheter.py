@@ -978,7 +978,8 @@ class BilenSerDeAndreTests(TestCase):
         gule stått til neste endring på serveren, ikke i ett minutt."""
         from patients.js_test_utils import build_harness, run_node
         from patients.js_test_utils import OPPDRAG_ENHET_JS
-        harness = build_harness(((OPPDRAG_ENHET_JS, ('lastMine', 'harNyDelt', 'erNyDelt')),))
+        harness = build_harness(((OPPDRAG_ENHET_JS, ('lastMine', 'harNyDelt', 'erNyDelt',
+                                                     'notePaVakt', 'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel')),))
         ut = run_node(harness, """
             const NY_DELT_MS = 60 * 1000;
             let tegnet = 0; let etagMine = 'x';
@@ -1061,7 +1062,7 @@ class SentralbordetsMatriseTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', 'enhetAvventer', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  '_statusvalg', '_nesteStatus', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                                  '_statusvalg', '_nesteStatus', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 

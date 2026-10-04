@@ -64,6 +64,13 @@ annet.
       ringebryteren på lydløs**: lyden skal likevel komme.
 - [ ] Sentralbordet ser alle tre bilene i ressurslista, som «Ledig».
 - [ ] KO-leder åpner `/ko/`, og ser de samme bilene i ressursoversikten.
+- [ ] **Posisjonsikonet** (4. okt. 2026) står til høyre på hvert bilkort i KO. Alle tre viser
+      «deler» etter første poll. **Bil B slår av «Del posisjon»**: KO ser gul pin med strek
+      innen 15 s, og fargeforklaringen («i») forklarer den. Bil B slår på igjen. **Bil A
+      nekter posisjon i nettleseren** (eller har gjort det): KO ser blå pin med utropstegn,
+      og linja nederst på bilskjermen sier hvor det rettes. Sentralbordet tar bil C **av
+      vakt**: kortet forsvinner, bilskjermen sier «Av vakt», bryteren er grå. På vakt igjen:
+      kortet kommer tilbake som «ukjent» og blir «deler» ved neste poll.
 
 ## 2. Ett oppdrag, hele kjeden (15 min)
 

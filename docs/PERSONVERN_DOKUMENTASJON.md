@@ -425,9 +425,22 @@ stemplet.
   stempling, ingen løpende sending), **bare siste posisjon** (én rad per enhet som
   overskrives), **ingen historikk**, og raden slettes i kartet **24 timer** etter siste
   melding. Den er **synlig for mannskapet**: bilskjermen sier «Posisjon sendes til kartet
-  ved stempling», og bryteren «Del posisjon» slår den av på den skjermen. Nettleseren spør
-  om lov før den gir posisjon, og et nei stopper ingenting annet enn posisjonen.
-  Stemplingen venter aldri på posisjonen.
+  ved stempling. KO ser at den deles». Nettleseren spør om lov før den gir posisjon, og et
+  nei stopper ingenting annet enn posisjonen. Stemplingen venter aldri på posisjonen.
+- *Deling er forventet på vakt* (André, 4. okt. 2026). Bryteren «Del posisjon» står på
+  bilskjermen, men den er for unntak — privat kjøring, en bil som ikke er på vakt — ikke et
+  fritt valg under tjeneste. Fram til 4. okt. sto bryteren her som et argument for at
+  inngrepet var lite; det ville vært usant å la den stå slik når KO nå ser hvem som har slått
+  av. **Det KO ser er tilstanden, ikke posisjonen:** ett av ordene deler, av, nektet,
+  utilgjengelig eller ukjent på enhetskortet, med klokkeslettet det sist skiftet. Ingen
+  koordinater følger med, så en bil i passiv vakt viser «deler» uten at noen ser hvor den
+  står. Formålet er å skille et bevisst valg fra en teknisk feil og fra glemt prosedyre —
+  samtalen over samband blir «la meg hjelpe deg» for en nettleser som har nektet, og
+  «er det med vilje?» for en bryter som er av. Tilstanden er **nåtilstand** (ett felt på
+  enheten som overskrives, uten logg over når noen slo av og på), nullstilles når 113 tar
+  bilen på eller av vakt, og vises ikke for biler av vakt. Bryteren nullstilles til på ved
+  neste vakt, så et «av» alltid er et valg tatt på denne vakta. Prosedyren for mannskapet
+  skal si det samme som dette avsnittet.
 - *Mottakeren* er **korpsets eget kart**, med samme behandlingsansvarlige (A.1), og bare
   medlemmer av en kartgruppe der kartets administrator har slått på «Viser enheter og lag
   fra portalen» ser noe. Meldingene er signert (HMAC) og går over TLS; kartet returnerer

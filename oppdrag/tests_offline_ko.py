@@ -36,7 +36,9 @@ HARNESS = (
     (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                        'klokke')),
     (OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
-                        'lagNokkel', 'projiser')),
+                        'lagNokkel', 'projiser',
+                        # køraden bærer posisjonsdelingen (4. okt. 2026)
+                        'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel')),
 )
 
 

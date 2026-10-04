@@ -184,7 +184,9 @@ class BilskjermenOgPosisjonTests(StemplingBasis):
 # ── Klienten, i node ─────────────────────────────────────────────────────────
 
 POS_FUNKSJONER = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAktiv',
-                  'delPosisjonNokkel', 'delerPosisjon', 'posisjonTilKo', 'posisjonLinjeTekst')
+                  'delPosisjonNokkel', 'delerPosisjon', 'posisjonTilKo', 'posisjonLinjeTekst',
+                  # Hvem deler posisjon (4. okt. 2026)
+                  'posisjonsdelingTilstand', 'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret')
 
 HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
                                'koFjern', 'projiser', 'synk', '_stemple', *POS_FUNKSJONER)),)
@@ -284,5 +286,10 @@ class PosisjonForStemplingTests(unittest.TestCase):
             globalThis.bilensPosisjonStatus = 'nektet'; t.push(posisjonLinjeTekst());
             localStorage.setItem(delPosisjonNokkel(), '0'); t.push(posisjonLinjeTekst());
             console.log(JSON.stringify(t));""")
-        self.assertEqual(ut, ['', 'Posisjon sendes til kartet ved stempling',
-                              'Nettleseren har ikke gitt tilgang til posisjon', 'Posisjon deles ikke'])
+        self.assertEqual(ut[0], '')
+        self.assertTrue(ut[1].startswith('Posisjon sendes til kartet ved stempling'), ut[1])
+        self.assertIn('KO ser at den deles', ut[1])
+        self.assertTrue(ut[2].startswith('Nettleseren har ikke gitt tilgang til posisjon'), ut[2])
+        self.assertIn('Innstillinger', ut[2], 'nektet kan ikke rettes fra siden — teksten sier hvor')
+        self.assertTrue(ut[3].startswith('Posisjon deles ikke'), ut[3])
+        self.assertIn('KO ser at den er slått av', ut[3])

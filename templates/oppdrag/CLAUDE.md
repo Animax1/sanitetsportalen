@@ -25,6 +25,7 @@ det ble en tom side stående etter én feilet henting, og den så ut som en vakt
 | Offline-køen | `localStorage`. «Venter på dekning» vises først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`. Uten forsinkelsen blinket varselet ved hvert trykk på god dekning |
 | Lydvarselet | `lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()` og `lydTikk()` hvert 5. s. Web Audio, **alltid på**, vekket av det første trykket på siden (`lydErKlar()`). `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av |
 | Posisjon til kartet (30. sep.) | Bare når `OPPDRAG_KART_KOBLING` er sann — ellers spørres nettleseren aldri, og **bare da får siden `geolocation=(self)`** (resten av portalen har `()`). `watchPosition` holder siste fix i minnet; `posisjonForStempling()` gir den bare om den er under 120 s. `_stemple` legger den i **køraden**, så den som sendes er fra trykket. Bryteren «Del posisjon» per skjerm (`delerPosisjon`), på som standard. Stemplingen venter aldri på GPS |
+| Hvem deler posisjon (4. okt.) | `posisjonsdelingTilstand()` er regelen — `null` uten kobling eller av vakt, ellers `av` før nettleserens `nektet`/`utilgjengelig`, ellers `deler` (gammel fix er ikke en tilstand). Rir på `lastMine` som header og ligger i køraden fra trykket. `erPaVakt()` leses fra `X-Enhet-Pa-Vakt`; **overgangen av → på nullstiller bryteren til på** (`notePaVakt`), fordi `localStorage` overlever fra forrige vakt. Linja sier at KO ser tilstanden, og hvor «nektet» rettes; bryteren er grå av vakt og uten GPS (`bryterSperret`) |
 | Tida det måles fra | Bilens `varslet_at` — og **et usendt trykk i køen teller som svart**, ellers ville bilen pipt om et oppdrag mannskapet nettopp kvitterte ut uten dekning |
 
 **Serveren sender `neste_overgang`/`alternativ_overgang` per rad.** Kjeden og alternativene
@@ -36,6 +37,15 @@ serveren i nøyaktig det øyeblikket en overgang ble endret.
 åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
 
 ## Ressurslista, delt med `/ko/`
+
+**Posisjonsikonet står helt til høyre på kortet** (4. okt. 2026, `posisjonsdelingIkon` i
+`oppdrag-kort.js`): fire tilstander som skiller seg på form og lysstyrke, ikke bare farge —
+dempet pin for deler, gul med strek for av (en samtale, ikke en alarm), blå med utropstegn
+for kan-ikke (nektet og uten GPS, ulik tekst), stiplet med spørsmålstegn for ukjent. Tom
+streng når `OPPDRAG_KART_KOBLING` er usann — da melder ingen bil noe, og et «?» på hver bil
+hadde sagt at noe var galt som ikke var det. Fargeforklaringen i KO får de fire radene fra
+`posisjonsdelingLegende()` med samme gate. Mappingen står inne i funksjonen, fordi harnessene
+henter funksjoner alene. Stilen i `oppdrag.css` (`.posdeling-*`).
 
 **Hele ressurslista er delt med `/ko/`** (18. sep. 2026). Serversiden:
 `services.enhetskort()` er den ene serialiseringen, og både `views.enheter_view` og

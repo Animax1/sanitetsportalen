@@ -148,6 +148,28 @@ STATUS_VALG: tuple[tuple[str, str], ...] = (
 #: (`status/avbryt/`), så køen i bilen kan bære den som alt annet.
 AVBRYT = 'avbryt'
 
+#: **Hvem deler posisjon** (André, 4. okt. 2026: «/ko har vel ingen oversikt over
+#: hvem som har slått av sporing? … skille mellom bevisst valg, teknisk funksjon
+#: og neglekt på å følge prosedyre»). Tilstanden bilskjermen alt kjenner
+#: (`posisjonLinjeTekst()` i `oppdrag-enhet.js`), meldt til portalen og vist på
+#: enhetskortet. **Nåtilstand, ikke historikk**: ett felt på `Enhet` som
+#: overskrives. «Gammel fix» er ikke en egen verdi — forbigående, og ikke noe KO
+#: skal handle på — den ligger i `deler`. En verdi serveren ikke kjenner lagres
+#: som `ukjent`, aldri 400: regelen er den samme som for `posisjon` i stemplingen.
+POSISJONSDELING_UKJENT = 'ukjent'
+POSISJONSDELING_DELER = 'deler'
+POSISJONSDELING_AV = 'av'
+POSISJONSDELING_NEKTET = 'nektet'
+POSISJONSDELING_UTILGJENGELIG = 'utilgjengelig'
+POSISJONSDELING_VALG = (
+    (POSISJONSDELING_UKJENT, 'Ikke hørt fra bilskjermen'),
+    (POSISJONSDELING_DELER, 'Deler posisjon'),
+    (POSISJONSDELING_AV, 'Slått av på bilskjermen'),
+    (POSISJONSDELING_NEKTET, 'Nettleseren har nektet'),
+    (POSISJONSDELING_UTILGJENGELIG, 'Ingen GPS på enheten'),
+)
+POSISJONSDELING_NAVN: dict[str, str] = dict(POSISJONSDELING_VALG)
+
 #: Hvor «aktiv» en status er, til utledning av oppdragets status når flere
 #: biler står på det (den mest aktive vinner). `Behandlet` teller som
 #: `Avreist`: begge er «ferdig på stedet».

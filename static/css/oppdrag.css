@@ -702,3 +702,51 @@ button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* Hvem deler posisjon (4. okt. 2026) — ikonet helt til høyre på enhetskortet,
+   i KO og på sentralbordet. Tilstandene skiller seg på form og lysstyrke, ikke
+   bare farge: strek over for «av», utropstegn for «kan ikke», spørsmålstegn og
+   stiplet for «ukjent». Fargene er pinnens, ikke statusprikkens — gul er en
+   samtale, blå er teknisk, og ingen av dem leser som alarm. */
+.posdeling {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.posdeling-av { color: #fbbf24; }
+.posdeling-av::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.5rem;
+  height: 2px;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-radius: 1px;
+}
+.posdeling-kan-ikke { color: #60a5fa; }
+.posdeling-kan-ikke::after,
+.posdeling-ukjent::after {
+  position: absolute;
+  right: -0.25rem;
+  top: -0.2rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: currentColor;
+}
+.posdeling-kan-ikke::after { content: '!'; }
+.posdeling-ukjent { color: var(--text-soft); opacity: 0.85; }
+.posdeling-ukjent::after { content: '?'; }
+.posdeling-ukjent .bi { opacity: 0.7; }

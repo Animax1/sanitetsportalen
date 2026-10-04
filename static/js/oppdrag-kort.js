@@ -171,12 +171,44 @@ function enhetskortInnmat(e) {
   // `trustedHtml('')` er et objekt like fullt. Meldt fra staging 16. sep. 2026.
   const passiv = (e.kan_passiv_vakt && e.passiv_vakt)
     ? '<span class="enhet-passivmerke">passiv vakt</span>' : '';
+  // Hvem deler posisjon (4. okt. 2026) — helt til høyre, så navn, status og
+  // oppdragslinja står der de står. Ferdig markup fra en bygger som skannes
+  // for seg; tom streng uten kobling.
+  const posdeling = posisjonsdelingIkon(e);
   return `<span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}${passiv}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
           ${oppdragslinje}
-        </div>`;
+        </div>${posdeling}`;
+}
+
+
+// Hvem deler posisjon (André, 4. okt. 2026: «skille mellom bevisst valg,
+// teknisk funksjon og neglekt på å følge prosedyre»). Fire tilstander på
+// kortet, og de skiller seg på **form og lysstyrke, ikke bare farge**:
+// deler er dempet (normaltilstanden skal være stille), av er gul med strek
+// (en samtale, ikke en alarm), kan-ikke er blå med utropstegn (teknisk —
+// «la meg hjelpe deg»), ukjent er stiplet og dim med spørsmålstegn.
+// `nektet` og `utilgjengelig` har samme ikon og ulik tekst: KO gjør det samme.
+//
+// Mappingen står **inne i** funksjonen, som lista i `_kanGrovsortere`: test-
+// harnessene henter funksjoner alene, og en toppnivå-`const` hadde vært borte.
+/** Ikonet på enhetskortet. Tom streng når kartkoblingen ikke er satt opp —
+ *  da melder ingen bil noe, og et «?» på hver bil hadde sagt at noe var galt
+ *  som ikke var det. En verdi kortet ikke kjenner tegnes som ukjent. */
+function posisjonsdelingIkon(e) {
+  if (globalThis.OPPDRAG_KART_KOBLING !== true) return '';
+  const visninger = {
+    deler: { klasse: 'posdeling-deler', tekst: 'Deler posisjon' },
+    av: { klasse: 'posdeling-av', tekst: 'Posisjon er slått av på bilskjermen' },
+    nektet: { klasse: 'posdeling-kan-ikke', tekst: 'Kan ikke dele posisjon: nettleseren har nektet' },
+    utilgjengelig: { klasse: 'posdeling-kan-ikke', tekst: 'Kan ikke dele posisjon: ingen GPS på enheten' },
+    ukjent: { klasse: 'posdeling-ukjent', tekst: 'Ikke hørt fra bilskjermen' },
+  };
+  const visning = visninger[e.posisjonsdeling] || visninger.ukjent;
+  const siden = e.posisjonsdeling_at ? ' · siden ' + klokke(e.posisjonsdeling_at) : '';
+  return `<span class="posdeling ${escHtmlValue(visning.klasse)}" title="${escapeHtml(visning.tekst + siden)}" aria-label="${escapeHtml(visning.tekst)}" role="img"><i class="bi bi-geo-alt"></i></span>`;
 }
 
 

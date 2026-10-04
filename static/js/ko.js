@@ -419,7 +419,19 @@ function koLegendeHtml() {
     + rad(p('av_vakt'), 'Av vakt', '')
     + rad('<i class="bi bi-exclamation-triangle-fill"></i>', 'Trenger ressurs', 'oppdrag uten enhet')
     + rad('<span class="enhet-passivmerke">passiv vakt</span>', '', 'sover, kan vekkes')
-    + rad('<span class="ko-opptatt">På H14</span>', '', 'laget står på en åpen hendelse');
+    + rad('<span class="ko-opptatt">På H14</span>', '', 'laget står på en åpen hendelse')
+    + posisjonsdelingLegende(rad);
+}
+
+/** Posisjonsikonene (4. okt. 2026) — bare når kartkoblingen er satt opp, som
+ *  ikonet selv (`posisjonsdelingIkon` i oppdrag-kort.js). */
+function posisjonsdelingLegende(rad) {
+  if (globalThis.OPPDRAG_KART_KOBLING !== true) return '';
+  const pin = (klasse) => '<span class="posdeling ' + klasse + '"><i class="bi bi-geo-alt"></i></span>';
+  return rad(pin('posdeling-deler'), 'Deler posisjon', '')
+    + rad(pin('posdeling-av'), 'Posisjon slått av', 'på bilskjermen — spør om det er med vilje')
+    + rad(pin('posdeling-kan-ikke'), 'Kan ikke dele', 'nettleseren har nektet, eller ingen GPS')
+    + rad(pin('posdeling-ukjent'), 'Ikke hørt fra bilen', '');
 }
 
 function koTegnLegende() {

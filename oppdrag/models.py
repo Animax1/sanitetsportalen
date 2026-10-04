@@ -96,6 +96,23 @@ class Enhet(BaseTimeStampedModel):
     enhetstype = models.ForeignKey(
         'Enhetstype', null=True, blank=True, on_delete=models.PROTECT,
         related_name='enheter', verbose_name='Enhetstype')
+    # **Hvem deler posisjon** (André, 4. okt. 2026). Bilskjermen melder
+    # tilstanden sin — deler, av, nektet, utilgjengelig — på pollet den alt
+    # kjører og i køraden ved stempling; kortet i KO og på sentralbordet viser
+    # den. Uten dette så alle fire likt ut fra KO: ingen markør i kartet.
+    #
+    # **Nåtilstand, ikke historikk** (besluttet samme dag): feltet overskrives,
+    # og `posisjonsdeling_at` er når verdien sist *skiftet*, ikke når den sist
+    # ble bekreftet — ellers hadde hvert poll vært en skriving, nøyaktig det
+    # `TODO.md` «Skalering mot 2027» advarer mot. Maskinskrevet: ikke i audit
+    # (`Enhet` auditeres ikke feltvis), og settes til `ukjent` når 113 tar
+    # bilen på eller av vakt, så kortet ikke viser gårsdagens tilstand som
+    # dagens. Ingen koordinater her — posisjonen går fortsatt bare til kartet.
+    posisjonsdeling = models.CharField(
+        max_length=16, choices=choices.POSISJONSDELING_VALG,
+        default=choices.POSISJONSDELING_UKJENT, verbose_name='Deler posisjon')
+    posisjonsdeling_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Posisjonsdeling sist endret')
 
     class Meta:
         verbose_name = 'Enhet'

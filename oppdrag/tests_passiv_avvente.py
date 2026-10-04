@@ -654,7 +654,7 @@ class PassivmerketTegnesTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'mkBesetning', 'kanSeBesetning', '_grovMerke',
+        (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', 'mkBesetning', 'kanSeBesetning', '_grovMerke',
                               '_problemMedAntall', 'hastegradKlasse', 'tidSiden')),
     )
 

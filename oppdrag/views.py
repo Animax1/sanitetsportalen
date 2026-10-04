@@ -156,6 +156,10 @@ def sentralbordkontekst(request) -> dict:
         # regel som bilens Avbryt-knapp, fra samme kilde.
         'avbryt_fra': js_json(sorted(services.AVBRYT_FRA)),
         'hastegrader': choices.HASTEGRAD,
+        # Hvem deler posisjon (4. okt. 2026): ikonet på enhetskortet vises bare
+        # når kartkoblingen er satt opp — uten den melder ingen bil noe, og et
+        # «?» på hver bil hadde sagt at noe var galt som ikke var det.
+        'kart_kobling_aktiv': js_json(kartkobling.er_konfigurert()),
     }
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
@@ -369,8 +373,8 @@ def enhet_vakt_view(request, pk):
                     f'({aktivt.get_status_display()}). Avslutt det først.'),
             }, status=400)
 
-    enhet.pa_vakt = pa_vakt
-    enhet.save(update_fields=['pa_vakt', 'updated_at'])
+    # Nullstiller også posisjonsdelingen — se `services.sett_pa_vakt`.
+    services.sett_pa_vakt(enhet, pa_vakt)
     return JsonResponse({'status': 'ok', 'data': {
         'id': enhet.pk, 'navn': enhet.navn, 'pa_vakt': enhet.pa_vakt}})
 
@@ -392,6 +396,13 @@ def oppdrag_liste_view(request):
 
     if request.method == 'GET':
         if er_enhetskonto(request.user):
+            # **Hvem deler posisjon** (4. okt. 2026): bilskjermen melder
+            # tilstanden sin i en header på dette pollet — ingen ny rute,
+            # ingen ny forespørsel. Leses *før* ETag-sjekken: tilstanden er
+            # uavhengig av om oppdragslista har endret seg, og 304 er det
+            # vanlige svaret. Skrives bare ved endring (`noter_posisjonsdeling`).
+            services.noter_posisjonsdeling(
+                request.user.enhet, request.META.get('HTTP_X_POSISJONSDELING'))
             # Statusmeldingene følger med: skjermen viser tidslinjen på det
             # aktive oppdraget («Fremme 21:20») og automatisk-markøren på de
             # avsluttede, uten et kall per rad. Få rader — egne, i vakta,
@@ -449,12 +460,18 @@ def oppdrag_liste_view(request):
         etag = etag_for_svar(data, ekstra=None if er_enhetskonto(request.user) else i_historikk)
         if request.META.get('HTTP_IF_NONE_MATCH') == etag:
             svar = HttpResponseNotModified()
-            svar['ETag'] = etag
-            return svar
-        svar = JsonResponse({'status': 'ok', 'data': data,
-                             'antall_i_historikk': (0 if er_enhetskonto(request.user)
-                                                    else i_historikk)})
+        else:
+            svar = JsonResponse({'status': 'ok', 'data': data,
+                                 'antall_i_historikk': (0 if er_enhetskonto(request.user)
+                                                        else i_historikk)})
         svar['ETag'] = etag
+        if er_enhetskonto(request.user):
+            # Bilen får vite om hun er på vakt — **i en header, så den følger
+            # også 304** (4. okt. 2026). Flagget settes av 113, ikke av bilen,
+            # og endrer ikke ETag-en: i kroppen hadde overgangen av → på først
+            # nådd skjermen når et oppdrag kom. Av vakt melder bilen ingen
+            # posisjonsdeling og legger ingen posisjon i køraden.
+            svar['X-Enhet-Pa-Vakt'] = '1' if request.user.enhet.pa_vakt else '0'
         return svar
 
     # POST — kun sentralbordet oppretter oppdrag. Ikke en enhetskonto, uansett
@@ -947,7 +964,12 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
 #: domenefeltet, og det leses bare ved «Annet sted» — se `_sted_tekst`.
 #: `posisjon` (30. sep. 2026) er **ikke et domenefelt**: den lagres aldri, den
 #: videresendes til kartet — se `_posisjon` og `docs/PLAN_KARTKOBLING.md` §6.
-STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst', 'posisjon'})
+#: `posisjonsdeling` (4. okt. 2026) er tilstanden bilskjermen hadde **ved
+#: trykket** — deler, av, nektet, utilgjengelig — så en stempling fra køen bærer
+#: den fra da, som posisjonen. Heller ikke et domenefelt på oppdraget: den
+#: skrives på enheten, bare ved endring (`services.noter_posisjonsdeling`).
+STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst', 'posisjon',
+                                       'posisjonsdeling'})
 
 #: En posisjon med tidspunkt lenger fram enn dette droppes. Kartet lar nyeste
 #: tidspunkt vinne, så én bil med klokka et døgn fram ville ellers frosset sin
@@ -1191,6 +1213,10 @@ def stempling_view(request, pk, overgang, sted=None):
     data, feil = _stempling_kropp(request)
     if feil:
         return JsonResponse({'status': 'error', 'message': feil}, status=400)
+
+    # Tilstanden ved trykket, uavhengig av hvordan stemplingen går: en bil som
+    # får 409 har like fullt sagt hva den gjør med posisjonen (4. okt. 2026).
+    services.noter_posisjonsdeling(request.user.enhet, data.get('posisjonsdeling'))
 
     klienttid = None
     if data.get('klienttid') is not None:

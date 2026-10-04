@@ -1168,7 +1168,7 @@ class DelingOgLagTests(SimpleTestCase):
         """«i» i ressursoversiktens hode (André, 19. sep. 2026, variant E1):
         av som standard, huskes per nettleser, og markupen tegnes først når
         den vises. Alle prikkene er med, «Tildelt» inkludert."""
-        harness = build_harness(((KO_JS, ('koLesLegende', 'koLagreLegende', 'koLegendeHtml',
+        harness = build_harness(((KO_JS, ('koLesLegende', 'koLagreLegende', 'koLegendeHtml', 'posisjonsdelingLegende',
                                           'koTegnLegende', 'koVippLegende')),))
         ut = run_node(harness, '''
             const KO_LEGENDE_NOKKEL = 'ko.legende';
@@ -1836,7 +1836,7 @@ class SynlighetsmenyTests(SimpleTestCase):
                     'vippSeksjon', 'visAlleGrupper', 'synlighetsSeksjoner', 'skjultTall',
                     '_synlighetsvalg', 'synlighetsmenyHtml', 'oppdaterSynlighetsmeny',
                     'gruppehode', 'tegnEnhetsliste', '_grupperEnheter',
-                    '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                    '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
                     'tidSiden', 'hastegradKlasse', '_grovMerke', '_problemMedAntall',
                     '_medAntall', 'oppdragsnr')
 

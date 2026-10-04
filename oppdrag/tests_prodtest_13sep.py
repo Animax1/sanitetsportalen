@@ -144,7 +144,9 @@ class VenterPaaDekningTests(SimpleTestCase):
     """3.4: meldingen venter tre sekunder på at sendingen skal lykkes."""
 
     HARNESS = ((OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel',
-                                   'usendtAlder', 'visUsendt')),)
+                                   'usendtAlder', 'visUsendt',
+                                   # køraden bærer posisjonsdelingen (4. okt. 2026)
+                                   'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel')),)
 
     def setUp(self):
         if not node_available():
@@ -240,7 +242,7 @@ class DenDelteListaLeserDenLevendeEnhetslistaTests(SimpleTestCase):
                               'tegnEnhetslistePaaNytt',
                               'settEnhetslisteKilde', '_grupperEnheter',
                               '_typeRekkefolge', '_enhetskort',
-                              'enhetskortInnmat', 'kanSeBesetning',
+                              'enhetskortInnmat', 'posisjonsdelingIkon', 'kanSeBesetning',
                               'mkBesetning', '_besetningKontakt', 'tidSiden',
                               'hastegradKlasse', '_grovMerke',
                               '_problemMedAntall', '_medAntall')),

@@ -39,6 +39,8 @@ HTML_BUILDERS_PER_FIL = {
         # markupen; lista her fulgte ikke etter.
         # `_manglendeByggereTests` under holder at det ikke kan gjenta seg.
         '_enhetskort', 'enhetskortInnmat',
+        # Hvem deler posisjon (4. okt. 2026): ikonet helt til høyre på kortet.
+        'posisjonsdelingIkon',
         # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
         # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
         'fyllProblemstillinger', 'problemstillingEtterBytte', 'visFoerStatus',
@@ -134,6 +136,7 @@ REVIEWED_INTERPOLATIONS = {
     # oppdrag-kort.js, som står først i OPPDRAG_SENTRAL_JS og altså leses av
     # samme skanner, og `mkBesetning` lenger nede i denne fila.
     'innmat': 'ferdig markup fra enhetskortInnmat(), som skannes for seg',
+    'posdeling': 'ferdig markup fra posisjonsdelingIkon(), som skannes for seg',
     'besetning': 'ferdig markup fra mkBesetning(), som skannes for seg',
     # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
     # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter
@@ -449,7 +452,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
                               '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
     )
 
@@ -776,6 +779,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall',
+                            'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel',
                             'stempleAvreistTil', 'stempleAnnetSted', 'avbrytStedvalg')),
     )
     STUBB = EnhetEscapingOppforselTests.STUBB + (

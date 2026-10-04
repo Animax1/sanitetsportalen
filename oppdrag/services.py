@@ -467,6 +467,55 @@ def _aktivt_oppdrag_felter(rad, meldinger=None) -> dict:
     }
 
 
+def noter_posisjonsdeling(enhet, verdi) -> bool:
+    """Bilskjermen sier hva den gjør med posisjonen; skriv det **bare når det
+    har endret seg** (André, 4. okt. 2026).
+
+    Verdien kommer på hvert poll, hvert 15. sekund fra hver bil. En skriving
+    per poll ville vært nøyaktig den lasten `TODO.md` «Skalering mot 2027»
+    advarer mot, og `posisjonsdeling_at` skal svare på «siden når», ikke «sist
+    bekreftet». Et poll uten endring koster derfor ingen spørring utover den
+    enheten alt er lastet med.
+
+    **Av vakt skriver ingenting.** Kortet vises ikke for en bil av vakt, og en
+    tilstand ingen ser skal ikke holdes à jour — bilskjermen sender heller ikke
+    noe da, men regelen står her også, så den ikke avhenger av klienten.
+
+    En verdi serveren ikke kjenner blir `ukjent`, aldri en feil: en gammel
+    bilskjerm mot en ny server skal fortsatt kunne stemple. Samme regel som
+    `_posisjon()` i viewet. Returnerer True når noe ble skrevet, så kallstedet
+    kan se det i tester.
+    """
+    if verdi is None or not enhet.pa_vakt:
+        return False
+    verdi = str(verdi).strip().lower()
+    if verdi not in choices.POSISJONSDELING_NAVN:
+        verdi = choices.POSISJONSDELING_UKJENT
+    if verdi == enhet.posisjonsdeling:
+        return False
+    enhet.posisjonsdeling = verdi
+    enhet.posisjonsdeling_at = timezone.now()
+    enhet.save(update_fields=['posisjonsdeling', 'posisjonsdeling_at'])
+    return True
+
+
+def sett_pa_vakt(enhet, pa_vakt: bool) -> None:
+    """Ta en enhet på eller av vakt, og **glem posisjonsdelingen** samtidig.
+
+    Tilstanden er nåtilstand, og «nå» begynner på nytt når 113 setter bilen
+    på vakt: uten nullstillingen hadde kortet vist gårsdagens «av» som dagens
+    til bilskjermen rakk å melde seg. Av vakt nullstilles også — en tilstand
+    som ikke lenger holdes à jour skal ikke ligge og se fersk ut.
+    """
+    felter = ['pa_vakt', 'updated_at']
+    if enhet.pa_vakt != pa_vakt:
+        enhet.posisjonsdeling = choices.POSISJONSDELING_UKJENT
+        enhet.posisjonsdeling_at = None
+        felter += ['posisjonsdeling', 'posisjonsdeling_at']
+    enhet.pa_vakt = pa_vakt
+    enhet.save(update_fields=felter)
+
+
 def enhetskort_liste(enheter, vakt=None, ledig_siden=None) -> list:
     """`enhetskort` for hele lista, med et fast antall spørringer (G4).
 
@@ -510,6 +559,11 @@ def _enhetskort(enhet, info, ledig_siden, meldinger) -> dict:
         'kan_passiv_vakt': kan_passiv_vakt(enhet),
         'kan_avvente': kan_avvente(enhet),
         'passiv_vakt': enhet.passiv_vakt,
+        # Hvem deler posisjon (4. okt. 2026) — tilstanden bilskjermen meldte,
+        # og når den sist skiftet. Kortet gater selv på om kartkoblingen er på.
+        'posisjonsdeling': enhet.posisjonsdeling,
+        'posisjonsdeling_at': (enhet.posisjonsdeling_at.isoformat()
+                               if enhet.posisjonsdeling_at else None),
         'er_aktiv': enhet.er_aktiv,
         'username': getattr(enhet.user, 'username', '') or '',
         'type': enhet.enhetstype_id,

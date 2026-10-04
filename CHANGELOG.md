@@ -4,6 +4,81 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-04 — Hvem deler posisjon: ikonet på enhetskortet, tilstanden fra bilskjermen  `#oppdrag` `#ko` `#kart` `#personvern`
+
+**Hvorfor:** André, 4. okt. 2026, etter skissene: «Jeg liker A best for min del. Kan sikkert
+bare kode det.» A er enhetskortet i KO og på sentralbordet; B, C og D er det som må til for
+at A skal kunne vise noe. Beslutningene fra samme dag står i seksjonen under: deling er
+forventet på vakt, nåtilstand uten historikk, følger `pa_vakt`.
+
+**Det bilen melder.** `posisjonsdelingTilstand()` i `oppdrag-enhet.js` er regelen: `null`
+uten kartkobling eller av vakt; ellers `av` når bryteren er av, `nektet` eller
+`utilgjengelig` fra nettleseren, ellers `deler` — «gammel fix» er ikke en tilstand, den er
+forbigående og ligger i `deler`. Tilstanden rir på pollet hvert 15 s som header
+`X-Posisjonsdeling` (ingen ny forespørsel, ingen ny rute, `tallfasit` uendret) og ligger i
+**køraden** ved stempling, så en stempling sendt når dekningen kommer bærer tilstanden fra
+trykket — som posisjonen. Slår mannskapet bryteren på før dekningen kommer, sendes fortsatt
+«av».
+
+**Det serveren skriver.** `Enhet.posisjonsdeling` (`ukjent`/`deler`/`av`/`nektet`/
+`utilgjengelig`, migrasjon `oppdrag/0035`, bare skjema) og `posisjonsdeling_at`.
+`services.noter_posisjonsdeling` skriver **bare ved endring**: hvert poll bærer verdien, og
+én skriving per poll hadde vært nøyaktig lasten «Skalering mot 2027» i `TODO.md` advarer
+mot — `_at` er derfor «siden når», ikke «sist bekreftet». Et poll uten endring koster null
+spørringer (`assertNumQueries(0)`). Leses **før** ETag-sjekken i `oppdrag_liste_view`, fordi
+304 er det vanlige svaret og tilstanden er uavhengig av lista. Ukjent verdi lagres som
+`ukjent`, aldri 400 — samme regel som `_posisjon()`. **Av vakt skrives ingenting**, og
+`services.sett_pa_vakt` nullstiller til `ukjent` når 113 tar bilen på eller av vakt, så
+kortet ikke viser gårsdagens «av» som dagens. `Enhet` auditeres ikke feltvis, så ingen
+auditrad per poll; `post_save` øker endringsnummeret, så kortene hentes når noe skiftet.
+
+**Bilen får `pa_vakt` i header `X-Enhet-Pa-Vakt`**, på 200 og 304 — flagget settes av 113
+og endrer ikke ETag-en, så i kroppen hadde overgangen først nådd skjermen når et oppdrag
+kom. **Overgangen av → på nullstiller bryteren «Del posisjon» til på** (`notePaVakt`):
+bryteren ligger i `localStorage` per skjerm og overlevde fra forrige vakt — en delt iPad
+slått av i mai sto av i september og så ut som neglekt. Linja nederst sier nå «KO ser at den
+deles» / «KO ser at den er slått av», «Av vakt» med grå bryter, og for nektet **hvor det
+rettes** (iPhone: Innstillinger → Safari → Posisjon; Android: hengelåsen → Tillatelser),
+siden det ikke kan rettes fra siden.
+
+**Kortet.** `posisjonsdelingIkon()` i `oppdrag-kort.js`, helt til høyre så navn, status og
+oppdragslinja står der de står. Fire tilstander på form *og* lysstyrke: dempet pin (deler),
+gul med strek (av — en samtale, ikke en alarm), blå med utropstegn (kan ikke — nektet og
+uten GPS har samme ikon og ulik tooltip, KO gjør det samme: hjelper), stiplet med
+spørsmålstegn (ukjent). Tooltipen bærer «siden HH:MM». **Tom streng uten kartkobling**:
+`OPPDRAG_KART_KOBLING` sendes nå til `/oppdrag/` og `/ko/` gjennom `sentralbordkontekst`,
+ellers hadde et «?» på hver bil sagt at noe var galt som ikke var det. Fargeforklaringen i
+KO får de fire radene (`posisjonsdelingLegende`) med samme gate. Av vakt vises ikke:
+kortene filtrerte alt på `pa_vakt` fra før, og det er riktig som det er.
+
+**Personvern:** A.6 er skrevet om i samme commit. Avveiningen brukte bryteren som argument
+for lite inngrep; det ville vært usant når KO ser hvem som har slått av. Ny kule: deling er
+forventet på vakt, bryteren er for unntak, det KO ser er ordet og ikke posisjonen (passiv
+vakt viser «deler» uten at noen ser hvor bilen står), nåtilstand uten logg, nullstilles ved
+vaktbytte. Prosedyren for mannskapet skal si det samme.
+
+**Tester:** `oppdrag/tests_posisjonsdeling.py`, 34 stk. — tjenesten (skriv ved endring,
+null spørringer uendret, ukjent for søppel, av vakt), headeren inn og ut på 200 og 304,
+sentralbordet skriver aldri, stemplingen også ved 409, nullstillingen ved vaktbytte (og
+idempotent), feltene på kortet, flagget på begge sidene; i node gjennom de ekte inngangene:
+tilstanden for hver kombinasjon, headeren på `lastMine`, køraden gjennom `_stemple` →
+`synk()`, av vakt uten posisjon og tilstand, nullstillingen av bryteren, grå bryter, ikonet
+for hver verdi og uten kobling, escaping, legenden. Ni harnesser utvidet med de nye
+funksjonene (de henter funksjoner alene); mappingen i ikonet står inne i funksjonen av samme
+grunn. **20 mutanter, alle drept:** vakt-sperren, skriv-alltid, ukjent rått,
+nullstillingen, noteringen på pollet og i stemplingen, vakt-headeren bare på 200, flagget
+alltid false, av vakt ignorert i tilstand og i `posisjonTilKo`, bryteren ikke lest,
+nullstillingen av bryteren, headeren ikke sendt, tilstanden ikke i køraden og ikke i
+kroppen, koblingsgaten og kallstedet for ikonet, tittelen rått interpolert (XSS-skanneren),
+gaten og kallstedet for legenden.
+
+**Dokumentasjon:** rader i `oppdrag/CLAUDE.md` og `templates/oppdrag/CLAUDE.md`, nytt
+punkt i generalprøven §1 (bil B slår av, bil A nekter, bil C av vakt), TODO-seksjonen fra
+tidligere i dag slettet (CHANGELOG er sannheten); det åpne spørsmålet — om kartet også skal
+få tilstanden og tegne markøren grå — står igjen som «Kartkoblingen — videre».
+
+---
+
 ## 2026-10-04 — Hvem deler posisjon: KO ser det ikke, og det er besluttet at den skal  `#oppdrag` `#ko` `#kart` `#personvern`
 
 **Hvorfor:** André, 4. okt. 2026: «Bil enhetene har mulighet til å slå av sporing, men /ko

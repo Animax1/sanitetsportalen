@@ -21,7 +21,9 @@ HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koL
                                # `_stemple` legger posisjonen i køraden (30. sep. 2026).
                                'posisjonTilKo', 'kartKoblingAktiv', 'delerPosisjon',
                                'delPosisjonNokkel', 'posisjonForStempling',
-                               'posisjonMaksAlderMs')),)
+                               'posisjonMaksAlderMs',
+                               # og posisjonsdelingen (4. okt. 2026)
+                               'posisjonsdelingTilstand', 'erPaVakt', 'paVaktNokkel')),)
 
 FORSPILL = _konst(OPPDRAG_ENHET_JS, 'STEMPEL_LAAS_MS') + """
 globalThis.localStorage = (() => { const m = {}; return {
