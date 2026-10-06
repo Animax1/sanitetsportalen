@@ -465,7 +465,7 @@ OFFSITE_S3_ACCESS_KEY = os.environ.get('OFFSITE_S3_ACCESS_KEY', '')
 OFFSITE_S3_SECRET_KEY = os.environ.get('OFFSITE_S3_SECRET_KEY', '')
 OFFSITE_BACKUP_KEY = os.environ.get('OFFSITE_BACKUP_KEY', '')
 
-# Kobling til kart.sanitet.net (core/kartkobling.py, docs/PLAN_KARTKOBLING.md):
+# Kobling til kart.sanitet.net (core/kartkobling.py, docs/archived/PLAN_KARTKOBLING.md):
 # bilenes posisjon ved stempling og lagenes sted. Inert når én av dem er tom.
 # **Egen nøkkel og egen kartadresse per Railway-miljø** (B14): staging-portalen
 # skal aldri kunne tegne i prod-kartet, så staging peker på staging-kartet

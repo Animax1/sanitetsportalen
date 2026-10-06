@@ -160,7 +160,7 @@ _CSP_MAL = '; '.join(_CSP_DIRECTIVES)
 #: Portalen bruker verken kamera, mikrofon, posisjon eller betaling.
 PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=()'
 #: **Det ene unntaket:** bilskjermen i `/oppdrag/` når kartkoblingen er satt
-#: opp (`docs/PLAN_KARTKOBLING.md` §6). Viewet setter headeren selv, og
+#: opp (`docs/archived/PLAN_KARTKOBLING.md` §6). Viewet setter headeren selv, og
 #: `setdefault` under lar den stå. Bare `self`, bare den siden, bare da.
 PERMISSIONS_POLICY_MED_POSISJON = PERMISSIONS_POLICY.replace(
     'geolocation=()', 'geolocation=(self)')

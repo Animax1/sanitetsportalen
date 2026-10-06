@@ -78,7 +78,7 @@ def index_view(request):
         svar = render(request, 'oppdrag/enhet.html', {
             'enhet': request.user.enhet,
             # Uten kobling spørres nettleseren **aldri** om posisjon
-            # (`docs/PLAN_KARTKOBLING.md` §6).
+            # (`docs/archived/PLAN_KARTKOBLING.md` §6).
             'kart_kobling_aktiv': js_json(kart_aktiv),
             'neste_kjede': js_json(neste),
             'status_navn': js_json(choices.STATUS_NAVN),
@@ -963,7 +963,7 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
 #: felter der vokser med modellen. `sted_tekst` (19. sep. 2026) er det ene
 #: domenefeltet, og det leses bare ved «Annet sted» — se `_sted_tekst`.
 #: `posisjon` (30. sep. 2026) er **ikke et domenefelt**: den lagres aldri, den
-#: videresendes til kartet — se `_posisjon` og `docs/PLAN_KARTKOBLING.md` §6.
+#: videresendes til kartet — se `_posisjon` og `docs/archived/PLAN_KARTKOBLING.md` §6.
 #: `posisjonsdeling` (4. okt. 2026) er tilstanden bilskjermen hadde **ved
 #: trykket** — deler, av, nektet, utilgjengelig — så en stempling fra køen bærer
 #: den fra da, som posisjonen. Heller ikke et domenefelt på oppdraget: den

@@ -1057,7 +1057,7 @@ async function _stemple(id, overgang, knappId, sted, stedTekst) {
 }
 
 // ════════════════════════════════════════════════════════
-// POSISJON TIL KARTET (30. sep. 2026, docs/PLAN_KARTKOBLING.md §6)
+// POSISJON TIL KARTET (30. sep. 2026, docs/archived/PLAN_KARTKOBLING.md §6)
 //
 // Bilens posisjon rir på stemplingen: ingen egen sending, ingen puls, ingen
 // lagring utenfor køraden. **Stemplingen venter aldri på GPS** (B7) — finnes

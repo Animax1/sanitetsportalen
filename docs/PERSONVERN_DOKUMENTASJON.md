@@ -25,7 +25,7 @@ Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd me
 
 > **Merk om ansvarssubjekt:** Behandlingsansvaret er per i dag lagt til André Eritsland som privatperson, ikke til organisasjonen som gjennomfører sanitetsvaktene. Det innebærer at innsynskrav, avviksmelding til Datatilsynet og det rettslige ansvaret ligger hos behandlingsansvarlig personlig. Dette er et bevisst valg og bør revurderes ved den årlige revisjonen (se C.4).
 >
-> **Besluttet 30. september 2026 (André, `docs/PLAN_KARTKOBLING.md` §1, B13):** behandlingsansvarlig er **korpset**, for både portalen og kart.sanitet.net, og André Eritsland er **systemansvarlig**. Tabellen over og signaturen er ikke skrevet om ennå, fordi organisasjonsnavnet står åpent i A.4 — når det er fylt inn, skal A.1, hodet og signaturfeltet følge. Beslutningen gjelder fra datoen over; avveiningen for kartkoblingen står i A.6.
+> **Besluttet 30. september 2026 (André, `docs/archived/PLAN_KARTKOBLING.md` §1, B13):** behandlingsansvarlig er **korpset**, for både portalen og kart.sanitet.net, og André Eritsland er **systemansvarlig**. Tabellen over og signaturen er ikke skrevet om ennå, fordi organisasjonsnavnet står åpent i A.4 — når det er fylt inn, skal A.1, hodet og signaturfeltet følge. Beslutningen gjelder fra datoen over; avveiningen for kartkoblingen står i A.6.
 
 ---
 
@@ -398,7 +398,7 @@ for oppbevaringstid, sletteinngangen og forbeholdet om backupene.
 ### Posisjon og sted til kart.sanitet.net (kartkoblingen) — 30. september 2026
 
 Portalen sender to ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
-`docs/PLAN_KARTKOBLING.md`). **Portalen lagrer ingenting av det** — ingen tabell, ingen
+`docs/archived/PLAN_KARTKOBLING.md`). **Portalen lagrer ingenting av det** — ingen tabell, ingen
 revisjonsrad; den videresender og glemmer.
 
 | Hva | Innhold | Når | Kategori |

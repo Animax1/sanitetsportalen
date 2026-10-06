@@ -1,6 +1,6 @@
 """Klienten mot kart.sanitet.net: bilenes posisjon ved stempling og lagenes sted.
 
-`docs/PLAN_KARTKOBLING.md` (30. sep. 2026). Retningen er **bare portal → kart**:
+`docs/archived/PLAN_KARTKOBLING.md` (30. sep. 2026). Retningen er **bare portal → kart**:
 kartet svarer 204 og returnerer aldri data, og kartet kaller aldri portalen.
 Ligger i `core` fordi både oppdrag (bilene) og KO (lagene) sender, og ingen av
 dem får kjenne den andre.

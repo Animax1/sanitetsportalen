@@ -1,4 +1,4 @@
-"""Lagene til kart.sanitet.net: hvor et lag står **nå** (`docs/PLAN_KARTKOBLING.md` §7).
+"""Lagene til kart.sanitet.net: hvor et lag står **nå** (`docs/archived/PLAN_KARTKOBLING.md` §7).
 
 **Send tilstand, ikke hendelser.** `meld_lag(ressurs)` er den ene inngangen, og
 den regner selv ut hvor laget står — så den kan kalles fra hvert sted som

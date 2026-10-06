@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-06 — TODO: fem «vurder»-punkter fra gjennomgangen mot 48-timersvakta  `#todo` `#kart`
+
+**Hvorfor:** André, 5. okt. 2026: «gå gjennom appen og gjerne husk kart.sanitets funksjon
+[…] se det opp imot den 48 timers vakten vi skal ha og se om det er noe andre moduler/apper
+vi kunne hatt nytte av». Elleve forslag ble lagt fram; han svarte punkt for punkt.
+
+**Lagt i `TODO.md`** under «Ideer / backlog», ny seksjon «Fra gjennomgangen mot
+48-timersvakta», alle som VURDER og ingen bestilt: pasientflyten gjennom leddene (ett
+pekerfelt på pasienten; André: «litt personvern og helseopplysnings risiko med å ha med hele
+flyten»), hviletid mellom to skift, forpleining uten allergidata, masseutsending på SMS/push,
+og tiltakskort i portalen («bonusen med separat system er at om portalen går ned så har vi
+fortsatt tiltakskortene»).
+
+**Avvist eller finnes alt, så det ikke foreslås igjen:** overlevering ved vaktskifte
+(muntlig rapport, skiftene byttes i rolige perioder med overlapp), depotmodul (eksternt
+system finnes), vær (ligger i kartet), sektorer/flere KO (nei), utstyrsmodul (dekket av
+depotet), stedsregister sendt til kartet (se under).
+
+**Veipunkter i kartkoblingen — kontrollert mot `kart-sanitet`:** lagets sted matches alt mot
+**både teiger og veipunkter** (`portal/lagring.steder_for`, 2. okt. 2026; teigen vinner ved
+likt navn). B12 i `docs/PLAN_KARTKOBLING.md` sier fortsatt bare «teiger» og er utdatert —
+ikke rettet i denne commiten. Det som er åpent ligger i kartet: biler grupperes bare ved
+punkt-i-polygon mot teig, så en bil ved et veipunkt står under «Utenfor teig» (kartets TODO:
+«180 m fra Hovedpost»). Forarbeidet står: navnene i `oppdrag.Lokasjon` må stemme med kartets,
+og portalen kan ikke sjekke det på forhånd uten å lese fra kartet (B1).
+
+**Senere samme dag — kartkoblingsplanen arkivert, depot-klausulen strøket, stillingsbildet inn som VURDER.**
+André: «Vi kan arkivere/slette kartkobling.md den er nytteløs nå. Fjern linje 188 o todo.»
+`docs/PLAN_KARTKOBLING.md` → `docs/archived/PLAN_KARTKOBLING.md` med banner (levert 30. sep.,
+B12 utdatert) og indeksrad under ny bolk «Utførte planer»; arkivert og ikke slettet fordi
+beslutningstabellen B1–B14 er begrunnelsen koden hviler på. Alle 15 henvisningene i kode,
+kommentarer og dokumenter peker nå på den arkiverte stien (CHANGELOG urørt). I `TODO.md` er
+«en eventuell beholdning/depot-modul» strøket fra «Veien til neste vakt» — depotet er et
+eksternt system. **Overleveringen** er lagt inn som «VURDER: stillingsbilde i KO —
+innlesingsside, ikke rapport» med skissen (André: «vi skal kanskje eksperimentere litt med
+den. Men er usikker»): ikke vaktskiftet, som løses muntlig, men byttene inne i skiftene og
+forventningene som bare finnes i hodet; nytt er bare en frist på en festet linje og en
+systemlinje ved kvittering.
+
+---
+
 ## 2026-10-04 — Hvem deler posisjon: ikonet på enhetskortet, tilstanden fra bilskjermen  `#oppdrag` `#ko` `#kart` `#personvern`
 
 **Hvorfor:** André, 4. okt. 2026, etter skissene: «Jeg liker A best for min del. Kan sikkert
@@ -192,6 +233,8 @@ heller — det sto bare i kartets egen TODO, som ingen har framme under vakt.
 
 Kartets filer omtales uten sti i runbooken: `core/tests_dokumentråte.py` sjekker hver sti mot
 *dette* repoet, og kartets `bin/start.sh` eller `PLAN.md` finnes ikke her.
+
+---
 
 ## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
 

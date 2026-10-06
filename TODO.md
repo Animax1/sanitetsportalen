@@ -38,7 +38,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet. **Behandlingsansvarlig er besluttet**
-      (B13 i `docs/PLAN_KARTKOBLING.md`, 30. sep. 2026): korpset, for portalen og
+      (B13 i `docs/archived/PLAN_KARTKOBLING.md`, 30. sep. 2026): korpset, for portalen og
       kart.sanitet.net, med André som systemansvarlig. Når navnet er på plass, skrives A.1,
       dokumenthodet og signaturfeltet om til korpset — beslutningen står alt som merknad i A.1.
 
@@ -184,8 +184,8 @@ virkeligheten, og rekkefølgen under følger av det.*
 
 - [ ] **Fastfrysing noen uker før vakta:** ingen skjemaendringer, flyttinger eller nye
       moduler — bare feilrettinger. Det som kjører på vakta skal være det generalprøven
-      prøvde. Det som skal være med på vakta — `/lag/`, puss av `/ko/` og `/vaktliste/`,
-      en eventuell beholdning/depot-modul — må derfor være ferdig før frysingen, ikke under.
+      prøvde. Det som skal være med på vakta — `/lag/`, puss av `/ko/` og `/vaktliste/` —
+      må derfor være ferdig før frysingen, ikke under.
 - [ ] **Generalprøve på staging, 3–4 uker før vakta** —
       [`docs/GENERALPROVE.md`](./docs/GENERALPROVE.md). Ekte folk og telefoner, hovedvekt
       på flere biler per oppdrag. Testsjekklistene for KO og vaktlista kjøres i forkant.
@@ -1020,6 +1020,70 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 > **Merk:** skissen antok modulene `vakter`, `utstyr`, `rapport` og `beredskap`. Retningen
 > siden er blitt park og oppdrag (se «Skalering mot 2027» over). Arkitekturvalgene i
 > skissen står seg — modullista gjør det ikke.
+
+### Fra gjennomgangen mot 48-timersvakta — 6. okt. 2026, til vurdering
+
+*Gjennomgang av modulene og kartkoblingen mot en vakt på to døgn med mange ledd. Fem av
+elleve forslag ble lagt hit som «vurder», og overleveringen kom til 6. okt. etter en skisse;
+resten ble avvist eller finnes alt (depotet er et eksternt system; vær er i kartet;
+sektorer/flere KO: nei). Ingen av dem er bestilt.*
+
+- [ ] **VURDER: stillingsbilde i KO — innlesingsside, ikke rapport.** André, 6. okt. 2026:
+      «vi skal kanskje eksperimentere litt med den. Men er usikker.» Ikke selve vaktskiftet —
+      det løses muntlig, med overlapp, i rolige perioder. Vinklingen er byttene *inne i*
+      skiftene over to døgn: KO-leder tilbake fra pause, utalarm fra to til én kl. 03,
+      bilskjermen som bytter hender, den som åpner KO kl. 04 og skal lese seg opp. Det som
+      går tapt da er ikke hendelsene og oppdragene (de står i loggen og på tavla), men
+      **forventningene**: «arrangøren ringer om gjerdet rundt 03», «bil 56 lader til 02:30».
+      Tre av fire bolker er lesing av det som finnes; den fjerde er en festet linje med frist:
+
+      ```
+      ┌─ Stillingsbilde ───────────────────────────── lør 01:52 ─┐
+      │ ÅPNE HENDELSER   H12 Rød Parkscene  Lag 4, Lag 1  siste 01:40 │
+      │ VENTER PÅ        ⏳ 02:30 Bil 56 ferdig ladet        — Kari   │
+      │                  ⏳ 03:00 Arrangør ringer om gjerdet  — Ola    │
+      │                  ⏳ 06:00 Lag 4 avløses (planlagt slutt)       │
+      │ RESSURSER        56 Ledig · 57 Fremme H12 · Lag 3 Hovedpost   │
+      │ NESTE I PROGRAM  02:00 Club, behov 2 lag · 03:00 stengt        │
+      │                     [ Jeg har lest meg opp — overtar KO ]      │
+      └───────────────────────────────────────────────────────────────┘
+      01:53 ⚙ Vaktskifte KO: Per overtok. 2 åpne hendelser, 3 venter-på.
+      ```
+
+      Nytt er bare fristen på en festet linje (`Logglinje.festet_*` finnes) og systemlinja
+      ved kvittering — den svarer tre uker senere på «hvem satt i KO da H14 eskalerte»;
+      sidebaren sier bare hvem som har KO oppe *nå*. Ingen ny modul, ingen ny tabell.
+      **Fella:** et «Venter på» ingen fyller ut kl. 03 er verre enn ingenting, fordi den
+      påtroppende stoler på en tom liste — samme felle som park-registreringen. Første prøve
+      er derfor om operatørene fester linjer med frist på en generalprøve, før vinduet tegnes.
+- [ ] **VURDER: pasientflyten gjennom leddene — lag → bil → post → ut.** `Patient` har
+      ingen peker til oppdrag, enhet eller hendelse, og ingen rad i park, oppdrag eller
+      pasientregistreringen peker på en annen. Den smaleste formen er ett nedtrekksfelt på
+      pasienten («innlevert fra oppdrag»), aldri pasientnummer i KO-loggen eller på
+      oppdraget, så art. 9-dataene blir værende hos posten. **Åpent valg:** André ser
+      personvern- og helseopplysningsrisiko ved å ha med hele flyten for en pasient
+      (6. okt. 2026), og pekere mellom KO, oppdrag og pasienter er alt utsatt med vilje i
+      KO-forslaget. Tas opp sammen med DPIA-gjennomgangen, ikke før.
+- [ ] **VURDER: hviletid mellom to skift for samme person.** Timetak og belastningsgrenser
+      finnes, og overlapp er sitt eget punkt over — men ingen regel sier noe om *mellomrommet*
+      mellom to skift. Over to døgn med nattskift er det der tretthet oppstår. Formen ville
+      vært som overlappsperren: en advarsel i planleggeren og en sperre ved frysing, ikke i
+      databasen.
+- [ ] **VURDER: forpleining — hvor mange spiser når.** Avledet av skiftene: antall til stede
+      per måltidstidspunkt, per ressurs eller korps, som en visning i vaktlista. Ingen
+      allergi- eller kostdata i portalen — det er helseopplysninger (art. 9) og hører ikke
+      hjemme her; kjøkkenet får tallet, ikke navnene.
+- [ ] **VURDER: masseutsending til mannskapet (SMS eller push).** I dag går lista på e-post
+      (`vaktliste/fil.py`) og lydvarselet til bilene; nødnett dekker det operative. SMS krever
+      en ny leverandør og en ny transport ut av Railway, og `Mannskap.telefon` ville fått et
+      nytt formål som må inn i personverndokumentasjonen. Nytten er mobilisering av reserve
+      og «møt opp»/«evakuer» til de som sover — vurder om nødnett og telefonkjeden alt dekker
+      det.
+- [ ] **VURDER: tiltakskort og sjekklister i portalen.** Utgangspunktet er nei: tiltakskortene
+      ligger i Bliksund (arrangørens system, lenken til `/lag/` går derfra), og en kopi i
+      portalen er utdatert ved første revisjon. **Bonusen med et separat system er at
+      tiltakskortene står om portalen går ned** (André, 6. okt. 2026) — det argumentet gjelder
+      uansett hvor gode kortene i portalen hadde vært.
 
 ### Eget domene — portal.sanitet.net
 

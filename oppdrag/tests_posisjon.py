@@ -1,6 +1,6 @@
 """Bilens posisjon rir på stemplingen til kart.sanitet.net (30. sep. 2026).
 
-`docs/PLAN_KARTKOBLING.md` §6. Serversiden: `posisjon` i kroppen valideres,
+`docs/archived/PLAN_KARTKOBLING.md` §6. Serversiden: `posisjon` i kroppen valideres,
 droppes når den er søppel (aldri 400 — køen i bilen ville strøket stemplingen),
 og sendes etter commit med navnet fra databasen. Klientsiden kjøres i node
 gjennom den ekte inngangen, `_stemple` → køraden → `synk()`.

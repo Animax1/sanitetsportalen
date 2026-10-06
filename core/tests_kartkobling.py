@@ -1,4 +1,4 @@
-"""Klienten mot kart.sanitet.net (`core/kartkobling.py`, `docs/PLAN_KARTKOBLING.md` §5).
+"""Klienten mot kart.sanitet.net (`core/kartkobling.py`, `docs/archived/PLAN_KARTKOBLING.md` §5).
 
 `urlopen` mockes; signaturen prøves mot kartets regel slik den står i
 `kart.sanitet/portal/signatur.py`, skrevet av her uavhengig av klientens egen

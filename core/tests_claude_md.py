@@ -89,7 +89,7 @@ ROT = Path(settings.BASE_DIR)
 #: klient i rammeverket som både oppdrag (bilene) og KO (lagene) sender gjennom,
 #: og ingen av dem får kjenne den andre — samme grunn som registrene. Én rad i
 #: miljøtabellen og ett kort avsnitt under «Avhengighetsretningen»
-#: (`docs/PLAN_KARTKOBLING.md` §8). Hvordan hver modul bruker den står hos modulen.
+#: (`docs/archived/PLAN_KARTKOBLING.md` §8). Hvordan hver modul bruker den står hos modulen.
 ROT_TEGNGRENSE = 67_800
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,

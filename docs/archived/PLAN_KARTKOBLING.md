@@ -1,3 +1,11 @@
+> **Arkivert 6. okt. 2026 (André: «den er nytteløs nå»).** Puljene A–F ble levert 30. sep.
+> 2026 og koblingen går i prod. Dokumentet beskriver planen slik den var før leveransen og
+> oppdateres ikke; **B12 er alt utdatert** — kartet matcher lagets sted mot både teiger og
+> veipunkter siden 2. okt. 2026 (`portal/lagring.steder_for` i `kart-sanitet`). Det som
+> gjelder står i koden (`core/kartkobling.py`, `ko/kartkobling.py`, `oppdrag/views._posisjon`)
+> og i kartets egen `docs/PLAN.md`. Beslutningstabellen i §1 (B1–B14) er grunnen til at fila
+> er arkivert og ikke slettet.
+
 # Plan: kobling fra portalen til kart.sanitet.net
 
 Status: **pulje A–F utført 30. september 2026** (se CHANGELOG i begge repoene); gjenstår
