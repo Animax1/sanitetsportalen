@@ -1,4 +1,4 @@
-"""Lagene til kart.sanitet.net (`ko/kartkobling.py`, `docs/PLAN_KARTKOBLING.md` §7).
+"""Lagene til kart.sanitet.net (`ko/kartkobling.py`, `docs/archived/PLAN_KARTKOBLING.md` §7).
 
 Prøvd gjennom de ekte inngangene — `tavle.plasser`, `services.sett_lag`,
 `services.lukk_hendelse` — og ikke gjennom `meld_lag` direkte, så et kallsted

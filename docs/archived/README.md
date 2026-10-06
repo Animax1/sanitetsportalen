@@ -45,6 +45,12 @@ kontrollert.
 | [`DATAIMPORT_FRA_GAMMEL_PROD.md`](./DATAIMPORT_FRA_GAMMEL_PROD.md) | Planen for å få årets pasientdata fra den gamle Pasientregistreringsappen inn i portalen (14. aug. 2026) | Utført 22. aug. 2026: 273 pasienter, 12 førstehjelpere, 6 helsepersonell, alle kontroller grønne — se TODO under «Dataimport fra gammel prod». `import_offline_data` er kommandoen som ble brukt, og den finnes fortsatt |
 | [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) | Oppsettet av `kollaps_arkiv` som cron-jobb i Railway | Jobben står i `production` (`0 4 1 * *`) siden 22. aug. 2026, tørrkjørt 23. aug. Dokumentet ba selv om å bli slettet når jobben var oppe; det er arkivert i stedet, fordi sperrene det beskriver (backup etter arkivet, audit per kollaps) er verdt å ha et sted |
 
+## Utførte planer (arkivert 6. okt. 2026)
+
+| Dokument | Hva det planla | Hva det etterlot seg |
+|---|---|---|
+| [`PLAN_KARTKOBLING.md`](./PLAN_KARTKOBLING.md) | Koblingen portal → kart.sanitet.net i seks puljer: bilenes posisjon ved stempling, lagenes sted fra KO, HMAC, ingen lagring i portalen (30. sep. 2026) | Levert samme dag og i prod fra 1. okt. `core/kartkobling.py`, `ko/kartkobling.py` og `posisjon` i stemplingen. Beslutningene B1–B14 i §1 er grunnen til at fila er arkivert og ikke slettet; B12 (teigmatching) er alt utdatert, kartet matcher også veipunkter |
+
 ## Forslag som er erstattet (arkivert 17. sep. 2026)
 
 Denne kategorien er ny, og den er annerledes enn de over: dokumentet beskriver ikke arbeid

@@ -113,7 +113,7 @@ Volumets navn er likegyldig; mount path (`/data`) er det som teller.
 ### 2e. Kobling til kart.sanitet.net (valgfritt)
 
 Bilenes posisjon ved stempling og lagenes sted sendes til kartet
-(`core/kartkobling.py`, `docs/PLAN_KARTKOBLING.md`). Uten variablene er koblingen **inert**.
+(`core/kartkobling.py`, `docs/archived/PLAN_KARTKOBLING.md`). Uten variablene er koblingen **inert**.
 
 | Variabel | Verdi | Merknad |
 |---|---|---|

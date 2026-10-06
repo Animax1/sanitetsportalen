@@ -30,6 +30,19 @@ punkt-i-polygon mot teig, så en bil ved et veipunkt står under «Utenfor teig�
 «180 m fra Hovedpost»). Forarbeidet står: navnene i `oppdrag.Lokasjon` må stemme med kartets,
 og portalen kan ikke sjekke det på forhånd uten å lese fra kartet (B1).
 
+**Senere samme dag — kartkoblingsplanen arkivert, depot-klausulen strøket, stillingsbildet inn som VURDER.**
+André: «Vi kan arkivere/slette kartkobling.md den er nytteløs nå. Fjern linje 188 o todo.»
+`docs/PLAN_KARTKOBLING.md` → `docs/archived/PLAN_KARTKOBLING.md` med banner (levert 30. sep.,
+B12 utdatert) og indeksrad under ny bolk «Utførte planer»; arkivert og ikke slettet fordi
+beslutningstabellen B1–B14 er begrunnelsen koden hviler på. Alle 15 henvisningene i kode,
+kommentarer og dokumenter peker nå på den arkiverte stien (CHANGELOG urørt). I `TODO.md` er
+«en eventuell beholdning/depot-modul» strøket fra «Veien til neste vakt» — depotet er et
+eksternt system. **Overleveringen** er lagt inn som «VURDER: stillingsbilde i KO —
+innlesingsside, ikke rapport» med skissen (André: «vi skal kanskje eksperimentere litt med
+den. Men er usikker»): ikke vaktskiftet, som løses muntlig, men byttene inne i skiftene og
+forventningene som bare finnes i hodet; nytt er bare en frist på en festet linje og en
+systemlinje ved kvittering.
+
 ---
 
 ## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
