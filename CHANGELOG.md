@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-06 — TODO: fem «vurder»-punkter fra gjennomgangen mot 48-timersvakta  `#todo` `#kart`
+
+**Hvorfor:** André, 5. okt. 2026: «gå gjennom appen og gjerne husk kart.sanitets funksjon
+[…] se det opp imot den 48 timers vakten vi skal ha og se om det er noe andre moduler/apper
+vi kunne hatt nytte av». Elleve forslag ble lagt fram; han svarte punkt for punkt.
+
+**Lagt i `TODO.md`** under «Ideer / backlog», ny seksjon «Fra gjennomgangen mot
+48-timersvakta», alle som VURDER og ingen bestilt: pasientflyten gjennom leddene (ett
+pekerfelt på pasienten; André: «litt personvern og helseopplysnings risiko med å ha med hele
+flyten»), hviletid mellom to skift, forpleining uten allergidata, masseutsending på SMS/push,
+og tiltakskort i portalen («bonusen med separat system er at om portalen går ned så har vi
+fortsatt tiltakskortene»).
+
+**Avvist eller finnes alt, så det ikke foreslås igjen:** overlevering ved vaktskifte
+(muntlig rapport, skiftene byttes i rolige perioder med overlapp), depotmodul (eksternt
+system finnes), vær (ligger i kartet), sektorer/flere KO (nei), utstyrsmodul (dekket av
+depotet), stedsregister sendt til kartet (se under).
+
+**Veipunkter i kartkoblingen — kontrollert mot `kart-sanitet`:** lagets sted matches alt mot
+**både teiger og veipunkter** (`portal/lagring.steder_for`, 2. okt. 2026; teigen vinner ved
+likt navn). B12 i `docs/PLAN_KARTKOBLING.md` sier fortsatt bare «teiger» og er utdatert —
+ikke rettet i denne commiten. Det som er åpent ligger i kartet: biler grupperes bare ved
+punkt-i-polygon mot teig, så en bil ved et veipunkt står under «Utenfor teig» (kartets TODO:
+«180 m fra Hovedpost»). Forarbeidet står: navnene i `oppdrag.Lokasjon` må stemme med kartets,
+og portalen kan ikke sjekke det på forhånd uten å lese fra kartet (B1).
+
+---
+
 ## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
 
 **Hvorfor:** André, 4. okt. 2026, med to skjermbilder fra telefon: «Når jeg skal sette

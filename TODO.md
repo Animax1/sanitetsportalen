@@ -990,6 +990,42 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 > siden er blitt park og oppdrag (se «Skalering mot 2027» over). Arkitekturvalgene i
 > skissen står seg — modullista gjør det ikke.
 
+### Fra gjennomgangen mot 48-timersvakta — 6. okt. 2026, til vurdering
+
+*Gjennomgang av modulene og kartkoblingen mot en vakt på to døgn med mange ledd. Fem av
+elleve forslag ble lagt hit som «vurder»; resten ble avvist eller finnes alt (overlevering
+ved vaktskifte løses muntlig og skiftene byttes i rolige perioder med overlapp; depotet er et
+eksternt system; vær er i kartet; sektorer/flere KO: nei). Ingen av dem er bestilt.*
+
+- [ ] **VURDER: pasientflyten gjennom leddene — lag → bil → post → ut.** `Patient` har
+      ingen peker til oppdrag, enhet eller hendelse, og ingen rad i park, oppdrag eller
+      pasientregistreringen peker på en annen. Den smaleste formen er ett nedtrekksfelt på
+      pasienten («innlevert fra oppdrag»), aldri pasientnummer i KO-loggen eller på
+      oppdraget, så art. 9-dataene blir værende hos posten. **Åpent valg:** André ser
+      personvern- og helseopplysningsrisiko ved å ha med hele flyten for en pasient
+      (6. okt. 2026), og pekere mellom KO, oppdrag og pasienter er alt utsatt med vilje i
+      KO-forslaget. Tas opp sammen med DPIA-gjennomgangen, ikke før.
+- [ ] **VURDER: hviletid mellom to skift for samme person.** Timetak og belastningsgrenser
+      finnes, og overlapp er sitt eget punkt over — men ingen regel sier noe om *mellomrommet*
+      mellom to skift. Over to døgn med nattskift er det der tretthet oppstår. Formen ville
+      vært som overlappsperren: en advarsel i planleggeren og en sperre ved frysing, ikke i
+      databasen.
+- [ ] **VURDER: forpleining — hvor mange spiser når.** Avledet av skiftene: antall til stede
+      per måltidstidspunkt, per ressurs eller korps, som en visning i vaktlista. Ingen
+      allergi- eller kostdata i portalen — det er helseopplysninger (art. 9) og hører ikke
+      hjemme her; kjøkkenet får tallet, ikke navnene.
+- [ ] **VURDER: masseutsending til mannskapet (SMS eller push).** I dag går lista på e-post
+      (`vaktliste/fil.py`) og lydvarselet til bilene; nødnett dekker det operative. SMS krever
+      en ny leverandør og en ny transport ut av Railway, og `Mannskap.telefon` ville fått et
+      nytt formål som må inn i personverndokumentasjonen. Nytten er mobilisering av reserve
+      og «møt opp»/«evakuer» til de som sover — vurder om nødnett og telefonkjeden alt dekker
+      det.
+- [ ] **VURDER: tiltakskort og sjekklister i portalen.** Utgangspunktet er nei: tiltakskortene
+      ligger i Bliksund (arrangørens system, lenken til `/lag/` går derfra), og en kopi i
+      portalen er utdatert ved første revisjon. **Bonusen med et separat system er at
+      tiltakskortene står om portalen går ned** (André, 6. okt. 2026) — det argumentet gjelder
+      uansett hvor gode kortene i portalen hadde vært.
+
 ### Eget domene — portal.sanitet.net
 
 - [ ] **Koble domenet i Railway** og legg inn DNS-oppføringen. Krever Andre
