@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 30. september 2026  
-**Versjon:** 1.16  
+**Siste oppdatering:** 7. oktober 2026  
+**Versjon:** 1.17  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -397,7 +397,7 @@ for oppbevaringstid, sletteinngangen og forbeholdet om backupene.
 
 ### Posisjon og sted til kart.sanitet.net (kartkoblingen) — 30. september 2026
 
-Portalen sender to ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
+Portalen sender fire ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
 `docs/archived/PLAN_KARTKOBLING.md`). **Portalen lagrer ingenting av det** — ingen tabell, ingen
 revisjonsrad; den videresender og glemmer.
 
@@ -405,6 +405,8 @@ revisjonsrad; den videresender og glemmer.
 |---|---|---|---|
 | **Enhetenes posisjon ved stempling** | Enhetens navn (`oppdrag.Enhet.navn`, f.eks. «Haugesund 56»), bredde- og lengdegrad, tidspunktet for posisjonen | Bare når mannskapet stempler en status, og bare en posisjon under to minutter gammel | Vanlig personopplysning: posisjonen er kjøretøyets, men sammen med vaktlista peker den på mannskapet i bilen |
 | **Lagenes sted** | Lagnavnet og stedsnavnet der KO har plassert laget, eller hendelsens sted — **ingen koordinater** | Når KO flytter laget, setter det på eller av en hendelse | Vanlig personopplysning på samme måte, i grovere form |
+| **Bilens posisjon på knappen «Send posisjon»** (7. okt. 2026) | Som ved stempling: enhetens navn, bredde- og lengdegrad, tidspunktet | Bare når mannskapet trykker knappen under enhetsnavnet — «her er jeg, hvor skal jeg?» | Som ved stempling |
+| **Lagets posisjon, «Vi finner ikke fram»** (7. okt. 2026) | Lagnavnet, bredde- og lengdegrad, tidspunktet, og når markøren skal bort | Bare når laget trykker den oransje knappen på lagregistreringen. Står i kartet i 15 minutter (admin kan endre, 1–120 min; kartet godtar høyst 3 timer) | Vanlig personopplysning: posisjonen er telefonens, og lagnavnet peker sammen med vaktlista på mannskapet |
 
 **Det som ikke sendes:** status, oppdragsnummer, hendelsesnummer, hastegrad,
 problemstilling, fritekst, nøyaktighet. Ingen helseopplysning går til kartet.
@@ -445,6 +447,17 @@ stemplet.
   medlemmer av en kartgruppe der kartets administrator har slått på «Viser enheter og lag
   fra portalen» ser noe. Meldingene er signert (HMAC) og går over TLS; kartet returnerer
   aldri data til portalen.
+
+**De to knappene (7. okt. 2026) er en utvidelse, og vurdert for seg.** Begge sender én
+posisjon på et uttrykkelig trykk — ikke ved en annen handling, og ikke løpende — og begge
+har formålet i navnet: mannskapet ber KO om veibeskrivelse. Lagenes knapp er **første gang
+lagenes koordinater går til kartet**; fram til da gikk bare stedsnavnet. Det er forsvarlig
+fordi det er laget selv som ber om det, og fordi posisjonen er **midlertidig**: markøren og
+raden i kartet slettes når tiden går ut, ikke etter 24 timer som de andre. Lagregistreringen
+spør ikke om posisjon før knappen trykkes, og teksten over knappen sier hvem som ser den
+(«KO … i kartet, i oransje») og hvor lenge. Bilens knapp sendes også når bryteren «Del
+posisjon» er av: bryteren gjelder det som rir på stemplingene uten at noen tenker over det,
+knappen er et valg om å sende akkurat nå. Ingen av knappene lagrer noe i portalen.
 
 Samlet veier korpsets interesse tyngre enn inngrepet, gitt grensene over.
 **Historikk over posisjoner er en ny behandling og krever ny vurdering.** Det samme gjelder
@@ -508,7 +521,7 @@ Key-prefiks `pasientregistrering:` brukes for å isolere applikasjonens nøkler 
 |---|---|---|
 | Interne appbrukere (helsepersonell/frivillige med konto) | Tjenestlig behov, rollebasert tilgangsstyring | Pasientdata i henhold til tildelt rolle |
 | Railway Corp. (databehandler) | Databehandleravtale (DPA), art. 28 | All data lagret i databasen (infrastrukturtilgang, ikke applikasjonsnivå) |
-| kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling; lagets navn og stedsnavn. Ingen helseopplysninger |
+| kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling og på «Send posisjon»; lagets navn og stedsnavn, og lagets posisjon på «Vi finner ikke fram». Ingen helseopplysninger |
 
 Det foretas **ingen videreformidling** til tredjeparter, kommersielle aktører, offentlige myndigheter (med unntak av eventuelle lovpålagte utleveringer) eller andre organisasjoner.
 
@@ -543,7 +556,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
-| **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
+| **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **«Vi finner ikke fram»: slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
@@ -1048,7 +1061,8 @@ Denne delen gjelder deg som logger inn i systemet og registrerer pasienter — i
 | Endringslogg: hvilke endringer du har gjort på pasientopplysninger, med tidspunkt og IP | 2 år |
 | Varsler du har fått i portalen | 30 dager |
 | Navnet ditt på pasienter du har hatt ansvar for under en arkivert vakt | Følger arkivet |
-| Kjører du en bil med enhetsskjerm: bilens posisjon når du stempler, sendt til korpsets kart (ikke lagret i portalen). Slås av med «Del posisjon» på skjermen | 24 timer i kartet, bare siste posisjon |
+| Kjører du en bil med enhetsskjerm: bilens posisjon når du stempler, sendt til korpsets kart (ikke lagret i portalen). Slås av med «Del posisjon» på skjermen. Og når du trykker «Send posisjon» | 24 timer i kartet, bare siste posisjon |
+| Er du på et lag og trykker «Vi finner ikke fram» i lagregistreringen: lagets posisjon, sendt til korpsets kart (ikke lagret i portalen) | 15 minutter i kartet som standard |
 
 ### Hvorfor
 
@@ -1210,9 +1224,14 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.16 – sist oppdatert 30. september 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.17 – sist oppdatert 7. oktober 2026*
 
 **Endringslogg:**
+
+- **v1.17 (07.10.2026):** **To knapper som sender én posisjon til kartet** (A.6): «Send
+  posisjon» på bilskjermen og «Vi finner ikke fram» på lagregistreringen — den siste er første
+  gang lagenes koordinater går til kartet, og vurdert for seg (uttrykkelig trykk, midlertidig,
+  slettes når tiden går ut). A.7, A.9 og B.8 følger.
 
 - **v1.16 (30.09.2026):** **Kartkoblingen:** ny behandling i A.6 — enhetenes posisjon ved
   stempling og lagenes sted sendes til kart.sanitet.net, med formål, grunnlag (berettiget

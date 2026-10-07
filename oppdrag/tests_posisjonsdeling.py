@@ -245,7 +245,8 @@ class EnhetskortetBaererTilstandenTests(StemplingBasis):
 
 POS = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAktiv', 'delPosisjonNokkel',
        'delerPosisjon', 'posisjonTilKo', 'posisjonLinjeTekst', 'posisjonsdelingTilstand',
-       'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret', 'tegnPosisjonLinje')
+       'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret', 'tegnPosisjonLinje',
+       'tegnSendPosisjon', 'sendPosisjonSperret')
 
 BIL_HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
                                    'projiser', 'synk', '_stemple', 'lastMine', 'harNyDelt', 'erNyDelt',

@@ -6,7 +6,8 @@
  * Reglene som avgjør noe står som egne funksjoner (park*), så de kan kjøres i
  * node (park/tests_js.py): hvilket lag som huskes, hvilket sted som
  * forhåndsvelges og hva linja under sier, hva som tømmes etter en registrering,
- * og hvor lenge «Angre» står. Markup bygges med createElement og textContent —
+ * og hvor lenge «Angre» står — og hva «Vi finner ikke fram» sender og sier.
+ * Markup bygges med createElement og textContent —
  * ingen mal-strenger med tagger, så ingen navn kan bli til markup.
  */
 
@@ -103,6 +104,44 @@ function parkKvitteringstekst(k) {
   return `${parkKlokke(k.registrert_at)} · ${antall}${k.problemstilling} · ${k.sted} · ${k.utfall}`;
 }
 
+/* «Vi finner ikke fram» (7. okt. 2026). Teksten under knappen sier hvor lenge
+ * posisjonen står, og at telefonen spør først nå — laget skal vite hva de sier
+ * ja til før de trykker. */
+function parkHjelpForklaring(varighetMin) {
+  const n = Number(varighetMin);
+  const min = Number.isInteger(n) && n > 0 ? n : 15;
+  return `Trykk, så ser KO hvor dere står i kartet, i oransje, i ${min} minutter. `
+    + 'Telefonen spør om lov til å bruke posisjonen når dere trykker.';
+}
+
+/* Kroppen til POST-en: laget som er valgt i skjemaet over, og én fix. Uten
+ * valgt lag sendes ingenting — navnet er det KO ser i kartet. */
+function parkHjelpKropp(lag, pos) {
+  if (!lag || !pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return null;
+  return {lag: Number(lag), posisjon: {lat: pos.lat, lon: pos.lon, tid: pos.tid}};
+}
+
+/* Linja etter et trykk. Feilene sier alle hva laget gjør i stedet: samband. */
+function parkHjelpSvartekst(svar) {
+  if (!svar) return 'Ikke sendt — ingen forbindelse. Meld posisjonen på samband.';
+  if (svar.ok) {
+    const kl = parkKlokke(svar.data.utloper);
+    return kl ? `Sendt. KO ser ${svar.data.lag} i kartet til kl. ${kl}.`
+      : `Sendt. KO ser ${svar.data.lag} i kartet.`;
+  }
+  return (svar.data && svar.data.message) || 'Ikke sendt. Meld posisjonen på samband.';
+}
+
+/* Hvorfor telefonen ikke ga en posisjon. Kode 1 er «nektet», og kan bare
+ * rettes i telefonens innstillinger — derfor sier teksten hvor. */
+function parkPosisjonsfeilTekst(feil) {
+  if (feil && feil.code === 1) {
+    return 'Telefonen ga ikke lov til å bruke posisjonen. iPhone: Innstillinger → Safari → Posisjon. '
+      + 'Android: hengelåsen i adressefeltet → Tillatelser. Meld posisjonen på samband i mellomtiden.';
+  }
+  return 'Fant ingen posisjon. Prøv igjen ute, eller meld på samband.';
+}
+
 /* En UUID. `crypto.randomUUID` krever sikker kontekst; reserven bygger en v4
  * av `getRandomValues`, som finnes overalt. */
 function parkUuid() {
@@ -132,7 +171,7 @@ function parkSkriv(nokkel, verdi) {
 /* ── Tilstand og DOM ─────────────────────────────────────────────────────── */
 
 const parkTilstand = {token: '', telefon: '', oppsett: null, forhandsvalg: null,
-                      nokkel: null, sender: false, angre: []};
+                      nokkel: null, sender: false, senderHjelp: false, angre: []};
 
 function parkEl(id) { return document.getElementById(id); }
 
@@ -289,6 +328,57 @@ async function parkRegistrer(e) {
   parkEl('park-vakt').textContent = `${parkTilstand.oppsett.vakt} · ${k.lag}: ${k.antall_for_laget} registrert`;
 }
 
+function parkHjelpStatus(tekst) {
+  parkEl('park-hjelp-status').textContent = tekst || '';
+}
+
+/* Én fix. Nettleserens spørsmål om tilgang kommer her — i trykket, aldri før. */
+function parkHentPosisjon() {
+  return new Promise((ok, feil) => {
+    if (!globalThis.navigator || !navigator.geolocation) {
+      feil({code: 2});
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((p) => ok({
+      lat: p.coords.latitude, lon: p.coords.longitude,
+      tid: new Date(p.timestamp || Date.now()).toISOString(),
+    }), feil, {enableHighAccuracy: true, timeout: 20000, maximumAge: 10000});
+  });
+}
+
+async function parkSendHjelp() {
+  if (parkTilstand.senderHjelp) return;
+  const lag = parkEl('park-lag').value;
+  if (!lag) {
+    parkHjelpStatus('Velg laget dere er i skjemaet over først.');
+    parkEl('park-lag').focus();
+    return;
+  }
+  parkTilstand.senderHjelp = true;
+  const knapp = parkEl('park-hjelp-knapp');
+  knapp.disabled = true;
+  try {
+    parkHjelpStatus('Henter posisjon…');
+    let pos;
+    try { pos = await parkHentPosisjon(); } catch (feil) {
+      parkHjelpStatus(parkPosisjonsfeilTekst(feil));
+      return;
+    }
+    const kropp = parkHjelpKropp(lag, pos);
+    if (!kropp) {
+      parkHjelpStatus(parkPosisjonsfeilTekst(null));
+      return;
+    }
+    parkHjelpStatus('Sender…');
+    let svar = null;
+    try { svar = await parkKall('/lag/r/api/hjelp/', 'POST', kropp); } catch (e) { svar = null; }
+    parkHjelpStatus(parkHjelpSvartekst(svar));
+  } finally {
+    parkTilstand.senderHjelp = false;
+    knapp.disabled = false;
+  }
+}
+
 async function parkStart() {
   parkTilstand.token = parkLesToken(globalThis.location.hash, parkLes(PARK_LAGRING.token));
   // Tokenet ut av adressefeltet (§4.6): fragmentet når aldri serveren, men
@@ -328,6 +418,11 @@ async function parkStart() {
   const lag = parkVelgLag(o.lag, parkLes(PARK_LAGRING.lag));
   if (lag != null) parkEl('park-lag').value = String(lag);
   parkEl('park-skjema').classList.remove('d-none');
+  if (o.hjelp && o.hjelp.aktiv) {
+    parkEl('park-hjelp-forklaring').textContent = parkHjelpForklaring(o.hjelp.varighet_min);
+    parkEl('park-hjelp').classList.remove('d-none');
+    parkEl('park-hjelp-knapp').addEventListener('click', parkSendHjelp);
+  }
   parkTegnKvitteringer();
   await parkHentSted();
 

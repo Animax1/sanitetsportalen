@@ -1191,6 +1191,102 @@ function tegnPosisjonLinje() {
   const bryter = document.getElementById('del-posisjon');
   bryter.checked = delerPosisjon();
   bryter.disabled = bryterSperret();
+  tegnSendPosisjon();
+}
+
+// ── «Send posisjon» (André, 7. okt. 2026) ──────────────────────────────────
+//
+// «Her er jeg, hvor skal jeg?» Knappen under enhetsnavnet sender én posisjon
+// til kartet, med eller uten oppdrag (`POST /oppdrag/api/posisjon/`). Den er
+// en egen handling, og **bryteren «Del posisjon» styrer den ikke**: bryteren
+// gjelder det som rir på stemplingene uten at noen tenker over det; et trykk
+// på knappen er et uttrykkelig valg om å sende akkurat nå. Ingen kø: uten
+// dekning sier knappen fra, og mannskapet melder på samband.
+
+//: En fix i minnet yngre enn dette brukes som den er; ellers spørres
+//: nettleseren på nytt. Strammere enn stemplingens 120 s — spørsmålet er
+//: «hvor er jeg *nå*», og en bil kjører langt på to minutter.
+function sendPosisjonMaksAlderMs() {
+  return 30 * 1000;
+}
+
+/** Fixen i minnet hvis den er fersk nok for knappen, ellers `null`. */
+function posisjonForKnapp(siste, naa) {
+  if (!siste || !Number.isFinite(siste.lat) || !Number.isFinite(siste.lon)) return null;
+  const alder = naa - Date.parse(siste.tid);
+  if (!(Math.abs(alder) < sendPosisjonMaksAlderMs())) return null;
+  return { lat: siste.lat, lon: siste.lon, tid: siste.tid };
+}
+
+/** Knappen er grå når den ikke kan virke: av vakt, uten GPS, eller midt i en sending. */
+function sendPosisjonSperret() {
+  return !erPaVakt() || globalThis.bilensPosisjonStatus === 'utilgjengelig'
+    || globalThis.sendPosisjonPagar === true;
+}
+
+function tegnSendPosisjon() {
+  const rad = document.getElementById('send-posisjon-rad');
+  if (!rad) return;
+  rad.classList.toggle('d-none', !kartKoblingAktiv());
+  document.getElementById('send-posisjon').disabled = sendPosisjonSperret();
+}
+
+function _sendPosisjonStatus(tekst) {
+  const el = document.getElementById('send-posisjon-status');
+  if (el) el.textContent = tekst;
+}
+
+/** Én fix fra nettleseren. Spørsmålet om tilgang kommer her, ved trykket,
+ *  om det ikke alt er besvart. */
+function _hentPosisjonEnGang() {
+  return new Promise((ok, feil) => {
+    navigator.geolocation.getCurrentPosition((p) => ok({
+      lat: p.coords.latitude, lon: p.coords.longitude,
+      tid: new Date(p.timestamp || Date.now()).toISOString(),
+    }), feil, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  });
+}
+
+async function sendPosisjon() {
+  if (!kartKoblingAktiv() || sendPosisjonSperret()) return;
+  globalThis.sendPosisjonPagar = true;
+  tegnSendPosisjon();
+  try {
+    let pos = posisjonForKnapp(globalThis.bilensPosisjon || null, Date.now());
+    if (!pos) {
+      _sendPosisjonStatus('Henter posisjon…');
+      try {
+        pos = await _hentPosisjonEnGang();
+      } catch (feil) {
+        if (feil && feil.code === 1) {
+          globalThis.bilensPosisjonStatus = 'nektet';
+          tegnPosisjonLinje();
+          _sendPosisjonStatus('Nettleseren har ikke gitt tilgang til posisjon — se linja nederst.');
+        } else {
+          _sendPosisjonStatus('Fant ingen posisjon. Prøv igjen, eller meld på samband.');
+        }
+        return;
+      }
+    }
+    _sendPosisjonStatus('Sender…');
+    let res;
+    try {
+      res = await apiFetch('/oppdrag/api/posisjon/', {
+        method: 'POST', body: JSON.stringify({ posisjon: pos }),
+      });
+    } catch (e) {
+      _sendPosisjonStatus('Ikke sendt — ingen dekning. Meld posisjonen på samband.');
+      return;
+    }
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    _sendPosisjonStatus(res.ok
+      ? `Sendt til kartet kl. ${klokke(data.data && data.data.sendt_at)}`
+      : (data.message || 'Ikke sendt. Meld posisjonen på samband.'));
+  } finally {
+    globalThis.sendPosisjonPagar = false;
+    tegnSendPosisjon();
+  }
 }
 
 function vekslDelPosisjon() {

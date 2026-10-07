@@ -651,7 +651,8 @@ nekter skal stoppe hele innsendingen, også portalens egne felter.
 `core/tests_registre.py` prøver begge egenskapene med oppdiktede handlere.
 
 **`core/kartkobling.py` er klienten mot kart.sanitet.net** (30. sep. 2026): oppdrag sender
-bilens posisjon ved stempling, KO lagenes sted, og ingen av dem kjenner den andre. Bare
+bilens posisjon, KO lagenes sted, park lagenes «Vi finner ikke fram», og ingen av dem
+kjenner de andre. Bare
 fra portalen til kartet, signert med HMAC, inert uten `KART_URL`, kaster aldri, lagrer ingenting.
 Kallstedet legger sendingen i `transaction.on_commit`. `posisjon` i stemplingen er det andre
 navngitte unntaket fra «`skriv_handling` leser ikke kroppen» — ikke et domenefelt, og det

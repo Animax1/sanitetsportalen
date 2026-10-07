@@ -31,6 +31,14 @@
   .park-kvittering { border-left: 4px solid #22c55e; }
   .park-feil { border-left: 4px solid #f87171; }
   .park-registrer { font-size: 1.15rem; padding: .75rem; }
+  /* «Vi finner ikke fram» (7. okt. 2026). Oransje, fordi den skal skille seg fra
+     der KO har plassert laget — samme farge som markøren i kartet. */
+  .park-hjelp { border-left: 4px solid #f97316; }
+  .park-hjelp-knapp { background: #f97316; border-color: #f97316; color: #111827;
+                      font-size: 1.1rem; font-weight: 700; padding: .7rem; }
+  .park-hjelp-knapp:hover, .park-hjelp-knapp:focus { background: #ea580c; border-color: #ea580c; color: #111827; }
+  .park-hjelp-knapp:disabled { background: #9a3412; border-color: #9a3412; color: #fed7aa; }
+  .park-hjelp-status { min-height: 1.2em; }
 </style>
 </head>
 <body>
@@ -73,6 +81,18 @@
       <i class="bi bi-check2-circle me-2"></i>Registrer
     </button>
   </form>
+
+  {# «Vi finner ikke fram» (André, 7. okt. 2026): egen boks under registreringen, #}
+  {# og bare når kartkoblingen er satt opp. Telefonen spør om posisjon først #}
+  {# når knappen trykkes — aldri når siden lastes. #}
+  <section id="park-hjelp" class="park-kort park-hjelp mt-3 d-none" aria-labelledby="park-hjelp-tittel">
+    <div class="fw-semibold mb-1" id="park-hjelp-tittel"><i class="bi bi-signpost-split me-2"></i>Finner dere ikke fram?</div>
+    <div class="small text-muted mb-2" id="park-hjelp-forklaring"></div>
+    <button type="button" class="btn w-100 park-hjelp-knapp" id="park-hjelp-knapp">
+      <i class="bi bi-geo-alt-fill me-2"></i>Send posisjonen vår til KO
+    </button>
+    <div class="small mt-2 park-hjelp-status" id="park-hjelp-status" role="status" aria-live="polite"></div>
+  </section>
 </main>
 <script src="{% static 'js/park-lag.js' %}"></script>
 </body>

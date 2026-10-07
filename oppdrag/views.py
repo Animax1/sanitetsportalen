@@ -10,8 +10,6 @@ en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt.
 from __future__ import annotations
 
 import logging
-import math
-from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -971,10 +969,7 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
 STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst', 'posisjon',
                                        'posisjonsdeling'})
 
-#: En posisjon med tidspunkt lenger fram enn dette droppes. Kartet lar nyeste
-#: tidspunkt vinne, så én bil med klokka et døgn fram ville ellers frosset sin
-#: egen markør til raden ble ryddet.
-POSISJON_MAKS_FRAM = timedelta(minutes=5)
+#: Tidsgrensen fram i tid står hos valideringen, `kartkobling.POSISJON_MAKS_FRAM`.
 
 
 def _stempling_kropp(request):
@@ -1101,31 +1096,70 @@ def _posisjon(data):
     bilen stryker raden på 4xx, og en stempling som forsvinner på grunn av
     GPS-søppel er verre enn en markør som mangler. Én `warning` i loggen,
     uten verdiene. Posisjonen lagres aldri — den videresendes til kartet.
+    Selve valideringen er `kartkobling.les_posisjon`, delt med knappene.
     """
     pos = data.get('posisjon')
     if pos is None:
         return None
     try:
-        if not isinstance(pos, dict) or set(pos) != {'lat', 'lon', 'tid'}:
-            raise ValueError('formen')
-        lat, lon = pos['lat'], pos['lon']
-        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in (lat, lon)):
-            raise ValueError('ikke tall')
-        lat, lon = float(lat), float(lon)
-        if not (math.isfinite(lat) and math.isfinite(lon)
-                and -90 <= lat <= 90 and -180 <= lon <= 180):
-            raise ValueError('utenfor')
-        tid = parse_datetime(str(pos['tid']))
-        if tid is None:
-            raise ValueError('tid')
-        if timezone.is_naive(tid):
-            tid = timezone.make_aware(tid)
-        if tid > timezone.now() + POSISJON_MAKS_FRAM:
-            raise ValueError('tid fram i tid')
-    except (ValueError, TypeError) as feil:
+        return kartkobling.les_posisjon(pos)
+    except ValueError as feil:
         logger.warning('Stempling: posisjonen droppet (%s)', feil)
         return None
-    return lat, lon, tid
+
+
+@modul_kreves('oppdrag', 'skriv_handling', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:posisjon', rate='12/m', method='POST')
+def posisjon_view(request):
+    """«Send posisjon» under enhetsnavnet — «her er jeg, hvor skal jeg?»
+    (André, 7. okt. 2026).
+
+    **Den andre veien en bil sender posisjon på, og den eneste uten
+    stempling.** Stemplingen sender ved hendelser (B4); denne er for bilen som
+    står uten oppdrag, eller med et, og trenger at KO ser hvor den er. Samme
+    endepunkt i kartet (`send_enhet`), samme rad der — nyeste vinner.
+
+    Kroppen er lukket: `{"posisjon": {"lat", "lon", "tid"}}` og ingenting
+    annet. **Ugyldig posisjon er 400 her**, ikke `None` som i stemplingen: her
+    finnes ingen kø som stryker en stempling, og mannskapet skal få vite at
+    trykket ikke gikk. Av samme grunn sendes det **direkte og ikke i
+    `on_commit`** — ingenting skrives i basen, og svaret skal si om kartet tok
+    imot (502 ellers). Posisjonen lagres aldri.
+
+    Navnet er `Enhet.navn` fra databasen. Av vakt sendes ingenting: kortet
+    vises ikke for KO da, og bryteren «Del posisjon» er grå.
+    """
+    if not er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Bare enhetskontoer sender posisjon.'},
+            status=403)
+    if not kartkobling.er_konfigurert():
+        return JsonResponse(
+            {'status': 'error', 'message': 'Kartkoblingen er ikke satt opp.'}, status=409)
+    enhet = request.user.enhet
+    if not enhet.pa_vakt:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Bilen er av vakt. Posisjon sendes ikke.'},
+            status=409)
+    try:
+        data = les_json(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': 'Ugyldig JSON i kroppen.'},
+                            status=400)
+    if not isinstance(data, dict) or set(data) != {'posisjon'}:
+        return JsonResponse({'status': 'error', 'message': 'Kroppen skal være {"posisjon": …}.'},
+                            status=400)
+    try:
+        lat, lon, tid = kartkobling.les_posisjon(data['posisjon'])
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': (
+            'Telefonen ga ingen gyldig posisjon. Prøv igjen ute, eller meld på samband.')},
+            status=400)
+    if not kartkobling.send_enhet(enhet.navn, lat, lon, tid):
+        return JsonResponse({'status': 'error', 'message': (
+            'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=502)
+    return JsonResponse({'status': 'ok', 'data': {'sendt_at': timezone.now().isoformat()}})
 
 
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')

@@ -38,6 +38,8 @@ urlpatterns = [
     path('api/problemstillinger/<int:pk>/', views_verdier.problemstilling_detalj_view,
          name='oppdrag_api_problemstilling_detalj'),
     path('api/bilinnstillinger/', views_verdier.bilinnstillinger_view, name='oppdrag_api_bilinnstillinger'),
+    # «Send posisjon» fra bilen (7. okt. 2026) — ingen stempling, bare kartet.
+    path('api/posisjon/', views.posisjon_view, name='oppdrag_api_posisjon'),
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),

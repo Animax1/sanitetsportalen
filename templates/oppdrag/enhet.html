@@ -25,7 +25,19 @@
 <div class="container-fluid px-3 py-3 enhet-skjerm">
 
   <div class="d-flex align-items-center justify-content-between mb-3 gap-2">
-    <h1 class="h5 mb-0"><i class="bi bi-truck-front me-2"></i>{{ enhet.navn }}</h1>
+    <div>
+      <h1 class="h5 mb-0"><i class="bi bi-truck-front me-2"></i>{{ enhet.navn }}</h1>
+      {# «Send posisjon» — «her er jeg, hvor skal jeg?» (André, 7. okt. 2026). #}
+      {# Under navnet, og der uansett om bilen har et oppdrag. Bare med #}
+      {# kartkoblingen satt opp; ellers spørres nettleseren aldri. #}
+      <div id="send-posisjon-rad" class="send-posisjon-rad mt-2 d-none">
+        <button type="button" class="btn btn-sm btn-outline-info send-posisjon" id="send-posisjon"
+                data-action="sendPosisjon">
+          <i class="bi bi-crosshair me-1"></i>Send posisjon
+        </button>
+        <span id="send-posisjon-status" class="enhet-meta ms-2" role="status"></span>
+      </div>
+    </div>
     <div class="d-flex align-items-center gap-2">
       <span id="enhet-oppdatert" class="enhet-meta"></span>
       {# Lyden er på som standard; ikonet demper på denne enheten (André, #}

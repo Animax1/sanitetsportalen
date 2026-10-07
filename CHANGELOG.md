@@ -4,6 +4,78 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — «Send posisjon» i bilen og «Vi finner ikke fram» for lagene  `#oppdrag` `#park` `#kartkobling`
+
+**Hvorfor:** André, 7. okt. 2026: «En posisjonsknapp som brukes til å sende posisjon som er
+tiltenkt for "jeg her er, hvor skal jeg?" Skal stå uansett om det er oppdrag eller ei. Knappen
+skal under enhetsnavnet.» Og for lagregistreringen: «En send enkelt posisjons knapp som skal
+hjelpe KO forklare hvor laget skal. "En help me im lost knapp". Den må være oransje farge for
+det skal være separat fra hvor KO plasserer lagene. Den er midlertidig og varer 15 minutt men
+admin skal kunne endre det. Om de skal få forespørsel om å dele posisjon så må det skje når de
+trykker knappen. Knappen skal stå i egen boks nedenfor der lag registrerer.»
+
+**Bilen — «Send posisjon»** under enhetsnavnet på `/oppdrag/`, med og uten oppdrag. Ny rute
+`POST /oppdrag/api/posisjon/` (`views.posisjon_view`, `skriv_handling`, bare enhetskonto, bare
+på vakt, bare med kartkoblingen satt opp) som sender til kartets eksisterende `enhet` — samme
+rad som stemplingene, nyeste vinner. Lukket kropp `{posisjon}`; **ugyldig posisjon er 400 her**,
+ikke `None` som i stemplingen, fordi det ikke finnes noen kø som stryker noe, og mannskapet skal
+få vite at trykket ikke gikk. Fixen i minnet brukes om den er under 30 s, ellers spørres
+nettleseren. **Bryteren «Del posisjon» styrer ikke knappen** — et valg, se under.
+*Planen fra 30. sep. sa «ingen ny rute for posisjon, den rir på stemplingen» (§10); det var før
+det fantes en grunn til å sende uten å stemple. Dette er den grunnen.*
+
+**Lagene — «Vi finner ikke fram»**: oransje knapp i egen boks under registreringen på `/lag/r/`.
+Ny rute `POST /lag/r/api/hjelp/` (`views_lag.hjelp_view`, bak `@park_lenke_kreves`): laget som
+står valgt i skjemaet, én posisjon, og `utloper` = nå + varigheten. **Telefonen spør om posisjon
+først ved trykket** — ingen `watchPosition`, og siden får `geolocation=(self)` bare med
+koblingen satt opp. Varigheten er **15 minutter**, styrt på `/portal-admin/innstillinger/`
+(«"Vi finner ikke fram" står i kartet», 1–120 min, `park_hjelp_varighet_min`). Bremsen: 6/min per
+telefon, og den teller sendingene etter valideringen, ikke avslagene.
+
+**`core/kartkobling.py`:**
+- `send_lag_posisjon()` → nytt endepunkt `/api/portal/lag-posisjon`, **ikke** et felt på `lag`:
+  `lag` er der KO har plassert laget, dette er der laget står. Samme rad ville skrevet over
+  hverandre, og kartet kunne ikke tegnet dem ulikt.
+- `les_posisjon()` er den ene valideringen av en posisjon fra en telefon, flyttet ut av
+  `oppdrag/views._posisjon` (som nå kaller den). `POSISJON_MAKS_FRAM` flyttet med.
+- **Sendingen svarer `True`/`False`.** Knappene sender direkte og sier 502 «meld på samband» når
+  kartet ikke tok imot; stemplingene og KO lar svaret ligge, som før.
+- **Et 4xx gir ingen pause** (`_raskt_avslag`). Pausen verner mot det *trege* (timeout); et 4xx
+  er et raskt nei. Uten dette ville et kart som ennå ikke kjenner `lag-posisjon` (404) stoppet
+  bilenes posisjon i et minutt for hvert trykk på lagenes knapp.
+
+**Kartet (`kart-sanitet`)** har fått mottaket: tabell `Laghjelp`, oransje markør der telefonen
+sto, ryddet ved `utloper`, tak på 3 timer. **På grenen `lag-posisjon` (`f3b0966`), ikke på
+`main`** — push dit deployer, og den ble stoppet i sesjonen. Se TODO, «Krever Andre». Før det er ute, svarer lagenes knapp «Kartet tok ikke imot posisjonen. Meld den på
+samband» (404 fra kartet → 502).
+
+**Valg å se på (André):**
+- *Bilens knapp sender også med «Del posisjon» av.* Bryteren gjelder det som rir på stemplingene
+  uten at noen tenker over det; knappen er et uttrykkelig valg om å sende nå. Snus med én linje i
+  `sendPosisjon()` om du vil ha det motsatt.
+- *KO får ingen beskjed i portalen* om at en bil har trykket — posisjonen havner i kartet, og
+  spørsmålet («hvor skal jeg?») går fortsatt på samband. Et merke på ressurskortet er mulig, men
+  ikke bygget.
+- *Lagenes knapp krever at laget er valgt* i skjemaet over; ellers sier den fra uten å spørre
+  telefonen.
+
+**Personvern:** `docs/PERSONVERN_DOKUMENTASJON.md` v1.17 — A.6 har de to knappene vurdert for
+seg (lagenes knapp er første gang lagenes koordinater går til kartet), og A.7, A.9 og B.8 følger.
+
+**Testene:** `oppdrag/tests_send_posisjon.py` (server + node gjennom `sendPosisjon()` og
+`tegnPosisjonLinje()`), `park/tests.py` (`HjelpTests`, varigheten i portalinnstillingene),
+`park/tests_js.py` (`HjelpknappenTests` gjennom `parkSendHjelp()`, og at posisjonen bare spørres
+ved trykket), `core/tests_kartkobling.py` (det nye endepunktet, svaret, 4xx uten pause,
+`les_posisjon`). **Mutasjonstesting for hånd: 31 mutanter, 31 drept** — sperrene i begge viewene
+(vakt, kobling, enhetskonto, lukket kropp, lagene på vaktlista, varigheten, bremsen, 502-grenen,
+Permissions-Policy), klientens regler (aldersgrensen, gråingen av vakt, kallstedet i
+`tegnPosisjonLinje`, lagsjekken, at knappen slippes igjen, `addEventListener`-kallstedet) og
+klienten i `core` (4xx-unntaket, `utloper`, endepunktet, returverdien, grensene i `les_posisjon`).
+Én test kom til underveis: ingenting prøvde at knappen faktisk *vises*, fordi testene kalte
+`tegnSendPosisjon()` direkte og ikke gjennom `tegnPosisjonLinje()` (fallgruve 3).
+
+---
+
 ## 2026-10-07 — Bilen: «Annet sted»-feltet hopper ikke ut ved pollingen  `#oppdrag`
 
 **Hvorfor:** André, 7. okt. 2026: «Når enheter skriver i annet sted i /oppdrag så hopper den

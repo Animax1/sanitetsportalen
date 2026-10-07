@@ -95,6 +95,47 @@ class KartkoblingTests(SimpleTestCase):
                                'tidspunkt': '2026-09-30T19:04:11+02:00'})
         self.assertEqual(self._foresporsel(1).full_url, 'https://kart.example.no/api/portal/lag')
 
+    def test_lag_posisjon_har_eget_endepunkt_og_noyaktig_feltene(self):
+        """«Vi finner ikke fram» (7. okt. 2026): ikke et felt på `lag`, som er
+        der KO har plassert laget — og utløpet er et tidspunkt, ikke en varighet."""
+        utloper = datetime(2026, 9, 30, 17, 19, 11, tzinfo=dt_timezone.utc)
+        self.assertTrue(kartkobling.send_lag_posisjon('Lag 3', 59.41, 5.27, TID, utloper))
+        req = self._foresporsel()
+        self.assertEqual(req.full_url, 'https://kart.example.no/api/portal/lag-posisjon')
+        self.assertEqual(json.loads(req.data), {
+            'navn': 'Lag 3', 'lat': 59.41, 'lon': 5.27,
+            'tidspunkt': '2026-09-30T19:04:11+02:00', 'utloper': '2026-09-30T19:19:11+02:00'})
+        tid = req.get_header('X-portal-tid')
+        self.assertTrue(kartets_regel(NOKKEL, tid, req.data, req.get_header('X-portal-signatur'),
+                                      int(time.time())))
+
+    def test_sendingen_svarer_om_kartet_tok_imot(self):
+        """Knappene har noen som venter på svaret; stemplingene lar det ligge."""
+        self.assertTrue(kartkobling.send_enhet('Bil', 59, 5, TID))
+        self.urlopen.side_effect = error.HTTPError('u', 404, 'x', {}, None)
+        with self.assertLogs('core.kartkobling', 'WARNING'):
+            self.assertFalse(kartkobling.send_enhet('Bil', 59, 5, TID))
+        with override_settings(KART_URL=''):
+            self.assertFalse(kartkobling.send_enhet('Bil', 59, 5, TID))
+
+    def test_et_raskt_nei_gir_ingen_pause(self):
+        """Et 4xx kom fram og ble besvart med en gang — pausen verner mot det
+        trege. Uten unntaket ville et kart som ennå ikke kjenner `lag-posisjon`
+        stoppet bilenes posisjon i et minutt for hvert trykk på hjelpeknappen."""
+        self.urlopen.side_effect = error.HTTPError('u', 404, 'x', {}, None)
+        with self.assertLogs('core.kartkobling', 'WARNING'):
+            kartkobling.send_lag_posisjon('Lag 3', 59, 5, TID, TID)
+        self.assertFalse(kartkobling.status()['pause'])
+        self.urlopen.side_effect = None
+        self.assertTrue(kartkobling.send_enhet('Bil', 59, 5, TID))
+        self.assertEqual(self.urlopen.call_count, 2)
+
+    def test_et_5xx_gir_pause(self):
+        self.urlopen.side_effect = error.HTTPError('u', 502, 'x', {}, None)
+        with self.assertLogs('core.kartkobling', 'WARNING'):
+            kartkobling.send_enhet('Bil', 59, 5, TID)
+        self.assertTrue(kartkobling.status()['pause'])
+
     def test_tidspunktet_har_alltid_sone(self):
         kartkobling.send_lag('Lag 3', '', datetime(2026, 9, 30, 19, 4, 11))
         self.assertRegex(json.loads(self._foresporsel().data)['tidspunkt'], r'[+-]\d\d:\d\d$')
@@ -209,3 +250,34 @@ console.log(JSON.stringify([
                          ['–', 'Ingen ennå',
                           '401: nøkkelen stemmer ikke med kartets PORTAL_HMAC_NOKKEL.', 'status-ok',
                           '403:'])
+
+
+class LesPosisjonTests(SimpleTestCase):
+    """Den ene valideringen av en posisjon fra en telefon (7. okt. 2026) —
+    stemplingen, bilens knapp og lagenes knapp går alle gjennom den."""
+
+    def _pos(self, **felt):
+        from django.utils import timezone
+        return {'lat': 59.41, 'lon': 5.27, 'tid': timezone.now().isoformat(), **felt}
+
+    def test_gyldig(self):
+        lat, lon, tid = kartkobling.les_posisjon(self._pos())
+        self.assertEqual((lat, lon), (59.41, 5.27))
+        self.assertIsNotNone(tid.tzinfo)
+
+    def test_naiv_tid_faar_sone(self):
+        self.assertIsNotNone(kartkobling.les_posisjon(self._pos(tid='2026-09-30T19:04:11'))[2].tzinfo)
+
+    def test_ugyldig(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        fram = (timezone.now() + kartkobling.POSISJON_MAKS_FRAM + timedelta(seconds=30)).isoformat()
+        for pos in ([], None, {'lat': 59, 'lon': 5}, self._pos(navn='x'), self._pos(lat=True),
+                    self._pos(lat='59'), self._pos(lat=90.1), self._pos(lon=-180.1),
+                    self._pos(lat=float('nan')), self._pos(tid='i går'), self._pos(tid=fram),
+                    self._pos(tid='2026-13-45T99:00:00')):
+            with self.subTest(pos=pos), self.assertRaises(ValueError):
+                kartkobling.les_posisjon(pos)
+
+    def test_grensene_er_med(self):
+        self.assertEqual(kartkobling.les_posisjon(self._pos(lat=-90, lon=180))[:2], (-90.0, 180.0))

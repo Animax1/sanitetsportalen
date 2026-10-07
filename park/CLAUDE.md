@@ -32,6 +32,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Registreringslista på `/lag/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
 | Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
 | Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
+| «Vi finner ikke fram»: lagets posisjon til kartet, midlertidig | `views_lag.hjelp_view`, `services.hjelp_varighet_min()`, `parkSendHjelp()` |
 
 ## Portalens første side uten innlogging
 
@@ -56,6 +57,25 @@ håndhever det på kilden, og at hver API-rute bærer `@park_lenke_kreves`.
 **Tre bøtter for rate-limit:** per telefon (tilfeldig ID fra `localStorage`, ingen person),
 et tak per lenke, og per IP **bare** for ugyldige tokens. Ikke per IP på gyldige: telefoner
 på mobilnett deler adresse bak operatørens NAT, og ti lag kan stå bak samme.
+
+## «Vi finner ikke fram» (7. okt. 2026)
+
+«En help me I'm lost-knapp» (André): et lag som har gått seg bort, sender posisjonen sin til
+kart.sanitet.net, og KO ser den **oransje** — atskilt fra der KO har plassert laget. Egen boks
+under registreringen, og bare med kartkoblingen satt opp.
+
+- **Telefonen spør først ved trykket.** Ingen `watchPosition`, ingen spørsmål ved lasting;
+  `parkHentPosisjon()` kalles bare fra knappens handler. `PosisjonSpoerresBareVedTrykketTests`
+  leser kilden, fordi siden ikke lar seg kjøre hel i node. `side_view` gir `geolocation=(self)`
+  bare med koblingen satt opp; resten av portalen har `()`.
+- **Laget er det som står valgt i skjemaet over** — uten valgt lag spørres ikke telefonen.
+  ID inn, `Ressurs.navn` fra basen ut, som alt annet her.
+- **Midlertidig:** `utloper` = nå + `hjelp_varighet_min()` (15 som standard, 1–120 på
+  portalinnstillingene) sendes som **tidspunkt**, så kartet ikke trenger å kjenne innstillingen.
+  Kartet sletter raden da (`Laghjelp` i `kart-sanitet`).
+- **Lagres ikke i portalen**, og er ingen registrering. Sendes direkte, ikke i `on_commit`:
+  ingenting skrives, og laget skal få vite om kartet tok imot (502 → «meld på samband»).
+- **Bremsen teller sendingene, ikke avslagene** — 6/min per telefon, etter valideringen.
 
 ## Ingen fritekst
 

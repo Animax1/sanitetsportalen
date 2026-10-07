@@ -30,5 +30,16 @@ Malbiten bor i modulen; verdiene kommer fra `park/portalinnstillinger.py`.
           Se FORSLAG_PARK.md §4.7.
         </div>
       </div>
+      <label class="form-label mt-3" for="park_hjelp_varighet">«Vi finner ikke fram» står i kartet</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="park_hjelp_varighet" name="park_hjelp_varighet" class="form-control"
+               min="{{ park_hjelp_varighet_min }}" max="{{ park_hjelp_varighet_maks }}" value="{{ park_hjelp_varighet }}">
+        <span class="input-group-text">minutter</span>
+      </div>
+      <div class="form-text">
+        Et lag som har gått seg bort, kan sende posisjonen sin fra lagregistreringen. Den vises
+        oransje i kartet så lenge, {{ park_hjelp_varighet_min }}–{{ park_hjelp_varighet_maks }}
+        minutter, og forsvinner så av seg selv. Gjelder posisjoner sendt etter at den er endret.
+      </div>
     </div>
   </div>

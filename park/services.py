@@ -50,6 +50,32 @@ def angrefrist_min() -> int:
     return min(max(verdi, ANGREFRIST_MIN), ANGREFRIST_MAKS)
 
 
+#: «Vi finner ikke fram» (André, 7. okt. 2026): hvor lenge lagets posisjon
+#: står i kartet. «Den er midlertidig og varer 15 minutt men admin skal kunne
+#: endre det.» Styrt av admin på portalinnstillingene, som angrefristen.
+HJELP_VARIGHET_NOKKEL = 'park_hjelp_varighet_min'
+HJELP_VARIGHET_STANDARD = 15
+HJELP_VARIGHET_MIN = 1
+HJELP_VARIGHET_MAKS = 120
+
+
+def hjelp_varighet_min() -> int:
+    """Minutter lagets hjelpeposisjon står i kartet. Klemt; standard ved søppel."""
+    try:
+        verdi = int(str(AppSetting.get(HJELP_VARIGHET_NOKKEL, HJELP_VARIGHET_STANDARD)).strip())
+    except (TypeError, ValueError):
+        return HJELP_VARIGHET_STANDARD
+    return min(max(verdi, HJELP_VARIGHET_MIN), HJELP_VARIGHET_MAKS)
+
+
+def hjelp_aktiv() -> bool:
+    """Tilbys knappen? Bare med kartkoblingen satt opp — uten den har
+    posisjonen ingen steds å gå, og siden skal aldri spørre om den."""
+    from core import kartkobling
+
+    return kartkobling.er_konfigurert()
+
+
 def ko_posisjon_paa() -> bool:
     """Skal forhåndsvalget bruke KO-tavla? **På** til noen slår den av."""
     raa = AppSetting.get(KO_POSISJON_NOKKEL, None)
