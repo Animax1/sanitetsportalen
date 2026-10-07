@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — «OBS: Posisjon delt»: nøytrale tekster, bilene med, én varighet  `#oppdrag` `#park` `#kartkobling`
+
+**Hvorfor:** André, 7. okt. 2026: «Ikke bruk bokstavelig finner ikke frem, ta det mer nøytralt.
+Gjelder og i sanitetsportalen.» Og: «bil enheter som trykker på send posisjon må og vises under
+samme gruppe. Og gjerne oransje før det returneres til vanlig oppsett i farger.» Besluttet etter en
+runde uten kode: gruppa i kartet heter **«OBS: Posisjon delt»**, varigheten er **én felles
+innstilling «Delt posisjon vises i kartet»**, og de interne navnene ble nøytrale også.
+
+**Lagsiden:** boksen heter «Del posisjonen med KO», teksten er «Trykk for å sende hvor dere står.
+KO ser det i kartet i 15 minutter. Telefonen spør om lov til å bruke posisjonen.», og knappen
+«Send posisjon til KO». Ruten er `POST /lag/r/api/posisjon/` (`views_lag.posisjon_view`), og
+oppsettet har `posisjon` i stedet for `hjelp`.
+
+**Bilen:** «Send posisjon» går nå til kartets delte posisjoner, ikke til den vanlige bilmarkøren
+alene: bilen står **oransje under «OBS: Posisjon delt»** til tiden går ut, og får så vanlige
+farger og teigen sin igjen. Kartet flytter også bilmarkøren. Kvitteringen: «Delt kl. 21:57. KO ser
+bilen i kartet til kl. 22:12.»
+
+**Varigheten** flyttet fra parks kort til et nytt kort **«Kartet»** på `/portal-admin/innstillinger/`
+(global admin): «Delt posisjon vises i kartet», 1–120 minutter, 15 som standard
+(`core/kart_innstillinger.py`, `kartkobling.delt_posisjon_min()`, nøkkel `kart_delt_posisjon_min`).
+**`core/0016` tar med verdien** som eventuelt ble satt under det gamle navnet på staging
+(`park_hjelp_varighet_min`), og sletter den gamle raden. Bare data, ingen skjemaendring.
+
+**`core/kartkobling.py`:** `send_lag_posisjon` → `send_delt_posisjon(type, …)` med `type` «lag» eller
+«enhet», til kartets `/api/portal/delt-posisjon` (kart-sanitet `96f1aa8`, i drift før denne).
+
+**Testene:** `oppdrag/tests_send_posisjon.py` (typen, varigheten fra innstillingen, kvitteringen),
+`park/tests.py` (`SendPosisjonTests`), `park/tests_js.py` (teksten er nøytral),
+`core/tests_kartkobling.py` (det nye endepunktet, varigheten, kortet på siden, migreringen).
+**Mutasjonstesting: elleve mutanter, elleve drept** — typen i begge viewene, varigheten i begge,
+grensene og lagringen i kortet, klemmingen, typesjekken i klienten, migreringens «ikke overskriv»
+og slettingen, og registreringen av kortet i `apps.ready()`. I kartet: fem av fem.
+
+---
+
 ## 2026-10-07 — Kartets mottak for «Vi finner ikke fram» er ute  `#kartkobling`
 
 André, 7. okt. 2026: «Ja så flett den». Grenen `lag-posisjon` er flettet inn i `main` i

@@ -1,4 +1,4 @@
-"""Klienten mot kart.sanitet.net: bilenes posisjon, lagenes sted, og lag som har gått seg bort.
+"""Klienten mot kart.sanitet.net: bilenes posisjon, lagenes sted, og posisjoner bil og lag deler.
 
 `docs/archived/PLAN_KARTKOBLING.md` (30. sep. 2026). Retningen er **bare portal → kart**:
 kartet svarer 204 og returnerer aldri data, og kartet kaller aldri portalen.
@@ -24,7 +24,7 @@ Fem regler:
 
 **Sendingen svarer om kartet tok imot** (7. okt. 2026). Stemplingene og KO
 lar svaret ligge — de sender i `on_commit` og har ingen å fortelle det til.
-De to knappene («Send posisjon» i bilen, «Vi finner ikke fram» hos lagene)
+De to knappene («Send posisjon» i bilen og hos lagene)
 har noen som venter på svaret, og en knapp som sier «sendt» om noe som aldri
 kom fram, er verre enn en som sier fra.
 
@@ -70,6 +70,26 @@ SISTE_TTL_S = 7 * 24 * 3600
 POSISJON_MAKS_FRAM = timedelta(minutes=5)
 
 
+#: «Delt posisjon vises i kartet» (André, 7. okt. 2026): hvor lenge en posisjon bil eller lag har
+#: delt med «Send posisjon», står under «OBS: Posisjon delt» i kartet. **Én felles innstilling**
+#: for bil og lag, på `/portal-admin/innstillinger/` i kortet «Kartet» (`core/kart_innstillinger.py`).
+DELT_VARIGHET_NOKKEL = 'kart_delt_posisjon_min'
+DELT_VARIGHET_STANDARD = 15
+DELT_VARIGHET_MIN = 1
+DELT_VARIGHET_MAKS = 120
+
+
+def delt_posisjon_min() -> int:
+    """Minutter en delt posisjon står i kartet. Klemt; standard ved søppel. Kaster aldri."""
+    from core.models import AppSetting
+
+    try:
+        verdi = int(str(AppSetting.get(DELT_VARIGHET_NOKKEL, DELT_VARIGHET_STANDARD)).strip())
+    except Exception:
+        return DELT_VARIGHET_STANDARD
+    return min(max(verdi, DELT_VARIGHET_MIN), DELT_VARIGHET_MAKS)
+
+
 def er_konfigurert() -> bool:
     return bool(getattr(settings, 'KART_URL', '') and getattr(settings, 'KART_HMAC_NOKKEL', ''))
 
@@ -91,7 +111,7 @@ def les_posisjon(pos) -> tuple[float, float, datetime]:
     """``(lat, lon, tid)`` fra ``{"lat", "lon", "tid"}`` — eller `ValueError`.
 
     Den ene valideringen av en posisjon fra en telefon, brukt av bilens
-    stempling, bilens posisjonsknapp og lagenes «Vi finner ikke fram». Hva
+    stempling og «Send posisjon» i bilen og hos lagene. Hva
     en ugyldig posisjon *fører til*, er kallstedets sak: stemplingen dropper
     den (B7), knappene svarer 400. Feilmeldingen bærer aldri verdiene.
     """
@@ -131,23 +151,26 @@ def send_lag(navn: str, sted: str, tidspunkt: datetime) -> bool:
                                        'tidspunkt': _tidspunkt(tidspunkt)})
 
 
-def send_lag_posisjon(navn: str, lat: float, lon: float, tidspunkt: datetime,
-                      utloper: datetime) -> bool:
-    """«Vi finner ikke fram» fra lagregistreringen (7. okt. 2026).
+DELT_TYPER = frozenset({'lag', 'enhet'})
 
-    **Et eget endepunkt, ikke et felt på `lag`.** `lag` er hvor KO har
-    *plassert* laget — tilstand, sendt av KO. Dette er hvor laget *står* og
-    ber om hjelp — en midlertidig markør, oransje i kartet, som forsvinner av
-    seg selv ved `utloper`. Sto de på samme rad, ville den ene skrevet over den
-    andre, og kartet kunne ikke tegnet dem ulikt.
 
-    `utloper` er et **tidspunkt**, ikke en varighet: varigheten er en
-    portalinnstilling, og kartet skal ikke trenge å vite hva den var — bare
-    når markøren skal bort.
+def send_delt_posisjon(type_: str, navn: str, lat: float, lon: float, tidspunkt: datetime,
+                       utloper: datetime) -> bool:
+    """«Send posisjon» fra en bil (`enhet`) eller et lag (`lag`) — «OBS: Posisjon delt» i kartet
+    (André, 7. okt. 2026).
+
+    **Et eget endepunkt, ikke et felt på `lag` eller `enhet`.** `lag` er der KO har *plassert*
+    laget; dette er der de *står*, sendt av dem selv, og kartet tegner det oransje til
+    `utloper`. For en bil flytter kartet også bilmarkøren — portalen sender én melding.
+
+    `utloper` er et **tidspunkt**, ikke en varighet: varigheten er en portalinnstilling
+    (`delt_posisjon_min`), og kartet skal ikke trenge å vite hva den var.
     """
-    return _send('lag-posisjon', navn, lambda: {
-        'navn': navn, 'lat': lat, 'lon': lon, 'tidspunkt': _tidspunkt(tidspunkt),
-        'utloper': _tidspunkt(utloper),
+    if type_ not in DELT_TYPER:
+        raise ValueError(f'Ukjent type {type_!r}')
+    return _send('delt-posisjon', navn, lambda: {
+        'type': type_, 'navn': navn, 'lat': lat, 'lon': lon,
+        'tidspunkt': _tidspunkt(tidspunkt), 'utloper': _tidspunkt(utloper),
     })
 
 
@@ -192,9 +215,9 @@ def _raskt_avslag(kode: int | None) -> bool:
 
     Pausen finnes for at en bil ikke skal vente `TIMEOUT_S` per trykk mens
     kartet er nede — den verner mot det *trege*. Et 4xx kom fram og ble
-    besvart med en gang. Og det er sendingens eget problem: kartet som ennå
-    ikke kjenner `lag-posisjon` svarer 404, og uten dette unntaket ville ett
-    trykk på «Vi finner ikke fram» stoppet bilenes posisjon i et minutt.
+    besvart med en gang. Og det er sendingens eget problem: et kart som ennå
+    ikke kjenner et nytt endepunkt svarer 404, og uten dette unntaket ville ett
+    trykk på lagenes «Send posisjon» stoppet bilenes posisjon i et minutt.
     """
     return kode is not None and 400 <= kode < 500
 

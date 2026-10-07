@@ -430,7 +430,7 @@ class PortenTests(_Grunnlag):
         self._registrer()
         d = self.c.get(reverse('park_lag_oppsett'), **self._h()).json()
         self.assertEqual(set(d), {'vakt', 'lag', 'steder', 'problemstillinger', 'utfall',
-                                  'angrefrist_min', 'hjelp'})
+                                  'angrefrist_min', 'posisjon'})
         self.assertEqual([lag['navn'] for lag in d['lag']], ['Sandnes 2.1', 'Sandnes 2.2'])
         self.assertEqual(d['utfall'][0]['navn'], 'Behandlet på stedet')
 
@@ -818,31 +818,17 @@ class PortalinnstillingeneTests(TestCase):
         self.assertIn('name="park_angrefrist"', html)
         self.assertIn('name="park_ko_posisjon_sendt"', html)
         self.assertIn('checked', html, 'bryteren er på uten rad')
-        self.assertIn('name="park_hjelp_varighet"', html)
-
-    def test_hjelpens_varighet(self):
-        """«Den er midlertidig og varer 15 minutt men admin skal kunne endre det.»"""
-        from django.core.exceptions import ValidationError
-        self.assertEqual(services.hjelp_varighet_min(), 15)
-        self.h.lagre(self.h.valider({'park_hjelp_varighet': '30'}))
-        self.assertEqual(services.hjelp_varighet_min(), 30)
-        for feil in ('0', '121', 'x', ''):
-            with self.assertRaises(ValidationError, msg=feil):
-                self.h.valider({'park_hjelp_varighet': feil})
-        AppSetting.set(services.HJELP_VARIGHET_NOKKEL, '999')
-        self.assertEqual(services.hjelp_varighet_min(), services.HJELP_VARIGHET_MAKS)
-        AppSetting.set(services.HJELP_VARIGHET_NOKKEL, 'tull')
-        self.assertEqual(services.hjelp_varighet_min(), services.HJELP_VARIGHET_STANDARD)
+        self.assertNotIn('varighet', html, 'varigheten står i kortet «Kartet», felles for bil og lag')
 
 
-# ── «Vi finner ikke fram» (7. okt. 2026) ─────────────────────────────────────
+# ── «Send posisjon til KO» (7. okt. 2026) ─────────────────────────────────────
 
 KART = {'KART_URL': 'https://kart.example.no', 'KART_HMAC_NOKKEL': 'k' * 64}
-SEND_HJELP = 'core.kartkobling.send_lag_posisjon'
+SEND_POSISJON = 'core.kartkobling.send_delt_posisjon'
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False, **KART)
-class HjelpTests(_Grunnlag):
+class SendPosisjonTests(_Grunnlag):
     """Lagets posisjon til kartet: lukket kropp, laget fra vaktlista, navnet fra
     basen, utløpet fra innstillingen — og ingenting lagret i portalen."""
 
@@ -852,7 +838,7 @@ class HjelpTests(_Grunnlag):
         self.telefon = str(uuid.uuid4())
 
     def _post(self, data, token=None):
-        return self.c.post(reverse('park_lag_hjelp'), data=json.dumps(data),
+        return self.c.post(reverse('park_lag_posisjon'), data=json.dumps(data),
                            content_type='application/json',
                            HTTP_X_PARK_LENKE=self.token if token is None else token,
                            HTTP_X_PARK_TELEFON=self.telefon)
@@ -864,13 +850,13 @@ class HjelpTests(_Grunnlag):
         return kropp
 
     def test_sendes_med_navnet_fra_basen_og_utloper_etter_innstillingen(self):
-        AppSetting.set(services.HJELP_VARIGHET_NOKKEL, '20')
+        AppSetting.set('kart_delt_posisjon_min', '20')
         foer = timezone.now()
-        with mock.patch(SEND_HJELP, return_value=True) as send:
+        with mock.patch(SEND_POSISJON, return_value=True) as send:
             svar = self._post(self._kropp())
         self.assertEqual(svar.status_code, 200, svar.content)
-        navn, lat, lon, _tid, utloper = send.call_args.args
-        self.assertEqual((navn, lat, lon), ('Sandnes 2.1', 59.41, 5.27))
+        type_, navn, lat, lon, _tid, utloper = send.call_args.args
+        self.assertEqual((type_, navn, lat, lon), ('lag', 'Sandnes 2.1', 59.41, 5.27))
         self.assertGreaterEqual(utloper, foer + timedelta(minutes=20))
         self.assertLess(utloper, timezone.now() + timedelta(minutes=20, seconds=1))
         self.assertEqual(svar.json()['varighet_min'], 20)
@@ -878,7 +864,7 @@ class HjelpTests(_Grunnlag):
         self.assertFalse(Registrering.objects.exists(), 'posisjonen er ingen registrering')
 
     def test_kroppen_er_lukket_og_bare_lagene_paa_vaktlista(self):
-        with mock.patch(SEND_HJELP, return_value=True) as send:
+        with mock.patch(SEND_POSISJON, return_value=True) as send:
             for kropp, kode in (
                     ({**self._kropp(), 'navn': 'Falskt lag'}, 400),
                     (self._kropp(lag=str(self.lag1.pk)), 400),
@@ -893,44 +879,44 @@ class HjelpTests(_Grunnlag):
         send.assert_not_called()
 
     def test_bak_lenkeporten(self):
-        with mock.patch(SEND_HJELP, return_value=True) as send:
+        with mock.patch(SEND_POSISJON, return_value=True) as send:
             self.assertEqual(self._post(self._kropp(), token='feil').status_code, 403)
         send.assert_not_called()
 
     def test_kartet_som_ikke_tar_imot_gir_424_ikke_5xx(self):
         """Et 5xx er en e-post til admin per trykk (staging, 7. okt. 2026)."""
-        with mock.patch(SEND_HJELP, return_value=False):
+        with mock.patch(SEND_POSISJON, return_value=False):
             svar = self._post(self._kropp())
         self.assertEqual(svar.status_code, 424)
         self.assertIn('samband', svar.json()['message'])
 
     def test_uten_kobling_tilbys_ingenting(self):
         with override_settings(KART_URL='', KART_HMAC_NOKKEL=''), \
-                mock.patch(SEND_HJELP, return_value=True) as send:
+                mock.patch(SEND_POSISJON, return_value=True) as send:
             self.assertEqual(self._post(self._kropp()).status_code, 409)
             oppsett = self.c.get(reverse('park_lag_oppsett'), HTTP_X_PARK_LENKE=self.token,
                                  HTTP_X_PARK_TELEFON=self.telefon).json()
             side = self.c.get(reverse('park_lag_side'))
         send.assert_not_called()
-        self.assertFalse(oppsett['hjelp']['aktiv'])
+        self.assertFalse(oppsett['posisjon']['aktiv'])
         self.assertIn('geolocation=()', side['Permissions-Policy'])
 
     def test_med_kobling_faar_siden_spoerre_og_oppsettet_sier_varigheten(self):
         oppsett = self.c.get(reverse('park_lag_oppsett'), HTTP_X_PARK_LENKE=self.token,
                              HTTP_X_PARK_TELEFON=self.telefon).json()
-        self.assertEqual(oppsett['hjelp'], {'aktiv': True, 'varighet_min': 15})
+        self.assertEqual(oppsett['posisjon'], {'aktiv': True, 'varighet_min': 15})
         side = self.c.get(reverse('park_lag_side'))
         self.assertIn('geolocation=(self)', side['Permissions-Policy'])
         self.assertIn('camera=()', side['Permissions-Policy'])
         html = side.content.decode()
-        self.assertLess(html.index('id="park-skjema"'), html.index('id="park-hjelp"'),
+        self.assertLess(html.index('id="park-skjema"'), html.index('id="park-posisjon"'),
                         'egen boks, under registreringen')
 
     @override_settings(RATELIMIT_ENABLE=True)
     def test_en_finger_som_ikke_slipper_bremses(self):
         from django.core.cache import cache
         cache.clear()
-        with mock.patch(SEND_HJELP, return_value=True):
+        with mock.patch(SEND_POSISJON, return_value=True):
             koder = [self._post(self._kropp()).status_code
                      for _ in range(nok_til_a_bryte(6))]
         self.assertIn(429, koder)
@@ -940,7 +926,7 @@ class HjelpTests(_Grunnlag):
     def test_avviste_forsok_teller_ikke(self):
         from django.core.cache import cache
         cache.clear()
-        with mock.patch(SEND_HJELP, return_value=True):
+        with mock.patch(SEND_POSISJON, return_value=True):
             for _ in range(nok_til_a_bryte(6)):
                 self.assertEqual(self._post(self._kropp(lag=999999)).status_code, 404)
             self.assertEqual(self._post(self._kropp()).status_code, 200)

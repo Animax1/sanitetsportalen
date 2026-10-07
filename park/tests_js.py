@@ -272,16 +272,16 @@ class ParkMarkupTests(SimpleTestCase):
         self.assertEqual(re.findall(r'`[^`]*<[a-z][^`]*`', kilde), [])
 
 
-# ── «Vi finner ikke fram» (7. okt. 2026) ─────────────────────────────────────
+# ── «Send posisjon til KO» (7. okt. 2026) ─────────────────────────────────────
 
-HJELP = ('parkEl', 'parkLes', 'parkSkriv', 'parkSkalGlemmeTokenet', 'parkKall', 'parkKlokke',
+POSISJON = ('parkEl', 'parkLes', 'parkSkriv', 'parkSkalGlemmeTokenet', 'parkKall', 'parkKlokke',
          'parkPosisjonFristMs', 'parkMedFrist', 'parkPosisjonstilgang',
-         'parkHjelpStatus', 'parkHentPosisjon', 'parkHjelpKropp', 'parkHjelpSvartekst',
-         'parkPosisjonsfeilTekst', 'parkHjelpForklaring', 'parkSendHjelp')
+         'parkPosisjonStatus', 'parkHentPosisjon', 'parkPosisjonKropp', 'parkPosisjonSvartekst',
+         'parkPosisjonsfeilTekst', 'parkPosisjonForklaring', 'parkSendPosisjon')
 
-HJELP_FORSPILL = """
+POSISJON_FORSPILL = """
 const PARK_LAGRING = {token: 'park.token'};
-const parkTilstand = {token: 't', telefon: 'f', senderHjelp: false};
+const parkTilstand = {token: 't', telefon: 'f', senderPosisjon: false};
 globalThis.localStorage = {getItem: () => null, setItem() {}, removeItem() {}};
 const el = {};
 globalThis.document = {getElementById: (id) => (el[id] = el[id] || {id, value: '', textContent: '',
@@ -310,22 +310,22 @@ const straks = () => { globalThis.setTimeout = (f) => { ekteSetTimeout(f, 0); re
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class HjelpknappenTests(SimpleTestCase):
-    """Gjennom `parkSendHjelp`, den ekte inngangen fra knappen."""
+class PosisjonsknappenTests(SimpleTestCase):
+    """Gjennom `parkSendPosisjon`, den ekte inngangen fra knappen."""
 
     def _kjor(self, kode):
-        ut = run_node(build_harness(((PARK_JS, HJELP),)), '(async () => {\n' + kode + '\n})();',
-                      preamble=HJELP_FORSPILL)
+        ut = run_node(build_harness(((PARK_JS, POSISJON),)), '(async () => {\n' + kode + '\n})();',
+                      preamble=POSISJON_FORSPILL)
         return json.loads(next(l for l in ut.splitlines() if l != 'OK'))
 
     def test_trykket_sender_laget_som_er_valgt_og_en_fix(self):
         ut = self._kjor("""
             el['park-lag'] = {value: '7', focus() {}};
-            await parkSendHjelp();
-            console.log(JSON.stringify({kall, gpsKall, status: el['park-hjelp-status'].textContent,
-                                        sperret: el['park-hjelp-knapp'].disabled}));""")
+            await parkSendPosisjon();
+            console.log(JSON.stringify({kall, gpsKall, status: el['park-posisjon-status'].textContent,
+                                        sperret: el['park-posisjon-knapp'].disabled}));""")
         self.assertEqual(ut['gpsKall'], 1)
-        self.assertEqual(ut['kall'][0]['url'], '/lag/r/api/hjelp/')
+        self.assertEqual(ut['kall'][0]['url'], '/lag/r/api/posisjon/')
         self.assertEqual(ut['kall'][0]['body']['lag'], 7)
         self.assertEqual(set(ut['kall'][0]['body']), {'lag', 'posisjon'})
         self.assertEqual(set(ut['kall'][0]['body']['posisjon']), {'lat', 'lon', 'tid'})
@@ -336,9 +336,9 @@ class HjelpknappenTests(SimpleTestCase):
         """Spørsmålet om posisjon skal komme når det betyr noe — og uten lag
         har posisjonen ikke noe navn å stå under i kartet."""
         ut = self._kjor("""
-            await parkSendHjelp();
+            await parkSendPosisjon();
             console.log(JSON.stringify({kall: kall.length, gpsKall,
-                                        status: el['park-hjelp-status'].textContent}));""")
+                                        status: el['park-posisjon-status'].textContent}));""")
         self.assertEqual((ut['kall'], ut['gpsKall']), (0, 0))
         self.assertIn('Velg laget', ut['status'])
 
@@ -346,12 +346,12 @@ class HjelpknappenTests(SimpleTestCase):
         ut = self._kjor("""
             el['park-lag'] = {value: '7', focus() {}};
             const t = [];
-            gps = {code: 1}; await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
-            gps = {code: 3}; await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
+            gps = {code: 1}; await parkSendPosisjon(); t.push(el['park-posisjon-status'].textContent);
+            gps = {code: 3}; await parkSendPosisjon(); t.push(el['park-posisjon-status'].textContent);
             gps = {lat: 59, lon: 5};
-            svar = 'nett'; await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
+            svar = 'nett'; await parkSendPosisjon(); t.push(el['park-posisjon-status'].textContent);
             svar = {status: 424, body: {message: 'Kartet tok ikke imot posisjonen. Meld den på samband.'}};
-            await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
+            await parkSendPosisjon(); t.push(el['park-posisjon-status'].textContent);
             console.log(JSON.stringify(t));""")
         self.assertIn('ga ikke lov', ut[0])
         self.assertIn('Innstillinger', ut[0], 'nektet rettes i telefonen — teksten sier hvor')
@@ -364,9 +364,9 @@ class HjelpknappenTests(SimpleTestCase):
         ut = self._kjor("""
             el['park-lag'] = {value: '7', focus() {}};
             gps = 'aldri'; straks();
-            await parkSendHjelp();
-            console.log(JSON.stringify({status: el['park-hjelp-status'].textContent,
-                                        sperret: el['park-hjelp-knapp'].disabled, kall: kall.length}));""")
+            await parkSendPosisjon();
+            console.log(JSON.stringify({status: el['park-posisjon-status'].textContent,
+                                        sperret: el['park-posisjon-knapp'].disabled, kall: kall.length}));""")
         self.assertIn('Fikk ikke svar fra telefonen', ut['status'])
         self.assertIn('samband', ut['status'])
         self.assertFalse(ut['sperret'])
@@ -376,17 +376,18 @@ class HjelpknappenTests(SimpleTestCase):
         ut = self._kjor("""
             el['park-lag'] = {value: '7', focus() {}};
             tilgang = 'denied';
-            await parkSendHjelp();
-            console.log(JSON.stringify({gpsKall, status: el['park-hjelp-status'].textContent}));""")
+            await parkSendPosisjon();
+            console.log(JSON.stringify({gpsKall, status: el['park-posisjon-status'].textContent}));""")
         self.assertEqual(ut['gpsKall'], 0)
         self.assertIn('ga ikke lov', ut['status'])
 
     def test_forklaringen_sier_varigheten_og_at_telefonen_spoer(self):
-        self.assertIn('i 20 minutter', self._kjor('console.log(JSON.stringify(parkHjelpForklaring(20)));'))
-        tekst = self._kjor('console.log(JSON.stringify(parkHjelpForklaring(undefined)));')
+        self.assertIn('i 20 minutter', self._kjor('console.log(JSON.stringify(parkPosisjonForklaring(20)));'))
+        tekst = self._kjor('console.log(JSON.stringify(parkPosisjonForklaring(undefined)));')
         self.assertIn('i 15 minutter', tekst)
         self.assertIn('spør om lov', tekst)
-        self.assertIn('oransje', tekst)
+        self.assertIn('KO ser det i kartet', tekst)
+        self.assertNotIn('finner ikke', tekst.lower(), 'nøytralt (André, 7. okt. 2026)')
 
 
 class PosisjonSpoerresBareVedTrykketTests(SimpleTestCase):
@@ -404,6 +405,6 @@ class PosisjonSpoerresBareVedTrykketTests(SimpleTestCase):
         self.assertIn('navigator.geolocation', kilde)
         self.assertNotIn('navigator.geolocation', self._uten(kilde, 'parkHentPosisjon'))
         self.assertNotIn('watchPosition', kilde, 'lagsiden følger ikke posisjonen, den spør én gang')
-        resten = self._uten(self._uten(kilde, 'parkSendHjelp'), 'parkHentPosisjon')
+        resten = self._uten(self._uten(kilde, 'parkSendPosisjon'), 'parkHentPosisjon')
         self.assertNotIn('parkHentPosisjon(', resten)
-        self.assertIn("addEventListener('click', parkSendHjelp)", kilde)
+        self.assertIn("addEventListener('click', parkSendPosisjon)", kilde)

@@ -44,6 +44,6 @@ urlpatterns = [
     path('r/api/sted/', views_lag.sted_view, name='park_lag_sted'),
     path('r/api/registrer/', views_lag.registrer_view, name='park_lag_registrer'),
     path('r/api/angre/', views_lag.angre_view, name='park_lag_angre'),
-    # «Vi finner ikke fram» (7. okt. 2026) — posisjonen til kartet, lagres ikke.
-    path('r/api/hjelp/', views_lag.hjelp_view, name='park_lag_hjelp'),
+    # «Send posisjon til KO» (7. okt. 2026) — posisjonen til kartet, lagres ikke.
+    path('r/api/posisjon/', views_lag.posisjon_view, name='park_lag_posisjon'),
 ]

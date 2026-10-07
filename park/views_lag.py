@@ -48,9 +48,9 @@ TELEFON_HEADER = 'HTTP_X_PARK_TELEFON'
 GRENSE_TELEFON = '60/m'
 GRENSE_LENKE = '1200/m'
 GRENSE_UGYLDIG = '20/m'
-#: «Vi finner ikke fram» per telefon. Et trykk i minuttet er rikelig for et lag
-#: som står stille og venter; mer er en finger som ikke slipper.
-GRENSE_HJELP = '6/m'
+#: «Send posisjon» per telefon. Et trykk i minuttet er rikelig for et lag som
+#: står stille og venter; mer er en finger som ikke slipper.
+GRENSE_POSISJON = '6/m'
 
 AVVIST = 'Lenken er ikke åpen. Sjekk tiltakskortet, eller spør KO.'
 
@@ -121,10 +121,10 @@ def side_view(request):
     **Posisjon åpnes bare med kartkoblingen satt opp** (7. okt. 2026), som på
     bilskjermen: resten av portalen har `geolocation=()`. Siden spør aldri
     selv — nettleserens spørsmål kommer først når laget trykker
-    «Vi finner ikke fram».
+    «Send posisjon til KO».
     """
     svar = render(request, 'park/lag.html')
-    if services.hjelp_aktiv():
+    if kartkobling.er_konfigurert():
         svar['Permissions-Policy'] = PERMISSIONS_POLICY_MED_POSISJON
     return svar
 
@@ -142,10 +142,10 @@ def oppsett_view(request):
                               for p in services.problemstillinger()],
         'utfall': [{'id': u.pk, 'navn': u.navn} for u in services.utfall()],
         'angrefrist_min': services.angrefrist_min(),
-        # «Vi finner ikke fram» (7. okt. 2026): om knappen tilbys, og hvor
-        # lenge posisjonen står i kartet — teksten under knappen sier det.
-        'hjelp': {'aktiv': services.hjelp_aktiv(),
-                  'varighet_min': services.hjelp_varighet_min()},
+        # «Send posisjon til KO» (7. okt. 2026): om knappen tilbys, og hvor
+        # lenge posisjonen står i kartet — teksten over knappen sier det.
+        'posisjon': {'aktiv': kartkobling.er_konfigurert(),
+                     'varighet_min': kartkobling.delt_posisjon_min()},
     })
 
 
@@ -189,28 +189,28 @@ def angre_view(request):
     return JsonResponse({'status': 'ok'})
 
 
-def _hjelp_nokkel(group, request):
+def _posisjon_nokkel(group, request):
     return f'telefon:{request.park_telefon}'
 
 
 @require_http_methods(['POST'])
 @park_lenke_kreves
-def hjelp_view(request):
-    """«Vi finner ikke fram» — lagets posisjon til kartet (André, 7. okt. 2026).
+def posisjon_view(request):
+    """«Send posisjon til KO» — lagets posisjon til kartet (André, 7. okt. 2026).
 
-    «En help me I'm lost-knapp» som hjelper KO å forklare hvor laget skal.
-    Kroppen er lukket: `{"lag": id, "posisjon": {"lat", "lon", "tid"}}`. Laget
-    valideres mot det siden tilbyr, og navnet som sendes er `Ressurs.navn` fra
-    basen — som alt annet her er det ID-er inn, aldri tekst.
+    Vises i kartet under «OBS: Posisjon delt», så KO kan se hvor laget står og
+    forklare veien. Kroppen er lukket: `{"lag": id, "posisjon": {"lat", "lon",
+    "tid"}}`. Laget valideres mot det siden tilbyr, og navnet som sendes er
+    `Ressurs.navn` fra basen — som alt annet her er det ID-er inn, aldri tekst.
 
     **Lagres ikke i portalen** (B9), og står i kartet i
-    `services.hjelp_varighet_min()` minutter, oransje og atskilt fra der KO
-    har plassert laget (`kartkobling.send_lag_posisjon`). Sendes direkte og
-    ikke i `on_commit`: ingenting skrives, og laget skal få vite om kartet tok
-    imot — 424 ellers, og siden ber dem melde på samband. Ikke 502: se
-    `oppdrag.views.posisjon_view` — et 5xx er en e-post til admin per trykk.
+    `kartkobling.delt_posisjon_min()` minutter, oransje og atskilt fra der KO har
+    plassert laget. Sendes direkte og ikke i `on_commit`: ingenting skrives, og
+    laget skal få vite om kartet tok imot — 424 ellers, og siden ber dem melde på
+    samband. Ikke 502: se `oppdrag.views.posisjon_view` — et 5xx er en e-post til
+    admin per trykk.
     """
-    if not services.hjelp_aktiv():
+    if not kartkobling.er_konfigurert():
         return json_feil('Kartet er ikke koblet til. Meld posisjonen på samband.', status=409)
     try:
         data = les_json(request.body or b'{}')
@@ -230,12 +230,12 @@ def hjelp_view(request):
         return json_feil('Telefonen ga ingen gyldig posisjon. Prøv igjen, eller meld på samband.')
     # Bremsen teller sendingene, ikke avslagene — en avvist kropp har ikke
     # nådd kartet (rota: «Tell riktig hendelse, ikke bare riktig endepunkt»).
-    if er_rate_limited(request, group='park:hjelp', key=_hjelp_nokkel,
-                       rate=GRENSE_HJELP, method=ALL):
+    if er_rate_limited(request, group='park:posisjon', key=_posisjon_nokkel,
+                       rate=GRENSE_POSISJON, method=ALL):
         return json_feil('Posisjonen er alt sendt. Vent litt før dere sender igjen.', status=429)
-    varighet = services.hjelp_varighet_min()
+    varighet = kartkobling.delt_posisjon_min()
     utloper = timezone.now() + timedelta(minutes=varighet)
-    if not kartkobling.send_lag_posisjon(lag.navn, lat, lon, tid, utloper):
+    if not kartkobling.send_delt_posisjon('lag', lag.navn, lat, lon, tid, utloper):
         return json_feil('Kartet tok ikke imot posisjonen. Meld den på samband.', status=424)
     return JsonResponse({'status': 'ok', 'lag': lag.navn, 'utloper': utloper.isoformat(),
                          'varighet_min': varighet})

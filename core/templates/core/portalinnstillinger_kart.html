@@ -1,0 +1,21 @@
+{% comment %}
+Kortet «Kartet» på /portal-admin/innstillinger/ (7. okt. 2026). Verdiene kommer fra
+`core/kart_innstillinger.py`.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Kartet</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="kart_delt_posisjon">Delt posisjon vises i kartet</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="kart_delt_posisjon" name="kart_delt_posisjon" class="form-control"
+               min="{{ kart_delt_posisjon_min }}" max="{{ kart_delt_posisjon_maks }}" value="{{ kart_delt_posisjon }}">
+        <span class="input-group-text">minutter</span>
+      </div>
+      <div class="form-text">
+        Når en bil eller et lag trykker «Send posisjon», står posisjonen oransje under
+        «OBS: Posisjon delt» i kartet så lenge, {{ kart_delt_posisjon_min }}–{{ kart_delt_posisjon_maks }}
+        minutter, og forsvinner så av seg selv. Gjelder posisjoner sendt etter at den er endret.
+        {% if not kart_konfigurert %}<strong>Kartkoblingen er ikke satt opp i dette miljøet</strong>, så knappene vises ikke.{% endif %}
+      </div>
+    </div>
+  </div>

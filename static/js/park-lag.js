@@ -6,7 +6,7 @@
  * Reglene som avgjør noe står som egne funksjoner (park*), så de kan kjøres i
  * node (park/tests_js.py): hvilket lag som huskes, hvilket sted som
  * forhåndsvelges og hva linja under sier, hva som tømmes etter en registrering,
- * og hvor lenge «Angre» står — og hva «Vi finner ikke fram» sender og sier.
+ * og hvor lenge «Angre» står — og hva «Send posisjon til KO» sender og sier.
  * Markup bygges med createElement og textContent —
  * ingen mal-strenger med tagger, så ingen navn kan bli til markup.
  */
@@ -104,25 +104,27 @@ function parkKvitteringstekst(k) {
   return `${parkKlokke(k.registrert_at)} · ${antall}${k.problemstilling} · ${k.sted} · ${k.utfall}`;
 }
 
-/* «Vi finner ikke fram» (7. okt. 2026). Teksten under knappen sier hvor lenge
- * posisjonen står, og at telefonen spør først nå — laget skal vite hva de sier
- * ja til før de trykker. */
-function parkHjelpForklaring(varighetMin) {
+/* «Del posisjonen med KO» (7. okt. 2026). Teksten over knappen sier hvor lenge
+ * posisjonen står, og at telefonen spør om lov — laget skal vite hva de sier ja
+ * til før de trykker. Nøytral med vilje (André: «ikke bruk bokstavelig finner
+ * ikke frem»): knappen er for hva som helst, ikke bare for et lag som har gått
+ * seg bort. Varigheten er admins, «Delt posisjon vises i kartet». */
+function parkPosisjonForklaring(varighetMin) {
   const n = Number(varighetMin);
   const min = Number.isInteger(n) && n > 0 ? n : 15;
-  return `Trykk, så ser KO hvor dere står i kartet, i oransje, i ${min} minutter. `
-    + 'Telefonen spør om lov til å bruke posisjonen når dere trykker.';
+  return `Trykk for å sende hvor dere står. KO ser det i kartet i ${min} minutter. `
+    + 'Telefonen spør om lov til å bruke posisjonen.';
 }
 
 /* Kroppen til POST-en: laget som er valgt i skjemaet over, og én fix. Uten
  * valgt lag sendes ingenting — navnet er det KO ser i kartet. */
-function parkHjelpKropp(lag, pos) {
+function parkPosisjonKropp(lag, pos) {
   if (!lag || !pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return null;
   return {lag: Number(lag), posisjon: {lat: pos.lat, lon: pos.lon, tid: pos.tid}};
 }
 
 /* Linja etter et trykk. Feilene sier alle hva laget gjør i stedet: samband. */
-function parkHjelpSvartekst(svar) {
+function parkPosisjonSvartekst(svar) {
   if (!svar) return 'Ikke sendt — ingen forbindelse. Meld posisjonen på samband.';
   if (svar.ok) {
     const kl = parkKlokke(svar.data.utloper);
@@ -200,7 +202,7 @@ function parkSkriv(nokkel, verdi) {
 /* ── Tilstand og DOM ─────────────────────────────────────────────────────── */
 
 const parkTilstand = {token: '', telefon: '', oppsett: null, forhandsvalg: null,
-                      nokkel: null, sender: false, senderHjelp: false, angre: []};
+                      nokkel: null, sender: false, senderPosisjon: false, angre: []};
 
 function parkEl(id) { return document.getElementById(id); }
 
@@ -357,8 +359,8 @@ async function parkRegistrer(e) {
   parkEl('park-vakt').textContent = `${parkTilstand.oppsett.vakt} · ${k.lag}: ${k.antall_for_laget} registrert`;
 }
 
-function parkHjelpStatus(tekst) {
-  parkEl('park-hjelp-status').textContent = tekst || '';
+function parkPosisjonStatus(tekst) {
+  parkEl('park-posisjon-status').textContent = tekst || '';
 }
 
 /* Én fix. Nettleserens spørsmål om tilgang kommer her — i trykket, aldri før. */
@@ -375,41 +377,41 @@ function parkHentPosisjon() {
   });
 }
 
-async function parkSendHjelp() {
-  if (parkTilstand.senderHjelp) return;
+async function parkSendPosisjon() {
+  if (parkTilstand.senderPosisjon) return;
   const lag = parkEl('park-lag').value;
   if (!lag) {
-    parkHjelpStatus('Velg laget dere er i skjemaet over først.');
+    parkPosisjonStatus('Velg laget dere er i skjemaet over først.');
     parkEl('park-lag').focus();
     return;
   }
-  parkTilstand.senderHjelp = true;
-  const knapp = parkEl('park-hjelp-knapp');
+  parkTilstand.senderPosisjon = true;
+  const knapp = parkEl('park-posisjon-knapp');
   knapp.disabled = true;
   try {
     const tilgang = await parkPosisjonstilgang();
     if (tilgang === 'denied') {
-      parkHjelpStatus(parkPosisjonsfeilTekst({code: 1}));
+      parkPosisjonStatus(parkPosisjonsfeilTekst({code: 1}));
       return;
     }
-    parkHjelpStatus(tilgang === 'prompt'
+    parkPosisjonStatus(tilgang === 'prompt'
       ? 'Telefonen spør om lov til å bruke posisjonen — svar «Tillat».' : 'Henter posisjon…');
     let pos;
     try { pos = await parkMedFrist(parkHentPosisjon(), parkPosisjonFristMs()); } catch (feil) {
-      parkHjelpStatus(parkPosisjonsfeilTekst(feil));
+      parkPosisjonStatus(parkPosisjonsfeilTekst(feil));
       return;
     }
-    const kropp = parkHjelpKropp(lag, pos);
+    const kropp = parkPosisjonKropp(lag, pos);
     if (!kropp) {
-      parkHjelpStatus(parkPosisjonsfeilTekst(null));
+      parkPosisjonStatus(parkPosisjonsfeilTekst(null));
       return;
     }
-    parkHjelpStatus('Sender…');
+    parkPosisjonStatus('Sender…');
     let svar = null;
-    try { svar = await parkKall('/lag/r/api/hjelp/', 'POST', kropp); } catch (e) { svar = null; }
-    parkHjelpStatus(parkHjelpSvartekst(svar));
+    try { svar = await parkKall('/lag/r/api/posisjon/', 'POST', kropp); } catch (e) { svar = null; }
+    parkPosisjonStatus(parkPosisjonSvartekst(svar));
   } finally {
-    parkTilstand.senderHjelp = false;
+    parkTilstand.senderPosisjon = false;
     knapp.disabled = false;
   }
 }
@@ -453,10 +455,10 @@ async function parkStart() {
   const lag = parkVelgLag(o.lag, parkLes(PARK_LAGRING.lag));
   if (lag != null) parkEl('park-lag').value = String(lag);
   parkEl('park-skjema').classList.remove('d-none');
-  if (o.hjelp && o.hjelp.aktiv) {
-    parkEl('park-hjelp-forklaring').textContent = parkHjelpForklaring(o.hjelp.varighet_min);
-    parkEl('park-hjelp').classList.remove('d-none');
-    parkEl('park-hjelp-knapp').addEventListener('click', parkSendHjelp);
+  if (o.posisjon && o.posisjon.aktiv) {
+    parkEl('park-posisjon-forklaring').textContent = parkPosisjonForklaring(o.posisjon.varighet_min);
+    parkEl('park-posisjon').classList.remove('d-none');
+    parkEl('park-posisjon-knapp').addEventListener('click', parkSendPosisjon);
   }
   parkTegnKvitteringer();
   await parkHentSted();

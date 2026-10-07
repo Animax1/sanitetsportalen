@@ -1277,6 +1277,15 @@ function _hentPosisjonEnGang() {
   });
 }
 
+/** Linja etter et vellykket trykk: når, og hvor lenge KO ser bilen oransje
+ *  under «OBS: Posisjon delt» (`utloper`, admins «Delt posisjon vises i kartet»). */
+function sendPosisjonKvittering(data) {
+  const sendt = klokke(data.sendt_at);
+  const til = klokke(data.utloper);
+  if (sendt && til) return `Delt kl. ${sendt}. KO ser bilen i kartet til kl. ${til}.`;
+  return sendt ? `Delt kl. ${sendt}.` : 'Delt.';
+}
+
 /** Teksten når telefonen ikke ga en posisjon. Alle sier hva mannskapet gjør nå. */
 function sendPosisjonFeiltekst(feil) {
   const kode = feil && feil.code;
@@ -1336,7 +1345,7 @@ async function sendPosisjon() {
     let data = {};
     try { data = await res.json(); } catch (e) { data = {}; }
     _sendPosisjonStatus(res.ok
-      ? `Sendt til kartet kl. ${klokke(data.data && data.data.sendt_at)}`
+      ? sendPosisjonKvittering(data.data || {})
       : (data.message || 'Ikke sendt. Meld posisjonen på samband.'));
   } finally {
     globalThis.sendPosisjonPagar = false;

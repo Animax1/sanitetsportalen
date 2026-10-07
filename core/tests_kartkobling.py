@@ -13,7 +13,7 @@ from unittest import mock
 from urllib import error
 
 from django.core.cache import cache
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from core import kartkobling
 
@@ -95,16 +95,20 @@ class KartkoblingTests(SimpleTestCase):
                                'tidspunkt': '2026-09-30T19:04:11+02:00'})
         self.assertEqual(self._foresporsel(1).full_url, 'https://kart.example.no/api/portal/lag')
 
-    def test_lag_posisjon_har_eget_endepunkt_og_noyaktig_feltene(self):
-        """«Vi finner ikke fram» (7. okt. 2026): ikke et felt på `lag`, som er
-        der KO har plassert laget — og utløpet er et tidspunkt, ikke en varighet."""
+    def test_delt_posisjon_har_eget_endepunkt_og_noyaktig_feltene(self):
+        """«OBS: Posisjon delt» (7. okt. 2026): ikke et felt på `lag`, som er der
+        KO har plassert laget — og utløpet er et tidspunkt, ikke en varighet."""
         utloper = datetime(2026, 9, 30, 17, 19, 11, tzinfo=dt_timezone.utc)
-        self.assertTrue(kartkobling.send_lag_posisjon('Lag 3', 59.41, 5.27, TID, utloper))
+        self.assertTrue(kartkobling.send_delt_posisjon('lag', 'Lag 3', 59.41, 5.27, TID, utloper))
         req = self._foresporsel()
-        self.assertEqual(req.full_url, 'https://kart.example.no/api/portal/lag-posisjon')
+        self.assertEqual(req.full_url, 'https://kart.example.no/api/portal/delt-posisjon')
         self.assertEqual(json.loads(req.data), {
-            'navn': 'Lag 3', 'lat': 59.41, 'lon': 5.27,
+            'type': 'lag', 'navn': 'Lag 3', 'lat': 59.41, 'lon': 5.27,
             'tidspunkt': '2026-09-30T19:04:11+02:00', 'utloper': '2026-09-30T19:19:11+02:00'})
+        kartkobling.send_delt_posisjon('enhet', 'Haugesund 56', 59.41, 5.27, TID, utloper)
+        self.assertEqual(json.loads(self._foresporsel(1).data)['type'], 'enhet')
+        with self.assertRaises(ValueError):
+            kartkobling.send_delt_posisjon('båt', 'X', 59, 5, TID, utloper)
         tid = req.get_header('X-portal-tid')
         self.assertTrue(kartets_regel(NOKKEL, tid, req.data, req.get_header('X-portal-signatur'),
                                       int(time.time())))
@@ -120,11 +124,11 @@ class KartkoblingTests(SimpleTestCase):
 
     def test_et_raskt_nei_gir_ingen_pause(self):
         """Et 4xx kom fram og ble besvart med en gang — pausen verner mot det
-        trege. Uten unntaket ville et kart som ennå ikke kjenner `lag-posisjon`
-        stoppet bilenes posisjon i et minutt for hvert trykk på hjelpeknappen."""
+        trege. Uten unntaket ville et kart som ennå ikke kjenner et nytt endepunkt
+        stoppet bilenes posisjon i et minutt for hvert trykk på lagenes knapp."""
         self.urlopen.side_effect = error.HTTPError('u', 404, 'x', {}, None)
         with self.assertLogs('core.kartkobling', 'WARNING'):
-            kartkobling.send_lag_posisjon('Lag 3', 59, 5, TID, TID)
+            kartkobling.send_delt_posisjon('lag', 'Lag 3', 59, 5, TID, TID)
         self.assertFalse(kartkobling.status()['pause'])
         self.urlopen.side_effect = None
         self.assertTrue(kartkobling.send_enhet('Bil', 59, 5, TID))
@@ -281,3 +285,76 @@ class LesPosisjonTests(SimpleTestCase):
 
     def test_grensene_er_med(self):
         self.assertEqual(kartkobling.les_posisjon(self._pos(lat=-90, lon=180))[:2], (-90.0, 180.0))
+
+
+class DeltVarighetTests(TestCase):
+    """«Delt posisjon vises i kartet» (André, 7. okt. 2026): én felles innstilling
+    for bil og lag, i kortet «Kartet» på `/portal-admin/innstillinger/`."""
+
+    def setUp(self):
+        from core.kart_innstillinger import KartInnstillinger
+        self.h = KartInnstillinger()
+
+    def test_standard_er_15_og_klemmes(self):
+        from core.models import AppSetting
+        self.assertEqual(kartkobling.delt_posisjon_min(), 15)
+        AppSetting.set(kartkobling.DELT_VARIGHET_NOKKEL, '999')
+        self.assertEqual(kartkobling.delt_posisjon_min(), 120)
+        AppSetting.set(kartkobling.DELT_VARIGHET_NOKKEL, 'tull')
+        self.assertEqual(kartkobling.delt_posisjon_min(), 15)
+
+    def test_settes_paa_innstillingene_og_valideres(self):
+        from django.core.exceptions import ValidationError
+        self.assertEqual(self.h.valider({}), {}, 'fraværende felt er «behold»')
+        self.h.lagre(self.h.valider({'kart_delt_posisjon': '30'}))
+        self.assertEqual(kartkobling.delt_posisjon_min(), 30)
+        for feil in ('0', '121', 'x', ''):
+            with self.assertRaises(ValidationError, msg=feil):
+                self.h.valider({'kart_delt_posisjon': feil})
+
+    def test_kortet_er_registrert_og_heter_det_vi_ble_enige_om(self):
+        from django.template.loader import render_to_string
+        from core.portalinnstillinger import all_handlers
+        self.assertIn('kart', [h.slug for h in all_handlers()])
+        html = render_to_string(self.h.mal, self.h.kontekst())
+        self.assertIn('name="kart_delt_posisjon"', html)
+        self.assertIn('Delt posisjon vises i kartet', html)
+        self.assertIn('OBS: Posisjon delt', html)
+
+    def test_admin_ser_kortet_paa_siden(self):
+        from accounts.models import CustomUser
+        from django.test import Client
+        from django.urls import reverse
+        admin = CustomUser.objects.create_user(username='kartadmin', password='x', role='admin',
+                                               must_change_password=False)
+        c = Client()
+        c.force_login(admin)
+        with self.settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False):
+            svar = c.get(reverse('portaladmin:portal_settings'))
+        self.assertContains(svar, 'Delt posisjon vises i kartet')
+
+
+class VarighetenFlytterTests(TestCase):
+    """`core/0016`: varigheten admin satte under «Vi finner ikke fram» på staging,
+    følger med til «Delt posisjon vises i kartet», og den gamle raden er borte."""
+
+    def _flytt(self):
+        import importlib
+        from django.apps import apps
+        importlib.import_module('core.migrations.0016_delt_posisjon_varighet').flytt(apps, None)
+
+    def test_verdien_folger_med(self):
+        from core.models import AppSetting
+        AppSetting.objects.create(key='park_hjelp_varighet_min', value='40')
+        self._flytt()
+        self.assertEqual(kartkobling.delt_posisjon_min(), 40)
+        self.assertFalse(AppSetting.objects.filter(key='park_hjelp_varighet_min').exists())
+
+    def test_en_ny_verdi_overskrives_ikke_og_uten_gammel_skjer_ingenting(self):
+        from core.models import AppSetting
+        self._flytt()
+        self.assertFalse(AppSetting.objects.filter(key=kartkobling.DELT_VARIGHET_NOKKEL).exists())
+        AppSetting.objects.create(key=kartkobling.DELT_VARIGHET_NOKKEL, value='10')
+        AppSetting.objects.create(key='park_hjelp_varighet_min', value='40')
+        self._flytt()
+        self.assertEqual(kartkobling.delt_posisjon_min(), 10)

@@ -1,4 +1,4 @@
-"""Parks felter på portalinnstillingssiden: angrefristen, KO-bryteren og hjelpeposisjonens varighet.
+"""Parks felter på portalinnstillingssiden: angrefristen og KO-bryteren.
 
 Se `core/portalinnstillinger.py` for registeret. **Fraværende felt er «behold»,
 tomt felt er en feil** — samme regel som `ko/portalinnstillinger.py`, og av
@@ -24,9 +24,6 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
             'park_angrefrist_min': services.ANGREFRIST_MIN,
             'park_angrefrist_maks': services.ANGREFRIST_MAKS,
             'park_ko_posisjon': services.ko_posisjon_paa(),
-            'park_hjelp_varighet': services.hjelp_varighet_min(),
-            'park_hjelp_varighet_min': services.HJELP_VARIGHET_MIN,
-            'park_hjelp_varighet_maks': services.HJELP_VARIGHET_MAKS,
         }
 
     def valider(self, post) -> dict:
@@ -49,19 +46,6 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
                     f'Angrefristen i lagregistreringen må være mellom {services.ANGREFRIST_MIN} '
                     f'og {services.ANGREFRIST_MAKS} minutter.')
             ut['angrefrist'] = minutter
-        raa = post.get('park_hjelp_varighet')
-        if raa is not None:
-            try:
-                minutter = int(str(raa).strip())
-            except (TypeError, ValueError):
-                raise ValidationError(
-                    'Hvor lenge «Vi finner ikke fram» står i kartet, må være et helt tall minutter.'
-                ) from None
-            if not services.HJELP_VARIGHET_MIN <= minutter <= services.HJELP_VARIGHET_MAKS:
-                raise ValidationError(
-                    f'Hvor lenge «Vi finner ikke fram» står i kartet, må være mellom '
-                    f'{services.HJELP_VARIGHET_MIN} og {services.HJELP_VARIGHET_MAKS} minutter.')
-            ut['hjelp_varighet'] = minutter
         return ut
 
     def lagre(self, verdier: dict) -> None:
@@ -72,8 +56,6 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
             AppSetting.set(services.KO_POSISJON_NOKKEL, 'true' if verdier['ko_posisjon'] else 'false')
         if 'angrefrist' in verdier:
             AppSetting.set(services.ANGREFRIST_NOKKEL, verdier['angrefrist'])
-        if 'hjelp_varighet' in verdier:
-            AppSetting.set(services.HJELP_VARIGHET_NOKKEL, verdier['hjelp_varighet'])
 
 
 def register_handlers() -> None:

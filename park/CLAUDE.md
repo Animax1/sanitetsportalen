@@ -32,7 +32,7 @@ tiltakskort i Bliksund. Designet og Andrés beslutninger (B1–B23) står i
 | Registreringslista på `/lag/`: hele vakta hentes, 200 tegnes, filteret søker i alt | `park-oppsett.js` — `parkFiltrer()`, `parkTellertekst()` |
 | Tallene i fanen «Lag»: kontakter, ikke pasienter; slettede utelatt | `statistikk.py` |
 | Reglene i nettleseren | `park-lag.js` (lagene), `park-oppsett.js` (oppsettet) |
-| «Vi finner ikke fram»: lagets posisjon til kartet, midlertidig | `views_lag.hjelp_view`, `services.hjelp_varighet_min()`, `parkSendHjelp()` |
+| «Send posisjon til KO»: lagets posisjon til kartet, midlertidig | `views_lag.posisjon_view`, `kartkobling.delt_posisjon_min()`, `parkSendPosisjon()` |
 
 ## Portalens første side uten innlogging
 
@@ -58,11 +58,12 @@ håndhever det på kilden, og at hver API-rute bærer `@park_lenke_kreves`.
 et tak per lenke, og per IP **bare** for ugyldige tokens. Ikke per IP på gyldige: telefoner
 på mobilnett deler adresse bak operatørens NAT, og ti lag kan stå bak samme.
 
-## «Vi finner ikke fram» (7. okt. 2026)
+## «Del posisjonen med KO» (7. okt. 2026)
 
-«En help me I'm lost-knapp» (André): et lag som har gått seg bort, sender posisjonen sin til
-kart.sanitet.net, og KO ser den **oransje** — atskilt fra der KO har plassert laget. Egen boks
-under registreringen, og bare med kartkoblingen satt opp.
+Et lag sender posisjonen sin til kart.sanitet.net, og KO ser den **oransje** under «OBS: Posisjon
+delt» — atskilt fra der KO har plassert laget. Egen boks under registreringen, og bare med
+kartkoblingen satt opp. Het «Vi finner ikke fram» den første dagen; **teksten er nøytral med
+vilje** (André: «Ikke bruk bokstavelig finner ikke frem, ta det mer nøytralt»).
 
 - **Telefonen spør først ved trykket.** Ingen `watchPosition`, ingen spørsmål ved lasting;
   `parkHentPosisjon()` kalles bare fra knappens handler. `PosisjonSpoerresBareVedTrykketTests`
@@ -73,9 +74,10 @@ under registreringen, og bare med kartkoblingen satt opp.
   sto på «Henter posisjon…» (André, 7. okt.). `parkPosisjonstilgang()` sier et nei med en gang.
 - **Laget er det som står valgt i skjemaet over** — uten valgt lag spørres ikke telefonen.
   ID inn, `Ressurs.navn` fra basen ut, som alt annet her.
-- **Midlertidig:** `utloper` = nå + `hjelp_varighet_min()` (15 som standard, 1–120 på
-  portalinnstillingene) sendes som **tidspunkt**, så kartet ikke trenger å kjenne innstillingen.
-  Kartet sletter raden da (`Laghjelp` i `kart-sanitet`).
+- **Midlertidig:** `utloper` = nå + `kartkobling.delt_posisjon_min()` — **én felles innstilling
+  for bil og lag**, «Delt posisjon vises i kartet» i kortet «Kartet» på portalinnstillingene
+  (15 som standard, 1–120; `core/kart_innstillinger.py`) — sendes som **tidspunkt**, så kartet
+  ikke trenger å kjenne innstillingen. Kartet sletter raden da (`DeltPosisjon` i `kart-sanitet`).
 - **Lagres ikke i portalen**, og er ingen registrering. Sendes direkte, ikke i `on_commit`:
   ingenting skrives, og laget skal få vite om kartet tok imot (424 → «meld på samband»; ikke 5xx, som er en e-post til admin per trykk).
 - **Bremsen teller sendingene, ikke avslagene** — 6/min per telefon, etter valideringen.

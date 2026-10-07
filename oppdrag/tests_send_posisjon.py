@@ -18,7 +18,7 @@ from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_availab
 
 from .tests_views import StemplingBasis, _bruker, _klient
 
-SEND = 'core.kartkobling.send_enhet'
+SEND = 'core.kartkobling.send_delt_posisjon'
 OPPSATT = {'KART_URL': 'https://kart.example.no', 'KART_HMAC_NOKKEL': 'k' * 64}
 URL = '/oppdrag/api/posisjon/'
 
@@ -40,10 +40,22 @@ class SendPosisjonTests(StemplingBasis):
         with mock.patch(SEND, return_value=True) as send:
             resp = self._send({'posisjon': pos})
         self.assertEqual(resp.status_code, 200, resp.content)
-        navn, lat, lon, tid = send.call_args.args
-        self.assertEqual((navn, lat, lon), ('Haugesund 56', 59.4136, 5.2683))
+        type_, navn, lat, lon, tid, utloper = send.call_args.args
+        self.assertEqual((type_, navn, lat, lon), ('enhet', 'Haugesund 56', 59.4136, 5.2683))
         self.assertEqual(tid.isoformat(), pos['tid'])
         self.assertIn('sendt_at', resp.json()['data'])
+        self.assertEqual(resp.json()['data']['utloper'], utloper.isoformat())
+
+    def test_vises_i_kartet_saa_lenge_admin_har_satt(self):
+        """«Delt posisjon vises i kartet» — samme innstilling som lagene."""
+        from core.models import AppSetting
+        AppSetting.set('kart_delt_posisjon_min', '25')
+        foer = timezone.now()
+        with mock.patch(SEND, return_value=True) as send:
+            self._send({'posisjon': _pos()})
+        utloper = send.call_args.args[5]
+        self.assertGreaterEqual(utloper, foer + timedelta(minutes=25))
+        self.assertLess(utloper, timezone.now() + timedelta(minutes=25, seconds=1))
 
     def test_kroppen_er_lukket(self):
         """Et navn i kroppen skal aldri kunne bli det som står i kartet."""
@@ -115,7 +127,7 @@ HARNESS = ((OPPDRAG_ENHET_JS, ('kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel',
                                'sendPosisjonSperret', 'tegnSendPosisjon',
                                '_sendPosisjonStatus', '_hentPosisjonEnGang', 'sendPosisjon',
                                'posisjonLinjeTekst', 'bryterSperret', 'tegnPosisjonLinje',
-                               'posisjonFristMs', 'medFrist', 'posisjonstilgang',
+                               'posisjonFristMs', 'medFrist', 'posisjonstilgang', 'sendPosisjonKvittering',
                                'sendPosisjonFeiltekst', 'posisjonMaksAlderMs',
                                'posisjonForStempling')),)
 
@@ -128,7 +140,7 @@ const lag = (id) => (el[id] = el[id] || { id, textContent: '', disabled: false, 
   klasser: new Set(['d-none']), classList: { toggle(k, v) { v ? el[id].klasser.add(k) : el[id].klasser.delete(k); } } });
 globalThis.document = { getElementById: (id) => lag(id) };
 function klokke(iso) { return iso ? 'KL' : ''; }
-const kall = []; let svar = { ok: true, body: { data: { sendt_at: new Date().toISOString() } } };
+const kall = []; let svar = { ok: true, body: { data: { sendt_at: new Date().toISOString(), utloper: new Date().toISOString() } } };
 globalThis.apiFetch = async (url, opts) => {
   kall.push({ url, body: JSON.parse(opts.body) });
   if (svar === 'nett') throw new Error('offline');
@@ -177,7 +189,7 @@ class SendPosisjonKnappenTests(unittest.TestCase):
         self.assertEqual(ut['kall'][0]['url'], '/oppdrag/api/posisjon/')
         self.assertEqual(set(ut['kall'][0]['body']), {'posisjon'})
         self.assertEqual(ut['kall'][0]['body']['posisjon']['lat'], 59.4136)
-        self.assertEqual(ut['status'], 'Sendt til kartet kl. KL')
+        self.assertEqual(ut['status'], 'Delt kl. KL. KO ser bilen i kartet til kl. KL.')
         self.assertFalse(ut['sperret'], 'knappen slippes igjen etter sendingen')
 
     def test_gammel_fix_spoerr_nettleseren_paa_nytt(self):

@@ -69,6 +69,12 @@ class CoreConfig(AppConfig):
         from core.backup import register_handlers as registrer_core_backup
         registrer_core_backup()
 
+        # Kortet «Kartet» på portalinnstillingene (7. okt. 2026): hvor lenge en
+        # delt posisjon står i kartet. Felles for bil og lag, derfor her og ikke
+        # hos en modul. Se `core/kart_innstillinger.py`.
+        from core.kart_innstillinger import register_handlers as registrer_kart_innstillinger
+        registrer_kart_innstillinger()
+
         # Backup-klokka (13. sep. 2026). Starter ikke under test, migrate eller
         # engangskommandoer — `klokke.skal_starte()` er det ene stedet den
         # avgjørelsen tas. Den ligger her og ikke i en cron-tjeneste fordi

@@ -10,6 +10,7 @@ en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -1117,8 +1118,10 @@ def posisjon_view(request):
 
     **Den andre veien en bil sender posisjon på, og den eneste uten
     stempling.** Stemplingen sender ved hendelser (B4); denne er for bilen som
-    står uten oppdrag, eller med et, og trenger at KO ser hvor den er. Samme
-    endepunkt i kartet (`send_enhet`), samme rad der — nyeste vinner.
+    står uten oppdrag, eller med et, og trenger at KO ser hvor den er. Den går
+    til kartets delte posisjoner (`send_delt_posisjon`, 7. okt. 2026): bilen
+    står oransje under «OBS: Posisjon delt» i `kartkobling.delt_posisjon_min()`
+    minutter, og kartet flytter bilmarkøren dit — nyeste vinner.
 
     Kroppen er lukket: `{"posisjon": {"lat", "lon", "tid"}}` og ingenting
     annet. **Ugyldig posisjon er 400 her**, ikke `None` som i stemplingen: her
@@ -1161,10 +1164,13 @@ def posisjon_view(request):
         return JsonResponse({'status': 'error', 'message': (
             'Telefonen ga ingen gyldig posisjon. Prøv igjen ute, eller meld på samband.')},
             status=400)
-    if not kartkobling.send_enhet(enhet.navn, lat, lon, tid):
+    naa = timezone.now()
+    utloper = naa + timedelta(minutes=kartkobling.delt_posisjon_min())
+    if not kartkobling.send_delt_posisjon('enhet', enhet.navn, lat, lon, tid, utloper):
         return JsonResponse({'status': 'error', 'message': (
             'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=424)
-    return JsonResponse({'status': 'ok', 'data': {'sendt_at': timezone.now().isoformat()}})
+    return JsonResponse({'status': 'ok', 'data': {'sendt_at': naa.isoformat(),
+                                                  'utloper': utloper.isoformat()}})
 
 
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')
