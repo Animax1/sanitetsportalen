@@ -68,6 +68,9 @@ under registreringen, og bare med kartkoblingen satt opp.
   `parkHentPosisjon()` kalles bare fra knappens handler. `PosisjonSpoerresBareVedTrykketTests`
   leser kilden, fordi siden ikke lar seg kjøre hel i node. `side_view` gir `geolocation=(self)`
   bare med koblingen satt opp; resten av portalen har `()`.
+- **Egen frist rundt spørsmålet** (`parkMedFrist`, 25 s): `timeout` i `getCurrentPosition` teller
+  først når tilgangen er gitt, så et spørsmål som aldri vises eller besvares, ga aldri svar — knappen
+  sto på «Henter posisjon…» (André, 7. okt.). `parkPosisjonstilgang()` sier et nei med en gang.
 - **Laget er det som står valgt i skjemaet over** — uten valgt lag spørres ikke telefonen.
   ID inn, `Ressurs.navn` fra basen ut, som alt annet her.
 - **Midlertidig:** `utloper` = nå + `hjelp_varighet_min()` (15 som standard, 1–120 på

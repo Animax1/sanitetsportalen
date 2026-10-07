@@ -275,6 +275,7 @@ class ParkMarkupTests(SimpleTestCase):
 # ── «Vi finner ikke fram» (7. okt. 2026) ─────────────────────────────────────
 
 HJELP = ('parkEl', 'parkLes', 'parkSkriv', 'parkSkalGlemmeTokenet', 'parkKall', 'parkKlokke',
+         'parkPosisjonFristMs', 'parkMedFrist', 'parkPosisjonstilgang',
          'parkHjelpStatus', 'parkHentPosisjon', 'parkHjelpKropp', 'parkHjelpSvartekst',
          'parkPosisjonsfeilTekst', 'parkHjelpForklaring', 'parkSendHjelp')
 
@@ -296,8 +297,15 @@ let gpsKall = 0; let gps = {lat: 59.41, lon: 5.27};
 Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {geolocation: {
   getCurrentPosition(ok, feil) {
     gpsKall += 1;
+    if (gps === 'aldri') return;
     if (gps.code) feil(gps); else ok({coords: {latitude: gps.lat, longitude: gps.lon}, timestamp: Date.now()});
+  }}, permissions: {query: async () => {
+    if (tilgang === null) throw new Error('ukjent');
+    return {state: tilgang};
   }}}});
+let tilgang = null;
+const ekteSetTimeout = setTimeout;
+const straks = () => { globalThis.setTimeout = (f) => { ekteSetTimeout(f, 0); return 0; }; };
 """
 
 
@@ -350,6 +358,29 @@ class HjelpknappenTests(SimpleTestCase):
         for tekst in ut:
             self.assertIn('samband', tekst)
 
+    def test_telefon_som_aldri_svarer_laaser_ikke_knappen(self):
+        """André, 7. okt. 2026: «får ikke opp om det er lov», og knappen sto på
+        «Henter posisjon…». Fristen slår til selv om nettleseren aldri svarer."""
+        ut = self._kjor("""
+            el['park-lag'] = {value: '7', focus() {}};
+            gps = 'aldri'; straks();
+            await parkSendHjelp();
+            console.log(JSON.stringify({status: el['park-hjelp-status'].textContent,
+                                        sperret: el['park-hjelp-knapp'].disabled, kall: kall.length}));""")
+        self.assertIn('Fikk ikke svar fra telefonen', ut['status'])
+        self.assertIn('samband', ut['status'])
+        self.assertFalse(ut['sperret'])
+        self.assertEqual(ut['kall'], 0)
+
+    def test_et_nei_som_alt_er_gitt_sies_uten_aa_spoerre(self):
+        ut = self._kjor("""
+            el['park-lag'] = {value: '7', focus() {}};
+            tilgang = 'denied';
+            await parkSendHjelp();
+            console.log(JSON.stringify({gpsKall, status: el['park-hjelp-status'].textContent}));""")
+        self.assertEqual(ut['gpsKall'], 0)
+        self.assertIn('ga ikke lov', ut['status'])
+
     def test_forklaringen_sier_varigheten_og_at_telefonen_spoer(self):
         self.assertIn('i 20 minutter', self._kjor('console.log(JSON.stringify(parkHjelpForklaring(20)));'))
         tekst = self._kjor('console.log(JSON.stringify(parkHjelpForklaring(undefined)));')
@@ -370,8 +401,8 @@ class PosisjonSpoerresBareVedTrykketTests(SimpleTestCase):
 
     def test_bare_ved_trykket(self):
         kilde = re.sub(r'/\*.*?\*/|//[^\n]*', '', read_js(PARK_JS), flags=re.S)
-        self.assertIn('geolocation', kilde)
-        self.assertNotIn('geolocation', self._uten(kilde, 'parkHentPosisjon'))
+        self.assertIn('navigator.geolocation', kilde)
+        self.assertNotIn('navigator.geolocation', self._uten(kilde, 'parkHentPosisjon'))
         self.assertNotIn('watchPosition', kilde, 'lagsiden følger ikke posisjonen, den spør én gang')
         resten = self._uten(self._uten(kilde, 'parkSendHjelp'), 'parkHentPosisjon')
         self.assertNotIn('parkHentPosisjon(', resten)

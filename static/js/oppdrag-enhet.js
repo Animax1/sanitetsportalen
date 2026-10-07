@@ -1236,6 +1236,36 @@ function _sendPosisjonStatus(tekst) {
   if (el) el.textContent = tekst;
 }
 
+/** Lengste knappen venter på telefonen før den gir opp (7. okt. 2026).
+ *
+ *  **`timeout` i `getCurrentPosition` er ikke nok.** Den begynner å telle først
+ *  når tilgangen er *gitt*. Vises spørsmålet om lov aldri — Chrome viser det
+ *  noen ganger bare som et ikon i adressefeltet — eller lukkes det uten svar,
+ *  som Firefox gjør, kommer verken svar eller feil, og knappen sto på
+ *  «Henter posisjon…» for alltid (André, 7. okt. 2026). */
+function posisjonFristMs() {
+  return 20 * 1000;
+}
+
+/** Løftet, eller avslag med `{code: 'frist'}` når fristen går ut. */
+function medFrist(lofte, ms) {
+  let tidtaker;
+  const frist = new Promise((_, nei) => { tidtaker = setTimeout(() => nei({ code: 'frist' }), ms); });
+  return Promise.race([lofte, frist]).finally(() => clearTimeout(tidtaker));
+}
+
+/** `granted`, `prompt`, `denied` — eller `null` der nettleseren ikke kan svare
+ *  (Safari før 16). Spørres før posisjonen, så et «nei» som alt er gitt kan
+ *  sies med en gang i stedet for å vente ut fristen. */
+async function posisjonstilgang() {
+  try {
+    const svar = await navigator.permissions.query({ name: 'geolocation' });
+    return svar.state;
+  } catch (e) {
+    return null;
+  }
+}
+
 /** Én fix fra nettleseren. Spørsmålet om tilgang kommer her, ved trykket,
  *  om det ikke alt er besvart. */
 function _hentPosisjonEnGang() {
@@ -1247,6 +1277,17 @@ function _hentPosisjonEnGang() {
   });
 }
 
+/** Teksten når telefonen ikke ga en posisjon. Alle sier hva mannskapet gjør nå. */
+function sendPosisjonFeiltekst(feil) {
+  const kode = feil && feil.code;
+  if (kode === 1) return 'Nettleseren har ikke gitt tilgang til posisjon — se linja nederst. Meld på samband.';
+  if (kode === 'frist') {
+    return 'Fikk ikke svar fra telefonen. Sjekk om nettleseren spør om lov (ikonet i adressefeltet), '
+      + 'og at posisjon er slått på. Meld på samband i mellomtiden.';
+  }
+  return 'Fant ingen posisjon. Prøv igjen, eller meld på samband.';
+}
+
 async function sendPosisjon() {
   if (!kartKoblingAktiv() || sendPosisjonSperret()) return;
   globalThis.sendPosisjonPagar = true;
@@ -1254,18 +1295,32 @@ async function sendPosisjon() {
   try {
     let pos = posisjonForKnapp(globalThis.bilensPosisjon || null, Date.now());
     if (!pos) {
-      _sendPosisjonStatus('Henter posisjon…');
-      try {
-        pos = await _hentPosisjonEnGang();
-      } catch (feil) {
-        if (feil && feil.code === 1) {
-          globalThis.bilensPosisjonStatus = 'nektet';
-          tegnPosisjonLinje();
-          _sendPosisjonStatus('Nettleseren har ikke gitt tilgang til posisjon — se linja nederst.');
-        } else {
-          _sendPosisjonStatus('Fant ingen posisjon. Prøv igjen, eller meld på samband.');
-        }
+      const tilgang = await posisjonstilgang();
+      if (tilgang === 'denied') {
+        globalThis.bilensPosisjonStatus = 'nektet';
+        tegnPosisjonLinje();
+        _sendPosisjonStatus(sendPosisjonFeiltekst({ code: 1 }));
         return;
+      }
+      _sendPosisjonStatus(tilgang === 'prompt'
+        ? 'Telefonen spør om lov til å bruke posisjonen — svar «Tillat».'
+        : 'Henter posisjon…');
+      try {
+        pos = await medFrist(_hentPosisjonEnGang(), posisjonFristMs());
+      } catch (feil) {
+        // En fix fra `watchPosition` under to minutter er bedre enn ingen —
+        // samme grense som stemplingen bruker. Men aldri etter et nei.
+        const reserve = feil && feil.code !== 1
+          ? posisjonForStempling(globalThis.bilensPosisjon || null, Date.now()) : null;
+        if (!reserve) {
+          if (feil && feil.code === 1) {
+            globalThis.bilensPosisjonStatus = 'nektet';
+            tegnPosisjonLinje();
+          }
+          _sendPosisjonStatus(sendPosisjonFeiltekst(feil));
+          return;
+        }
+        pos = reserve;
       }
     }
     _sendPosisjonStatus('Sender…');

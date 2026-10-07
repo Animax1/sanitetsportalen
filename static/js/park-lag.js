@@ -139,7 +139,36 @@ function parkPosisjonsfeilTekst(feil) {
     return 'Telefonen ga ikke lov til å bruke posisjonen. iPhone: Innstillinger → Safari → Posisjon. '
       + 'Android: hengelåsen i adressefeltet → Tillatelser. Meld posisjonen på samband i mellomtiden.';
   }
+  if (feil && feil.code === 'frist') {
+    return 'Fikk ikke svar fra telefonen. Sjekk om nettleseren spør om lov (ikonet i adressefeltet), '
+      + 'og at posisjon er slått på i telefonen. Åpnet dere lenken inne i en annen app, prøv i '
+      + 'Safari eller Chrome. Meld posisjonen på samband i mellomtiden.';
+  }
   return 'Fant ingen posisjon. Prøv igjen ute, eller meld på samband.';
+}
+
+/* Lengste knappen venter på telefonen (7. okt. 2026). `timeout` i
+ * `getCurrentPosition` teller først når tilgangen er gitt: vises spørsmålet om
+ * lov aldri, eller lukkes det uten svar, kommer ingenting — og knappen sto på
+ * «Henter posisjon…» for alltid. */
+function parkPosisjonFristMs() {
+  return 25 * 1000;
+}
+
+function parkMedFrist(lofte, ms) {
+  let tidtaker;
+  const frist = new Promise((_, nei) => { tidtaker = setTimeout(() => nei({code: 'frist'}), ms); });
+  return Promise.race([lofte, frist]).finally(() => clearTimeout(tidtaker));
+}
+
+/* `granted`, `prompt`, `denied` — eller null der nettleseren ikke kan svare. */
+async function parkPosisjonstilgang() {
+  try {
+    const svar = await navigator.permissions.query({name: 'geolocation'});
+    return svar.state;
+  } catch (e) {
+    return null;
+  }
 }
 
 /* En UUID. `crypto.randomUUID` krever sikker kontekst; reserven bygger en v4
@@ -358,9 +387,15 @@ async function parkSendHjelp() {
   const knapp = parkEl('park-hjelp-knapp');
   knapp.disabled = true;
   try {
-    parkHjelpStatus('Henter posisjon…');
+    const tilgang = await parkPosisjonstilgang();
+    if (tilgang === 'denied') {
+      parkHjelpStatus(parkPosisjonsfeilTekst({code: 1}));
+      return;
+    }
+    parkHjelpStatus(tilgang === 'prompt'
+      ? 'Telefonen spør om lov til å bruke posisjonen — svar «Tillat».' : 'Henter posisjon…');
     let pos;
-    try { pos = await parkHentPosisjon(); } catch (feil) {
+    try { pos = await parkMedFrist(parkHentPosisjon(), parkPosisjonFristMs()); } catch (feil) {
       parkHjelpStatus(parkPosisjonsfeilTekst(feil));
       return;
     }

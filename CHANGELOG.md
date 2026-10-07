@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — Posisjonsknappene: «Henter posisjon…» frøs  `#oppdrag` `#park`
+
+**Hvorfor:** André, 7. okt. 2026, fra staging: «når jeg forsøker å sende posisjon så fryses det
+ved å sende posisjon, det står bare: "Henter posisjon..." Det samme skjer med lag. … På lag så får
+jeg ikke opp om det er lov å ta posisjon.»
+
+**Årsaken:** `timeout` i `getCurrentPosition` begynner å telle **først når tilgangen er gitt**.
+Vises spørsmålet om lov aldri — Chrome viser det noen ganger bare som et ikon i adressefeltet,
+og en side åpnet inne i en annen app viser det ofte ikke i det hele tatt — eller lukkes det uten
+svar, som Firefox gjør, kaller nettleseren verken svar eller feil. Knappen ventet for alltid.
+`Permissions-Policy` var ikke årsaken: staging sender `geolocation=(self)` på `/lag/r/`
+(kontrollert med `curl`).
+
+**Rettingen, i begge knappene:**
+- **Egen frist** rundt hele spørsmålet — `medFrist()`/`parkMedFrist()`, 20 s i bilen og 25 s for
+  lagene — som slår til uansett hva nettleseren gjør. Teksten sier da hva som er galt og hva man
+  gjør nå: se etter ikonet i adressefeltet, sjekk at posisjon er på, prøv Safari/Chrome om lenken
+  ble åpnet i en annen app, meld på samband.
+- **Tilgangen spørres først** (`navigator.permissions.query`). Er det alt sagt nei, sies det med en
+  gang — ikke etter fristen. Står den på «spør», sier knappen «Telefonen spør om lov … svar
+  «Tillat»», så den som ikke ser spørsmålet vet at det finnes.
+- **Bilen faller tilbake på fixen fra `watchPosition`** når den er under to minutter (samme grense
+  som stemplingen) og telefonen ikke svarer i tide — men aldri etter et nei.
+
+**Hva jeg ikke vet:** hvilken nettleser og enhet André prøvde på. Rettingen gjør at knappen aldri
+henger, men vises spørsmålet om lov fortsatt ikke, sier den nå *hvorfor* den ga opp — og den
+teksten er det neste sporet.
+
+**Testene:** fire nye i `oppdrag/tests_send_posisjon.py` og to i `park/tests_js.py`, med en
+`getCurrentPosition` som aldri svarer — nøyaktig det André så. Fem mutanter (fristen fjernet i
+begge, nei-sjekken fjernet i begge, reserven fjernet): fem drept.
+
+---
+
 ## 2026-10-07 — «Send posisjon» i bilen og «Vi finner ikke fram» for lagene  `#oppdrag` `#park` `#kartkobling`
 
 **Hvorfor:** André, 7. okt. 2026: «En posisjonsknapp som brukes til å sende posisjon som er

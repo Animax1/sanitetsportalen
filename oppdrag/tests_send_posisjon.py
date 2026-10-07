@@ -113,7 +113,10 @@ HARNESS = ((OPPDRAG_ENHET_JS, ('kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel',
                                'sendPosisjonMaksAlderMs', 'posisjonForKnapp',
                                'sendPosisjonSperret', 'tegnSendPosisjon',
                                '_sendPosisjonStatus', '_hentPosisjonEnGang', 'sendPosisjon',
-                               'posisjonLinjeTekst', 'bryterSperret', 'tegnPosisjonLinje')),)
+                               'posisjonLinjeTekst', 'bryterSperret', 'tegnPosisjonLinje',
+                               'posisjonFristMs', 'medFrist', 'posisjonstilgang',
+                               'sendPosisjonFeiltekst', 'posisjonMaksAlderMs',
+                               'posisjonForStempling')),)
 
 FORSPILL = """
 globalThis.localStorage = (() => { const m = {}; return {
@@ -133,8 +136,13 @@ globalThis.apiFetch = async (url, opts) => {
 let gpsKall = 0; let gps = { lat: 60.1, lon: 6.1 };
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { geolocation: { getCurrentPosition(ok, feil) {
   gpsKall += 1;
+  if (gps === 'aldri') return;   // spørsmålet om lov vises aldri, eller lukkes uten svar
   if (gps.code) feil(gps); else ok({ coords: { latitude: gps.lat, longitude: gps.lon }, timestamp: Date.now() });
-} } } });
+} }, permissions: { query: async () => { if (tilgang === null) throw new Error('ukjent'); return { state: tilgang }; } } } });
+let tilgang = null;
+// Fristen slår til med en gang: testen skal ikke vente 20 s.
+const ekteSetTimeout = setTimeout;
+const straks = () => { globalThis.setTimeout = (f) => { ekteSetTimeout(f, 0); return 0; }; };
 const NAA = Date.now();
 const fix = (s) => ({ lat: 59.4136, lon: 5.2683, tid: new Date(NAA - s * 1000).toISOString() });
 globalThis.OPPDRAG_KART_KOBLING = true;
@@ -232,3 +240,45 @@ class SendPosisjonKnappenTests(unittest.TestCase):
         self.assertEqual(ut[1], 'nektet', 'linja nederst får vite det også')
         self.assertIn('ingen dekning', ut[2])
         self.assertIn('samband', ut[3])
+
+    def test_telefon_som_aldri_svarer_laaser_ikke_knappen(self):
+        """André, 7. okt. 2026: «det fryses ved å sende posisjon, det står bare
+        "Henter posisjon..."». `timeout` i `getCurrentPosition` teller først når
+        tilgangen er gitt, så et spørsmål som aldri besvares, ga aldri svar."""
+        (ut,) = _kjor("""
+            gps = 'aldri'; straks();
+            await sendPosisjon();
+            console.log(JSON.stringify({ status: el['send-posisjon-status'].textContent,
+                                         sperret: el['send-posisjon'].disabled, kall: kall.length }));""")
+        self.assertIn('Fikk ikke svar fra telefonen', ut['status'])
+        self.assertIn('samband', ut['status'])
+        self.assertFalse(ut['sperret'], 'knappen kan trykkes igjen')
+        self.assertEqual(ut['kall'], 0)
+
+    def test_etter_fristen_brukes_en_fix_under_to_minutter(self):
+        (ut,) = _kjor("""
+            gps = 'aldri'; straks();
+            globalThis.bilensPosisjon = fix(90);
+            await sendPosisjon();
+            console.log(JSON.stringify(kall.map((k) => k.body.posisjon.lat)));""")
+        self.assertEqual(ut, [59.4136])
+
+    def test_et_nei_som_alt_er_gitt_sies_med_en_gang(self):
+        (ut,) = _kjor("""
+            tilgang = 'denied';
+            globalThis.bilensPosisjon = fix(90);
+            await sendPosisjon();
+            console.log(JSON.stringify({ gpsKall, kall: kall.length, linje: globalThis.bilensPosisjonStatus,
+                                         status: el['send-posisjon-status'].textContent }));""")
+        self.assertEqual((ut['gpsKall'], ut['kall'], ut['linje']), (0, 0, 'nektet'))
+        self.assertIn('ikke gitt tilgang', ut['status'])
+
+    def test_naar_telefonen_spoer_sier_knappen_det(self):
+        (ut,) = _kjor("""
+            const historikk = [];
+            el['send-posisjon-status'] = { set textContent(t) { historikk.push(t); }, get textContent() { return historikk.at(-1); } };
+            tilgang = 'prompt'; gps = 'aldri'; straks();
+            await sendPosisjon();
+            console.log(JSON.stringify(historikk));""")
+        self.assertIn('svar «Tillat»', ut[0])
+        self.assertIn('Fikk ikke svar fra telefonen', ut[-1])
