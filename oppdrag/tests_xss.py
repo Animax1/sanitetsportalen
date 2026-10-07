@@ -542,7 +542,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )
@@ -775,7 +775,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall',

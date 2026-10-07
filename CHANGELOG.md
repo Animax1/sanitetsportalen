@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — Bilen: «Annet sted»-feltet hopper ikke ut ved pollingen  `#oppdrag`
+
+**Hvorfor:** André, 7. okt. 2026: «Når enheter skriver i annet sted i /oppdrag så hopper den
+ut etter ca 15 sekunder, det må vi fikse.»
+
+**Årsaken:** `pollOgSynk` hvert 15. sekund → `lastMine()` → `renderAlt()` →
+`renderAktivt()`, som tegner hele det aktive kortet med `innerHTML`. Fritekstfeltet ved
+«Avreist → Annet sted» ble byttet ut med et nytt og tomt midt i skrivingen — teksten
+forsvant, og på telefonen lukket tastaturet seg. Sentralbordet hadde alt samme slags sperre
+(`skjemaErIBruk()`, `foer-aapen`); bilens skjerm hadde ingen.
+
+**Rettingen:** `stedfeltetErApent(liste, apentFor, annetApent, felt)` i `oppdrag-enhet.js`,
+kalt øverst i `renderAktivt()`. Kortet står urørt så lenge (1) feltet er åpent, (2) feltet
+som *faktisk står i DOM-en* gjelder samme oppdrag — `data-oppdrag` på feltet — og (3)
+oppdraget fortsatt venter på «Avreist». Går kjeden videre (KO førte status) eller oppdraget
+er borte, tegnes kortet som før — et felt for et stempel som ikke lenger er neste, skal ikke
+stå igjen og se gyldig ut. Ventende og avsluttede tegnes som før, og «Oppdatert hh:mm» går.
+
+**Valgt bort:** å ta vare på teksten og gi feltet fokus igjen etter tegningen. Teksten
+kunne vært reddet, men iOS åpner ikke tastaturet på `focus()` uten et trykk — tastaturet
+ville fortsatt lukket seg hvert 15. sekund, og det er det André så.
+
+**Prisen:** mens feltet står åpent, vises ikke endringer KO gjør på *det aktive kortet*
+(hastegrad, notat, delte linjer) før bilen trykker «Avreist» eller «Avbryt». Feltet står
+åpent i sekunder, og det som haster mest — at oppdraget flyttes eller går videre — tegnes.
+
+**Testene** (`oppdrag/tests_bilen_annet_sted.py`) går gjennom den ekte inngangen
+`lastMine()` og henter `data-oppdrag` fra markupen kortet selv tegnet. Underveis gikk
+den positive testen grønn **uten å måle noe**: `lastMine` på staging kaller
+`posisjonsdelingTilstand()` og `notePaVakt()`, stubben manglet dem, `ReferenceError` ble
+fanget av `try` som om det var nettbrudd, og ingenting ble tegnet — så «kortet står urørt»
+var sant av feil grunn. Fanget fordi de negative testene ble røde; testen krever nå at
+`renderAlt` faktisk satte «Oppdatert». To eksisterende harnesser (`tests_xss`,
+`tests_runde_h`) fikk den nye funksjonen og `velgerAnnetSted` i stubben.
+
+**Mutanter:** **8 mutanter, 7 drept i første runde.** Kallstedet, hver av de fire betingelsene, attributtet i
+markupen og felt-i-DOM-sjekken ble drept. **Id-kravet overlevde**: KO flytter bilen til et nytt
+oppdrag som også venter på «Avreist», og feltet for det gamle sto igjen. Ny test
+(`test_et_annet_oppdrag_paa_samme_steg_holder_ikke_feltet`) dreper den.
+
+**Ikke rettet, notert:** «hver 15. sekund» betyr at pollet svarte 200 og ikke 304 hver
+gang — ellers tegnes ikke kortet. Hvorfor ETag-en ikke treffer på bilens poll er ikke
+undersøkt; det koster en full kropp per bil per 15 s, men er ikke lenger det som gjør vondt.
+
+---
+
 ## 2026-10-06 — TODO: fem «vurder»-punkter fra gjennomgangen mot 48-timersvakta  `#todo` `#kart`
 
 **Hvorfor:** André, 5. okt. 2026: «gå gjennom appen og gjerne husk kart.sanitets funksjon
