@@ -4,6 +4,15 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — Kartets mottak for «Vi finner ikke fram» er ute  `#kartkobling`
+
+André, 7. okt. 2026: «Ja så flett den». Grenen `lag-posisjon` er flettet inn i `main` i
+`kart-sanitet` (`cd4c7d4`), etter de to commit-ene som hadde kommet til der i mellomtiden; ruff,
+pytest (421) og node (115) grønne på det flettede. Push til kartets `main` deployer.
+Punktet i TODO, «Krever Andre», er slettet.
+
+---
+
 ## 2026-10-07 — Posisjonsknappene: 424, ikke 502, når kartet ikke tar imot  `#oppdrag` `#park`
 
 **Hvorfor:** André prøvde lagenes knapp på staging fra en iPhone (Chrome) etter rettingen under.

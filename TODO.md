@@ -35,13 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Flett kartets mottak for «Vi finner ikke fram» til `main`** (7. okt. 2026). Det ligger
-      på grenen `lag-posisjon` i `kart-sanitet` (`f3b0966`: ny tabell `Laghjelp`,
-      `/api/portal/lag-posisjon`, oransje markør), grønt på ruff, pytest og node. Push til kartets
-      `main` deployer, og den ble stoppet i sesjonen. Til den er ute, svarer
-      lagenes knapp på `/lag/r/` «Kartet tok ikke imot posisjonen» — bilens «Send posisjon»
-      virker uten, fordi den bruker kartets eksisterende `enhet`.
-
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet. **Behandlingsansvarlig er besluttet**
