@@ -1187,6 +1187,13 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 ### Løse punkter
 
+- [ ] **Treffer ETag-en på bilens poll?** Funnet 7. okt. 2026 under «Annet sted»-feilen: at
+      feltet forsvant *hvert* 15. sekund betyr at `lastMine()` tegnet ved hver polling — og
+      det gjør den bare på 200, eller på 304 mens en delt linje er under ett minutt gammel.
+      Sjekk i nettleserens nettverksfane på staging om `/oppdrag/api/oppdrag/` svarer 304 når
+      ingenting har endret seg. Gjør den ikke det, koster det en full kropp per bil per 15 s,
+      og noe i svaret endrer seg uten at noen skriver (kandidat: posisjonsdelingen fra 4. okt.).
+
 - [ ] **Reservenettet for backup-klokka hører ikke på `BACKUP_KLOKKE=av`** (funnet 4. okt.
       2026, da prod skulle settes i dvale i fire måneder). Variabelen stopper bare tråden;
       `BackupSchedulerMiddleware` kaller `kanskje_kjor()` ved hver forespørsel uansett, tar

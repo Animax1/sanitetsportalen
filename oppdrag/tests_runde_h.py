@@ -53,11 +53,11 @@ class BehandletIStatistikkOgArkivTests(FlereEnheterBasis):
 class BilensKnapperJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', 'hastegradKlasse', '_udefinertVarsel', '_antallRad', '_medAntall',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', 'hastegradKlasse', '_udefinertVarsel', '_antallRad', '_medAntall',
                             '_problemMedAntall', 'tidslinjeEnhetHtml', '_stedvalg',
                             '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', 'projiser')),
     )
-    STUBB = ("globalThis.velgerStedFor = null; globalThis.AVREIST_TIL = []; globalThis.GROVSORTERING = [];\n"
+    STUBB = ("globalThis.velgerStedFor = null; globalThis.velgerAnnetSted = false; globalThis.AVREIST_TIL = []; globalThis.GROVSORTERING = [];\n"
              "const el = { innerHTML: '' }; globalThis.document = { getElementById: () => el };\n")
 
     def setUp(self):

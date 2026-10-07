@@ -325,7 +325,7 @@ function _stedvalg() {
     <div class="mt-3">
       <div class="oppdrag-meta mb-2">Avreist til annet sted — hvor?</div>
       <input type="text" class="form-control form-control-lg" id="stemple-sted-tekst"
-             maxlength="120" placeholder="F.eks. Legevakt Karmøy" autocomplete="off">
+             data-oppdrag="${escHtmlValue(velgerStedFor)}" maxlength="120" placeholder="F.eks. Legevakt Karmøy" autocomplete="off">
       <button type="button" class="btn btn-primary stor-knapp mt-2 w-100"
               id="stemple-sted-annet-ok" data-action="stempleAnnetSted">Avreist</button>
       <button type="button" class="btn btn-outline-light stor-knapp mt-2 w-100"
@@ -438,9 +438,26 @@ function _udefinertVarsel(o) {
 }
 
 
+// Skal det aktive kortet stå urørt i denne tegningen? Ja mens «Annet sted»-
+// feltet er åpent og oppdraget det gjelder fortsatt venter på «Avreist».
+// Kortet tegnes med innerHTML, og pollingen hvert 15. sekund byttet feltet ut
+// midt i skrivingen: teksten forsvant, og på telefonen lukket tastaturet seg
+// (André, 7. okt. 2026: «hopper ut etter ca 15 sekunder»). Å gi feltet fokus
+// igjen hjelper ikke — iOS åpner ikke tastaturet uten et trykk.
+// `felt` er elementet i DOM-en, og `data-oppdrag` må stemme: det er feltet
+// som faktisk står der, ikke tilstanden, som avgjør om noe kan gå tapt.
+// Er oppdraget borte eller videre i kjeden, tegnes kortet som før.
+function stedfeltetErApent(liste, apentFor, annetApent, felt) {
+  if (!annetApent || apentFor == null || !felt) return false;
+  if (!felt.dataset || felt.dataset.oppdrag !== String(apentFor)) return false;
+  return liste.some((o) => o.id === apentFor && o.neste_overgang === 'avreist');
+}
+
 function renderAktivt() {
   const el = document.getElementById('aktivt-oppdrag');
   if (!el) return;
+  const felt = document.getElementById('stemple-sted-tekst');
+  if (stedfeltetErApent(mineOppdrag, velgerStedFor, velgerAnnetSted, felt)) return;
 
   // Serveren garanterer maks ett påbegynt oppdrag (§4.3) — «neste» på et
   // ventende lukker det pågående. Skulle lista likevel ha flere, vises alle:
