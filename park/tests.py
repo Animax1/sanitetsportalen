@@ -897,10 +897,11 @@ class HjelpTests(_Grunnlag):
             self.assertEqual(self._post(self._kropp(), token='feil').status_code, 403)
         send.assert_not_called()
 
-    def test_kartet_som_ikke_tar_imot_gir_502(self):
+    def test_kartet_som_ikke_tar_imot_gir_424_ikke_5xx(self):
+        """Et 5xx er en e-post til admin per trykk (staging, 7. okt. 2026)."""
         with mock.patch(SEND_HJELP, return_value=False):
             svar = self._post(self._kropp())
-        self.assertEqual(svar.status_code, 502)
+        self.assertEqual(svar.status_code, 424)
         self.assertIn('samband', svar.json()['message'])
 
     def test_uten_kobling_tilbys_ingenting(self):

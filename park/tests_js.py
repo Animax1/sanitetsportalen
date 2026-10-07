@@ -350,7 +350,7 @@ class HjelpknappenTests(SimpleTestCase):
             gps = {code: 3}; await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
             gps = {lat: 59, lon: 5};
             svar = 'nett'; await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
-            svar = {status: 502, body: {message: 'Kartet tok ikke imot posisjonen. Meld den på samband.'}};
+            svar = {status: 424, body: {message: 'Kartet tok ikke imot posisjonen. Meld den på samband.'}};
             await parkSendHjelp(); t.push(el['park-hjelp-status'].textContent);
             console.log(JSON.stringify(t));""")
         self.assertIn('ga ikke lov', ut[0])

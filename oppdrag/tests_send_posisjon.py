@@ -66,10 +66,11 @@ class SendPosisjonTests(StemplingBasis):
                     self.assertEqual(self._send({'posisjon': pos}).status_code, 400)
         send.assert_not_called()
 
-    def test_kartet_som_ikke_tar_imot_gir_502(self):
+    def test_kartet_som_ikke_tar_imot_gir_424_ikke_5xx(self):
+        """Et 5xx er en e-post til admin per trykk (staging, 7. okt. 2026)."""
         with mock.patch(SEND, return_value=False):
             resp = self._send({'posisjon': _pos()})
-        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(resp.status_code, 424)
         self.assertIn('samband', resp.json()['message'])
 
     def test_av_vakt_sendes_ingenting(self):

@@ -1125,7 +1125,12 @@ def posisjon_view(request):
     finnes ingen kø som stryker en stempling, og mannskapet skal få vite at
     trykket ikke gikk. Av samme grunn sendes det **direkte og ikke i
     `on_commit`** — ingenting skrives i basen, og svaret skal si om kartet tok
-    imot (502 ellers). Posisjonen lagres aldri.
+    imot. Posisjonen lagres aldri.
+
+    **Svaret når kartet ikke tok imot er 424, ikke 502** (7. okt. 2026): et
+    5xx gir en feilmelding på e-post til admin for hvert trykk, og på staging
+    kom ikke kroppen fram til telefonen — den fikk den generiske teksten i
+    stedet for «meld på samband». Portalen har ikke feilet; kartet har.
 
     Navnet er `Enhet.navn` fra databasen. Av vakt sendes ingenting: kortet
     vises ikke for KO da, og bryteren «Del posisjon» er grå.
@@ -1158,7 +1163,7 @@ def posisjon_view(request):
             status=400)
     if not kartkobling.send_enhet(enhet.navn, lat, lon, tid):
         return JsonResponse({'status': 'error', 'message': (
-            'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=502)
+            'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=424)
     return JsonResponse({'status': 'ok', 'data': {'sendt_at': timezone.now().isoformat()}})
 
 

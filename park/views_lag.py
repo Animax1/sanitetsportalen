@@ -207,7 +207,8 @@ def hjelp_view(request):
     `services.hjelp_varighet_min()` minutter, oransje og atskilt fra der KO
     har plassert laget (`kartkobling.send_lag_posisjon`). Sendes direkte og
     ikke i `on_commit`: ingenting skrives, og laget skal få vite om kartet tok
-    imot — 502 ellers, og siden ber dem melde på samband.
+    imot — 424 ellers, og siden ber dem melde på samband. Ikke 502: se
+    `oppdrag.views.posisjon_view` — et 5xx er en e-post til admin per trykk.
     """
     if not services.hjelp_aktiv():
         return json_feil('Kartet er ikke koblet til. Meld posisjonen på samband.', status=409)
@@ -235,6 +236,6 @@ def hjelp_view(request):
     varighet = services.hjelp_varighet_min()
     utloper = timezone.now() + timedelta(minutes=varighet)
     if not kartkobling.send_lag_posisjon(lag.navn, lat, lon, tid, utloper):
-        return json_feil('Kartet tok ikke imot posisjonen. Meld den på samband.', status=502)
+        return json_feil('Kartet tok ikke imot posisjonen. Meld den på samband.', status=424)
     return JsonResponse({'status': 'ok', 'lag': lag.navn, 'utloper': utloper.isoformat(),
                          'varighet_min': varighet})

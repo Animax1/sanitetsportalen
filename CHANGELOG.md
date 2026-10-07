@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-07 — Posisjonsknappene: 424, ikke 502, når kartet ikke tar imot  `#oppdrag` `#park`
+
+**Hvorfor:** André prøvde lagenes knapp på staging fra en iPhone (Chrome) etter rettingen under.
+Telefonen ga posisjonen, og kallet nådde portalen. Kartet svarte 404, fordi `lag-posisjon` ennå
+ikke er ute der, og det var ventet. Men to ting var feil hos oss: **hvert trykk ga en e-post
+«Bad Gateway: /lag/r/api/hjelp/»** til admin, fordi Django logger alle 5xx som feil; og
+telefonen viste den generiske «Ikke sendt. Meld posisjonen på samband.» i stedet for serverens
+melding, så kroppen kom ikke fram som JSON.
+
+**Rettingen:** begge knappene svarer **424** (Failed Dependency) når kartet ikke tar imot.
+Portalen har ikke feilet, kartet har; `core/kartkobling` logger det alt som én `warning`, og
+statuskortet på server-status viser siste utfall. Valgt bort: 200 med `sendt: false`, fordi det
+gjør en ikke-sendt posisjon til et «ok» for alt som bare leser statuskoden.
+
+---
+
 ## 2026-10-07 — Posisjonsknappene: «Henter posisjon…» frøs  `#oppdrag` `#park`
 
 **Hvorfor:** André, 7. okt. 2026, fra staging: «når jeg forsøker å sende posisjon så fryses det

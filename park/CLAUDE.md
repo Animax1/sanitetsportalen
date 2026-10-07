@@ -77,7 +77,7 @@ under registreringen, og bare med kartkoblingen satt opp.
   portalinnstillingene) sendes som **tidspunkt**, så kartet ikke trenger å kjenne innstillingen.
   Kartet sletter raden da (`Laghjelp` i `kart-sanitet`).
 - **Lagres ikke i portalen**, og er ingen registrering. Sendes direkte, ikke i `on_commit`:
-  ingenting skrives, og laget skal få vite om kartet tok imot (502 → «meld på samband»).
+  ingenting skrives, og laget skal få vite om kartet tok imot (424 → «meld på samband»; ikke 5xx, som er en e-post til admin per trykk).
 - **Bremsen teller sendingene, ikke avslagene** — 6/min per telefon, etter valideringen.
 
 ## Ingen fritekst
