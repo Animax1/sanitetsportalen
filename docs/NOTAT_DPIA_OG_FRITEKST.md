@@ -108,7 +108,11 @@ mangler. Kapittel (c) er nyttig i seg selv, uavhengig av om en DPIA noen gang bl
 
 ## 5. Det som veier tyngre enn DPIA-spørsmålet
 
-Fra A.1:
+> **Avklart (8. okt. 2026):** behandlingsansvarlig er **Kverneland Røde Kors**, med André
+> Eritsland som systemansvarlig — besluttet 30. sep. (B13), skrevet inn i A.1 i
+> `PERSONVERN_DOKUMENTASJON.md` v1.19. Kapitlet under står som begrunnelsen for valget.
+
+Fra A.1, slik den sto da notatet ble skrevet:
 
 > Behandlingsansvaret er per i dag lagt til André Eritsland **som privatperson**, ikke til
 > organisasjonen som gjennomfører sanitetsvaktene.

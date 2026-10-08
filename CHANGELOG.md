@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-08 — Behandlingsansvarlig er Kverneland Røde Kors; TODO ryddet for duplikater  `#personvern` `#todo`
+
+**Hvorfor:** André, 8. okt. 2026, på tilbakemeldingene om `TODO.md`: «organisasjonsnavnet er
+Kverneland Røde Kors», og «fiks det» om det gjennomstrekte punktet og `leder`-nivået som sto
+to ganger.
+
+**Personverndokumentet, v1.19.** Beslutningen fra 30. sep. (B13) — korpset er
+behandlingsansvarlig, André systemansvarlig — sto bare som merknad i A.1, fordi navnet
+manglet i A.4 («[fyll inn organisasjonsnavn]»). Nå skrevet inn der den gjelder: hodet, A.1
+(tabellen, med systemansvarlig som kontaktpunkt for A.14 og A.15), A.4
+(taushetserklæringene), B.1 og B.9 (erklæringen til de registrerte). A.12 mister risikoen
+«behandlingsansvaret ligger hos en privatperson». C.4 kontrollerer rollefordelingen i stedet
+for å spørre om den skal flyttes. **Signaturfeltet har fått en godkjenning for korpset** —
+navn, dato og signatur står tomme; det er ført i `TODO.md`. `docs/NOTAT_DPIA_OG_FRITEKST.md`
+§5 har fått en datert merknad om at spørsmålet er avklart; kapitlet står som begrunnelsen.
+
+**Ikke fylt inn:** korpsets egen e-post og organisasjonsnummer. Kontakten går til
+systemansvarlig, og det ble ikke gjettet på noe som ikke var oppgitt.
+
+**`TODO.md` — fire rettinger fra gjennomgangen 7. okt.:**
+- **Slettet:** «Avklar behandlingsansvaret» (besvart 30. sep.), og organisasjonsnavnet i A.4,
+  som sto **tre** steder — «Krever Andre», GDPR-seksjonen og dokumentgjennomgangen.
+- **Slettet:** det gjennomstrekte `~~§8b med hel backup …~~`. Kontrollert mot
+  `docs/RUNBOOK_VAKT.md` §8b, som har den hele gjenopprettingen *og* `purge_old_logs` +
+  `kollaps_arkiv` rett etterpå. Et gjort punkt slettes, det strekes ikke over.
+- **Slått sammen:** `leder`-nivået sto som punkt og så som prosa under det, med samme
+  begrunnelse to ganger. Nå ett punkt; at nivået ble lagt til og reversert 28. aug. står i det.
+- **Nytt:** få personverndokumentet godkjent for Kverneland Røde Kors.
+
+**Ikke gjort, og ikke bedt om:** å skille notatene ut fra oppgavene, og å løfte L17 ut som
+eget punkt (tilbakemelding 5 og 6).
+
+---
+
 ## 2026-10-08 — «OBS: Lag 3 delte posisjon» i KO-loggen  `#ko` `#kartkobling`
 
 **Hvorfor:** André, 8. okt. 2026: «vises det i hendelsesloggen at lag eller bil enheter har sendt
