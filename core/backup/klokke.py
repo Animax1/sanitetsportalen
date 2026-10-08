@@ -371,6 +371,27 @@ def _lokke() -> None:
         time.sleep(TIKK_SEKUNDER)
 
 
+def klokka_er_av() -> bool:
+    """Er backup-klokka slått av med `BACKUP_KLOKKE=av` (eller settingen)?
+
+    **Bryteren er ett sted, og både tråden og reservenettet leser den**
+    (8. okt. 2026). Fram til da stoppet den bare tråden: `kanskje_kjor()` i
+    middlewaren kjørte videre ved hver forespørsel, tok backup av planer som
+    sto på, og sendte det kritiske varselet «Backup-klokka har stoppet» — om
+    en klokke noen med vilje hadde slått av. Funnet 4. okt. 2026, da prod
+    skulle settes i dvale i fire måneder. En bryter som bare slår av halve
+    mekanismen er verre enn ingen: den ser ut som den virker.
+
+    Store og små bokstaver og mellomrom spiller ingen rolle — `Av` i Railway
+    skal ikke bety «på».
+    """
+    from django.conf import settings
+
+    if getattr(settings, 'BACKUP_KLOKKE_AV', False):
+        return True
+    return os.environ.get('BACKUP_KLOKKE', '').strip().lower() == 'av'
+
+
 def skal_starte() -> bool:
     """Om klokka skal starte i denne prosessen.
 
@@ -386,11 +407,7 @@ def skal_starte() -> bool:
     """
     import sys
 
-    from django.conf import settings
-
-    if getattr(settings, 'BACKUP_KLOKKE_AV', False):
-        return False
-    if os.environ.get('BACKUP_KLOKKE') == 'av':
+    if klokka_er_av():
         return False
 
     argv = sys.argv
@@ -434,8 +451,14 @@ def kanskje_kjor() -> None:
     feilet `ready()`, en kjøremåte vi ikke har tenkt på. Går gjennom den samme
     `kjor_forfalte()`, så oppførselen er identisk; det eneste den legger til er
     en throttle, slik at trafikk ikke spør databasen oftere enn tråden ville.
+
+    **Hører på samme bryter som tråden** — se `klokka_er_av()`. Står klokka av,
+    tar reservenettet ingen backup og varsler ikke om at den har stoppet.
     """
     global _siste_sjekk_ts, _kjorer
+
+    if klokka_er_av():
+        return
 
     na = time.monotonic()
     with _sjekk_las:

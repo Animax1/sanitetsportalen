@@ -143,6 +143,14 @@ def extract_function(source, name):
     raise AssertionError(f'Fant ikke slutten på {name}()')
 
 
+#: Offline-køene ligger under en nøkkel per bruker (`brukerNokkel()`, L17, 8. okt. 2026).
+#: En harness som henter `koNokkel` trenger hjelperen *og* en innlogget bruker — uten
+#: ID-en er nøkkelen `null`, og køen finnes ikke. Legg `INNLOGGET` i spec-en og sett
+#: `INNLOGGET_STUBB` foran harnessen.
+INNLOGGET = (PORTAL_UTILS_JS, ('brukerNokkel',))
+INNLOGGET_STUBB = 'globalThis.PORTAL_BRUKER_ID = 7;\n'
+
+
 def build_harness(spec):
     """Sett sammen kildekoden til funksjonene i ``spec``.
 

@@ -4,6 +4,84 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-08 — Backup-klokka «av» gjelder reservenettet, offline-køene per bruker (L17), delt konto bare i oppdrag  `#backup` `#sikkerhet` `#oppdrag` `#vaktliste` `#ko`
+
+**Hvorfor:** André, 8. okt. 2026: «Start 2,3,4» — punkt 2–4 på nivå 1 i rangeringen av
+`TODO.md` 7. okt.
+
+### 1. `BACKUP_KLOKKE=av` stopper hele klokka, ikke bare tråden
+
+**Symptomet** (funnet 4. okt., da prod skulle i dvale): variabelen stoppet tråden, men
+`BackupSchedulerMiddleware` → `kanskje_kjor()` kjørte videre ved hver forespørsel, tok backup
+av planer som sto på, og sendte det kritiske varselet **«Backup-klokka har stoppet»** til hver
+admin — om en klokke noen hadde slått av med vilje. Backupsiden sa **«Backup-klokka svarer
+ikke»** i rødt.
+
+**Rettingen:** `klokka_er_av()` i `core/backup/klokke.py` er bryteren, ett sted. Tråden
+(`skal_starte`) og reservenettet (`kanskje_kjor`) leser den. Backupsiden sier «Backup-klokka er
+slått av» i grått, og statuskortet på server-status «Slått av (BACKUP_KLOKKE=av)» uten
+forsinkede. `Av`, `AV` og ` av ` leses likt — før var bare `av` med små bokstaver av.
+
+**Testene** (`KlokkeAvGjelderReservenettetTests`) kaller middlewaren selv — den er tatt ut av
+testinnstillingene — med tråden kjørt synkront, og hver har en kontroll uten bryteren.
+**9 mutanter, 8 drept i første runde.** Den niende (filteret i `oversikt.py` fjernet) var en
+no-op: malen viser aldri «svarer ikke» når klokka er av. Filteret er fjernet, malen avgjør
+alene, og mutanten på malen er drept.
+
+### 2. L17: offline-køene tilhører kontoen som trykket
+
+**Symptomet** (sikkerhetsgjennomgangen 13. sep., L17): «Offline-køene i localStorage er ikke
+knyttet til bruker; en annen konto på samme enhet spiller av forgjengerens usendte
+stemplinger.» Bilens kø (`oppdrag_ko_v1`) og vaktlistas (`vl_stemplinger_v1`) lå under én fast
+nøkkel. Logget A seg ikke ut — utløpt økt, lukket fane, tvungen utlogging — sendte B sine
+trykk som B.
+
+**Rettingen:** `brukerNokkel(prefiks)` i `portal-utils.js` gir `prefiks:u<id>`, og
+`window.PORTAL_BRUKER_ID` settes av `base_portal.html`. Køen venter på A, og sendes som A når
+hun logger inn igjen på samme enhet. **Ukjent bruker gir `null` og ingen kø** — en reserve til
+den gamle nøkkelen ville gjenåpnet hullet i det stille. Den gamle felles nøkkelen leses ikke;
+prod står i dvale, så det som måtte ligge der er fra test.
+
+**Testene** (`core/tests_offline_ko_per_bruker.py`) gjennomfører angrepet gjennom den ekte
+`synk()` og `synkKo()`: A trykker, B logger inn og synker — ingenting sendt — A kommer tilbake
+og trykket går. Og siden har ID-en **før** køskriptet. 33 eksisterende JS-tester fikk
+hjelperen og en innlogget bruker (`INNLOGGET`, `INNLOGGET_STUBB` i `js_test_utils.py`).
+**7 mutanter, alle drept.**
+
+**Funnet underveis, ikke rettet:** «Logg ut» sender `Clear-Site-Data: "storage"` og sletter
+usendte stemplinger uten å si fra. Lagt i `TODO.md`.
+
+### 3. En delt konto kan bare ha tilgang til `oppdrag` (FORSLAG_KO §5.2)
+
+«Ikke som konvensjon, men håndhevet i flere lag — skjemaet, datalaget og en test.»
+
+| Lag | Hvor |
+|---|---|
+| Hvilke moduler som sier ja | `Module.tillat_delt_konto`, bare `oppdrag/module.py` — ikke et navn i `core` |
+| **Der tilgangen avgjøres** | `nivaa_for()`: en delt konto får `None`. Dekker rader fra før regelen og enhver ny skrivevei (`bulk_create`, import, migrasjon) |
+| De som leser radene i bulk | `ko/tilstede.py` (KO-sidebaren) og `backlog/varsler.py` (varselmottakere) gikk utenom `nivaa_for` — **funnet av testen**, ikke ved gjennomlesning. En test lister nå hver fil som leser `ModulTilgang.objects`, og en ny må føres opp med begrunnelse |
+| Datalaget | `ModulTilgang.save()` nekter |
+| Skjemaene | Matrisen tilbyr bare «Ingen tilgang» på andre moduler; en personlig konto med slik tilgang kan ikke gjøres delt før den er fjernet; ved opprettelse og redigering vet matrisen at kontoen **blir** delt (`blir_delt`) |
+| Synlig for André | `verifiser_modultilgang` lister «Delte kontoer med rader som ikke gir noe» — hvem som mistet noe |
+
+**To feil i egen kode fanget av testene før push:** opprettelsen ga **500** når en ny bil ble
+krysset av for pasienter (matrisen visste ikke at kontoen ble delt, `save()` nektet), og en
+delt konto med en gammel rad kunne **ikke lagres i det hele tatt**, så raden kunne aldri
+fjernes (brukerskjemaet sjekket alle delte, ikke bare dem som *ble* delt).
+
+**KO:** `test_delt_konto_er_merket` er erstattet av `test_delt_konto_staar_ikke_i_lista` — en
+delt konto når ikke KO lenger. `tests_sikkerhet_pulje4` legger statistikkraden inn utenom
+`save()`, som en rad fra før regelen. Fire `accounts`-tester ga «bilen» pasienttilgang uten å
+handle om det; de gir nå `oppdrag: skriv_handling`.
+
+**16 mutanter, 13 drept i første runde.** «Ukjent modul gir ja» overlevde og fikk en test.
+«Matrisens `clean()` fjernet» var en no-op — nedtrekket er sperra, Django avviser resten — og
+`clean()` er fjernet. «Redigeringen uten `blir_delt`» er ekvivalent i dag fordi
+`form.is_valid()` setter flagget på objektet i minnet før matrisen lages; beholdt likevel, så
+regelen ikke henger på rekkefølgen av to linjer, som sto omvendt fram til i dag.
+
+---
+
 ## 2026-10-08 — Behandlingsansvarlig er Kverneland Røde Kors; TODO ryddet for duplikater  `#personvern` `#todo`
 
 **Hvorfor:** André, 8. okt. 2026, på tilbakemeldingene om `TODO.md`: «organisasjonsnavnet er

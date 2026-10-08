@@ -31,12 +31,14 @@ KIND_KOMMENTAR = 'backlog_ny_kommentar'
 def _mottakere(unntatt):
     """Kontoene som kan løse et innspill, minus den som meldte det inn."""
     from accounts.models import CustomUser, ModulTilgang
+    from core.modules import delt_konto_kan_bruke
 
-    ider = set(
-        ModulTilgang.objects
-        .filter(modul_slug='backlog', nivaa='skriv_leder')
-        .values_list('bruker_id', flat=True)
-    )
+    rader = ModulTilgang.objects.filter(modul_slug='backlog', nivaa='skriv_leder')
+    # Samme sperre som `nivaa_for` (8. okt. 2026, FORSLAG_KO §5.2): en delt konto
+    # med en rad fra før regelen kan ikke løse et innspill, og skal ikke varsles.
+    if not delt_konto_kan_bruke('backlog'):
+        rader = rader.exclude(bruker__er_delt_konto=True)
+    ider = set(rader.values_list('bruker_id', flat=True))
     admin_ider = set(
         CustomUser.objects.filter(role='admin', is_active=True)
         .values_list('pk', flat=True)

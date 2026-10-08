@@ -49,4 +49,8 @@ OppdragModule = Module(
     # for dem også, de skal ikke sperres. skriv_handling er bilene og de skal
     # bare være i /oppdrag.» Adressen virker fortsatt for alle med tilgang.
     snarvei_for_nivaaer=('skriv_handling',),
+    # **Den ene modulen en delt konto kan ha** (8. okt. 2026, FORSLAG_KO §5.2):
+    # bilkontoene er delte, og de stempler her. Alt annet krever en personlig
+    # konto — se `Module.tillat_delt_konto`.
+    tillat_delt_konto=True,
 )

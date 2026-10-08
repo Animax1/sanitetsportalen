@@ -5,7 +5,9 @@ from django import forms
 from django.contrib.auth import password_validation
 
 from .brukernavn import oppslagsnokkel
-from .models import CustomUser, ModulTilgang, TilgangsNivaa, UserRole
+from .models import (
+    CustomUser, ModulTilgang, TilgangsNivaa, UserRole, delt_konto_sperret,
+)
 
 #: Hjelpetekst på rollefeltet, delt av opprettings- og redigeringsskjemaet.
 #: Rollen er kontotype, ikke tilgangsnivå. Feltet hadde fem verdier fram til
@@ -453,6 +455,22 @@ class AdminUserEditForm(forms.ModelForm):
         """
         data = super().clean()
         if data.get('er_delt_konto'):
+            # **En personlig konto med tilgang til pasienter, vaktliste eller KO
+            # kan ikke gjøres delt** (8. okt. 2026, FORSLAG_KO §5.2). Tilgangen
+            # ville sluttet å virke i det stille (`nivaa_for`), og radene sett ut
+            # som tilgang i matrisen. Fjern dem først; da er valget tatt.
+            # Bare når kontoen *blir* delt: en konto som alt er delt og har en
+            # rad fra før regelen, må kunne lagres for at raden skal kunne
+            # fjernes. `instance` har ennå det lagrede flagget i `clean()`.
+            if self.instance and self.instance.pk and not self.instance.er_delt_konto:
+                sperrede = sorted(
+                    t.modul_slug for t in self.instance.modultilganger.all()
+                    if delt_konto_sperret(_SOM_DELT, t.modul_slug))
+                if sperrede:
+                    self.add_error('er_delt_konto', (
+                        'Kontoen har tilgang til ' + ', '.join(sperrede)
+                        + '. En delt konto kan bare ha tilgang til moduler som '
+                        'tillater det — fjern de andre i tilgangsmatrisen først.'))
             if data.get('email'):
                 self.add_error('email', 'En delt konto skal ikke ha e-post.')
             if data.get('fullt_navn'):
@@ -483,6 +501,15 @@ class AdminUserEditForm(forms.ModelForm):
         return paakrevd
 
 
+class _SomDeltKonto:
+    """Stedfortreder for «denne kontoen, når den er blitt delt» — for å spørre
+    `delt_konto_sperret()` før flagget faktisk er lagret."""
+    er_delt_konto = True
+
+
+_SOM_DELT = _SomDeltKonto()
+
+
 class ModulTilgangForm(forms.Form):
     """Matrise modul × nivå. Erstatter de fem avkrysningsboksene.
 
@@ -509,10 +536,14 @@ class ModulTilgangForm(forms.Form):
     # oppdragsmodulen, som er den nivået ble laget for, og tilbød `skriv_full`
     # på statistikk, der skriving ikke finnes.
 
-    def __init__(self, *args, bruker=None, **kwargs):
+    def __init__(self, *args, bruker=None, blir_delt=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.bruker = bruker
         self._naavaerende = self._les_naavaerende(bruker)
+        # Kontoen regelen spørres om. `blir_delt`: kontoen opprettes som, eller
+        # gjøres til, en delt konto i samme innsending — da er flagget ennå ikke
+        # lagret, og matrisen skal likevel ikke gi den mer enn den kan ha.
+        self._for_regelen = _SOM_DELT if blir_delt else bruker
 
         for modul in self.moduler():
             navn = self.PREFIKS + modul.slug
@@ -525,16 +556,27 @@ class ModulTilgangForm(forms.Form):
             # kunne lage et valg som ikke finnes i modellen.
             kjente = dict(TilgangsNivaa.choices)
             valg += [(v, modul.etikett_for(v)) for v in modul.nivaaer if v in kjente]
+            # **En delt konto tilbys bare «Ingen tilgang»** på moduler som ikke
+            # tillater den (8. okt. 2026, FORSLAG_KO §5.2) — et valg som gir
+            # feilmelding er en kontroll som fører til en vegg. En rad som fantes
+            # fra før, står i lista under og kan fjernes, men gir ingenting.
+            # Valgene *er* sperra: et nivå som ikke står i lista, avviser
+            # `ChoiceField` som ugyldig, også når skjemaet postes direkte.
+            sperret = delt_konto_sperret(self._for_regelen, modul.slug)
+            if sperret:
+                valg = [(self.INGEN, 'Ingen tilgang')]
             # Et nivå brukeren allerede har, men som ikke tilbys, må stå i
             # lista — ellers ville et lagre-trykk stille fjernet det.
             if har and har not in [v for v, _ in valg]:
-                valg.append((har, modul.etikett_for(har)))
+                valg.append((har, modul.etikett_for(har)
+                             + (' — gir ingenting på en delt konto' if sperret else '')))
             self.fields[navn] = forms.ChoiceField(
                 choices=valg,
                 required=False,
                 initial=har,
                 label=modul.name,
-                help_text=modul.description,
+                help_text=(('Delt konto: bare moduler som tillater det. '
+                            + modul.description) if sperret else modul.description),
                 widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
             )
 

@@ -7,6 +7,7 @@ skjermen i stedet for å se ut som om det gikk gjennom.
 """
 from django.test import SimpleTestCase
 
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node,
 )
@@ -35,7 +36,7 @@ globalThis.OPPDRAG_STATUSNAVN = {
 HARNESS = (
     (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                        'klokke')),
-    (OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
+    INNLOGGET, (OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
                         'lagNokkel', 'projiser',
                         # køraden bærer posisjonsdelingen (4. okt. 2026)
                         'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel')),
@@ -46,7 +47,7 @@ class OfflineKoTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(HARNESS)
+        self.harness = INNLOGGET_STUBB + build_harness(HARNESS)
 
     def _kjor(self, snippet):
         return run_node(self.harness, FORSPILL + snippet)

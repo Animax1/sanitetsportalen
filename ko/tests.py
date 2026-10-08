@@ -240,13 +240,18 @@ class SidebarenTests(TestCase):
         self._logg_inn_som(bruker)
         self.assertEqual([r['brukernavn'] for r in tilstede()], ['operator'])
 
-    def test_delt_konto_er_merket(self):
-        """**En delt konto må se ut som en delt konto** (§4.5). «Enhet 2» er
-        to til tre personer; «Kari Nordmann» er én."""
+    def test_delt_konto_staar_ikke_i_lista(self):
+        """**En delt konto når ikke KO** (8. okt. 2026, FORSLAG_KO §5.2). Før
+        sperra var den merket i lista (§4.5: «Enhet 2» er to til tre personer);
+        nå står den ikke der, heller ikke med en KO-rad fra før regelen."""
+        from accounts.models import ModulTilgang
         bruker = _bruker('enhet-2', er_delt_konto=True)
-        _gi_ko(bruker)
+        ModulTilgang.objects.bulk_create([ModulTilgang(bruker=bruker, modul_slug='ko', nivaa='les')])
         self._logg_inn_som(bruker)
-        self.assertTrue(tilstede()[0]['er_delt_konto'])
+        operator = _bruker('operator')
+        _gi_ko(operator)
+        self._logg_inn_som(operator)
+        self.assertEqual([r['brukernavn'] for r in tilstede()], ['operator'])
 
     def test_sesjonsnokkelen_slipper_aldri_ut(self):
         """`session_key` er adminflatens håndtak for å **avslutte** en sesjon.

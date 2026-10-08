@@ -12,11 +12,12 @@ import unittest
 
 from django.test import SimpleTestCase
 
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_available, run_node
 
 from .tests_runde_d import _konst
 
-HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
+HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
                                'koFjern', 'projiser', 'synk', '_stemple',
                                # `_stemple` legger posisjonen i køraden (30. sep. 2026).
                                'posisjonTilKo', 'kartKoblingAktiv', 'delerPosisjon',
@@ -47,7 +48,7 @@ globalThis.apiFetch = (url) => new Promise((ok) => {
 
 
 def _kjor(kode):
-    ut = run_node(build_harness(HARNESS), '(async () => {\n' + kode + '\n})();', preamble=FORSPILL)
+    ut = run_node(INNLOGGET_STUBB + build_harness(HARNESS), '(async () => {\n' + kode + '\n})();', preamble=FORSPILL)
     return [json.loads(l) for l in ut.splitlines() if l != 'OK']
 
 

@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from oppdrag import choices
 from oppdrag.models import Oppdrag, Statusmelding
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_available, run_node
 
 from .tests_views import StemplingBasis, _bruker, _klient
@@ -188,7 +189,7 @@ POS_FUNKSJONER = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAkt
                   # Hvem deler posisjon (4. okt. 2026)
                   'posisjonsdelingTilstand', 'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret')
 
-HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
+HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
                                'koFjern', 'projiser', 'synk', '_stemple', *POS_FUNKSJONER)),)
 
 FORSPILL = """
@@ -214,7 +215,7 @@ const fix = (sekunderSiden) => ({ lat: 59.4136, lon: 5.2683,
 
 
 def _kjor(kode):
-    ut = run_node(build_harness(HARNESS), '(async () => {\n' + kode + '\n})();', preamble=FORSPILL)
+    ut = run_node(INNLOGGET_STUBB + build_harness(HARNESS), '(async () => {\n' + kode + '\n})();', preamble=FORSPILL)
     return [json.loads(linje) for linje in ut.splitlines() if linje != 'OK']
 
 

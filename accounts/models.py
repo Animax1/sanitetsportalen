@@ -240,6 +240,40 @@ class ModulTilgang(BaseTimeStampedModel):
     def __str__(self):
         return f'{self.bruker_id}:{self.modul_slug}={self.nivaa}'
 
+    def clean(self):
+        """En delt konto kan bare ha tilgang til moduler som sier ja (§5.2)."""
+        super().clean()
+        if delt_konto_sperret(self.bruker, self.modul_slug):
+            from django.core.exceptions import ValidationError
+            raise ValidationError(DELT_KONTO_SPERRET.format(modul=self.modul_slug))
+
+    def save(self, *args, **kwargs):
+        """Datalaget nekter — ikke bare skjemaet (8. okt. 2026, FORSLAG_KO §5.2).
+
+        `bulk_create` og `.update()` går utenom denne, og det er greit: sperra
+        som faktisk *holder* står i `nivaa_for()`, der tilgangen avgjøres. Denne
+        er laget før, slik at en ny skrivevei sier fra med det samme i stedet for
+        å lage en rad som ser ut som tilgang uten å være det.
+        """
+        if delt_konto_sperret(self.bruker, self.modul_slug):
+            from django.core.exceptions import ValidationError
+            raise ValidationError(DELT_KONTO_SPERRET.format(modul=self.modul_slug))
+        super().save(*args, **kwargs)
+
+
+#: Én tekst for skjemaet, modellen og brukerskjemaet.
+DELT_KONTO_SPERRET = ('En delt konto kan ikke ha tilgang til «{modul}». Delte kontoer — '
+                      'biler og skjermer — har bare tilgang til moduler som tillater det; '
+                      'alt annet krever en personlig konto.')
+
+
+def delt_konto_sperret(bruker, modul_slug) -> bool:
+    """Er dette en delt konto, og en modul som ikke tillater delte kontoer?"""
+    if not getattr(bruker, 'er_delt_konto', False):
+        return False
+    from core.modules import delt_konto_kan_bruke
+    return not delt_konto_kan_bruke(modul_slug)
+
 
 class LoginEvent(models.Model):
     """Logg over innloggingsforsøk og MFA-hendelser."""

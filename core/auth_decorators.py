@@ -164,6 +164,15 @@ def nivaa_for(user, modul_slug):
         # `skriv_full` måtte hvert `skriv_leder`-kallsted huske
         # `er_global_admin(...) or`, og én glemt `or` var et 403 for admin.
         return max(NIVAA_HIERARKI, key=NIVAA_HIERARKI.get)
+    # **En delt konto når bare moduler som sier ja** (8. okt. 2026, §5.2 i
+    # FORSLAG_KO.md). Sperra står her, der tilgangen avgjøres, og ikke bare der
+    # rader skrives: den dekker rader som fantes før regelen, og enhver vei inn
+    # som kommer senere — `bulk_create`, en importjobb, en migrasjon. Skjemaet
+    # og `ModulTilgang.save()` sier fra før noen prøver; dette er det som holder.
+    if getattr(user, 'er_delt_konto', False):
+        from core.modules import delt_konto_kan_bruke  # noqa: WPS433
+        if not delt_konto_kan_bruke(modul_slug):
+            return None
     if not _modul_er_aktiv(user, modul_slug):
         return None
     return _tilganger(user).get(modul_slug)

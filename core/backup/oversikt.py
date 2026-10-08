@@ -188,7 +188,7 @@ def helrad(plan_form_klasse=None) -> dict | None:
 def sideinnhold(plan_form_klasse=None) -> dict:
     """Alt siden trenger, i én dict."""
     from core import offsite
-    from core.backup.klokke import TIKK_SEKUNDER, vakthund
+    from core.backup.klokke import TIKK_SEKUNDER, klokka_er_av, vakthund
     from core.models import Backupplan
 
     advarsler = vakthund()
@@ -203,5 +203,9 @@ def sideinnhold(plan_form_klasse=None) -> dict:
         'disk': diskbruk(),
         'offsite': offsite.status(),
         'vakthund': advarsler,
+        # Er klokka slått av med vilje, er «svarer ikke» feil beskjed: den står
+        # stille fordi noen ba den om det. Malen viser det i stedet, og lar
+        # vakthunden ligge (8. okt. 2026).
+        'klokke_av': klokka_er_av(),
         'tikk_sekunder': TIKK_SEKUNDER,
     }

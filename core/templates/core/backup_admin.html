@@ -104,7 +104,17 @@ helseopplysningsdump utenfor portalens kontroll.
 Klokka er en tråd og synes ikke i Railways grensesnitt slik en cron-jobb gjør.
 Dette er beviset på at den lever: er den stille, står det her.
 {% endcomment %}
-{% if vakthund %}
+{% if klokke_av %}
+<div class="alert alert-secondary py-2" id="klokke-av">
+  <strong><i class="bi bi-pause-circle me-1"></i>Backup-klokka er slått av.</strong>
+  <div class="small">
+    <code>BACKUP_KLOKKE=av</code> er satt i Railway. Ingen plan vurderes automatisk —
+    heller ikke av reservenettet — og det varsles ikke om at klokka står.
+    <code>python manage.py backup_kjor</code> tar en runde for hånd. Fjern variabelen
+    for å slå den på igjen.
+  </div>
+</div>
+{% elif vakthund %}
 <div class="alert alert-danger py-2">
   <strong><i class="bi bi-exclamation-triangle me-1"></i>Backup-klokka svarer ikke.</strong>
   {% for v in vakthund %}

@@ -361,6 +361,13 @@ function renderKonfig(k) {
 
 function renderBackupklokke(k) {
   if (k.error) { setVal('klokke-tikk', k.error, 'status-warn'); return; }
+  // Slått av med BACKUP_KLOKKE=av (8. okt. 2026): ikke rødt — den står
+  // stille fordi noen ba den om det.
+  if (k.av) {
+    setVal('klokke-tikk', 'Slått av (BACKUP_KLOKKE=av)', 'status-warn');
+    setVal('klokke-forsinket', '–', 'status-warn');
+    return;
+  }
   setVal('klokke-tikk',
          k.siste_tikk ? datoKlokke(k.siste_tikk) + ' (' + tidSiden(k.minutter_siden) + ')' : 'Aldri',
          k.siste_tikk ? (k.ok ? 'status-ok' : 'status-crit') : 'status-warn');

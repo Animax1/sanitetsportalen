@@ -13,6 +13,7 @@ from django.test import SimpleTestCase
 
 from oppdrag.tests_offline_ko import FORSPILL
 from oppdrag.tests_runde_d import _konst
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
     node_available, read_js, run_node,
@@ -143,7 +144,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
 class VenterPaaDekningTests(SimpleTestCase):
     """3.4: meldingen venter tre sekunder på at sendingen skal lykkes."""
 
-    HARNESS = ((OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel',
+    HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel',
                                    'usendtAlder', 'visUsendt',
                                    # køraden bærer posisjonsdelingen (4. okt. 2026)
                                    'posisjonsdelingTilstand', 'kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel', 'delerPosisjon', 'delPosisjonNokkel')),)
@@ -152,7 +153,7 @@ class VenterPaaDekningTests(SimpleTestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = (_konst(OPPDRAG_ENHET_JS, 'USENDT_VENTETID_MS') + 'let usendtTimer = null;\n'
-                        + build_harness(self.HARNESS))
+                        + INNLOGGET_STUBB + build_harness(self.HARNESS))
 
     DOM = '''
     const klasser = new Set(['d-none']);

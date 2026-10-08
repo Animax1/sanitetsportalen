@@ -120,6 +120,26 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 }
 
 
+// ════════════════════════════════════════════════════════
+// NØKLER SOM TILHØRER ÉN BRUKER (8. okt. 2026, L17)
+// ════════════════════════════════════════════════════════
+//
+// `localStorage` følger nettleseren, ikke kontoen. Offline-køene lå under én
+// fast nøkkel, så en annen konto på samme PC eller telefon spilte av
+// forgjengerens usendte stemplinger — under sin egen innlogging, og uten at
+// noen så det. Med brukeren i nøkkelen venter køen på den som trykket, og
+// sendes som henne når hun logger inn igjen på samme enhet.
+//
+// **Ukjent bruker gir `null`, ikke en felles nøkkel.** En reserve til den gamle
+// nøkkelen ville gjenåpnet hullet i det stille den dagen ID-en manglet.
+// `window.PORTAL_BRUKER_ID` settes av `base_portal.html`.
+function brukerNokkel(prefiks) {
+  const id = globalThis.PORTAL_BRUKER_ID;
+  if (id === undefined || id === null || id === '') return null;
+  return `${prefiks}:u${id}`;
+}
+
+
 async function apiFetch(url, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const headers = { ...(options.headers || {}) };

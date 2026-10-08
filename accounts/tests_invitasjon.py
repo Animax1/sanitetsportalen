@@ -17,7 +17,7 @@ from django.urls import reverse
 from accounts.invitasjon import (
     LEVETID_SEKUNDER, kan_inviteres, lag_token, les_token,
 )
-from accounts.models import CustomUser
+from accounts.models import CustomUser, ModulTilgang
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -82,7 +82,7 @@ class InvitasjonTokenTests(TestCase):
             username='bil3', password='pass', role='bruker',
             er_delt_konto=True,
         )
-        gi_standardtilgang(bil, 'skriver')
+        ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')  # en bil: bare oppdrag (FORSLAG_KO §5.2)
         self.assertFalse(kan_inviteres(bil))
 
         bil.email = 'vakt@eksempel.no'
@@ -317,7 +317,7 @@ class EksisterendeKontoerTests(TestCase):
             username='bil9', password='pass', role='bruker',
             er_delt_konto=True,
         )
-        gi_standardtilgang(bil, 'skriver')
+        ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')  # en bil: bare oppdrag (FORSLAG_KO §5.2)
         svar = self.klient.post(
             reverse('portaladmin:user_detail', args=[bil.pk]),
             {

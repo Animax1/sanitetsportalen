@@ -1437,6 +1437,110 @@ class KlokkeOppstartTests(TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+class KlokkeAvGjelderReservenettetTests(TestCase):
+    """`BACKUP_KLOKKE=av` stopper hele klokka, ikke bare tråden (8. okt. 2026).
+
+    Funnet 4. okt. 2026, da prod skulle i dvale: bryteren stoppet tråden, men
+    reservenettet i middlewaren tok backup og sendte «Backup-klokka har
+    stoppet» til hver admin ved første sidevisning. Testene går gjennom
+    middlewaren selv — den er tatt ut av testinnstillingene, så den kalles
+    direkte — og hver har en kontroll uten bryteren, så en test som ikke
+    kan se forskjell ikke står grønn.
+    """
+
+    def setUp(self) -> None:
+        _restore_patients_handler()
+        self.backup_dir = _prepare_backup_dir()
+        self.admin = CustomUser.objects.create_user(
+            username='admin', password='pwd', role='admin',
+            must_change_password=False)
+        gi_standardtilgang(self.admin, 'admin')
+        # En plan som står på og er forfalt — det vakthunden slår ut på.
+        plan = Backupplan.hent('patients')
+        plan.folger_standard = False
+        plan.modus = Backupplan.MODUS_ALLTID
+        plan.intervall_verdi, plan.intervall_enhet = 10, 'minutt'
+        plan.sist_sjekket_at = timezone.now() - timedelta(hours=5)
+        plan.save()
+        _lagret_for(plan, timedelta(hours=5))
+
+    def _forespørsel_gjennom_middlewaren(self, miljo: dict) -> tuple[list, list]:
+        """Én forespørsel gjennom `BackupSchedulerMiddleware`. Tråden kjøres
+        synkront, så det den gjorde er gjort når kallet returnerer."""
+        from django.http import HttpResponse
+        from django.test import RequestFactory
+
+        import core.backup.klokke as klokke
+        from core.middleware import BackupSchedulerMiddleware
+
+        class _Synkron:
+            def __init__(self, target=None, **_):
+                self._target = target
+
+            def start(self):
+                self._target()
+
+        kjort, varslet = [], []
+        klokke._siste_sjekk_ts = 0.0
+        klokke._kjorer = False
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir), **miljo}), \
+                patch('core.backup.klokke.threading.Thread', _Synkron), \
+                patch('core.backup.klokke.kjor_forfalte',
+                      side_effect=lambda: kjort.append(1) or 0), \
+                patch('core.backup.klokke.varsle_stoppet_klokke',
+                      side_effect=lambda: varslet.append(1) or 0):
+            BackupSchedulerMiddleware(lambda r: HttpResponse())(
+                RequestFactory().get('/'))
+        return kjort, varslet
+
+    def test_reservenettet_tar_ingen_backup_og_varsler_ikke_naar_klokka_er_av(self) -> None:
+        self.assertEqual(self._forespørsel_gjennom_middlewaren({'BACKUP_KLOKKE': 'av'}),
+                         ([], []))
+
+    def test_kontroll_uten_bryteren_kjorer_reservenettet(self) -> None:
+        """Uten denne kunne testen over vært grønn fordi middlewaren aldri
+        nådde reservenettet i det hele tatt."""
+        os.environ.pop('BACKUP_KLOKKE', None)
+        self.assertEqual(self._forespørsel_gjennom_middlewaren({}), ([1], [1]))
+
+    def test_bryteren_leses_uten_hensyn_til_store_bokstaver_og_mellomrom(self) -> None:
+        from core.backup.klokke import klokka_er_av
+
+        for verdi, forventet in ((' Av ', True), ('AV', True), ('av', True),
+                                 ('', False), ('på', False), ('avslått', False)):
+            with self.subTest(verdi=verdi), patch.dict(os.environ, {'BACKUP_KLOKKE': verdi}):
+                self.assertEqual(klokka_er_av(), forventet)
+
+    def test_settingen_slaar_av_ogsaa_reservenettet(self) -> None:
+        os.environ.pop('BACKUP_KLOKKE', None)
+        with self.settings(BACKUP_KLOKKE_AV=True):
+            self.assertEqual(self._forespørsel_gjennom_middlewaren({}), ([], []))
+
+    def test_backupsiden_sier_slaatt_av_og_ikke_svarer_ikke(self) -> None:
+        client = Client()
+        client.force_login(self.admin)
+        with patch.dict(os.environ, {'BACKUP_KLOKKE': 'av'}):
+            resp = client.get('/portal-admin/backup/')
+        self.assertContains(resp, 'Backup-klokka er slått av')
+        self.assertNotContains(resp, 'Backup-klokka svarer ikke')
+        os.environ.pop('BACKUP_KLOKKE', None)
+        resp = client.get('/portal-admin/backup/')
+        self.assertContains(resp, 'Backup-klokka svarer ikke', msg_prefix='kontroll')
+        self.assertNotContains(resp, 'Backup-klokka er slått av')
+
+    def test_statuskortet_melder_av_og_ingen_forsinkede(self) -> None:
+        from core.admin_status import _get_backupklokke
+
+        with patch.dict(os.environ, {'BACKUP_KLOKKE': 'av'}):
+            kort = _get_backupklokke()
+        self.assertTrue(kort['av'])
+        self.assertEqual(kort['forsinkede'], [])
+        os.environ.pop('BACKUP_KLOKKE', None)
+        kort = _get_backupklokke()
+        self.assertFalse(kort['av'])
+        self.assertIn('patients', kort['forsinkede'], 'kontroll')
+
+
 class BackupConstantsTests(TestCase):
     def test_valid_kinds_complete(self) -> None:
         # Mot modellens valgliste, ikke en avskrift: `pre_slett` (28. sep. 2026)

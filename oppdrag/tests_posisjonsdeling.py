@@ -26,6 +26,7 @@ from django.utils import timezone
 
 from oppdrag import choices
 from oppdrag.models import Enhet
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     KO_JS, OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available,
     run_node)
@@ -248,7 +249,7 @@ POS = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAktiv', 'delPo
        'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret', 'tegnPosisjonLinje',
        'tegnSendPosisjon', 'sendPosisjonSperret')
 
-BIL_HARNESS = ((OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
+BIL_HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
                                    'projiser', 'synk', '_stemple', 'lastMine', 'harNyDelt', 'erNyDelt',
                                    'nyeOppdrag', *POS)),)
 
@@ -281,7 +282,7 @@ const fix = (s) => ({ lat: 59.4136, lon: 5.2683, tid: new Date(NAA - s * 1000).t
 
 
 def _kjor_bil(kode):
-    ut = run_node(build_harness(BIL_HARNESS), '(async () => {\n' + kode + '\n})();', preamble=BIL_FORSPILL)
+    ut = run_node(INNLOGGET_STUBB + build_harness(BIL_HARNESS), '(async () => {\n' + kode + '\n})();', preamble=BIL_FORSPILL)
     return [json.loads(l) for l in ut.splitlines() if l != 'OK']
 
 

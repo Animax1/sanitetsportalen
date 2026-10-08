@@ -9,6 +9,7 @@ import re
 
 from django.test import SimpleTestCase, override_settings
 
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
     node_available, read_js, run_node)
@@ -298,7 +299,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
 class EnhetsskjermJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAvsluttet', 'oppdragsnr', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
+        INNLOGGET, (OPPDRAG_ENHET_JS, ('renderAvsluttet', 'oppdragsnr', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
                             'koLes', 'koSkriv', 'koFjern', 'koNokkel', 'synk')),
     )
     STUBB = (
@@ -310,7 +311,7 @@ class EnhetsskjermJsTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = INNLOGGET_STUBB + build_harness(self.HARNESS)
 
     def test_nylig_avsluttet_baerer_nummeret(self):
         ut = run_node(self.harness, """

@@ -11,6 +11,7 @@ from datetime import timedelta
 from django.test import SimpleTestCase
 from django.utils import timezone
 
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     JS_DIR, PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available,
     read_js, run_node,
@@ -163,7 +164,7 @@ class WorkerensRegelJsTests(SimpleTestCase):
 class KoenJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('koNokkel', 'koLes', 'koSkriv', '_leggIKo', '_brukLokalt', '_projiserKo',
+        INNLOGGET, (VAKTLISTE_JS, ('koNokkel', 'koLes', 'koSkriv', '_leggIKo', '_brukLokalt', '_projiserKo',
                         '_sesjonUtgaatt', 'tegnOffline', '_tegnOfflineKlar', '_dag', '_kl', '_d')),
     )
     LAGER = ("globalThis.localStorage = (() => { const m = {}; return {"
@@ -179,7 +180,7 @@ class KoenJsTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = self.LAGER + build_harness(self.HARNESS)
+        self.harness = self.LAGER + INNLOGGET_STUBB + build_harness(self.HARNESS)
 
     def test_koen_leses_og_skrives_og_taaler_rot(self):
         ut = run_node(self.harness, """
@@ -281,7 +282,7 @@ class SwUtkastingTests(SimpleTestCase):
         # `VERSJON` er en toppnivåkonstant og må med i harnessen.
         versjon = [l for l in read_js(SW_JS).splitlines()
                    if l.startswith('const VERSJON')][0]
-        self.harness = versjon + '\n' + build_harness(self.HARNESS)
+        self.harness = versjon + '\n' + INNLOGGET_STUBB + build_harness(self.HARNESS)
 
     def _kastes(self, *navn):
         ut = run_node(self.harness, 'console.log(JSON.stringify([%s].filter(skalKastes)));'
@@ -340,7 +341,7 @@ const R = (sti) => ({ url: 'https://portal.test' + sti });
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = INNLOGGET_STUBB + build_harness(self.HARNESS)
 
     def _kjor(self, kropp):
         return run_node(self.harness, '(async () => {' + kropp + '})().catch((e) => {'

@@ -934,8 +934,13 @@ def user_create_view(request):
 
     if request.method == 'POST':
         form = AdminUserCreateForm(request.POST)
-        tilgang_form = ModulTilgangForm(request.POST)
-        if form.is_valid() and tilgang_form.is_valid():
+        # Kontotypen avgjør hva matrisen kan gi (FORSLAG_KO §5.2): en ny bil
+        # skal ikke kunne få pasienttilgang fordi flagget ikke var lagret ennå.
+        skjema_ok = form.is_valid()
+        tilgang_form = ModulTilgangForm(
+            request.POST,
+            blir_delt=skjema_ok and bool(form.cleaned_data.get('er_delt_konto')))
+        if skjema_ok and tilgang_form.is_valid():
             user = form.save(commit=False)
             vil_invitere = (
                 request.POST.get('metode', 'invitasjon') == 'invitasjon'
@@ -1135,8 +1140,16 @@ def user_detail_view(request, pk):
             # skriver dem over på samme objekt.
             foer = {f: getattr(user, f) for f in AdminUserEditForm.Meta.fields}
             form = AdminUserEditForm(request.POST, instance=user)
-            tilgang_form = ModulTilgangForm(request.POST, bruker=user)
-            if form.is_valid() and tilgang_form.is_valid():
+            # Som ved opprettelse: gjøres kontoen delt i samme lagring, gjelder
+            # regelen for delte kontoer matrisen også (FORSLAG_KO §5.2). I dag
+            # ville `form.is_valid()` alt ha satt flagget på `user` i minnet —
+            # men da hang regelen på rekkefølgen av to linjer, og de sto i
+            # motsatt rekkefølge fram til 8. okt. 2026.
+            skjema_ok = form.is_valid()
+            tilgang_form = ModulTilgangForm(
+                request.POST, bruker=user,
+                blir_delt=skjema_ok and bool(form.cleaned_data.get('er_delt_konto')))
+            if skjema_ok and tilgang_form.is_valid():
                 # Sletting og frys sperrer «deg selv» og «siste admin»;
                 # redigering gjorde det ikke (13. sep. 2026, M7). Uten
                 # Django-admin i prod finnes ingen nødutgang.

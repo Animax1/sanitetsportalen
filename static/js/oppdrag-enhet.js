@@ -55,8 +55,11 @@ const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift', 'Plassering'
 //: `ReferenceError` og meldt «tom kø». Testen hadde da bestått uten å måle
 //: noe. Versjonstallet står i navnet: endres formen på radene, byttes v1 ut,
 //: og en gammel kø leses ikke som en ny.
+//: **Nøkkelen tilhører den innloggede kontoen** (`brukerNokkel()`, L17,
+//: 8. okt. 2026): en annen konto på samme telefon spiller ikke av denne køen.
+//: `null` uten bruker — da finnes ingen kø å lese eller skrive.
 function koNokkel() {
-    return 'oppdrag_ko_v1';
+    return brukerNokkel('oppdrag_ko_v1');
 }
 
 
@@ -65,7 +68,9 @@ function koLes() {
     // eller inneholde noe annet enn det vi skrev. En kø vi ikke kan lese er
     // en tom kø — skjermen skal virke, men da uten offline-dekning.
     try {
-        const raa = localStorage.getItem(koNokkel());
+        const nokkel = koNokkel();
+        if (!nokkel) return [];
+        const raa = localStorage.getItem(nokkel);
         const verdi = raa ? JSON.parse(raa) : [];
         return Array.isArray(verdi) ? verdi : [];
     } catch (e) {
@@ -76,7 +81,9 @@ function koLes() {
 
 function koSkriv(ko) {
     try {
-        localStorage.setItem(koNokkel(), JSON.stringify(ko));
+        const nokkel = koNokkel();
+        if (!nokkel) return false;
+        localStorage.setItem(nokkel, JSON.stringify(ko));
         return true;
     } catch (e) {
         return false;
