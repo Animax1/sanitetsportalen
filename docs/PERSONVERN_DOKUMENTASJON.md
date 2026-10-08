@@ -1,8 +1,9 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 8. oktober 2026  
-**Versjon:** 1.18  
-**Behandlingsansvarlig:** André Eritsland
+**Versjon:** 1.19  
+**Behandlingsansvarlig:** Kverneland Røde Kors  
+**Systemansvarlig:** André Eritsland
 
 ---
 
@@ -16,16 +17,22 @@
 
 | Felt | Opplysning |
 |---|---|
-| Navn | André Eritsland |
-| E-post | andre.eritsland@gmail.com |
-| Rolle | Behandlingsansvarlig |
+| Behandlingsansvarlig | Kverneland Røde Kors |
+| Systemansvarlig | André Eritsland |
+| Kontakt | andre.eritsland@gmail.com (systemansvarlig) |
 | Geografisk plassering | Rogaland, Norge |
+
+Behandlingsansvaret gjelder både portalen og kart.sanitet.net. Korpset bestemmer formål og
+midler — at det føres pasientregistrering på vakt, hvem som får konto, hva som registreres —
+og er derfor behandlingsansvarlig. Systemansvarlig drifter og utvikler systemet på korpsets
+vegne, og er kontaktpunktet for henvendelser etter A.14 og for avvik etter A.15.
 
 Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd med gjeldende personvernregelverk, herunder EUs personvernforordning (GDPR) og lov om behandling av personopplysninger (personopplysningsloven) av 2018.
 
-> **Merk om ansvarssubjekt:** Behandlingsansvaret er per i dag lagt til André Eritsland som privatperson, ikke til organisasjonen som gjennomfører sanitetsvaktene. Det innebærer at innsynskrav, avviksmelding til Datatilsynet og det rettslige ansvaret ligger hos behandlingsansvarlig personlig. Dette er et bevisst valg og bør revurderes ved den årlige revisjonen (se C.4).
->
-> **Besluttet 30. september 2026 (André, `docs/archived/PLAN_KARTKOBLING.md` §1, B13):** behandlingsansvarlig er **korpset**, for både portalen og kart.sanitet.net, og André Eritsland er **systemansvarlig**. Tabellen over og signaturen er ikke skrevet om ennå, fordi organisasjonsnavnet står åpent i A.4 — når det er fylt inn, skal A.1, hodet og signaturfeltet følge. Beslutningen gjelder fra datoen over; avveiningen for kartkoblingen står i A.6.
+> **Historikk:** Fram til 30. september 2026 sto behandlingsansvaret på André Eritsland som
+> privatperson. Det ble besluttet endret den dagen (`docs/archived/PLAN_KARTKOBLING.md` §1,
+> B13), og tabellen over ble skrevet om 8. oktober 2026 da organisasjonsnavnet var på plass
+> (v1.19). Beslutningen gjelder fra 30. september; avveiningen for kartkoblingen står i A.6.
 
 ---
 
@@ -137,7 +144,7 @@ Art. 9(2)(h) kan bare påberopes når opplysningene behandles av — eller under
 | Personellgruppe | Grunnlag for taushetsplikt |
 |---|---|
 | Helsepersonell med autorisasjon | Taushetsplikt i kraft av helsepersonelloven § 21 |
-| Frivillige førstehjelpere uten helsefaglig autorisasjon | Signert taushetserklæring gjennom organisasjonen som gjennomfører sanitetsvakten: **[fyll inn organisasjonsnavn]** |
+| Frivillige førstehjelpere uten helsefaglig autorisasjon | Signert taushetserklæring gjennom organisasjonen som gjennomfører sanitetsvakten: **Kverneland Røde Kors** |
 
 Samtlige med tilgang til pasientregistreringen har signert taushetserklæring via organisasjonen. Erklæringene oppbevares hos organisasjonen, ikke hos behandlingsansvarlig. Ved behov for dokumentasjon overfor tilsynsmyndighet innhentes de derfra.
 
@@ -831,7 +838,6 @@ kø i klienten, ikke gjennom cachen.
   står i oppdragstabellen til oppdraget slettes eller arkiveres.
 - Pasientnummer brukes som pseudonym, men kan i prinsippet kobles til person dersom annen informasjon fra arrangementsstedet foreligger (re-identifikasjonsrisiko er vurdert som lav). Personell som var på vakt vil normalt kunne knytte nummer til person i minnet.
 - Offline-modus innebærer at personopplysninger lagres lokalt på en enhet utenfor den kontrollerte skyinfrastrukturen – dette øker risikoen for uautorisert tilgang ved tap av enhet.
-- Behandlingsansvaret ligger hos en privatperson, ikke hos organisasjonen som gjennomfører vaktene. Se merknad i A.1.
 
 ### Vurderte og fravalgte tiltak
 
@@ -946,8 +952,10 @@ Alle brudd, uavhengig av om de medfører meldeplikt, skal loggføres skriftlig m
 Denne appen brukes av sanitetsvakter ved arrangementer for å registrere og følge opp pasienter som trenger medisinsk hjelp på stedet.
 
 **Ansvarlig for opplysningene (behandlingsansvarlig):**  
-André Eritsland, Rogaland  
-E-post: andre.eritsland@gmail.com
+Kverneland Røde Kors, Rogaland
+
+**Kontakt (systemansvarlig):**  
+André Eritsland — e-post: andre.eritsland@gmail.com
 
 ---
 
@@ -1088,7 +1096,7 @@ Du har de samme rettighetene som er beskrevet i B.7 — innsyn, retting, slettin
 
 ## B.9 Kontakt
 
-Har du spørsmål om personvern, ønsker innsyn eller vil utøve andre rettigheter, ta kontakt med behandlingsansvarlig:
+Har du spørsmål om personvern, ønsker innsyn eller vil utøve andre rettigheter, ta kontakt med systemansvarlig, som svarer på vegne av Kverneland Røde Kors:
 
 **André Eritsland**  
 E-post: andre.eritsland@gmail.com
@@ -1172,7 +1180,7 @@ Denne sjekklisten skal gjennomgås ved etablering av ny databehandleravtale og v
 - [ ] Verifiser at automatisk opprydding av backup-filer faktisk kjører (antallscap, standard 50 per modul)
 - [ ] Verifiser at `purge_old_logs` kjører som planlagt, og at ingen audit-logger er eldre enn 2 år
 - [ ] Verifiser at arkiverte pasientrader eldre enn 24 måneder er kollapset til aggregert statistikk
-- [ ] Vurder om behandlingsansvaret fortsatt bør ligge hos privatperson, eller om det bør overføres til organisasjonen (se A.1)
+- [ ] Kontroller at rollefordelingen i A.1 fortsatt stemmer: Kverneland Røde Kors som behandlingsansvarlig, og hvem som er systemansvarlig
 - [ ] Test SSL/TLS: verifiser at sertifikater er gyldige og at HSTS er aktivt
 - [ ] Gjennomgå sikkerhetsfikser og oppgraderinger siden forrige revisjon; vurder om nye CVE-er i avhengigheter er adressert
 - [ ] Vurder om det har skjedd endringer i behandlingens art, omfang eller formål som utløser behov for DPIA (art. 35)
@@ -1220,19 +1228,36 @@ Denne sjekklisten skal gjennomgås ved etablering av ny databehandleravtale og v
 
 ## Signatur og godkjenning
 
-Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
+Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarlig.
+
+**Utarbeidet av**
 
 | | |
 |---|---|
-| **Navn:** | André Eritsland |
-| **Dato:** | 12. august 2026 |
+| **Navn:** | André Eritsland, systemansvarlig |
+| **Dato:** | 12. august 2026 (første versjon) |
+| **Signatur:** | ________________________________ |
+
+**Godkjent for behandlingsansvarlig (Kverneland Røde Kors)**
+
+| | |
+|---|---|
+| **Navn og rolle i korpset:** | ________________________________ |
+| **Dato:** | ________________________________ |
 | **Signatur:** | ________________________________ |
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.18 – sist oppdatert 8. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.19 – sist oppdatert 8. oktober 2026*
 
 **Endringslogg:**
+
+- **v1.19 (08.10.2026):** **Behandlingsansvarlig er Kverneland Røde Kors** (A.1, hodet, B.1,
+  B.9), med André Eritsland som systemansvarlig og kontaktpunkt — beslutningen fra 30. sep.
+  (B13) er nå skrevet inn, fordi navnet er på plass. A.4: navnet fylt inn for
+  taushetserklæringene. A.12: risikoen «behandlingsansvaret ligger hos en privatperson» er
+  strøket. C.4: revisjonspunktet kontrollerer rollefordelingen i stedet for å spørre om den
+  skal flyttes. Signaturfeltet har fått en godkjenning for korpset.
 
 - **v1.18 (08.10.2026):** A.6: at en bil eller et lag har delt posisjon, står som systemlinje i
   KO-loggen — uten koordinater, med loggens lagringstid.

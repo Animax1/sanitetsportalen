@@ -35,13 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
-      Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
-      behandlingsprotokollen overfor tilsynsmyndighet. **Behandlingsansvarlig er besluttet**
-      (B13 i `docs/archived/PLAN_KARTKOBLING.md`, 30. sep. 2026): korpset, for portalen og
-      kart.sanitet.net, med André som systemansvarlig. Når navnet er på plass, skrives A.1,
-      dokumenthodet og signaturfeltet om til korpset — beslutningen står alt som merknad i A.1.
-
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
       - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:
@@ -465,8 +458,6 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
       offline, offsite, flere enheter per oppdrag, ISSI og besetning, audit i vaktlista,
       lyd og bilens utganger). Lista over hva som mangler hvor står i `docs/BACKUP.md` §5:
-      - [ ] ~~§8b med hel backup og gjenoppretting i tom base~~
-            (`BACKUP.md` §4), inkludert `purge_old_logs` + `kollaps_arkiv` rett etterpå
       - [ ] `docs/PERSONVERN_DOKUMENTASJON.md` — A.2 (Scaleway: hele databasen), A.9 (hel
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
@@ -532,9 +523,13 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 
 Fase 0–5 er gjennomført. Begrunnelsene og de varige beslutningene ligger i
 [`docs/PERSONVERN_DOKUMENTASJON.md`](./docs/PERSONVERN_DOKUMENTASJON.md); hva som ble gjort
-står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
+står i [`CHANGELOG.md`](./CHANGELOG.md). Behandlingsansvarlig er Kverneland Røde Kors, med
+André som systemansvarlig (A.1, v1.19, 8. okt. 2026).
 
-- [ ] Fyll inn organisasjonsnavn i A.4 — se «Krever Andre» øverst
+- [ ] **Få personverndokumentet godkjent for Kverneland Røde Kors.** Signaturfeltet har fra
+      v1.19 en rad for den som godkjenner på korpsets vegne. Det er behandlingsansvarlig som
+      står bak protokollen overfor Datatilsynet; til noen i korpset har signert, er den
+      systemansvarliges dokument. Ingen kode — en utskrift og en underskrift.
 
 #### DPIA, fritekst og adresse — se [`docs/NOTAT_DPIA_OG_FRITEKST.md`](./docs/NOTAT_DPIA_OG_FRITEKST.md)
 
@@ -547,10 +542,6 @@ skala, ingen profilering. Det tyngste (skala) holder. Det første gjør ikke det
 legges inn, og **A.12 har selv skrevet utløseren**: «særlig dersom nye moduler tar inn
 direkte identifikatorer».
 
-- [ ] **Avklar behandlingsansvaret.** A.1 legger det på André som privatperson, ikke på
-      organisasjonen. Behandlingsansvar følger virkeligheten, ikke papiret — bestemmer
-      foreningen formål og midler, er de ansvarlig uansett hva dokumentet sier. Påvirker
-      alle svarene under, og bør derfor tas først. Se «Krever Andre» øverst
 - [ ] **Slettefrist på `Oppdrag.fritekst`.** Feltet slettes aldri fra historikken hos KO i
       dag; beskyttelsen som finnes er bygget helt mot bilen. A.12 har det som åpen
       restrisiko. To deler: serveren utelater teksten når fristen er passert, og en feiing
@@ -931,13 +922,11 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       redigere navneregistrene, uten å være global admin. Det irreversible (nullstilling,
       kollaps, brukeradmin, backup) forblir admin per §3.3. Se §3.1 i notatet.
 
-      Å legge til verdien er en `-- (no-op)`-migrasjon; kostnaden ligger i å bestemme
-      innholdet. **Tas opp igjen når noen faktisk skal ha nivået** — et tomt nivå er lett
-      å dele ut i god tro, og gir automatisk mer den dagen det fylles.
-Et femte trinn `leder` ble lagt til 28. aug. og reversert samme dag — begrunnelsen var at
-et nytt nivå senere ville koste en migrasjon, og det stemmer ikke (`choices` er en
-`non_db_attr`, migrasjonen er `-- (no-op)`). Se §3.1 i notatet. Innføres når noe faktisk
-skal ligge der.
+      **Tas opp igjen når noen faktisk skal ha nivået** — et tomt nivå er lett å dele ut i
+      god tro, og gir automatisk mer den dagen det fylles. Nivået ble lagt til 28. aug. og
+      reversert samme dag, fordi grunnen («senere koster det en migrasjon») ikke holdt:
+      `choices` er en `non_db_attr`, så migrasjonen er `-- (no-op)`. Kostnaden ligger i å
+      bestemme innholdet, ikke i skjemaet.
 
 ### Oppdragsmodulen: `skriv_handling` for bilkontoer
 
@@ -1122,7 +1111,6 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       kan fremlegges for Datatilsynet. **Skal ikke slankes eller foldes inn i TODO.**
       Gjennomgangen her er en annen øvelse enn for de tre andre: verifiser at hver
       påstådte kontroll faktisk er reell i koden.
-      - Organisasjonsnavn i A.4 — se «Krever Andre» øverst
       - A.9 lagringstider: `purge_old_logs` er **verifisert i drift 23. aug. 2026** og
         dokumentert med datert merknad (v1.6). `kollaps_arkiv` gjenstår — den har ennå
         ikke hatt noe å kollapse, så påstanden om 24-måneders-grensen er foreløpig
