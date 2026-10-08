@@ -291,6 +291,11 @@ finnes.
 
 ### 5.2 Delt konto får bare oppdragsmodulen
 
+> **Bygget 8. okt. 2026.** `Module.tillat_delt_konto` (bare `oppdrag` sier ja), sperra i
+> `nivaa_for()` og i de to bulk-leserne (`ko/tilstede.py`, `backlog/varsler.py`),
+> `ModulTilgang.save()`, matrisen og brukerskjemaene. `accounts/tests_delt_konto_tilgang.py`
+> holder lagene, og `verifiser_modultilgang` lister rader fra før regelen.
+
 `CustomUser.er_delt_konto` finnes og styrer i dag e-post, MFA og selvbetjent reset. Den skal
 også avgrense modultilgang: **en delt konto kan ikke ha `ModulTilgang` til annet enn
 `oppdrag`.**

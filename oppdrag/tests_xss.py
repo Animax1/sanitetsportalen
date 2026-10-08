@@ -14,6 +14,7 @@ import re
 
 from django.test import SimpleTestCase
 
+from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     js_navn,
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
@@ -773,6 +774,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     """
 
     HARNESS = (
+        INNLOGGET,
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
@@ -799,7 +801,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = INNLOGGET_STUBB + build_harness(self.HARNESS)
 
     def test_avreist_knappen_staar_til_valget_er_apnet(self):
         ut = run_node(self.harness, self.STUBB + self.AKTIV + """

@@ -836,11 +836,6 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       hete (punktet over) er blitt mer synlig, ikke mindre — når noen ser «Lag 3 · 2 av 3
       møtt» og vil skrive «sendt til H12», er det dette som mangler.
 
-- [ ] **Delt konto skal bare kunne ha `ModulTilgang` til `oppdrag`.** `er_delt_konto` finnes
-      og styrer e-post, MFA og selvbetjent reset; den avgrenser ikke modultilgang. Håndheves
-      i skjemaet, i datalaget og med en test — sperrer som bare dekker dagens veier, ser ikke
-      en ny vei. Kan gjøres uavhengig av KO.
-
 - [ ] **`/lag/` — se [`docs/FORSLAG_PARK.md`](./docs/FORSLAG_PARK.md)** (27. sep. 2026).
       Lagenes utfallsregistrering uten innlogging, via én lenke i tiltakskortet i Bliksund.
       Avklart i fire runder (§2, B1–B23). **Alle tre puljene er levert** (27.–28. sep. 2026, se CHANGELOG);
@@ -1182,14 +1177,12 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       ingenting har endret seg. Gjør den ikke det, koster det en full kropp per bil per 15 s,
       og noe i svaret endrer seg uten at noen skriver (kandidat: posisjonsdelingen fra 4. okt.).
 
-- [ ] **Reservenettet for backup-klokka hører ikke på `BACKUP_KLOKKE=av`** (funnet 4. okt.
-      2026, da prod skulle settes i dvale i fire måneder). Variabelen stopper bare tråden;
-      `BackupSchedulerMiddleware` kaller `kanskje_kjor()` ved hver forespørsel uansett, tar
-      backup av planer som er aktive, og sender det kritiske varselet «Backup-klokka har
-      stoppet». Med alle planer på «Av» er det ufarlig, fordi ingenting er forfalt og
-      vakthunden er tom. Står én plan på, og variabelen er satt, får hver admin et rødt varsel
-      ved første sidevisning. Vurder: la `kanskje_kjor()` se på samme bryter, eller vis
-      «klokka er slått av» på backupsiden i stedet for «svarer ikke».
+- [ ] **«Logg ut» sletter usendte stemplinger uten å si fra.** Funnet 8. okt. 2026 under L17:
+      utloggingen sender `Clear-Site-Data: "storage"` (H4, 13. sep.), som tømmer
+      offline-køene i vaktlista og bilen sammen med alt annet. Logger en fører ut mens et
+      trykk venter på dekning, er trykket borte, og ingen ser det. Køen per bruker (L17)
+      endrer ikke det. Vurder en advarsel før utlogging når køen ikke er tom — ikke å
+      beholde køen, for da ligger den igjen på en delt PC.
 - [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
       (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er
       riktig for det den prøver, men prisen betales av hver eneste kjøring. Vurder et
@@ -1213,6 +1206,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       nye felt krever en versjonert payload — nye arkiver får dem, gamle verifiserer som
       før. Mønsteret finnes allerede (`varslet_modus` og `behandlet_at` står i payloaden
       bare når de er satt). Egen beslutning, ikke en oppgave som bare kan gjøres.
-- [ ] **Sikkerhetsgjennomgangen: L6, L8, L12, L17, L18, L22 gjenstår.** Lavpunktene fra
+- [ ] **Sikkerhetsgjennomgangen: L6, L8, L12, L18, L22 gjenstår.** Lavpunktene fra
       `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md` som ble satt til «senere». De er
       navngitt der, med begrunnelse for hvorfor de ikke hastet.

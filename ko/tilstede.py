@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from accounts.models import ModulTilgang
 from core.models import ModuleSettings
-from core.modules import get_module
+from core.modules import delt_konto_kan_bruke, get_module
 from core.sesjoner import aktive_sesjoner
 
 from .models import Ansvarsmerke
@@ -49,11 +49,12 @@ def _har_ko_tilgang_ider(bruker_ider):
             # skal kunne forberede modulen i kulissene.
             return set()
 
-    return set(
-        ModulTilgang.objects
-        .filter(modul_slug=SLUG, bruker_id__in=ider)
-        .values_list('bruker_id', flat=True)
-    )
+    rader = ModulTilgang.objects.filter(modul_slug=SLUG, bruker_id__in=ider)
+    # Samme sperre som `nivaa_for` (8. okt. 2026, FORSLAG_KO §5.2): en delt
+    # konto når ikke KO, heller ikke med en rad fra før regelen.
+    if not delt_konto_kan_bruke(SLUG):
+        rader = rader.exclude(bruker__er_delt_konto=True)
+    return set(rader.values_list('bruker_id', flat=True))
 
 
 def _laveste(a, b):
@@ -86,9 +87,9 @@ def tilstede():
     `er_delt_konto` er med fordi **en delt konto må se ut som en delt konto**
     (§4.5): «Enhet 2» og «Kari Nordmann» betyr fundamentalt ulike ting — den
     ene er en person, den andre er to til tre man må slå opp i vaktlista for å
-    finne. §5.2 vil etter hvert sperre delte kontoer ute av alt annet enn
-    `oppdrag`, men den sperren finnes ikke ennå, og til den gjør det skal lista
-    si sant om det den viser.
+    finne. **Sperra fra §5.2 kom 8. okt. 2026** (`nivaa_for`): en delt konto når
+    ikke KO, så feltet er `False` for alle i lista i dag. Det står igjen fordi det
+    er lista som skal si sant om det den viser, ikke en antakelse om sperra.
     """
     fra_sesjoner = aktive_sesjoner()
     admin_ider = {b.id for b, _ in fra_sesjoner

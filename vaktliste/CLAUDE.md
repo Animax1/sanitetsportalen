@@ -495,7 +495,8 @@ hovedveier.
   2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;
   cookies røres ikke. Køen for møtt/av vakt ligger i `vaktliste.js`
   (`koLes`/`koSkriv`, `_leggIKo`, `_projiserKo`, `synkKo`, `tegnOffline`) — samme
-  mønster som bilens kø i `oppdrag-enhet.js`. **Står noe i kø, går alt i kø** —
+  mønster som bilens kø i `oppdrag-enhet.js`. **Nøkkelen er per bruker** (`brukerNokkel()`,
+  L17, 8. okt. 2026): en annen konto på samme PC spiller ikke av køen. **Står noe i kø, går alt i kø** —
   rekkefølgen er regelen. `stempling_view` leser `tidspunkt` i kroppen, og
   `services.vurder_klienttid` klipper det urimelige. Den gamle `OFFLINE_MODE`-en er
   borte; Django-admin rutes bare under `DEBUG`.

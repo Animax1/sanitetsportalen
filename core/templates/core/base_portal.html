@@ -206,6 +206,15 @@
 
   /* ──── Felles komponenter: se static/css/portal.css ──── */
 </style>
+{% if request.user.is_authenticated %}
+{% comment %}
+  Hvem som er logget inn, for nøklene i `localStorage` som tilhører én bruker —
+  offline-køene i vaktlista og bilen (`brukerNokkel()` i portal-utils.js, L17,
+  8. okt. 2026). Primærnøkkelen er et tall; ingen escaping trengs, men den går
+  ikke gjennom noe annet enn Django heller.
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">window.PORTAL_BRUKER_ID = {{ request.user.pk }};</script>
+{% endif %}
 {% block extra_head %}{% endblock %}
 </head>
 <body>

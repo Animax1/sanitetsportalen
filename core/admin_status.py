@@ -518,14 +518,17 @@ def _get_backupklokke():
     den gjør jobben sin.
     """
     try:
-        from core.backup.klokke import vakthund
+        from core.backup.klokke import klokka_er_av, vakthund
         from core.models import Backupplan
 
         siste = (Backupplan.objects.exclude(sist_sjekket_at=None)
                  .order_by('-sist_sjekket_at')
                  .values_list('sist_sjekket_at', flat=True).first())
-        forsinket = vakthund()
+        # Slått av med vilje er ikke «stoppet» — se `klokka_er_av()`.
+        av = klokka_er_av()
+        forsinket = [] if av else vakthund()
         return {
+            'av': av,
             'siste_tikk': siste.isoformat() if siste else None,
             'minutter_siden': (
                 None if siste is None

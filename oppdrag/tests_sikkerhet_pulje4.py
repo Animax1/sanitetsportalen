@@ -92,7 +92,11 @@ class StatistikkForBilkontoTests(OppdragBasis):
     def setUp(self):
         super().setUp()
         self.bilbruker = _bruker('bil_stat', 'les', delt=True)
-        ModulTilgang.objects.create(bruker=self.bilbruker, modul_slug='statistikk', nivaa='les')
+        # En rad fra før delte kontoer ble sperret ute av alt annet enn oppdrag
+        # (8. okt. 2026, FORSLAG_KO §5.2) — `save()` nekter den nå, så den legges
+        # inn utenom. Testene viser at den heller ikke gir noe.
+        ModulTilgang.objects.bulk_create([ModulTilgang(
+            bruker=self.bilbruker, modul_slug='statistikk', nivaa='les')])
         Enhet.objects.filter(pk=self.enhet.pk).update(user=self.bilbruker)
         self.bilbruker.refresh_from_db()
 

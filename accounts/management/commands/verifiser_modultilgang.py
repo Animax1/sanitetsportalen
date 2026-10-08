@@ -23,11 +23,14 @@ Det som er igjen er kontroller som holder seg like sanne om ti moduler:
    feil, eller en modul som er fjernet fra registeret, etterlater rader som ser
    ut som tilgang uten å være det.
 3. **Rolleverdier feltet ikke kjenner** er data migrasjonen ikke fikk tak i.
+4. **Delte kontoer med rader som ikke gir noe** (8. okt. 2026, FORSLAG_KO §5.2):
+   en delt konto når bare moduler som tillater det. Rader fra før regelen står
+   og ser ut som tilgang i matrisen — dette er lista over hvem som mistet noe.
 """
 from django.core.management.base import BaseCommand
 
 from accounts.models import CustomUser, TilgangsNivaa, UserRole
-from core.modules import get_all_modules
+from core.modules import delt_konto_kan_bruke, get_all_modules
 
 
 class Command(BaseCommand):
@@ -51,6 +54,7 @@ class Command(BaseCommand):
         kjente_nivaa = set(TilgangsNivaa.values)
 
         uten_rader, ukjent_modul, ukjent_nivaa, ukjent_rolle = [], [], [], []
+        delt_uten_virkning = []
         for b in brukere:
             rader = {(t.modul_slug, t.nivaa) for t in b.modultilganger.all()}
 
@@ -61,6 +65,8 @@ class Command(BaseCommand):
                     ukjent_modul.append((b, slug, nivaa))
                 if nivaa not in kjente_nivaa:
                     ukjent_nivaa.append((b, slug, nivaa))
+                if b.er_delt_konto and not delt_konto_kan_bruke(slug):
+                    delt_uten_virkning.append((b, slug, nivaa))
             if b.role not in UserRole.values:
                 ukjent_rolle.append(b)
 
@@ -91,6 +97,13 @@ class Command(BaseCommand):
             [f'{b.username} ({b.role})' for b in ukjent_rolle],
             'Deploy 2 skrev alt som ikke var `admin` om til `bruker`.\n'
             'En verdi utenfor de to er rader migrasjonen ikke fikk tak i.',
+        )
+
+        self._seksjon(
+            'Delte kontoer med rader som ikke gir noe',
+            [f'{b.username}: {slug}:{nivaa}' for b, slug, nivaa in delt_uten_virkning],
+            'En delt konto når bare moduler som tillater det (FORSLAG_KO §5.2).\n'
+            'Fjern radene i matrisen, eller gi personen en personlig konto.',
         )
 
         self.stdout.write('')

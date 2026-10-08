@@ -25,14 +25,18 @@ let offlineTilstand = { frakoblet: false, kopiFra: null, sesjonUtgaatt: false, s
 let synkPaagaar = false;
 
 
+// Nøkkelen tilhører den innloggede kontoen (`brukerNokkel()` i portal-utils.js,
+// L17, 8. okt. 2026): en annen konto på samme PC spiller ikke av denne køen.
 function koNokkel() {
-  return 'vl_stemplinger_v1';
+  return brukerNokkel('vl_stemplinger_v1');
 }
 
 
 function koLes() {
   try {
-    const raa = globalThis.localStorage.getItem(koNokkel());
+    const nokkel = koNokkel();
+    if (!nokkel) return [];
+    const raa = globalThis.localStorage.getItem(nokkel);
     const verdi = raa ? JSON.parse(raa) : [];
     return Array.isArray(verdi) ? verdi : [];
   } catch (e) {
@@ -43,7 +47,9 @@ function koLes() {
 
 function koSkriv(ko) {
   try {
-    globalThis.localStorage.setItem(koNokkel(), JSON.stringify(ko));
+    const nokkel = koNokkel();
+    if (!nokkel) return false;
+    globalThis.localStorage.setItem(nokkel, JSON.stringify(ko));
     return true;
   } catch (e) {
     return false;

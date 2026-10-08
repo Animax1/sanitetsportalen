@@ -7,8 +7,7 @@ konto — så en omskriving av innloggingsstien ikke kan miste den i stillhet.
 """
 from django.test import Client, TestCase, override_settings
 
-from accounts.models import CustomUser
-from accounts.test_helpers import gi_standardtilgang
+from accounts.models import CustomUser, ModulTilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -17,7 +16,7 @@ class EnInnloggingPerKontoTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='bil7', password='TestPassord123!', role='bruker',
             must_change_password=False, er_delt_konto=True)
-        gi_standardtilgang(self.user, 'skriver')
+        ModulTilgang.objects.create(bruker=self.user, modul_slug='oppdrag', nivaa='skriv_handling')  # en bil: bare oppdrag (FORSLAG_KO §5.2)
 
     def _logg_inn(self):
         c = Client()

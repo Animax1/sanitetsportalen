@@ -98,6 +98,13 @@ class Module:
     #: utenfor, kommer fortsatt inn på adressen — det er `ModulTilgang` som
     #: stenger. Global admin får alltid snarveien.
     snarvei_for_nivaaer: tuple[str, ...] = ()
+    #: Kan en delt konto (`CustomUser.er_delt_konto`) ha tilgang til modulen?
+    #: **Nei som standard** (8. okt. 2026, `docs/FORSLAG_KO.md` §5.2): en delt
+    #: konto er en bil eller en skjerm, ikke en person, og personlige kontoer er
+    #: dem som ser data på tvers av ett oppdrag — pasienter, vaktliste, KO. I dag
+    #: sier bare oppdragsmodulen ja. Flagget står på modulen og ikke som et navn
+    #: i `core`, fordi rammeverket ikke kjenner modulene ved navn.
+    tillat_delt_konto: bool = False
 
     def har_snarvei_for(self, user) -> bool:
         """Skal modulen stå i menyen og på dashbordet for `user`?
@@ -221,6 +228,16 @@ def get_module(slug: str) -> Optional[Module]:
         if module.slug == slug:
             return module
     return None
+
+
+def delt_konto_kan_bruke(slug: str) -> bool:
+    """Kan en delt konto ha tilgang til modulen `slug`? Se `Module.tillat_delt_konto`.
+
+    Ukjent modul gir **False** — samme regel som et ukjent nivå: en skrivefeil
+    skal stenge døra.
+    """
+    modul = get_module(slug)
+    return bool(modul and modul.tillat_delt_konto)
 
 
 def get_visible_modules(user, *, only_enabled: bool = True) -> list[Module]:
