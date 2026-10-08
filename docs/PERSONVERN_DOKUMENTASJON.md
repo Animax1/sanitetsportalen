@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 7. oktober 2026  
-**Versjon:** 1.17  
+**Siste oppdatering:** 8. oktober 2026  
+**Versjon:** 1.18  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -457,7 +457,13 @@ raden i kartet slettes når tiden går ut, ikke etter 24 timer som de andre. Lag
 spør ikke om posisjon før knappen trykkes, og teksten over knappen sier hvem som ser den
 («KO ser det i kartet») og hvor lenge. Bilens knapp sendes også når bryteren «Del
 posisjon» er av: bryteren gjelder det som rir på stemplingene uten at noen tenker over det,
-knappen er et valg om å sende akkurat nå. Ingen av knappene lagrer noe i portalen.
+knappen er et valg om å sende akkurat nå. Ingen av knappene lagrer **posisjonen** i portalen.
+
+**At det skjedde, står i KO-loggen** (8. okt. 2026): «OBS: Lag 3 delte posisjon · vises i kartet
+til 22:12», som en systemlinje, i vaktas logg og i hendelsen laget eller bilen står på. **Uten
+koordinater** — bare navnet, at posisjonen ble delt, klokkeslettet og til når den vises — og
+med loggens vanlige lagringstid (730 dager, A.9). En logg over *hvor* noen har vært ville vært
+en historikk over posisjoner; en logg over *at* et lag ba om veien er det KO-loggen er til for.
 
 Samlet veier korpsets interesse tyngre enn inngrepet, gitt grensene over.
 **Historikk over posisjoner er en ny behandling og krever ny vurdering.** Det samme gjelder
@@ -1224,9 +1230,12 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.17 – sist oppdatert 7. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.18 – sist oppdatert 8. oktober 2026*
 
 **Endringslogg:**
+
+- **v1.18 (08.10.2026):** A.6: at en bil eller et lag har delt posisjon, står som systemlinje i
+  KO-loggen — uten koordinater, med loggens lagringstid.
 
 - **v1.17 (07.10.2026):** **To knapper som sender én posisjon til kartet** (A.6): «Send
   posisjon» på bilskjermen og «Send posisjon til KO» (først kalt «Vi finner ikke fram») på lagregistreringen — den siste er første

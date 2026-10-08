@@ -160,6 +160,13 @@ seg skrive skal ikke ta ned en stempling i en bil.**
 
 **Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk før du designer.
 
+**«OBS: Lag 3 delte posisjon» (`POSISJON_DELT`, 8. okt. 2026) har ingen rad å lytte på** —
+portalen lagrer ingenting når noen deler posisjon. `core.kartkobling.posisjon_delt` er et
+Django-signal sendt når kartet tok imot, og `ko/signals.posisjon_delt` skriver linja: i
+strømmen alltid, og i hendelsen når laget (`HendelseLag`, åpen) eller bilens påbegynte
+oppdrag står på en. **Aldri koordinatene** — `systemdata` er `type`, `navn`, `til`. Samme
+bil eller lag innenfor `POSISJON_DELT_SAMLE_S` (120 s) gir ingen ny linje; KO av gir ingen.
+
 ## Hendelsene — reglene som står
 
 André 18. sep. 2026: **en lukket hendelse kan åpnes igjen, og det logges**

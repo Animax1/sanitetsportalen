@@ -150,6 +150,8 @@ function koLinjeMerke(linje) {
   // Hendelseslinjene skal vises **tydelig som hendelse** (André, 18. sep.
   // 2026) — de er operatørens handlinger, ikke en projeksjon av et stempel.
   if (linje.kilde === 'system' && String(linje.systemkode || '').startsWith('hendelse_')) return 'hendelse';
+  // «OBS: Lag 3 delte posisjon» (8. okt. 2026): oransje, som i kartet.
+  if (linje.kilde === 'system' && linje.systemkode === 'posisjon_delt') return 'posisjon';
   if (linje.kilde === 'system') return 'system';
   if (linje.uformell) return 'chat';
   if (linje.delt_konto) return 'delt';
@@ -166,7 +168,10 @@ function koLinjeMerke(linje) {
 // Bryteren «System» gikk ut med dem.
 function koIStrommen(linje) {
   if (linje.kilde === 'system') {
-    return koLinjeMerke(linje) === 'hendelse' || linje.systemkode === 'oppdrag_knyttet';
+    // En delt posisjon står i strømmen også når den hører til en hendelse:
+    // den er situasjonen nå, og skal sees uten å åpne noe (André, 8. okt. 2026).
+    const merke = koLinjeMerke(linje);
+    return merke === 'hendelse' || merke === 'posisjon' || linje.systemkode === 'oppdrag_knyttet';
   }
   return !linje.hendelse_id;
 }
@@ -221,7 +226,8 @@ function koLinjeHtml(linje) {
   const merke = koLinjeMerke(linje);
   const system = linje.kilde === 'system';
   const klasse = 'ls-linje' + (system ? ' ls-system' : '')
-    + (merke === 'hendelse' ? ' ls-hendelse' : '') + (merke === 'chat' ? ' ls-chat' : '');
+    + (merke === 'hendelse' ? ' ls-hendelse' : '') + (merke === 'posisjon' ? ' ls-posisjon' : '')
+    + (merke === 'chat' ? ' ls-chat' : '');
   // «H12» på linja (§4.1): hendelsen som adresse, uten å skjule noe. Klikk
   // åpner hendelsen.
   const hendelseHtml = linje.hendelse_nummer

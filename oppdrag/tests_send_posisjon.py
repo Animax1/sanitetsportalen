@@ -45,6 +45,8 @@ class SendPosisjonTests(StemplingBasis):
         self.assertEqual(tid.isoformat(), pos['tid'])
         self.assertIn('sendt_at', resp.json()['data'])
         self.assertEqual(resp.json()['data']['utloper'], utloper.isoformat())
+        self.assertEqual(send.call_args.kwargs['kilde_id'], self.enhet.pk,
+                         'KO trenger å vite hvilken bil, for å finne hendelsen')
 
     def test_vises_i_kartet_saa_lenge_admin_har_satt(self):
         """«Delt posisjon vises i kartet» — samme innstilling som lagene."""

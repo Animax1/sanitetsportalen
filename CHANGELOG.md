@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-08 — «OBS: Lag 3 delte posisjon» i KO-loggen  `#ko` `#kartkobling`
+
+**Hvorfor:** André, 8. okt. 2026: «vises det i hendelsesloggen at lag eller bil enheter har sendt
+posisjon?» — det gjorde det ikke; portalen lagret ingenting, og KO så delingen bare med kartet
+oppe. Besluttet etter en runde uten kode: teksten er **«OBS: Lag delte posisjon»**, biler også,
+bare når kartet tok imot, og linja står **i loggstrømmen og i hendelsesloggen**.
+
+**Linja:** «OBS: Lag 3 delte posisjon · vises i kartet til 22:12» (bilen: «OBS: Haugesund 56
+delte posisjon …»), systemkode `posisjon_delt`, oransje i strømmen (`ls-posisjon`) og i
+hendelsen (`h-linje.posisjon`). **Uten koordinater** — `systemdata` er `type`, `navn`, `til`.
+
+**Hvor:** alltid i loggstrømmen — `koIStrommen()` slipper den inn også når den hører til en
+hendelse, slik den gjør for hendelseslinjene. I hendelsen når **laget** står på en åpen
+(`HendelseLag`) eller **bilens påbegynte oppdrag** er knyttet til en.
+
+**Hvordan, og hvorfor ikke som de andre:** de andre systemlinjene løftes av databasesignaler, men
+her finnes ingen rad. `core.kartkobling.posisjon_delt` er et Django-signal sendt med
+`send_robust` når kartet svarte 2xx; `ko/signals.posisjon_delt` lytter. Retningen holdes: verken
+bilen eller lagregistreringen kjenner KO. Kallstedene sender `kilde_id` (`Enhet.pk`, `Ressurs.pk`),
+så KO finner hendelsen. **Ett trykk til innen 120 s** fra samme bil eller lag gir ingen ny linje
+(regel 3 i `ko/systemlinjer.py`); KO slått av gir ingen linje; en feil i KO tar aldri ned delingen.
+
+**Personvern:** v1.18, A.6 — at det skjedde står i loggen med loggens lagringstid; hvor, gjør det
+ikke.
+
+**Testene:** `ko/tests_posisjon_delt.py` gjennom den ekte inngangen (`send_delt_posisjon` med
+`urlopen` mocket), pluss `kilde_id` i bilens og lagenes viewtester. **Mutasjonstesting: elleve
+mutanter, elleve drept** — «bare når kartet tok imot», KO-sperra, samlevinduet og typen i det,
+åpen-filteret på hendelsen, bilens hendelse, kallstedet for hendelsen, `kilde_id` fra begge
+viewene, og begge reglene i strømmen og merket.
+
+---
+
 ## 2026-10-07 — «OBS: Posisjon delt»: nøytrale tekster, bilene med, én varighet  `#oppdrag` `#park` `#kartkobling`
 
 **Hvorfor:** André, 7. okt. 2026: «Ikke bruk bokstavelig finner ikke frem, ta det mer nøytralt.

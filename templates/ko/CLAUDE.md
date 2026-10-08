@@ -95,7 +95,9 @@ tallene: `ko/signals.py` og `oppdrag/signals.py`.
 (`koFolgerTilstede`, 12 s) går `koApneHendelse` dit, tabellen står med raden merket, og
 hodet sier «H12 vises på skjerm 2»; sidebaren (`koVelgHendelse`) bytter alltid på stedet.
 Uten livstegn åpnes klikket her igjen. Én skjerm 2, ingen «fest» (André). **Loggstrømmen viser linjene uten
-hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
+hendelse pluss systemlinjene om hendelsene** (`koIStrommen`) — og «OBS: … delte posisjon» også
+når den hører til en hendelse (8. okt. 2026), oransje (`ls-posisjon`, `h-linje.posisjon`);
+kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO). **Alle | Meldinger | System** filtrerer strømmen
 (`koLoggfilterTreffer`, huskes per nettleser); **festede står uansett**, og hodet teller
 det filtrerte.

@@ -1166,7 +1166,8 @@ def posisjon_view(request):
             status=400)
     naa = timezone.now()
     utloper = naa + timedelta(minutes=kartkobling.delt_posisjon_min())
-    if not kartkobling.send_delt_posisjon('enhet', enhet.navn, lat, lon, tid, utloper):
+    if not kartkobling.send_delt_posisjon('enhet', enhet.navn, lat, lon, tid, utloper,
+                                          kilde_id=enhet.pk):
         return JsonResponse({'status': 'error', 'message': (
             'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=424)
     return JsonResponse({'status': 'ok', 'data': {'sendt_at': naa.isoformat(),

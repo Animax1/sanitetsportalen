@@ -410,6 +410,11 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 .ls-linje.ls-system .tekst { font-style: italic; }
 .ls-linje.ls-hendelse .tekst { font-weight: 600; font-style: normal; color: var(--text-main); }
 .ls-linje.ls-chat { opacity: 0.75; }
+/* «OBS: Lag 3 delte posisjon» (8. okt. 2026): oransje, samme farge som
+   «OBS: Posisjon delt» i kartet, så de to henger sammen for den som leser. */
+.ls-linje.ls-posisjon { border-left: 3px solid #f97316; padding-left: 0.35rem; }
+.ls-linje.ls-posisjon .tekst { color: #fb923c; font-weight: 600; font-style: normal; }
+.h-linje.posisjon { border-left: 3px solid #f97316; color: #fb923c; font-weight: 600; font-style: normal; }
 .ls-linje .verktoy { margin-left: auto; white-space: nowrap; font-size: 0.78rem; }
 .ls-linje .verktoy .btn-link { padding: 0 0.2rem; font-size: 0.85rem; color: var(--text-muted); }
 .ls-linje .verktoy .btn-link:hover { color: var(--text-main); }

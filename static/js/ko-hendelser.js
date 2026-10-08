@@ -684,7 +684,8 @@ function koDetaljLinjeHtml(linje) {
   const verktoy = (system || linje.fjernet) ? ''
     : koDelingKnapper(linje) + koRettFjernKnapper(linje.id);
   const delt = (system || linje.fjernet) ? '' : koDeltMerke(linje);
-  return '<div class="h-linje' + (system ? ' system' : '') + (koErDelt(linje) ? ' delt' : '') + '">'
+  const posisjon = system && linje.systemkode === 'posisjon_delt' ? ' posisjon' : '';
+  return '<div class="h-linje' + (system ? ' system' : '') + posisjon + (koErDelt(linje) ? ' delt' : '') + '">'
     + '<span class="tid">' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span>'
     + tekst + hvem + delt + verktoy + '</div>';
 }

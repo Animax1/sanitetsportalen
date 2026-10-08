@@ -46,6 +46,7 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.cache import cache
+from django.dispatch import Signal
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -153,9 +154,18 @@ def send_lag(navn: str, sted: str, tidspunkt: datetime) -> bool:
 
 DELT_TYPER = frozenset({'lag', 'enhet'})
 
+#: «OBS: Lag 3 delte posisjon» i KO-loggen (André, 8. okt. 2026). Sendes når kartet **tok imot**
+#: en delt posisjon, med `type_`, `navn`, `utloper` og `kilde_id` (`Ressurs.pk` for et lag,
+#: `Enhet.pk` for en bil) — **aldri koordinatene**: loggen står i 730 dager, og en logg over
+#: hvor folk har vært er en ny behandling (personverndokumentet A.6). Et signal og ikke et
+#: register, fordi verken bilen eller lagregistreringen skal kjenne KO; KO lytter
+#: (`ko/signals.py`). Mottakerne kalles med `send_robust`, så en KO-feil aldri blir en feil for
+#: den som trykket.
+posisjon_delt = Signal()
+
 
 def send_delt_posisjon(type_: str, navn: str, lat: float, lon: float, tidspunkt: datetime,
-                       utloper: datetime) -> bool:
+                       utloper: datetime, *, kilde_id: int | None = None) -> bool:
     """«Send posisjon» fra en bil (`enhet`) eller et lag (`lag`) — «OBS: Posisjon delt» i kartet
     (André, 7. okt. 2026).
 
@@ -168,10 +178,19 @@ def send_delt_posisjon(type_: str, navn: str, lat: float, lon: float, tidspunkt:
     """
     if type_ not in DELT_TYPER:
         raise ValueError(f'Ukjent type {type_!r}')
-    return _send('delt-posisjon', navn, lambda: {
+    ok = _send('delt-posisjon', navn, lambda: {
         'type': type_, 'navn': navn, 'lat': lat, 'lon': lon,
         'tidspunkt': _tidspunkt(tidspunkt), 'utloper': _tidspunkt(utloper),
     })
+    if ok:
+        # Bare når kartet tok imot: en linje om en posisjon som ikke vises noe sted, ville
+        # vært misvisende — og laget har da fått beskjed om å melde på samband.
+        for mottaker, svar in posisjon_delt.send_robust(
+                sender=None, type_=type_, navn=navn, utloper=utloper, kilde_id=kilde_id):
+            if isinstance(svar, Exception):
+                logger.warning('Kartkobling: mottakeren %s for delt posisjon feilet (%s)',
+                               getattr(mottaker, '__name__', mottaker), type(svar).__name__)
+    return ok
 
 
 def siste_utfall() -> dict | None:

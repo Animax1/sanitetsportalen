@@ -235,7 +235,7 @@ def posisjon_view(request):
         return json_feil('Posisjonen er alt sendt. Vent litt før dere sender igjen.', status=429)
     varighet = kartkobling.delt_posisjon_min()
     utloper = timezone.now() + timedelta(minutes=varighet)
-    if not kartkobling.send_delt_posisjon('lag', lag.navn, lat, lon, tid, utloper):
+    if not kartkobling.send_delt_posisjon('lag', lag.navn, lat, lon, tid, utloper, kilde_id=lag.pk):
         return json_feil('Kartet tok ikke imot posisjonen. Meld den på samband.', status=424)
     return JsonResponse({'status': 'ok', 'lag': lag.navn, 'utloper': utloper.isoformat(),
                          'varighet_min': varighet})

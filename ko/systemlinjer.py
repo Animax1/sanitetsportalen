@@ -87,6 +87,7 @@ OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 TAVLE_FLYTTET = 'tavle_flyttet'
 TAVLE_RETTET = 'tavle_rettet'
 PROGRAM_ENDRET = 'program_endret'
+POSISJON_DELT = 'posisjon_delt'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -158,6 +159,14 @@ KODER: dict[str, str] = {
     PROGRAM_ENDRET:
         '«Headliner forsinket til 22:30, beredskap satt til rød» forklarer hvorfor '
         '«2 / 4» plutselig ble «2 / 5» på tavla, og hvem som bestemte det.',
+    # «Send posisjon» fra bil og lag (André, 8. okt. 2026). Ikke løftet av et
+    # databasesignal — portalen lagrer ingenting — men av
+    # `core.kartkobling.posisjon_delt`, sendt når kartet tok imot.
+    # **Aldri koordinatene**: bare at det skjedde, og til når det vises.
+    POSISJON_DELT:
+        '«OBS: Lag 3 delte posisjon» sier at noen sto og trengte veien, og svarer '
+        'i etterkant på hvorfor laget brukte tjue minutter. KO ser det uten å ha '
+        'kartet oppe.',
 }
 
 
@@ -307,6 +316,11 @@ def tegn(kode: str, data: dict) -> str:
         endringer = ', '.join(f'{e.get("felt")} {e.get("fra") or "–"} → {e.get("til") or "–"}'
                               for e in (data.get('endringer') or []))
         return f'Program: {navn}{sted} endret' + (f' — {endringer}' if endringer else '')
+    if kode == POSISJON_DELT:
+        linje = f'OBS: {data.get("navn") or "Ukjent"} delte posisjon'
+        if data.get('til'):
+            linje += f' · vises i kartet til {data["til"]}'
+        return linje
     if kode == OPPDRAG_KNYTTET:
         fra = data.get('fra_hendelsesnummer')
         til = data.get('hendelsesnummer')

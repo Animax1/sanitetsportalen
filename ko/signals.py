@@ -27,6 +27,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from audit.utils import ikke_under_loaddata
+from core import kartkobling
 from core.models import AppSetting
 # `ko` → `oppdrag` er den tillatte retningen (`ko/tests_avhengighet.py`).
 # **Klasser og ikke strengreferanser**: `SignalerFyrerIkkeUnderLoaddataTests`
@@ -51,8 +52,8 @@ from oppdrag import endringer as oppdrag_endringer
 
 from . import endringer as ko_endringer
 from . import systemlinjer
-from .models import (Hendelse, HendelseDeltaker, HendelseLag, Linjedeling, Logglinje, PlanlagtPause,
-                     Programbehov, Programpost, Tavleplassering)
+from .models import (HENDELSE_APEN, Hendelse, HendelseDeltaker, HendelseLag, Linjedeling, Logglinje,
+                     PlanlagtPause, Programbehov, Programpost, Tavleplassering)
 from .services import systemlinje
 
 logger = logging.getLogger(__name__)
@@ -431,3 +432,66 @@ def oppdragslista_endret(sender, instance=None, **kwargs):
     if sender is Logglinje and not getattr(instance, 'hendelse_id', None):
         return
     oppdrag_endringer.oppdrag_endret()
+
+
+# ── «OBS: Lag 3 delte posisjon» (André, 8. okt. 2026) ────────────────────────
+#
+# Ikke et databasesignal: portalen lagrer ingenting når noen deler posisjon, så
+# det finnes ingen rad å lytte på. `core.kartkobling` sender `posisjon_delt` når
+# kartet tok imot, og KO skriver linja — retningen holdes, for verken bilen
+# eller lagregistreringen kjenner KO.
+
+#: Et nytt trykk fra samme bil eller lag innenfor dette gir ingen ny linje: en
+#: finger som trykker tre ganger, er én ting som skjedde (regel 3).
+POSISJON_DELT_SAMLE_S = 120
+
+
+def _hendelse_for_delt(type_: str, kilde_id, vakt):
+    """Hendelsen den som delte står på, eller ``None`` — da står linja bare i
+    strømmen. Laget: hendelsen det er registrert på. Bilen: hendelsen det
+    påbegynte oppdraget er knyttet til."""
+    if kilde_id is None or vakt is None:
+        return None
+    if type_ == 'lag':
+        rad = (HendelseLag.objects
+               .filter(ressurs_id=kilde_id, hendelse__status=HENDELSE_APEN, hendelse__vakt=vakt)
+               .select_related('hendelse').order_by('-fra', '-id').first())
+        return rad.hendelse if rad is not None else None
+    from oppdrag.models import Enhet
+    from oppdrag.services import aktivt_oppdrag
+
+    enhet = Enhet.objects.filter(pk=kilde_id).first()
+    oppdrag = aktivt_oppdrag(enhet, vakt) if enhet is not None else None
+    return oppdrag.hendelse if oppdrag is not None and oppdrag.hendelse_id else None
+
+
+@receiver(kartkobling.posisjon_delt)
+@ikke_under_loaddata
+@_trygt('posisjon_delt')
+def posisjon_delt(sender, type_, navn, utloper, kilde_id=None, **kwargs):
+    """Én systemlinje, i strømmen — og i hendelsen når bilen eller laget står
+    på en åpen. Ingen koordinater. Ingen linje når KO er slått av."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from core.models import ModuleSettings
+    from core.vakt import hent_aktiv_vakt
+
+    if 'ko' not in ModuleSettings.get_enabled_slugs():
+        return
+    vakt = hent_aktiv_vakt()
+    naa = timezone.now()
+    nylig = Logglinje.objects.filter(
+        vakt=vakt, systemkode=systemlinjer.POSISJON_DELT,
+        tidspunkt__gte=naa - timedelta(seconds=POSISJON_DELT_SAMLE_S),
+        systemdata__type=type_, systemdata__navn=navn)
+    if nylig.exists():
+        return
+    systemlinje(
+        vakt,
+        systemlinjer.POSISJON_DELT,
+        {'type': type_, 'navn': navn, 'til': systemlinjer.klokkeslett(utloper)},
+        tidspunkt=naa,
+        hendelse=_hendelse_for_delt(type_, kilde_id, vakt),
+    )
