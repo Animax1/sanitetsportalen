@@ -35,16 +35,16 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Delte KO-kontoer på staging: `ko1` og `rk01` mister tilgang — avgjør før `staging`
-      går til `main`.** `verifiser_modultilgang` på staging 9. okt. 2026: `ko1` har
-      `vaktliste: les_alle` og `rk01` har `ko: skriv_leder`, og fra `ef74dbe` når en delt konto
-      bare `oppdrag` (FORSLAG_KO §5.2). **A (anbefalt):** de som sitter i KO får personlige
-      kontoer, og radene fjernes i matrisen — da står hver logglinje på en person, som var
-      poenget med §5.2. **B:** `tillat_delt_konto=True` i `ko/module.py` (og vaktlista), og
-      sporbarheten for de kontoene går tapt — med `skriv_leder` også for slettinger.
-      **Og etter `main`:** kjør `verifiser_modultilgang` i production igjen. Kjøringen 9. okt.
-      var på den gamle koden — seksjonen «Delte kontoer med rader som ikke gir noe» fantes
-      ikke i utskriften.
+- [ ] **Personlige KO-kontoer i stedet for `ko1` og `rk01` — før `staging` går til `main`.**
+      Valg A (André, 9. okt. 2026: «vi må vel nesten ta A»): en delt konto når bare `oppdrag`
+      fra `ef74dbe` (FORSLAG_KO §5.2). `verifiser_modultilgang` på staging viste `ko1` med
+      `vaktliste: les_alle` og `rk01` med `ko: skriv_leder`. Gi dem som sitter i KO personlige
+      kontoer, og fjern radene fra `ko1` og `rk01` i matrisen. **De 1–2 som både sender og
+      kjører** får en personlig konto *i tillegg* og bruker bilens delte konto på
+      bil-telefonen — én konto kan ikke være begge, med vilje (`ikke_for_enhetskonto`:
+      en konto knyttet til en enhet får 403 på sentralbordet uansett nivå).
+      **Etter `main`:** kjør `verifiser_modultilgang` i production igjen — kjøringen 9. okt.
+      var på den gamle koden.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
@@ -519,11 +519,6 @@ Fase 0–5 er gjennomført. Begrunnelsene og de varige beslutningene ligger i
 [`docs/PERSONVERN_DOKUMENTASJON.md`](./docs/PERSONVERN_DOKUMENTASJON.md); hva som ble gjort
 står i [`CHANGELOG.md`](./CHANGELOG.md). Behandlingsansvarlig er Kverneland Røde Kors, med
 André som systemansvarlig (A.1, v1.19, 8. okt. 2026).
-
-- [ ] **Få personverndokumentet godkjent for Kverneland Røde Kors.** Signaturfeltet har fra
-      v1.19 en rad for den som godkjenner på korpsets vegne. Det er behandlingsansvarlig som
-      står bak protokollen overfor Datatilsynet; til noen i korpset har signert, er den
-      systemansvarliges dokument. Ingen kode — en utskrift og en underskrift.
 
 #### DPIA, fritekst og adresse — se [`docs/NOTAT_DPIA_OG_FRITEKST.md`](./docs/NOTAT_DPIA_OG_FRITEKST.md)
 
