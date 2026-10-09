@@ -35,6 +35,14 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Feltprøv Wake Lock på bilskjermen** (på staging fra 9. okt. 2026 — kan ikke prøves i
+      node). En iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring —
+      én gang med strømsparing av, én gang på. Trykk på skjermen først (låsen hentes ved
+      trykk). Linja under lydhintet skal si «Skjermen holdes våken»; med strømsparing på
+      skal den si «Skjermen kan sovne — slå av strømsparing». Bytt app eller ta en samtale midt
+      i, og kom tilbake: skjermen skal fortsatt holdes våken. **Bilrutinen:** telefonen står i
+      lader — skjerm på hele vakta tømmer batteriet og gjør telefonen varm.
+
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
       - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:
@@ -179,49 +187,6 @@ virkeligheten, og rekkefølgen under følger av det.*
 - [ ] **G2 (store filer) før frysingen, men ikke `oppdrag/services.py` før G6b** — ellers
       skrives samme fil om to ganger med vakta imellom. `accounts/views.py`
       (`user_detail_view` som dispatch-tabell) og `ko/views.py` er uavhengige.
-
-### Bilskjermen: Wake Lock — bestilt 9. okt. 2026, ikke påbegynt
-
-*André: bilkontoene har telefonen i holderen gjennom vakta, og når skjermen sovner, stopper
-pollingen og lydvarselet. Løsningen er Screen Wake Lock (`navigator.wakeLock.request('screen')`)
-på bilskjermen. **Push og native app er vurdert og valgt bort** — dette er hele løsningen for
-bilene. Det finnes ingen Wake Lock i koden (kontrollert 9. okt. 2026).*
-
-- [ ] **Hold skjermen våken på bilskjermen (`static/js/oppdrag-enhet.js`).** Les
-      `templates/oppdrag/CLAUDE.md` og fila før designet: `lydErKlar()`, `lydSkalSpille()`,
-      `_stilleLydbaerer()`, `_lydKlar()` og `DOMContentLoaded`-kroken nederst.
-      - **Kun bilskjermen.** Fila lastes bare for enhetskontoer; sentralbordet og andre
-        sider skal ikke holde skjermen våken.
-      - **Hent ved første trykk** — noen nettlesere krever en brukerhandling. Det er
-        `_lydKlar()`, kalt fra `pointerdown`-lytteren `vekk` i `DOMContentLoaded`, som
-        vekker lyden (`lydErKlar()` bare leser tilstanden); samme trykk er stedet.
-      - **Hent på nytt etter `visibilitychange`.** Nettleseren slipper låsen hver gang
-        siden skjules (appbytte, telefonsamtale) — den vanligste feilen med API-et: det
-        virker ved første test og ikke etter første samtale.
-      - **Synlig status**, samme idé som «OBS: Posisjon delt»: «Skjermen holdes våken» /
-        «Skjermen kan sovne — slå av strømsparing». iOS avviser i strømsparingsmodus
-        (`NotAllowedError`), og iOS < 18.4 avviste i hjem-skjerm-PWA — feilen er stille.
-        Uten API-et: vis at skjermen kan sovne, ikke kast.
-      - **Kaster aldri.** En feil i låsen skal aldri ta ned pollingen eller lyden.
-      - **`Permissions-Policy` må ikke stenge den.** `core/middleware.py` nevner ikke
-        `screen-wake-lock`, så standarden (`self`) gjelder og API-et er lov i dag. Legges
-        `screen-wake-lock=()` inn senere, dør låsen stille — samme felle som
-        `geolocation=(self)`, som bare bilsiden får.
-      - **Regelen som egen ren funksjon**, f.eks. `skjermSkalHoldesVaaken(synlig, lydKlar)`,
-        i samme idiom som `lydSkalSpille()` og `klikkSkalKjore()`.
-      - **Tester i node** (`patients/js_test_utils.py`), ved siden av
-        `oppdrag/tests_runde_f.py`, `tests_runde_i.py` og `tests_posisjonsdeling.py`. Minst
-        én test går gjennom den ekte hendelsen (`visibilitychange`), ikke hjelperen.
-      - **Mutanter (middels lag):** regelen invertert, et ledd fjernet, og **kallstedet
-        fjernet** — særlig `visibilitychange`-lytteren. Antall og overlevende i CHANGELOG.
-      - Statusmarkup med `innerHTML` følger XSS-reglene; `templates/oppdrag/CLAUDE.md`
-        (tabellen over bilskjermen) får en rad om låsen og hvorfor den hentes på nytt.
-        CHANGELOG skrives for søket: «skjermen sovner», «wake lock», «bilskjerm».
-      - **Feltprøven** (André, når koden er på staging — den kan ikke prøves i node): en
-        iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring — én
-        gang med strømsparing av, én gang på. Bytt app og kom tilbake midt i: skjermen skal
-        fortsatt holdes våken. **Bilrutinen** bør si at telefonen står i lader — skjerm på
-        hele vakta tømmer batteriet og gjør telefonen varm.
 
 ### Kodegjennomgangen 25. sep. 2026 — se [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md)
 
