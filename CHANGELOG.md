@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — Delte KO-kontoer: valg A, og hybrid er to kontoer  `#todo` `#sikkerhet` `#ko`
+
+**Hvorfor:** André, 9. okt. 2026, om `ko1` og `rk01`: «ja vi må vel nesten ta A da det er bare
+1-2 brukere som har behov for en hybrid løsning» — mail og MFA som de andre, men både sende
+og motta oppdrag.
+
+**Svaret (ingen kode):** én konto kan ikke være begge. En konto knyttet til en `Enhet` får
+bilskjermen, og `ikke_for_enhetskonto` gir den **403 på alle ti sentralbordhandlingene uansett
+nivå** (sikkerhetsgjennomgangen 28. sep. 2026) — en glemt bil-telefon skal ikke kunne styre
+flåten. Et unntak for 1–2 personer ville åpnet nettopp den sperra. **Hybrid er to kontoer:**
+en personlig (e-post, MFA, KO og oppdrag) for sentralbordet, og bilens delte konto på
+bil-telefonen. Én økt per konto hindrer ikke det — det er to kontoer — og loggen får riktig
+spor for begge rollene.
+
+**`TODO.md`:** punktet om `ko1`/`rk01` er skrevet om til valg A, med hybriden. Påminnelsen om å
+få personverndokumentet godkjent for Kverneland Røde Kors er fjernet (André: «Jeg tar det
+selv og er på saken»).
+
+---
+
 ## 2026-10-09 — Rota av CLAUDE.md: fire kopier ble pekere, ~1 100 tegn å gå på; delte KO-kontoer på staging  `#claude-md` `#todo` `#sikkerhet`
 
 **Hvorfor:** André, 9. okt. 2026: «du kan gjøre nr 4» — rota av `CLAUDE.md` sto **113 tegn**
