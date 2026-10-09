@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — Rota av CLAUDE.md: fire kopier ble pekere, ~1 100 tegn å gå på; delte KO-kontoer på staging  `#claude-md` `#todo` `#sikkerhet`
+
+**Hvorfor:** André, 9. okt. 2026: «du kan gjøre nr 4» — rota av `CLAUDE.md` sto **113 tegn**
+under taket (67 687 av 67 800), og taket var hevet seks ganger på to uker. Neste avsnitt i
+rota ville sprengt det midt i en annen oppgave.
+
+**Ikke hevet en sjuende gang.** Fire avsnitt sto to steder, og i rota var de kopier av
+historien om én modul — regelen sto igjen, historien gikk ut:
+
+| Avsnitt i rota | Står fra før i | I rota nå |
+|---|---|---|
+| `_prefiks()` kjenner tre former, og «koden Scaleway faktisk svarte» (677 tegn) | Docstringen til `_prefiks()` og kommentaren ved feilteksten i `core/offsite.py` | Én setning med peker |
+| Planleggerfeltene og «jeg får ikke fylt feltene» | CHANGELOG 15. sep. 2026, ordrett | Én setning med sitatet som søkeord |
+| `_stilleLydbaerer()` og «stille der det telte» | Kommentaren i `oppdrag-enhet.js` | Regelen (`media-src 'self' blob:`); historien **flyttet** til `templates/oppdrag/CLAUDE.md`, som før bare pekte tilbake til rota |
+| KO-raden i backup-tabellen, «Backup, ikke arkiv» | `ko/CLAUDE.md`, «Ingen SHA-signatur» | Peker |
+
+Rota: 67 687 → **66 696 tegn**. `ROT_TEGNGRENSE` står på 67 800; ryddingen er ført i
+kommentaren over den, ved siden av hevingene.
+
+**Vurdert og latt stå:** klikkdelegeringen (`data-action` + `data-hendelse`) og «Adressen i
+`data-id`» forteller vaktlistas feil, men er regler for `portal-utils.js`, altså for alle
+sider — og regelen sammen med feilen som lærte oss den er det `CLAUDE.md` sier ikke skal
+kuttes. Vaktlistas flatefil har dessuten 169 tegn igjen av sitt eget tak.
+
+**`verifiser_modultilgang` kjørt av André 9. okt.:** staging har to delte kontoer som mister
+tilgang med `ef74dbe` — `ko1` (`vaktliste: les_alle`) og `rk01` (`ko: skriv_leder`). Ført
+øverst i `TODO.md` som en avgjørelse før `main`. Production viste ikke seksjonen i det hele
+tatt: den kjører den gamle koden, og kontrollen må kjøres der igjen etter `main`.
+
+**`TODO.md`:** feilvarslene til `admin@sanitet.net` er gjort (André) og punktet slettet;
+«Rota har ~40 tegn igjen» slettet.
+
+---
+
 ## 2026-10-08 — Backup-klokka «av» gjelder reservenettet, offline-køene per bruker (L17), delt konto bare i oppdrag  `#backup` `#sikkerhet` `#oppdrag` `#vaktliste` `#ko`
 
 **Hvorfor:** André, 8. okt. 2026: «Start 2,3,4» — punkt 2–4 på nivå 1 i rangeringen av

@@ -90,6 +90,12 @@ ROT = Path(settings.BASE_DIR)
 #: og ingen av dem får kjenne den andre — samme grunn som registrene. Én rad i
 #: miljøtabellen og ett kort avsnitt under «Avhengighetsretningen»
 #: (`docs/archived/PLAN_KARTKOBLING.md` §8). Hvordan hver modul bruker den står hos modulen.
+#:
+#: **Ryddet 9. okt. 2026, taket står:** 67 687 tegn, 113 under. Fire avsnitt som
+#: sto to steder ble pekere — offsite-prefiksene (docstringen til `_prefiks()`),
+#: planleggerhistorien (CHANGELOG), lydbæreren (`templates/oppdrag/CLAUDE.md`) og
+#: KO-raden i backup-tabellen (`ko/CLAUDE.md`). Regelen sto igjen i rota hver gang;
+#: det som gikk ut var historien om én modul. Rundt 1 100 tegn å gå på.
 ROT_TEGNGRENSE = 67_800
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
