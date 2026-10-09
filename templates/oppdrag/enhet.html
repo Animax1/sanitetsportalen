@@ -53,6 +53,9 @@
   <div id="lyd-hint" class="enhet-meta mb-2" role="status">
     <i class="bi bi-hand-index me-1"></i>Trykk hvor som helst på skjermen for å slå på lydvarslene.
   </div>
+  {# Om skjermen holdes våken (Wake Lock, 9. okt. 2026). Avslaget fra iOS i #}
+  {# strømsparing er stille, så linja sier fra — `tegnVaaken()` skriver den. #}
+  <div id="vaaken-linje" class="enhet-meta vaaken-linje mb-2 d-none" role="status"></div>
 
   {# Feil skal synes fra førersetet — banneret er stort og blir stående til #}
   {# neste vellykkede handling. En knapp som ser ut til å ha virket, men #}

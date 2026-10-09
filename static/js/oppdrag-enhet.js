@@ -902,6 +902,97 @@ async function _lydKlar() {
 }
 
 
+// ── Skjermen holdes våken (Wake Lock, 9. okt. 2026) ─────────────────────
+//
+// Telefonen står i holderen gjennom vakta. **Sovner skjermen, stopper
+// pollingen og lydvarselet** — bilen hører ikke det nye oppdraget. Screen Wake
+// Lock holder den våken; push og native app er vurdert og valgt bort (André).
+//
+// Tre ting gjør API-et lumsk, og hver har sitt svar her:
+// 1. **Nettleseren slipper låsen hver gang siden skjules** — appbytte,
+//    telefonsamtale. Det virker ved første test og ikke etter første samtale.
+//    Derfor hentes den på nytt på `visibilitychange` (`startVaakenLaas`).
+// 2. **Noen nettlesere krever et trykk.** Låsen hentes fra samme trykk som
+//    vekker lyden, og igjen ved hvert trykk så lenge den ikke holder.
+// 3. **Avslaget er stille** — iOS i strømsparing (`NotAllowedError`), og
+//    hjem-skjerm-PWA før iOS 18.4. Derfor står det på skjermen om den holder.
+// Alt er pakket: en feil her skal aldri ta ned pollingen eller lyden.
+
+//: Låsen nettleseren ga oss, eller `null`. Status: `ukjent` til første
+//: forsøk, ellers `holder`, `avvist`, `sluppet` eller `mangler` (uten API).
+let vaakenLaas = null;
+let vaakenStatus = 'ukjent';
+let vaakenTrykket = false;
+
+
+//: **Regelen.** Be om låsen bare når siden synes, noen har trykket, og vi
+//: ikke alt holder den. En skjult side får avslag uansett, og en lås vi alt
+//: har skal ikke bes om to ganger.
+function skjermSkalHoldesVaaken(synlig, trykket, holder) {
+  return !!synlig && !!trykket && !holder;
+}
+
+
+//: Hva linja under lydhintet sier, og om den skal se ut som et problem.
+//: `null` = ingenting å vise ennå (før første trykk står lydhintet der).
+function vaakenTekst(status) {
+  if (status === 'holder') return { tekst: 'Skjermen holdes våken', problem: false };
+  if (status === 'avvist') return { tekst: 'Skjermen kan sovne — slå av strømsparing', problem: true };
+  if (status === 'sluppet') return { tekst: 'Skjermen kan sovne — trykk på skjermen', problem: true };
+  if (status === 'mangler') return { tekst: 'Skjermen kan sovne — nettleseren kan ikke holde den våken', problem: true };
+  return null;
+}
+
+
+function tegnVaaken() {
+  try {
+    const el = globalThis.document && document.getElementById('vaaken-linje');
+    if (!el) return;
+    const t = vaakenTekst(vaakenStatus);
+    el.classList.toggle('d-none', !t);
+    el.classList.toggle('vaaken-problem', !!(t && t.problem));
+    el.textContent = t ? t.tekst : '';
+  } catch (e) { /* visning, ikke drift */ }
+}
+
+
+async function hentVaakenLaas() {
+  try {
+    const synlig = !(globalThis.document && document.visibilityState === 'hidden');
+    if (!skjermSkalHoldesVaaken(synlig, vaakenTrykket, !!vaakenLaas)) return;
+    const wl = globalThis.navigator && navigator.wakeLock;
+    if (!wl || typeof wl.request !== 'function') {
+      vaakenStatus = 'mangler';
+    } else {
+      const laas = await wl.request('screen');
+      vaakenLaas = laas;
+      vaakenStatus = 'holder';
+      if (laas && typeof laas.addEventListener === 'function') {
+        laas.addEventListener('release', () => {
+          if (vaakenLaas === laas) { vaakenLaas = null; vaakenStatus = 'sluppet'; }
+          tegnVaaken();
+        });
+      }
+    }
+  } catch (e) {
+    // `NotAllowedError` (iOS i strømsparing), eller noe annet: skjermen kan
+    // sovne, og det skal stå på skjermen — ikke kastes videre til pollingen.
+    vaakenStatus = 'avvist';
+  }
+  tegnVaaken();
+}
+
+
+//: Kobler låsen til siden. Egen funksjon, ikke inne i `DOMContentLoaded`,
+//: så testene kan fyre de ekte hendelsene mot den.
+function startVaakenLaas() {
+  try {
+    document.addEventListener('pointerdown', () => { vaakenTrykket = true; hentVaakenLaas(); });
+    document.addEventListener('visibilitychange', () => { hentVaakenLaas(); });
+  } catch (e) { /* uten låsen virker siden som før */ }
+}
+
+
 async function lastBilinnstillinger() {
   // Det admin setter skal nå bilen uten at siden lastes på nytt.
   let res;
@@ -1591,6 +1682,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   _lydHintTegn();
   const vekk = async () => { if (await _lydKlar()) { _lydHintTegn(); document.removeEventListener('pointerdown', vekk); } };
   document.addEventListener('pointerdown', vekk);
+  // Skjermen holdes våken fra samme trykk, og på nytt når siden synes igjen.
+  startVaakenLaas();
   setInterval(() => lydTikk(), 5000);
   setInterval(lastBilinnstillinger, 5 * 60 * 1000);
 

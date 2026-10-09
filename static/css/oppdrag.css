@@ -750,3 +750,7 @@ button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
 .posdeling-ukjent { color: var(--text-soft); opacity: 0.85; }
 .posdeling-ukjent::after { content: '?'; }
 .posdeling-ukjent .bi { opacity: 0.7; }
+
+/* Skjermen holdes våken (Wake Lock, 9. okt. 2026). Et stille avslag fra iOS i
+   strømsparing er det vanlige problemet; da skal linja synes fra førersetet. */
+.vaaken-linje.vaaken-problem { color: #f59e0b; font-weight: 600; }

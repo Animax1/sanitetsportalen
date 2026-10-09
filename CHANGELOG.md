@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — Bilskjermen holdes våken: Wake Lock på `/oppdrag/` for enhetskontoer  `#oppdrag/enhetsskjerm`
+
+**Hvorfor:** André, 9. okt. 2026: bilkontoene har telefonen i holderen gjennom vakta, og
+**skjermen sovner** — da stopper pollingen og lydvarselet, og bilen hører ikke det nye
+oppdraget. Løsningen er Screen Wake Lock (`navigator.wakeLock.request('screen')`) på
+**bilskjermen**; push og native app er vurdert og valgt bort.
+
+**Hvordan** (`static/js/oppdrag-enhet.js`, bare lastet for enhetskontoer):
+
+| Del | Hva |
+|---|---|
+| `skjermSkalHoldesVaaken(synlig, trykket, holder)` | Regelen, som egen ren funksjon: be bare når siden synes, noen har trykket, og vi ikke alt holder låsen |
+| `startVaakenLaas()` | Kalt fra `DOMContentLoaded`. `pointerdown` — samme trykk som vekker lyden — og **`visibilitychange`**: nettleseren slipper låsen ved hvert appbytte og hver telefonsamtale, og uten lytteren virker wake lock ved første test og ikke etter første samtale. Et trykk henter den også igjen om den er sluppet |
+| `#vaaken-linje` | «Skjermen holdes våken», eller i oransje «Skjermen kan sovne — slå av strømsparing» (iOS: `NotAllowedError`), «— trykk på skjermen» (sluppet) og «— nettleseren kan ikke holde den våken» (uten API). Skrevet med `textContent`, ingen `innerHTML` |
+| Kaster aldri | Hele `hentVaakenLaas()` er pakket; `tegnVaaken()` også. En feil i låsen tar ikke ned pollingen eller lyden |
+
+`Permissions-Policy` nevner ikke `screen-wake-lock`, så standarden `self` gjelder — står i
+`templates/oppdrag/CLAUDE.md` at den ikke må stenges.
+
+**Testene** (`oppdrag/tests_bilen_wakelock.py`, sju i node) fyrer de ekte hendelsene mot
+`startVaakenLaas()`, og én klipper ut **selve `DOMContentLoaded`-kroken** fra fila og kjører den
+med resten stubbet — slik at kallstedet ikke kan forsvinne uten at noe blir rødt. Node 22 har
+sin egen `navigator` med bare getter; den byttes ut med `defineProperty`.
+
+**12 mutanter, 11 drept i første runde:** regelen invertert, hvert av de tre leddene fjernet,
+`visibilitychange`- og `pointerdown`-lytteren fjernet, **kallstedet i `DOMContentLoaded`
+fjernet**, `release` som ikke nullstiller, uten-API-grenen, statusteksten og problemklassen.
+«Avslaget fanges ikke» overlevde: den indre `try` var dobbel med den ytre. Den indre er fjernet,
+og mutanten på den som står igjen er drept.
+
+**Feltprøven** står øverst i `TODO.md` under «Krever Andre»: iPhone og Android, 20 minutter
+uten berøring, strømsparing av og på, appbytte midt i — og telefonen i lader.
+
+---
+
 ## 2026-10-09 — Bare .md endret: dokumenttestene, ikke hele suiten; CI henter PostgreSQL utenom Docker Hub  `#core/dokumentasjon`
 
 **Hvorfor:** André, 9. okt. 2026: «Når vi kjører bare redigerer dokument filer er det
