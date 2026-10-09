@@ -35,17 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Personlige KO-kontoer i stedet for `ko1` og `rk01` — før `staging` går til `main`.**
-      Valg A (André, 9. okt. 2026: «vi må vel nesten ta A»): en delt konto når bare `oppdrag`
-      fra `ef74dbe` (FORSLAG_KO §5.2). `verifiser_modultilgang` på staging viste `ko1` med
-      `vaktliste: les_alle` og `rk01` med `ko: skriv_leder`. Gi dem som sitter i KO personlige
-      kontoer, og fjern radene fra `ko1` og `rk01` i matrisen. **De 1–2 som både sender og
-      kjører** får en personlig konto *i tillegg* og bruker bilens delte konto på
-      bil-telefonen — én konto kan ikke være begge, med vilje (`ikke_for_enhetskonto`:
-      en konto knyttet til en enhet får 403 på sentralbordet uansett nivå).
-      **Etter `main`:** kjør `verifiser_modultilgang` i production igjen — kjøringen 9. okt.
-      var på den gamle koden.
-
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
       - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:

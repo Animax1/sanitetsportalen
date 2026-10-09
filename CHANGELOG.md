@@ -4,6 +4,19 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — Delte KO-kontoer ryddet på staging  `#todo` `#sikkerhet`
+
+**André, 9. okt. 2026 kl. 23:** «Da er det ordnet i staging og ingen slike brukere på prod.»
+`verifiser_modultilgang` på staging (bygg `13c7ead1`, 17 kontoer): «Delte kontoer med rader
+som ikke gir noe — Ingen.» `ko1` og `rk01` har ikke lenger rader utenfor `oppdrag`. Punktet er
+slettet fra `TODO.md`; `staging` kan gå til `main` når André sier fra.
+
+**Prod** ble kjørt 9. okt. på den gamle koden, der seksjonen ikke fantes — André har sett over
+de seks kontoene selv. Kommandoen kan kjøres der igjen etter `main` som en kontroll på ti
+sekunder.
+
+---
+
 ## 2026-10-09 — TODO: Wake Lock på bilskjermen, bestilt  `#todo` `#oppdrag`
 
 **Hvorfor:** André, 9. okt. 2026: «legge dette inn i todo ift wake lock på bil kontoer når de
