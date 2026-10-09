@@ -18,6 +18,7 @@ skal lete er alltid et sted færre enn der koden er.**
 """
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -94,3 +95,111 @@ class TestkommandoenDekkerAltTests(SimpleTestCase):
         self.assertEqual(
             ukjente, [],
             'CLAUDE.md navngir pakker som ikke har tester: ' + ', '.join(ukjente))
+
+
+# ── Dokumenttestene (9. okt. 2026) ──────────────────────────────────────────
+
+def _uten_docstrings(tre) -> set[int]:
+    ids = set()
+    for node in ast.walk(tre):
+        if (isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.body and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)):
+            ids.add(id(node.body[0].value))
+    return ids
+
+
+def _leser_markdown(sti: Path) -> bool:
+    """Har fila en strengkonstant som ender på `.md` — utenom docstrings?
+
+    Docstringene teller ikke: `patients.tests_choices` *nevner*
+    personverndokumentet uten å lese det.
+    """
+    try:
+        tre = ast.parse(sti.read_text(encoding='utf-8'))
+    except (SyntaxError, UnicodeDecodeError):
+        return False
+    docs = _uten_docstrings(tre)
+    return any(isinstance(n, ast.Constant) and isinstance(n.value, str)
+               and n.value.endswith('.md') and id(n) not in docs
+               for n in ast.walk(tre))
+
+
+def _prosjektimporter(sti: Path) -> list[Path]:
+    """Prosjektfilene en testfil importerer, som `core/changelog.py` —
+    `tests_changelog` leser CHANGELOG gjennom den, ikke selv."""
+    rot = Path(settings.BASE_DIR)
+    ut = []
+    for node in ast.walk(ast.parse(sti.read_text(encoding='utf-8'))):
+        if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            for navn in node.names:
+                for kandidat in (f"{node.module.replace('.', '/')}/{navn.name}.py",
+                                 f"{node.module.replace('.', '/')}.py"):
+                    if (rot / kandidat).is_file():
+                        ut.append(rot / kandidat)
+        elif isinstance(node, ast.Import):
+            for navn in node.names:
+                kandidat = rot / f"{navn.name.replace('.', '/')}.py"
+                if kandidat.is_file():
+                    ut.append(kandidat)
+    return ut
+
+
+def _dokumenttestene_utledet() -> set[str]:
+    rot = Path(settings.BASE_DIR)
+    ut = set()
+    for pakke in _pakker_med_tester():
+        for sti in sorted((rot / pakke).glob('**/tests*.py')):
+            if '/migrations/' in sti.as_posix():
+                continue
+            if _leser_markdown(sti) or any(
+                    _leser_markdown(i) and not i.name.startswith('tests')
+                    for i in _prosjektimporter(sti)):
+                ut.add('.'.join(sti.relative_to(rot).with_suffix('').parts))
+    return ut
+
+
+def _dokumenttestene_dokumentert() -> set[str]:
+    tekst = CLAUDE_MD.read_text(encoding='utf-8')
+    treff = re.search(r'^python manage\.py test (core\.tests_\S+(?: \S+)*?) -v \d$',
+                      tekst, re.M)
+    return set(treff.group(1).split()) if treff else set()
+
+
+class DokumenttesteneTests(SimpleTestCase):
+    """«Bare `.md`-filer endret: dokumenttestene» (André, 9. okt. 2026).
+
+    Kommandoen i `CLAUDE.md` er en liste over hvor man skal lete, og den er
+    alltid et sted færre enn der koden er — se docstringen øverst. Derfor
+    utledes settet av testene som faktisk leser Markdown, direkte eller
+    gjennom en prosjektmodul, og kommandoen må være nøyaktig det settet.
+    """
+
+    def test_utledningen_finner_noe(self):
+        utledet = _dokumenttestene_utledet()
+        self.assertIn('core.tests_claude_md', utledet)
+        self.assertIn('core.tests_changelog', utledet, 'leser CHANGELOG gjennom core/changelog.py')
+        self.assertNotIn('patients.tests_choices', utledet, 'nevner bare et dokument i en docstring')
+
+    def test_kommandoen_er_noeyaktig_dokumenttestene(self):
+        dokumentert = _dokumenttestene_dokumentert()
+        self.assertNotEqual(dokumentert, set(), 'fant ikke dokumenttest-kommandoen i CLAUDE.md')
+        utledet = _dokumenttestene_utledet()
+        self.assertEqual(
+            sorted(dokumentert), sorted(utledet),
+            'Dokumenttest-kommandoen i CLAUDE.md stemmer ikke med testene som leser .md.\n'
+            f'  Mangler: {sorted(utledet - dokumentert)}\n'
+            f'  Leser ikke Markdown: {sorted(dokumentert - utledet)}')
+
+    def test_en_docstring_som_nevner_et_dokument_teller_ikke(self):
+        """Funnet ved mutasjon: `patients.tests_choices` sin docstring slutter
+        ikke på `.md`, så unntaket for docstrings ble aldri prøvd."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as mappe:
+            bare_nevnt = Path(mappe) / 'a.py'
+            bare_nevnt.write_text('"""Se CLAUDE.md"""\n\ndef f():\n    """og docs/X.md"""\n',
+                                  encoding='utf-8')
+            leser = Path(mappe) / 'b.py'
+            leser.write_text('"""Leser."""\nFIL = "CLAUDE.md"\n', encoding='utf-8')
+            self.assertFalse(_leser_markdown(bare_nevnt))
+            self.assertTrue(_leser_markdown(leser))
