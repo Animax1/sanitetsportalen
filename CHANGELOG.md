@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — TODO: Wake Lock på bilskjermen, bestilt  `#todo` `#oppdrag`
+
+**Hvorfor:** André, 9. okt. 2026: «legge dette inn i todo ift wake lock på bil kontoer når de
+er inne i /oppdrag». Bilskjermen sovner i holderen, og da stopper pollingen og lydvarselet —
+**skjermen sovner**, bilen hører ikke det nye oppdraget. Løsningen er Screen Wake Lock
+(`navigator.wakeLock`); push og native app er valgt bort.
+
+**Lagt i `TODO.md`** under «Bilskjermen: Wake Lock», med kravene (kun bilskjermen, hent ved
+første trykk, hent på nytt etter `visibilitychange`, synlig status, kaster aldri), byggemåten
+(ren regel-funksjon, node-tester gjennom hendelsen, mutanter på kallstedet) og feltprøven.
+
+**Kontrollert mot koden før det ble skrevet:** ingen Wake Lock finnes. To presiseringer: det er
+`_lydKlar()` fra `pointerdown`-lytteren som *vekker* lyden — `lydErKlar()` leser bare
+tilstanden — og `Permissions-Policy` nevner ikke `screen-wake-lock`, så API-et er lov i dag og
+må ikke stenges med `screen-wake-lock=()`. **Feltprøven er ikke merket «Krever Andre»** ennå:
+den blokkerer ingenting før koden er på staging.
+
+---
+
 ## 2026-10-09 — Delte KO-kontoer: valg A, og hybrid er to kontoer  `#todo` `#sikkerhet` `#ko`
 
 **Hvorfor:** André, 9. okt. 2026, om `ko1` og `rk01`: «ja vi må vel nesten ta A da det er bare
