@@ -318,12 +318,10 @@ en test som glemmer kallet tester 403-stien uten å vite det.
 klientens påstand. Innloggingsloggen, audit-signalene, arkivene og rate-limit-bøttene per
 IP (`ratelimit_nokkel`) bruker den; `REMOTE_ADDR` direkte er proxyen i prod.
 
-**CSP-ens `media-src` er `'self' blob:`** (14. sep. 2026). `_stilleLydbaerer()` i
-`oppdrag-enhet.js` bygger en stum WAV som Blob — uten den demper iOS' ringebryter
-lydvarselet, fordi Web Audio alene regnes som «ambient». `default-src 'self'` dekker ikke
-`blob:`, så direktivet må stå eksplisitt; å slakke `default-src` i stedet ville sluppet
-blob-er inn i alt som arver. Feilen var *stille der det telte*: siden virket, oppdraget
-lastet, og bare konsollen sa fra — mens bilen ikke pep.
+**CSP-ens `media-src` er `'self' blob:`** (14. sep. 2026) — bilens lydvarsel trenger en
+Blob (`templates/oppdrag/CLAUDE.md`). `default-src 'self'` dekker ikke `blob:`, så
+direktivet må stå eksplisitt; å slakke `default-src` i stedet ville sluppet blob-er inn i
+alt som arver.
 
 **Modaler slipper fokus før Bootstrap skjuler dem** — `slippFokusFoerSkjul()` i
 `portal-utils.js`, én lytter på `hide.bs.modal` (den bobler) for hele portalen. Bootstrap
@@ -446,7 +444,7 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner og verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
-| `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv**: loggen fryses aldri med en SHA-signatur, fordi et felt i signaturen er låst i 24 måneder og sletteinngangen i §4.4 da ville meldt tukling |
+| `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv** — ingen SHA-signatur, se `ko/CLAUDE.md` |
 | `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
 | `park` | `park/backup.py` | Lagenes registreringer og lenkene — hashen, ikke tokenet |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
@@ -535,13 +533,7 @@ bare volumet — så `offsite.livssyklus()` leser reglene *tilbake* fra bucketen
 `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid
 som stille ble uendelig. Avviket står på `/portal-admin/backup/`; funksjonen
 kaster aldri og cacher i fem minutter. **Prefikset leses av `_prefiks()`, som kjenner tre
-former** (15. sep. 2026): `Filter.Prefix`, `Filter.And.Prefix` — den S3 bruker når regelen
-kombinerer prefiks med en tag eller en størrelsesgrense — og det gamle `Prefix` på toppnivå.
-Vi leste to av dem, og meldte «filene blir liggende for alltid» om en regel som sto helt
-riktig. Det er den verste sorten feilmelding: den peker på en ekte fare på et tidspunkt der
-faren ikke finnes, og lærer den som leser den å overse kortet. Feilteksten bærer nå også
-**koden Scaleway faktisk svarte** — sto det «mangler ObjectStorageBucketsRead» uansett, var
-en riktig satt nøkkel og en feil i vår egen kode umulig å skille fra hverandre. `hent_offsite --list`
+former**, og feilteksten bærer koden Scaleway svarte — hvorfor står i `core/offsite.py`. `hent_offsite --list`
 / `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med
 en `Backup`-rad; prefikset utledes av slugen i filnavnet. **`gjenopprett` er den
 som rører basen** (`--list`, `--siste <modul>`, `--hent <objekt>`, `--full`,
@@ -809,11 +801,9 @@ verdi, sendte en tom PUT, og tegnet panelet på nytt, så lista forsvant idet de
 `if` inne i en lytter ikke lar seg kjøre i en test.
 
 **Og delegeringen sender `(id, felt, verdi)` bare til elementer med `data-felt`** —
-`hendelseArgumenter()`. Alt annet får **ett** argument. Planleggerfeltene ble skrevet med
-`data-arg="0:1:fra"` og handlere som tok `(arg, verdi)`; `verdi` var alltid `undefined`,
-hvert tastetrykk skrev `undefined` inn i tilstanden, og feltet ble blankt ved neste
-tegning (meldt fra staging 15. sep. 2026 — «jeg får ikke fylt feltene»). Regelen sto
-allerede her; koden ble skrevet som om den ikke gjorde det.
+`hendelseArgumenter()`. Alt annet får **ett** argument. Planleggerfeltene tok `(arg, verdi)`
+og skrev `undefined` ved hvert tastetrykk («jeg får ikke fylt feltene», CHANGELOG 15. sep.
+2026). Regelen sto allerede her; koden ble skrevet som om den ikke gjorde det.
 
 **En test som bare leser markupen ser ikke dette.** `PlanleggerfanenTests._skriv()` plukker
 attributtene ut av den ekte markupen og sender dem gjennom `hendelseArgumenter()`, så

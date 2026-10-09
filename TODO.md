@@ -35,6 +35,17 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Delte KO-kontoer på staging: `ko1` og `rk01` mister tilgang — avgjør før `staging`
+      går til `main`.** `verifiser_modultilgang` på staging 9. okt. 2026: `ko1` har
+      `vaktliste: les_alle` og `rk01` har `ko: skriv_leder`, og fra `ef74dbe` når en delt konto
+      bare `oppdrag` (FORSLAG_KO §5.2). **A (anbefalt):** de som sitter i KO får personlige
+      kontoer, og radene fjernes i matrisen — da står hver logglinje på en person, som var
+      poenget med §5.2. **B:** `tillat_delt_konto=True` i `ko/module.py` (og vaktlista), og
+      sporbarheten for de kontoene går tapt — med `skriv_leder` også for slettinger.
+      **Og etter `main`:** kjør `verifiser_modultilgang` i production igjen. Kjøringen 9. okt.
+      var på den gamle koden — seksjonen «Delte kontoer med rader som ikke gir noe» fantes
+      ikke i utskriften.
+
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
       - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:
@@ -65,16 +76,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       testsuite gjør: samband, dekning i felt, og om knappene sitter der hendene
       forventer dem. Ha `docs/RUNBOOK_VAKT.md` framme; §10a har nå **to**
       arkivknapper å krysse av ved vaktslutt.
-
-- [ ] **Feilvarslene til `admin@sanitet.net`, ikke til privat Gmail** (André, 1. okt. 2026).
-      Railway, sanitetsportalen, **production** (og staging): `ADMINS` =
-      `Sanitetsportalen:admin@sanitet.net`. Sjekk etterpå med
-      `railway ssh --service web -- python manage.py verifiser_feilvarsel` at varselet
-      kommer fram. Varselet bærer
-      brukernavn, rolle, klient-IP, URL og traceback — med en privat Gmail-konto har korpset
-      ingen databehandleravtale for innboksen. **Noter hvem som leverer e-posten til
-      `sanitet.net`** (Google Workspace, Microsoft 365, domeneleverandøren …): det er den som
-      skal stå i A.2, og den trenger en avtale.
 
 - [ ] **Vurder å slå av lagring av e-postinnhold hos AHASend.** Avtalen sier det kan
       deaktiveres. Feilvarslene inneholder brukernavn, rolle, klient-IP, URL og
@@ -479,13 +480,6 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       `patients/arkiv`, `patients/registre`, `statistikk/kilder`, `oppdrag/verdimengder`,
       `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
       som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
-
-- [ ] **Rota har ~40 tegn igjen av taket på 66 000** (65 962 etter G1, 26. sep. 2026; taket
-      ble hevet fra 65 500 samme dag for norsk sortering). Neste avsnitt i rota sprenger den,
-      og da står man med valget midt i en annen oppgave. Det som skal
-      flyttes er avsnitt som beskriver **én** modul — regelen fila selv setter — og den
-      eneste kandidaten som er igjen er backup-tabellen med ni rader, der hver rad
-      forklarer sin egen modul. Vurderes før neste pulje, ikke under den.
 
 - [ ] **Samme feilklasse som gjenopprettingsrekkefølgen, andre steder.** Rekkefølgen sto
       skrevet ut fire steder og tre gikk i utakt uten at noe ble rødt, fordi

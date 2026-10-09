@@ -35,8 +35,10 @@ følger med som data **kun** for å projisere neste steg mens noe ligger usendt 
 eier ikke statusmaskinen, og en klient som regnet den ut selv ville blitt uenig med
 serveren i nøyaktig det øyeblikket en overgang ble endret.
 
-**Hvorfor `_stilleLydbaerer()` finnes** står i rota, under CSP — `media-src` måtte
-åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
+**Hvorfor `_stilleLydbaerer()` finnes** (14. sep. 2026): den bygger en stum WAV som Blob —
+uten den demper iOS' ringebryter lydvarselet, fordi Web Audio alene regnes som «ambient».
+Derfor er CSP-ens `media-src` `'self' blob:` (regelen står i rota). Feilen var *stille der det
+telte*: siden virket, oppdraget lastet, og bare konsollen sa fra — mens bilen ikke pep.
 
 ## Ressurslista, delt med `/ko/`
 
