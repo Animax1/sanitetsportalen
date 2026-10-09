@@ -40,7 +40,10 @@ class WorkflowenTests(SimpleTestCase):
 
     def test_node_kreves_og_basen_er_postgresql(self):
         self.assertRegex(self.tekst, r"KREV_NODE: '1'")
-        self.assertRegex(self.tekst, r'image: postgres:\d+')
+        # Registeret foran er lov (9. okt. 2026: `public.ecr.aws/docker/library/`,
+        # fordi Docker Hub stoppet CI på nedlastingsgrensen) — men det er
+        # PostgreSQL, med en fast hovedversjon, ikke `latest`.
+        self.assertRegex(self.tekst, r'image: (?:[\w.-]+/)*postgres:\d+')
         self.assertIn('verifiser_migrasjoner', self.tekst)
 
     def test_tblib_installeres(self):

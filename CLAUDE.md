@@ -31,7 +31,7 @@ André har sagt fra**. Byggnummeret i footeren skal stemme med commit-en som ble
 
 **En push er ikke ferdig før CI er grønn på den SHA-en** (André, 30. sep. 2026: «vent på
 ci svar før du er ferdig»). `e81709d` var grønn på SQLite og rød i CI, som er PostgreSQL.
-Kjør suiten mot en lokal PostgreSQL før push.
+Kjør suiten mot en lokal PostgreSQL før push — er bare `.md`-filer endret, dokumenttestene (se Commands).
 
 **Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Regelen sto her fra
 14. sep. 2026, da det var **to**. 16. sep. var det **23** — seks av dem ting som ventet på
@@ -97,6 +97,11 @@ python manage.py test core -v 1
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
+
+# Bare .md-filer endret (9. okt. 2026): dokumenttestene, ~12 s. Ingen database leser
+# Markdown, og CI kjører hele suiten likevel. Én .py/.js/.html i diffen: hele suiten.
+# Lista utledes av testene som leser .md — `core/tests_testkommandoen.py` holder den.
+python manage.py test core.tests_beredskap core.tests_changelog core.tests_ci core.tests_claude_md core.tests_dokumentråte core.tests_oppdateringsintervaller core.tests_testkommandoen core.tests_todo -v 1
 
 # Migrasjoner
 python manage.py makemigrations

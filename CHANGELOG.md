@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-09 — Bare .md endret: dokumenttestene, ikke hele suiten; CI henter PostgreSQL utenom Docker Hub  `#core/dokumentasjon`
+
+**Hvorfor:** André, 9. okt. 2026: «Når vi kjører bare redigerer dokument filer er det
+nødvendig med full test suite?» — og etter svaret: «ja, skriv det inn i CLAUDE.md». De fire
+siste pushene var rene dokumentendringer, og hver kostet rundt fem minutter lokalt for null
+gevinst: regelen om PostgreSQL kom av `e81709d` (grønn på SQLite, rød i CI), og ingen database
+leser Markdown.
+
+**Regelen** (`CLAUDE.md`, arbeidsflyt og Commands): bare `.md`-filer endret → dokumenttestene,
+~12 s. Én `.py`/`.js`/`.html` i diffen → hele suiten, også for en kommentar i en testfil. CI
+kjører hele suiten på `staging` uansett, og push er fortsatt ikke ferdig før den er grønn.
+
+**Lista er utledet, ikke skrevet av:** `DokumenttesteneTests` i `core/tests_testkommandoen.py`
+finner hver testfil med en strengkonstant som ender på `.md` (utenom docstrings), eller som
+importerer en prosjektmodul som har det (`tests_changelog` leser CHANGELOG gjennom
+`core/changelog.py`), og krever at kommandoen i `CLAUDE.md` er nøyaktig det settet. Utledningen
+la til `core.tests_ci` og tok ut `patients.tests_choices`, som bare *nevner* personverndokumentet
+i en docstring. **4 mutanter, 3 drept i første runde.** «Docstrings teller» overlevde: den ene
+docstringen i prosjektet som nevner et dokument, slutter ikke på `.md`, så unntaket ble aldri
+prøvd. Ny test med en oppdiktet fil dreper den.
+
+**CI: PostgreSQL fra `public.ecr.aws`, ikke Docker Hub.** Kjøring #105 (`29353e0`) feilet to
+ganger i «Initialize containers» før checkout: «toomanyrequests: You have reached your
+unauthenticated pull rate limit», og én gang «500 Internal Server Error» fra Docker Hub.
+Runnerne deler IP-er, så grensen nås av andres jobber. `services.postgres.image` er nå
+`public.ecr.aws/docker/library/postgres:18` — AWS' speil av de offisielle Docker-imagene, samme
+image (kontrollert: manifestet bærer `com.docker.official-images.bashbrew.arch`).
+`core/tests_ci.py` krevde `image: postgres:<tall>` ordrett og ble rød på registeret foran;
+mønsteret godtar nå et register, men fortsatt bare PostgreSQL med fast hovedversjon — to
+mutanter (`latest`, en annen database) er drept.
+
+---
+
 ## 2026-10-09 — Delte KO-kontoer ryddet på staging  `#todo` `#sikkerhet`
 
 **André, 9. okt. 2026 kl. 23:** «Da er det ordnet i staging og ingen slike brukere på prod.»

@@ -30,7 +30,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18   # som Railway (server-status viste 18.6, 26. sep. 2026)
+        # Fra AWS' offentlige speil av de offisielle Docker-imagene, ikke Docker Hub
+        # (9. okt. 2026): runnerne deler IP-er, og Docker Hubs grense for anonyme
+        # nedlastinger («toomanyrequests») stoppet CI to ganger før en test kjørte.
+        # Samme image, samme versjon.
+        image: public.ecr.aws/docker/library/postgres:18   # som Railway (server-status viste 18.6, 26. sep. 2026)
         env:
           POSTGRES_PASSWORD: postgres
         ports: ['5432:5432']
