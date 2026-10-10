@@ -27,8 +27,10 @@ function renderHistorikk() {
     return;
   }
   el.innerHTML = (historikkliste.map((o) => {
+    // Nedtellingen står under notatet: historikken er der teksten ellers
+    // ble liggende til noen avsluttet vakta (`notatSlettesHtml`).
     const fritekstBlokk = o.fritekst
-      ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
+      ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>${notatSlettesHtml(o)}`
       : '';
     // **Avbrytelsen følger med i historikken** (15. sep. 2026). Et oppdrag
     // der en bil avbrøt, men en annen løste det, ryddes bort av seg selv —

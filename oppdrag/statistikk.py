@@ -179,8 +179,13 @@ def rader_for_vakt(vakt):
     """
     from .arkiv import _per_enhet, avreist_sted, enhetshendelser_for
 
+    from django.utils import timezone
+
+    from . import fritekstfrist
+
+    naa = timezone.now()
     oppdragene = list(
-        Oppdrag.objects
+        fritekstfrist.med_siste_aktivitet(Oppdrag.objects)
         .filter(vakt=vakt)
         .select_related('lokasjon')
         .prefetch_related(
@@ -218,8 +223,11 @@ def rader_for_vakt(vakt):
                 # grovsortering og enhetshendelsene.
                 'varslet_at': varslet_at,
                 'avreist_til': sted,
-                # Bare live — fritekst fryses ikke i arkivet.
-                'avreist_til_tekst': sted_tekst,
+                # Bare live — fritekst fryses ikke i arkivet — og bare til
+                # fristen på fritekst er ute (`fritekstfrist`).
+                'avreist_til_tekst': ('' if fritekstfrist.er_utlopt(oppdrag.siste_aktivitet, naa,
+                                                                       oppdrag.fritekst_frist_dager)
+                                      else sted_tekst),
                 'grovsortering': oppdrag.grovsortering or '',
                 'enhetshendelser': hendelser,
             })

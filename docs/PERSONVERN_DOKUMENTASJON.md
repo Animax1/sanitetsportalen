@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 8. oktober 2026  
-**Versjon:** 1.19  
+**Siste oppdatering:** 10. oktober 2026  
+**Versjon:** 1.20  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -316,6 +316,13 @@ tekstfelt som kan ses av flere enn den som skrev det:
    teksten.
 4. **Ingen mellomlagring.** Oppdragsdata caches ikke i Redis; avsnittet om cache-data
    under gjelder uendret.
+5. **Slettefrist (fra 10.10.2026).** Fritekst og «Annet sted»-teksten på bilens
+   stempling slettes **3 dager etter siste aktivitet** på oppdraget (stempling, endring,
+   varsling, flytting til historikk) — justerbart 1–30 dager av global admin. Klokka går
+   fra siste aktivitet og ikke fra når oppdraget ble avsluttet, slik at også et oppdrag
+   som aldri ble avsluttet får en frist. Serveren slutter å vise teksten straks fristen
+   er ute; `purge_old_logs` tømmer feltene natt til søndag. Selve oppdraget står igjen
+   til vakta avsluttes. **Fristen fjerner ikke teksten fra backupene** (A.9).
 
 ### Mannskapsdata (vaktlistemodulen)
 
@@ -570,6 +577,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
+| **Oppdragsnotat og «Annet sted» (`Oppdrag.fritekst`, `Statusmelding.sted_tekst`)** | **3 dager etter siste aktivitet** på oppdraget, justerbart 1–30 av global admin | Skjules i serverens svar straks fristen er ute; tømmes av `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Fritt tekstfelt der identifikatorer kan havne (A.6). Oppdraget står igjen til vakta avsluttes. Teksten ligger fortsatt i backupene (730 og 90 dager hos Scaleway) — fristen er ikke en sletterett |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
@@ -834,8 +842,10 @@ kø i klienten, ikke gjennom cachen.
   skrive personopplysninger der, også direkte identifikatorer — feltet finnes fordi
   enheten trenger operativ kontekst som ikke lar seg uttrykke i faste lister. Tiltakene
   (unntak fra verdilogging i audit, server-side skjuling mot enhetskontoer etter
-  avslutning, veiledning i skjemaet) er beskrevet i A.6. Restrisiko: selve feltverdien
-  står i oppdragstabellen til oppdraget slettes eller arkiveres.
+  avslutning, veiledning i skjemaet, slettefrist 3 dager etter siste aktivitet) er
+  beskrevet i A.6. Restrisiko: teksten ligger i backupene (730 og 90 dager hos
+  Scaleway) etter at fristen har tømt feltet, og den kan leses i inntil 3 dager etter
+  siste aktivitet av alle med tilgang til oppdragsmodulen.
 - Pasientnummer brukes som pseudonym, men kan i prinsippet kobles til person dersom annen informasjon fra arrangementsstedet foreligger (re-identifikasjonsrisiko er vurdert som lav). Personell som var på vakt vil normalt kunne knytte nummer til person i minnet.
 - Offline-modus innebærer at personopplysninger lagres lokalt på en enhet utenfor den kontrollerte skyinfrastrukturen – dette øker risikoen for uautorisert tilgang ved tap av enhet.
 
@@ -1252,6 +1262,10 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 **Endringslogg:**
 
+- **v1.20 (10.10.2026):** **Slettefrist på oppdragets frie tekst** (A.6 tiltak 5, A.9, A.12):
+  `Oppdrag.fritekst` og «Annet sted»-teksten slettes 3 dager etter siste aktivitet på
+  oppdraget. Restrisikoen «står i oppdragstabellen til oppdraget slettes eller arkiveres»
+  er lukket for den levende tabellen; backupene står igjen som restrisiko.
 - **v1.19 (08.10.2026):** **Behandlingsansvarlig er Kverneland Røde Kors** (A.1, hodet, B.1,
   B.9), med André Eritsland som systemansvarlig og kontaktpunkt — beslutningen fra 30. sep.
   (B13) er nå skrevet inn, fordi navnet er på plass. A.4: navnet fylt inn for

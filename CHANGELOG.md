@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-10 — Slettefrist på oppdragsnotatet: fritekst og «Annet sted» slettes 3 dager etter siste aktivitet  `#personvern`
+
+**Hvorfor:** A.12 hadde det som åpen restrisiko: «selve feltverdien står i oppdragstabellen
+til oppdraget slettes eller arkiveres». Beskyttelsen var bygget helt mot bilen; i
+**historikken hos KO ble fritekst liggende for alltid** — til noen husket å trykke «Avslutt
+vakt». Med prod i dvale og en vakt som ikke er avsluttet, er det måneder.
+
+**Valget** (André: «C 3 dager bør være adekvat»): klokka går fra **siste aktivitet** på
+oppdraget, ikke fra `historikk_fra` (A) eller siste `Ledig` (B). Med A ville et oppdrag som
+står med «trenger ny ressurs» aldri fått noen frist — det kommer aldri til historikken. Et
+oppdrag noen arbeider med flytter klokka hele tiden; bare det glemte tømmes.
+
+**Hvordan** (`oppdrag/fritekstfrist.py`):
+
+| Del | Hva |
+|---|---|
+| Siste aktivitet | Det seneste av stemplingene (`updated_at`, så korreksjon og tilbaketrekking teller), endringene i verdiene (også notatet selv), varslingene, enhetshendelsene, enhetsbyttene, `historikk_fra` og radens egen `updated_at` (grovsortering, antall). Delspørringer, ikke joins; `Coalesce` rundt hvert ledd fordi `Greatest` gir NULL på SQLite |
+| Vis-regelen | `oppdrag_til_dict` utelater teksten straks fristen er ute — tavla, historikken, detaljvinduet og bilen. «Annet sted: Storgata 5» blir «Annet sted» i enhetslista og tidslinjen (`skjul_sted_tekst`), og i statistikkens live-liste |
+| Feiingen | `purge_old_logs` (natt til søndag) gjennom `oppdrag/opprydding.py` tømmer `fritekst` og `sted_tekst` med `update()` — raden står, og feiingen starter ikke klokka på nytt. Melder `oppdrag_endret()` selv |
+| Fristen | `AppSetting` `oppdrag_fritekst_frist_dager`, 3 som standard, 1–30, klemt ved lesing. Nytt kort «Oppdrag» på `/portal-admin/innstillinger/` |
+| Nedtellingen | `fritekst_slettes` er et **fast tidspunkt** i svaret (aldri «om så lenge», ellers ny ETag ved hver polling). `notatSlettesTekst()` viser «Notatet slettes om 2 d 4 t» under notatet i historikkraden og i oppdragsvinduet — bare når det står tekst der |
+| Spørringer | Lista og historikken annoterer `med_siste_aktivitet` — ingen spørring per rad, fristen lest én gang. Statistikken gikk fra 7 til 8 spørringer (fristen) |
+
+**Fristen fjerner ikke teksten fra backupene** (730 og 90 dager hos Scaleway). Det står i
+personverndokumentet, som er **v1.20**: A.6 tiltak 5, ny rad i A.9, A.12-restrisikoen skrevet
+om. `docs/NOTAT_DPIA_OG_FRITEKST.md` §6 og §8 oppdatert, spørsmålet om klokka avgjort.
+
+**Testene** (`oppdrag/tests_fritekstfrist.py`, 20): hver aktivitetstype flytter klokka, med
+kildene skrevet for hånd i testen og ikke lest fra modulen; aldringen flytter *hvert*
+tidsstempel generisk. Vis-regelen går gjennom de ekte endepunktene (tavla, historikken,
+detaljen, PUT av nytt notat), feiingen gjennom `purge_old_logs` og `--dry-run`, nedtellingen i
+node gjennom den ekte `renderHistorikk()`.
+
+**28 mutanter, alle drept i første runde:** grensa `>=` → `>`, regelen invertert, hver av de
+fem kildene fjernet, `updated_at` → `created_at` på stemplingene, `historikk_fra`- og
+`updated_at`-leddet fjernet, `Coalesce` fjernet, klemmingen, begge `update()`-ene i feiingen,
+`lte` → `gte`, tekstfilteret, `oppdrag_endret()`, vis-regelen i `oppdrag_til_dict`, i lista og i
+tidslinjen, nedtelling uten tekst, annotasjonen i lista (fanget av spørringstellingen),
+statistikken, registreringen i `apps.py`, valideringen, kallstedet i `renderHistorikk` og to
+grenser i `notatSlettesTekst`.
+
+**Vaktene for endringsnummeret sa fra** (`oppdrag`, KO-tavla og KO-loggen): `update()` sender
+ingen signaler. Feiingen melder `oppdrag_endret()` selv; tavla og loggen viser verken notatet
+eller «Annet sted»-teksten, og står i `VURDERT` med den begrunnelsen.
+
+**Feiingen går ukentlig**, så teksten kan ligge i basen i inntil ti dager — men den vises ikke
+etter tre. Skal den også tømmes etter tre, må `purge_old_logs` gå daglig i Railway Cron.
+
 ## 2026-10-10 — Rota av `CLAUDE.md` hadde 312 tegn igjen: backupens maskineri til `core/backup/CLAUDE.md`  `#core/dokumentasjon`
 
 **Hvorfor:** rota sto på 67 488 av 67 800 tegn etter avsnittet om «Logg ut». Det neste

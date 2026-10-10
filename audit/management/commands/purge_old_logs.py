@@ -5,7 +5,9 @@ Rydder:
   - ``core.Notification``           – standard 30 dager
   - **modulenes egne fristdata** via ``core.opprydding``-registeret
     (KO-loggen, 730 dager — se ``ko/opprydding.py``; overnattingsplasseringene
-    i vaktlista, 30 dager etter natta — se ``vaktliste/opprydding.py``)
+    i vaktlista, 30 dager etter natta — se ``vaktliste/opprydding.py``;
+    oppdragets frie tekst, 3 dager etter siste aktivitet — se
+    ``oppdrag/fritekstfrist.py``)
 
 Kjøres som:
   python manage.py purge_old_logs                      # bruk standardgrensene

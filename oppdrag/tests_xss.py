@@ -49,6 +49,8 @@ HTML_BUILDERS_PER_FIL = {
         # `visRedigerOppdrag`: brikkene, nedtrekket, notatet og raden i
         # tidslinjen.
         '_verdiBrikke', '_verdiVelgerHtml', '_verdierHtml', '_notatHtml', 'endringTekst',
+        # Nedtellingen under notatet (10. okt. 2026, `oppdrag/fritekstfrist.py`).
+        'notatSlettesHtml',
         'visRettTid', '_lydvarselSkjema', 'fyllNedtrekk', 'renderArkiv',
         # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
         # fritekst fra et annet moduls register, og escapes her som alt annet.
@@ -98,6 +100,9 @@ HTML_BUILDERS_PER_FIL = {
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Nedtellingen under notatet (10. okt. 2026): markup fra `notatSlettesHtml`,
+    # som selv står i skanningen og escaper teksten sin.
+    'notatSlettesHtml(o)': 'bygger i HTML_BUILDERS_PER_FIL, escaper selv',
     # Verdiene rett i oppdragsvinduet (23. sep. 2026).
     'verdiTekst': 'escapeHtml(_verdiTekst(...)) rett over',
     'notatTekst': 'markup bygget rett over, notatet escapet der',

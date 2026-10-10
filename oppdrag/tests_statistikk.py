@@ -315,10 +315,11 @@ class GjeldendeBulkTests(OppdragStatsBasis):
             oppdrag = self._oppdrag()
             self._stempel(oppdrag, choices.RYKKER_UT, 2)
 
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(8):
             # oppdrag + koblingsrader + enhetshendelser (7b) + statusmeldinger
             # + to Enhet-tellinger (på vakt, og av dem passive) +
-            # vaktmodusperiodene.
+            # vaktmodusperiodene + fristen på fritekst (10. okt. 2026, lest
+            # én gang for hele vakta — «Annet sted»-tekstene følger den).
             #
             # **Budsjettet er konstant, ikke lavt.** Poenget er at det ikke
             # vokser med antall oppdrag; to tellinger og én periodelesing er

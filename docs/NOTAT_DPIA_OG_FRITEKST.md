@@ -146,7 +146,7 @@ der. Kartlagt 14. sep. 2026:
 | Bilen, etter `Ledig` | **Nei** — utelates server-side i `views_common.oppdrag_til_dict` | Straks |
 | Bilen, 30 min etter `Ledig` | Hele oppdraget borte (`services.SKJUL_ETTER_LEDIG`) | 30 min |
 | KO, tavla | Ja | — |
-| **KO, historikken** | **Ja** | **Aldri** |
+| **KO, historikken** | **Ja** | **3 dager etter siste aktivitet** (fra 10. okt. 2026, §8) |
 | Vaktarkivet | Nei — arkiveres bevisst ikke (`ArkivertOppdrag`) | — |
 | Auditloggen | Nei — står som `(skjult)` (`signals.FELT_UTEN_VERDILOGGING`) | — |
 | **Backup, modulfila `oppdrag`** | **Ja** | 730 dager hos Scaleway |
@@ -224,10 +224,14 @@ Uavhengig av adressen. Fristen lukker en restrisiko som står åpen i A.12 i dag
    infrastruktur. (Backup er ikke en cron-jobb, av grunner som står i `CLAUDE.md`; denne
    jobben har ikke det problemet.)
 
-**Klokka går fra `historikk_fra`**, som er Andrés ordlyd. Én konsekvens å ta bevisst:
-`services.hent_tilbake` nullstiller `historikk_fra`, så henter KO oppdraget tilbake til
-tavla, starter nedtellingen på nytt. Vurderingen her er at det er riktig — men det er et
-valg, ikke noe som skal arves fra implementasjonen.
+**Klokka går fra siste aktivitet på oppdraget** — avgjort av André 10. okt. 2026 («C, 3
+dager»), og ikke fra `historikk_fra` som denne paragrafen først foreslo. Grunnen står i
+spørsmålet under: et oppdrag som står med «trenger ny ressurs» kommer aldri til
+historikken. Aktivitet er en stempling (også korreksjon og tilbaketrekking), en endring
+i verdiene, en varsling, en enhetshendelse, et enhetsbytte og flyttingen til historikken.
+Et oppdrag noen arbeider med flytter klokka hele tiden; bare det glemte tømmes. Bygget i
+`oppdrag/fritekstfrist.py`, og regelen gjelder «Annet sted»-teksten på bilens stempling
+også.
 
 **Fristen bør være en `AppSetting`, ikke et tall i koden.** Samme begrunnelse som
 `Belastningsgrenser` i vaktlista: grensene er organisasjonens, ikke portalens. Global admin,
@@ -238,12 +242,12 @@ ved siden av lyd-bryterne.
 når det faktisk står tekst der** — en nedtelling på et tomt felt er støy, og det er slik
 støy som gjør at folk slutter å lese varsler.
 
-### Ett spørsmål som ikke er avgjort
+### Spørsmålet som ble avgjort
 
-- [ ] **Oppdrag som aldri når historikken.** Et oppdrag med `trenger_ressurs` står i
-      `Venter` på ubestemt tid og beholder fritekst for alltid. Skal klokka i stedet gå fra
-      **siste `Ledig`-stempling**, som bilens 30-minutters-regel gjør? Det dekker flere
-      tilfeller, men bryter med ordlyden «i historikken». Hullet bør lukkes bevisst.
+**Oppdrag som aldri når historikken.** Et oppdrag med `trenger_ressurs` står i `Venter`
+på ubestemt tid og ville beholdt fritekst for alltid med klokka fra `historikk_fra`.
+Siste `Ledig` dekket ikke et oppdrag ingen bil hadde vært på. Siste aktivitet dekker
+begge — avgjort 10. okt. 2026.
 
 ---
 
@@ -251,7 +255,7 @@ støy som gjør at folk slutter å lese varsler.
 
 1. **Avklar behandlingsansvaret** (§5). Billigst, størst effekt, og påvirker alle de andre
    svarene.
-2. **Bygg slettefristen på fritekst** (§8). Står som åpen restrisiko i A.12 allerede i dag,
+2. **Bygg slettefristen på fritekst** (§8) — **gjort 10. okt. 2026**, 3 dager etter siste aktivitet. Sto som åpen restrisiko i A.12,
    uavhengig av adressen — og den er det som gjør adressen forsvarlig senere.
 3. **Deretter adressen** (§7), med DPIA-vurderingen tatt opp igjen og **skrevet ned enten
    svaret blir ja eller nei**. Art. 5(2) krever at vurderingen dokumenteres, ikke at den

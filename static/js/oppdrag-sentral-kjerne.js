@@ -248,3 +248,30 @@ async function kvitterAvbrutt(oppdragId) {
   etagOppdrag = null;
   await lastAlt();
 }
+
+
+function notatSlettesTekst(slettesIso, naa) {
+  // **Nedtellingen på oppdragsnotatet** (10. okt. 2026, `oppdrag/fritekstfrist.py`):
+  // notatet og «Annet sted»-teksten slettes når oppdraget har stått urørt i
+  // fristen. Serveren sender et fast tidspunkt (`fritekst_slettes`) — ikke «om
+  // så lenge», ellers ble hver polling en ny ETag — og dette regner det om.
+  // Tomt når det ikke står tekst, og når tidspunktet er passert: da har
+  // serveren alt sluttet å sende teksten.
+  if (!slettesIso) return '';
+  const t = new Date(slettesIso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const min = Math.floor((t - (naa ?? Date.now())) / 60000);
+  if (min <= 0) return '';
+  if (min < 60) return 'Notatet slettes om under en time';
+  const timer = Math.floor(min / 60);
+  if (timer < 24) return `Notatet slettes om ${timer} t`;
+  const dager = Math.floor(timer / 24);
+  const rest = timer % 24;
+  return `Notatet slettes om ${dager} d${rest ? ` ${rest} t` : ''}`;
+}
+
+
+function notatSlettesHtml(o) {
+  const tekst = notatSlettesTekst(o.fritekst_slettes);
+  return tekst ? `<div class="oppdrag-meta small"><i class="bi bi-hourglass-split me-1"></i>${escapeHtml(tekst)}</div>` : '';
+}

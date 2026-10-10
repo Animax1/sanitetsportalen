@@ -1,0 +1,25 @@
+{% comment %}
+Oppdragsmodulens felt på /portal-admin/innstillinger/: fristen på fritekst.
+
+**Hjelpeteksten sier hva fristen ikke er**, som KO-loggens: backupene ligger
+der uansett hva tallet står på, og en frist som ser ut som en sletterett lukker
+spørsmålet uten å svare på det.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Oppdrag</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="oppdrag_fritekst_dager">Frist på oppdragsnotat og «Annet sted»</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="oppdrag_fritekst_dager" name="oppdrag_fritekst_dager"
+               class="form-control" min="{{ oppdrag_fritekst_dager_min }}"
+               max="{{ oppdrag_fritekst_dager_maks }}" value="{{ oppdrag_fritekst_dager }}">
+        <span class="input-group-text">dager</span>
+      </div>
+      <div class="form-text">
+        Regnet fra <strong>siste aktivitet</strong> på oppdraget — en stempling, en endring,
+        en varsling. Standard er 3 dager. Teksten skjules straks fristen er ute, og
+        <code>purge_old_logs</code> tømmer feltene natt til søndag. Oppdraget selv står igjen.
+        Fristen fjerner ikke teksten fra backupene (730 dager for modulfila hos Scaleway).
+      </div>
+    </div>
+  </div>

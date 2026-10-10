@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from core.auth_decorators import har_tilgang
 
-from . import choices, services
+from . import choices, fritekstfrist, services
 
 
 def etag_for(rader, ekstra=None) -> str:
@@ -127,7 +127,7 @@ def delte_linjer_for_liste(oppdragene) -> dict:
     return hendelse_modell.delte_linjer_bulk([(o.pk, o.hendelse_id) for o in oppdragene])
 
 
-def enheter_til_liste(oppdrag, meldinger=None) -> list:
+def enheter_til_liste(oppdrag, meldinger=None, *, skjul_sted_tekst: bool = False) -> list:
     """Enhetene på oppdraget med hver sin status — matrisen sentralbordet
     ser. Leser `oppdrag.enheter`; kalleren prefetcher `enheter__enhet` der
     det er mange oppdrag.
@@ -159,7 +159,9 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
             'status_tidspunkt': siste.tidspunkt.isoformat() if siste else None,
             # «Avreist → Sykehus» skal synes i sentralbordet, ikke bare i
             # tidslinjen (André, 12. sep. 2026).
-            'sted_navn': choices.sted_navn_for(siste.sted, siste.sted_tekst) if siste else '',
+            # «Annet sted: …» følger fristen på fritekst (`fritekstfrist`).
+            'sted_navn': (choices.sted_navn_for(siste.sted, '' if skjul_sted_tekst else siste.sted_tekst)
+                          if siste else ''),
             'varslet_at': rad.varslet_at.isoformat(),
             'rekkefolge': rad.rekkefolge,
         })
@@ -199,6 +201,12 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     samme grunn (G4, 26. sep. 2026).
     """
     status = koblingsrad.status if koblingsrad is not None else oppdrag.status
+    # **Fristen på den frie teksten** (10. okt. 2026, `fritekstfrist`). Regnet
+    # her, i serverens svar, av samme grunn som bilens skjuleregel under: er
+    # fristen ute, skal teksten ikke stå i responsen — uansett om feiingen har
+    # kjørt. Lista sender `siste_aktivitet` som annotasjon; ellers én spørring.
+    siste_aktivitet, frist_dager = fritekstfrist.frist_for(oppdrag)
+    utlopt = fritekstfrist.er_utlopt(siste_aktivitet, timezone.now(), frist_dager)
     # Den primære bilen, fra koblingsradene og ikke fra `Oppdrag.enhet` (G6,
     # 26. sep. 2026). Lista prefetcher `enheter__enhet`, så dette er gratis der.
     primaer = oppdrag.primaer
@@ -222,7 +230,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'lokasjon_navn': oppdrag.lokasjon.navn,
         'status': status,
         'status_navn': choices.status_navn_for(oppdrag.hastegrad, status),
-        'enheter': enheter_til_liste(oppdrag, meldinger),
+        'enheter': enheter_til_liste(oppdrag, meldinger, skjul_sted_tekst=utlopt),
         'opprettet': oppdrag.created_at.isoformat(),
         'status_tidspunkt': status_tidspunkt,
         'historikk_fra': (oppdrag.historikk_fra.isoformat()
@@ -264,7 +272,14 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'hendelse_lag': oppdrag.hendelse.lag_navn() if oppdrag.hendelse_id else [],
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
-    data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
+    data['fritekst'] = '' if (skjul_fritekst or utlopt) else oppdrag.fritekst
+    # Når teksten slettes — nedtellingen i historikkraden og i vinduet. Bare
+    # når det står tekst der: en nedtelling på et tomt felt er støy, og det er
+    # slik støy som gjør at folk slutter å lese varsler. Et fast tidspunkt,
+    # ikke «om så lenge»: svaret får ikke bære noe regnet ut fra klokka, ellers
+    # blir hver polling en ny ETag (`etag_for_svar`).
+    data['fritekst_slettes'] = (fritekstfrist.slettes_at(siste_aktivitet, frist_dager).isoformat()
+                                if data['fritekst'] and siste_aktivitet else None)
     # De delte linjene følger fritekstens regel: fritekst er der
     # helseopplysningene havner (`NOTAT_DPIA_OG_FRITEKST.md` §7), og bilen
     # skal ikke sitte med dem etter at oppdraget er avsluttet. Hver rad
@@ -298,7 +313,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     return data
 
 
-def melding_til_dict(melding) -> dict:
+def melding_til_dict(melding, *, skjul_sted_tekst: bool = False) -> dict:
     return {
         'id': melding.pk,
         'status': melding.status,
@@ -320,8 +335,9 @@ def melding_til_dict(melding) -> dict:
         'trukket_tilbake_av': getattr(melding.trukket_tilbake_av, 'username', '') or '',
         # «Avreist → Sykehus». Tom for alle andre statuser.
         'sted': melding.sted,
-        'sted_tekst': melding.sted_tekst,
-        'sted_navn': choices.sted_navn_for(melding.sted, melding.sted_tekst),
+        # Fristen på fritekst gjelder «Annet sted» også (`fritekstfrist`).
+        'sted_tekst': '' if skjul_sted_tekst else melding.sted_tekst,
+        'sted_navn': choices.sted_navn_for(melding.sted, '' if skjul_sted_tekst else melding.sted_tekst),
     }
 
 

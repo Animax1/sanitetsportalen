@@ -100,6 +100,10 @@ class TavleEndringerFangesTests(SimpleTestCase):
                                                'som lagrer HendelseLag i samme transaksjon',
         'oppdrag/services.py: Statusmelding.update': '_slett_meldinger kobler fra korrigerer rett før '
                                                      'meldingene og oppdraget slettes (post_delete)',
+        # Fristen på fritekst (10. okt. 2026): feiingen tømmer `fritekst` og
+        # `sted_tekst`, og tavla tegner ingen av dem.
+        'oppdrag/fritekstfrist.py: Oppdrag.update': 'tømmer bare fritekst — tavla viser den ikke',
+        'oppdrag/fritekstfrist.py: Statusmelding.update': 'tømmer bare sted_tekst — tavla viser den ikke',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):

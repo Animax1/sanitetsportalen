@@ -141,6 +141,7 @@ class VerdiReglerJsTests(SimpleTestCase):
                             (OPPDRAG_SENTRAL_JS, (
                                 '_verdiKanEndres', '_verdiValg', '_verdiForesporsel', '_verdiTekst',
                                 '_verdiBrikke', '_verdiVelgerHtml', '_verdierHtml', '_notatHtml',
+                                'notatSlettesHtml', 'notatSlettesTekst',
                                 'endringTekst', 'hastegradKlasse', 'tidslinjeHtml',
                                 'enhetshendelseTekst')),
                         )))

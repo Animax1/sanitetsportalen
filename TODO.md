@@ -528,13 +528,6 @@ skala, ingen profilering. Det tyngste (skala) holder. Det første gjør ikke det
 legges inn, og **A.12 har selv skrevet utløseren**: «særlig dersom nye moduler tar inn
 direkte identifikatorer».
 
-- [ ] **Slettefrist på `Oppdrag.fritekst`.** Feltet slettes aldri fra historikken hos KO i
-      dag; beskyttelsen som finnes er bygget helt mot bilen. A.12 har det som åpen
-      restrisiko. To deler: serveren utelater teksten når fristen er passert, og en feiing
-      (i `purge_old_logs`) tømmer feltet for alvor. Frist som `AppSetting`, nedtelling i
-      historikkraden — og bare når det faktisk står tekst der
-- [ ] **Avgjør: klokka fra `historikk_fra`, eller fra siste `Ledig`?** Et oppdrag med
-      `trenger_ressurs` når aldri historikken og beholder fritekst for alltid
 - [ ] **Adressefeltet: eget felt, ikke i fritekst — og aldri i `Lokasjon`.**
       `Lokasjon.navn` fryses i `ArkivertOppdrag.lokasjon_navn`, som inngår i
       SHA-signaturen: en adresse lagt der er låst i 24 måneder ved konstruksjon

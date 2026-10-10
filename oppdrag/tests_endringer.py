@@ -94,6 +94,8 @@ class OppdragEndringerFangesTests(SimpleTestCase):
     VURDERT = {
         'oppdrag/services.py: Statusmelding.update': '_slett_meldinger kobler fra korrigerer rett før '
                                                      'meldingene og oppdraget slettes (post_delete)',
+        'oppdrag/fritekstfrist.py: Oppdrag.update': 'feiingen av fritekst kaller oppdrag_endret() selv',
+        'oppdrag/fritekstfrist.py: Statusmelding.update': 'samme feiing, samme kall',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):

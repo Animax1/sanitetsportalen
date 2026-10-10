@@ -1017,7 +1017,7 @@ function _notatHtml(o, aapen, kanSkrive) {
     return `<div class="oppdrag-notat mb-3">
         <label class="form-label small mb-1" for="notat-felt">Oppdragsnotat</label>
         <textarea id="notat-felt" class="form-control form-control-sm" rows="3">${escapeHtml(o.fritekst || '')}</textarea>
-        <div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes.</div>
+        <div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes, og slettes når oppdraget har stått urørt i fristen.</div>
         <div class="d-flex gap-2 justify-content-end mt-1">
           <button type="button" class="btn btn-sm btn-outline-secondary" data-action="avbrytNotat">Avbryt</button>
           <button type="button" class="btn btn-sm btn-primary" id="notat-lagre" data-action="lagreNotat">Lagre</button>
@@ -1028,7 +1028,7 @@ function _notatHtml(o, aapen, kanSkrive) {
     ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visNotat">${o.fritekst ? 'Endre' : 'Legg til'}</button>`
     : '';
   const notatTekst = o.fritekst
-    ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
+    ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>${notatSlettesHtml(o)}`
     : '<div class="oppdrag-meta">Ingen oppdragsnotat.</div>';
   return `<div class="oppdrag-notat mb-3"><div class="oppdrag-meta small">Oppdragsnotat${knapp}</div>${notatTekst}</div>`;
 }

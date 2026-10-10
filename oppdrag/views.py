@@ -33,7 +33,7 @@ from core.ratelimit import rate_limit
 from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
 
-from . import choices, services, verdier
+from . import choices, fritekstfrist, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
@@ -427,7 +427,8 @@ def oppdrag_liste_view(request):
         else:
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
-            qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
+            qs = list(fritekstfrist.med_siste_aktivitet(
+                          Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True))
                       .select_related('lokasjon', 'hendelse')
                       .prefetch_related('enheter__enhet', 'hendelse__lag')
                       .order_by('-created_at'))
@@ -696,12 +697,15 @@ def oppdrag_detalj_view(request, pk):
             alle = (Statusmelding.objects.filter(oppdrag=oppdrag)
                     .select_related('oppdragsenhet__enhet', 'meldt_av', 'trukket_tilbake_av')
                     .order_by('created_at'))
+        # Fristen på fritekst (`fritekstfrist`); slått opp én gang og husket
+        # på instansen, så `oppdrag_til_dict` ikke spør på nytt.
+        utlopt = fritekstfrist.tekst_utlopt(oppdrag)
         return JsonResponse({'status': 'ok', 'data': {
             **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user),
                                koblingsrad=kobling),
-            'statusmeldinger': [melding_til_dict(m) for m in gjeldende],
-            'andre_meldinger': [melding_til_dict(m) for m in andre],
-            'historikk': [melding_til_dict(m) for m in alle],
+            'statusmeldinger': [melding_til_dict(m, skjul_sted_tekst=utlopt) for m in gjeldende],
+            'andre_meldinger': [melding_til_dict(m, skjul_sted_tekst=utlopt) for m in andre],
+            'historikk': [melding_til_dict(m, skjul_sted_tekst=utlopt) for m in alle],
             'enhetsbytter': [bytte_til_dict(b) for b in oppdrag.enhetsbytter.all()],
             'enhetshendelser': [hendelse_til_dict(h) for h in
                                 oppdrag.enhetshendelser.select_related('enhet', 'av')],
@@ -1451,7 +1455,7 @@ def historikk_liste_view(request):
         return JsonResponse(
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
-    qs = (Oppdrag.objects
+    qs = (fritekstfrist.med_siste_aktivitet(Oppdrag.objects)
           .filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False)
           .select_related('lokasjon', 'hendelse')
           .prefetch_related('enheter__enhet', 'hendelse__lag')

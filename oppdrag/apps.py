@@ -38,6 +38,13 @@ class OppdragConfig(AppConfig):
         from .endringer import register_handlers as register_endringer
         register_endringer()
 
+        # Fristen på fritekst (10. okt. 2026, `oppdrag/fritekstfrist.py`):
+        # feiingen går gjennom `purge_old_logs`, feltet på portalinnstillingene.
+        from .opprydding import register_handlers as register_opprydding
+        register_opprydding()
+        from .portalinnstillinger import register_handlers as register_innstillinger
+        register_innstillinger()
+
         # «Avslutt vakt» (28. sep. 2026): oppdragene arkiveres og tømmes med
         # resten av vakta. Se `core/vaktslutt.py`.
         from .vaktslutt import register_handlers as register_vaktslutt

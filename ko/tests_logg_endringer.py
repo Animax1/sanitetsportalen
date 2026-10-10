@@ -125,6 +125,9 @@ class LoggEndringerFangesTests(SimpleTestCase):
     VURDERT = {
         'ko/services.py: Linjedeling.bulk_create': 'korriger() er atomisk og lagrer den nye linja i samme '
                                                    'transaksjon; tallet øker ved commit, etter delingene',
+        # Fristen på fritekst (10. okt. 2026): systemlinjene bærer aldri fritekst
+        # (`ko/systemlinjer.py`), så tømmingen endrer ingen linje i loggen.
+        'oppdrag/fritekstfrist.py: Oppdrag.update': 'tømmer bare fritekst — loggen viser den aldri',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):
