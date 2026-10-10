@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-10 — Rota av `CLAUDE.md` hadde 312 tegn igjen: backupens maskineri til `core/backup/CLAUDE.md`  `#core/dokumentasjon`
+
+**Hvorfor:** rota sto på 67 488 av 67 800 tegn etter avsnittet om «Logg ut». Det neste
+avsnittet noen skrev ville gjort `test_rota_har_ikke_vokst_tilbake` rød midt i en annen
+oppgave — og da heves taket i hast, eller noe nyttig strykes.
+
+**Hva som flyttet** (uendret, 5 604 tegn): `BrukerpekereStrippesEllerBegrunnesTests`-historien,
+klokka i web-prosessen, `core.Backupplan`, «registeret er fasit», `clear_registry()`-fella,
+offsite til Scaleway, `hent_offsite`/`gjenopprett` og `verifiser_backup`. Fila lastes når
+noen arbeider i `core/backup/`.
+
+**Hva som sto igjen i rota**, fordi hver modul som melder inn en handler må kjenne det:
+handlertabellen («Ti handlere i dag», som `tallfasit` holder), gjenopprettingsrekkefølgen,
+`restore_models` utledet, `@ikke_under_loaddata`, `strip_fields`, at backupfilene bare skal
+finnes hos Scaleway og Railway, og at all logikk ligger i `core/backup/`. Pluss én linje som
+peker til den nye fila.
+
+**Vaktene ser fila:** `_modulfiler()` i `core/tests_claude_md.py` finner nå også
+`core/*/CLAUDE.md` (`_app()` gir `core/backup`, aldri `core`), `TABELLRAD` godtar raden, og
+fila står i `DOKUMENTER` i `core/tests_dokumentråte.py`. **Fire mutanter, alle drept:** fila ute
+av `DOKUMENTER`, raden ute av tabellen i rota, hjemmepekeren borte, en død sti i fila.
+
+**Taket er senket fra 67 800 til 64 500** — rota er 62 815. Samme grep som vaktlistefila:
+taket følger ned, ellers gror plassen igjen.
+
+---
+
 ## 2026-10-10 — «Logg ut» spør før usendte stemplinger slettes  `#sikkerhet`
 
 **Hvorfor:** funnet 8. okt. 2026 under L17. «Logg ut» sender `Clear-Site-Data: "cache",

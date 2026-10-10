@@ -60,6 +60,7 @@ DOKUMENTER = [
     'templates/vaktliste/CLAUDE.md',
     'backlog/CLAUDE.md',
     'park/CLAUDE.md',
+    'core/backup/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',
     # Testsjekklistene (19. sep. 2026). De navngir flater, filer og nivåer, og

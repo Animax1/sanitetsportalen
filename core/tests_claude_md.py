@@ -96,7 +96,12 @@ ROT = Path(settings.BASE_DIR)
 #: planleggerhistorien (CHANGELOG), lydbæreren (`templates/oppdrag/CLAUDE.md`) og
 #: KO-raden i backup-tabellen (`ko/CLAUDE.md`). Regelen sto igjen i rota hver gang;
 #: det som gikk ut var historien om én modul. Rundt 1 100 tegn å gå på.
-ROT_TEGNGRENSE = 67_800
+#:
+#: **Senket til 64 500 den 10. okt. 2026:** rota sto 312 tegn under, og
+#: backupens innvendige maskineri — klokka, planene, offsite, `gjenopprett`,
+#: `verifiser_backup` — flyttet uendret til `core/backup/CLAUDE.md`. Reglene
+#: hver modul må kjenne sto igjen. Taket følger ned så plassen ikke gror igjen.
+ROT_TEGNGRENSE = 64_500
 
 #: Modulfilene har sin egen grense. De lastes bare av den som arbeider i mappa,
 #: så de er billigere enn rota — men delingen 15. sep. 2026 flyttet 574 linjer
@@ -203,7 +208,7 @@ FILNAVN = re.compile(r'`([A-Za-z0-9_./*-]+\.(?:js|css|py|html))`')
 
 #: Raden i tabellen «Hvor dokumentasjonen bor». `templates/ko/CLAUDE.md` er
 #: modulens *flatefil* (22. sep. 2026), og står i tabellen som de andre.
-TABELLRAD = re.compile(r'^\|\s*`((?:templates/)?[a-z_]+/CLAUDE\.md)`\s*\|', re.M)
+TABELLRAD = re.compile(r'^\|\s*`((?:templates/|core/)?[a-z_]+/CLAUDE\.md)`\s*\|', re.M)
 
 #: `### Vaktlistemodulen (vaktliste/)` — et avsnitt som har en modul som subjekt.
 MODULOVERSKRIFT = re.compile(r'^#{1,4} .*\(([a-z_]+)/\)', re.M)
@@ -221,12 +226,17 @@ def _modulfiler() -> list[str]:
     """
     moduler = [f'{p.parent.name}/CLAUDE.md' for p in ROT.glob('*/CLAUDE.md')]
     flater = [f'templates/{p.parent.name}/CLAUDE.md' for p in ROT.glob('templates/*/CLAUDE.md')]
-    return sorted(moduler + flater)
+    # Rammeverksfilene (10. okt. 2026): en del av `core/` med nok innvendig
+    # maskineri til at det ikke hører hjemme i rota — `core/backup/` først.
+    rammeverk = [f'core/{p.parent.name}/CLAUDE.md' for p in ROT.glob('core/*/CLAUDE.md')]
+    return sorted(moduler + flater + rammeverk)
 
 
 def _app(sti: str) -> str:
     """Hvilken app en modul- eller flatefil hører til."""
     deler = sti.split('/')
+    if deler[0] == 'core':
+        return '/'.join(deler[:-1])     # ingen modul: `core/backup`, aldri `core`
     return deler[1] if deler[0] == 'templates' else deler[0]
 
 
