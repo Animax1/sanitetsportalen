@@ -4,6 +4,45 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-10 — «Logg ut» spør før usendte stemplinger slettes  `#sikkerhet`
+
+**Hvorfor:** funnet 8. okt. 2026 under L17. «Logg ut» sender `Clear-Site-Data: "cache",
+"storage"` (H4, 13. sep.), og det tømmer **offline-køene** i bilen (`oppdrag_ko_v1:u<id>`) og
+vaktlista (`vl_stemplinger_v1:u<id>`) sammen med alt annet. Logget en fører eller bil ut mens
+et trykk ventet på dekning, var trykket borte — **usendte stemplinger slettet uten å si fra**,
+og ingen så det. Køen skal fortsatt slettes (ellers ligger den igjen på en delt PC); den som
+trykker skal bare vite hva hun sletter.
+
+**Hvordan** (`static/js/ui-actions.js`, som `base_portal` alt laster):
+
+| Del | Hva |
+|---|---|
+| `usendteStemplinger(lager, brukerId)` | Teller radene i begge køene for **denne** brukeren. Kaster aldri: ødelagt JSON, noe som ikke er en liste, sperret lager eller ingen bruker gir 0 — et lager som ikke kan leses skal ikke hindre utloggingen |
+| `utloggingsAdvarsel(antall)` | «Du har 3 stemplinger som ikke er sendt ennå. Logger du ut nå, slettes de fra denne enheten og kommer aldri fram.» — `null` ved 0 |
+| `submit`-lytteren | Bare skjemaer med `data-utlogging`. Avbryt holder deg innlogget, OK logger ut likevel |
+
+Begge «Logg ut»-skjemaene har fått `data-utlogging` — `base_portal.html` og pasientsidens
+eget skall, som nå også laster `ui-actions.js` og setter `window.PORTAL_BRUKER_ID`. Prefiksene
+står i `OFFLINE_KOER` fordi fila ikke laster `portal-utils.js`; en test krever at de gir
+nøyaktig det `koNokkel()` gir i `oppdrag-enhet.js` og `vaktliste-offline.js`.
+
+**Testene** (`core/tests_utlogging.py`, 9): hele fila kjøres i node og skjemaet sendes gjennom
+den **ekte `submit`-lytteren**; en annen brukers kø og den gamle felles nøkkelen teller ikke;
+andre skjemaer får ikke spørsmålet; alle maler med et skjema mot `accounts:logout` må ha merket;
+`/` og `/pasienter/` rendres og sjekkes for merket, fila og bruker-ID-en.
+
+**12 mutanter, 11 drept i første runde:** kallstedet i lytteren fjernet, `&&` → `||`, grensen
+`> 0` → `> 1`, felles nøkkel uten bruker, `+=` → `=`, gaten på `data-utlogging`, `try` rundt
+`localStorage`, entall/flertall byttet, merket borte i `base_portal`, fila og bruker-ID-en borte
+fra pasientsiden. **«`Array.isArray`-sjekken fjernet» overlevde:** testen brukte et objekt, og
+`{}.length` er `undefined`. Byttet til en JSON-*streng* (som har `length`) — drept.
+Fjernet `brukerId`-vakt er ekvivalent (nøkkelen `:uundefined` finnes ikke) og ikke prøvd.
+
+Dokumentert i `CLAUDE.md` (rota — regelen gjelder to moduler), `vaktliste/CLAUDE.md` og
+`docs/RUNBOOK_VAKT.md` («Avbryt, vent på dekning, logg ut etterpå»). TODO-punktet er slettet.
+
+---
+
 ## 2026-10-09 — Bilskjermen holdes våken: Wake Lock på `/oppdrag/` for enhetskontoer  `#oppdrag/enhetsskjerm`
 
 **Hvorfor:** André, 9. okt. 2026: bilkontoene har telefonen i holderen gjennom vakta, og

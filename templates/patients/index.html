@@ -29,6 +29,9 @@
   };
   window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
   window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};
+  // Hvem som er logget inn: «Logg ut» ser etter usendte stemplinger i
+  // offline-køene, som er per bruker (`ui-actions.js`, L17).
+  window.PORTAL_BRUKER_ID = {{ request.user.pk }};
 </script>
 
 <!-- ══════════ HEADER ══════════ -->
@@ -96,7 +99,7 @@
         {% endif %}
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li>
-          <form method="post" action="{% url 'accounts:logout' %}">
+          <form method="post" action="{% url 'accounts:logout' %}" data-utlogging>
             {% csrf_token %}
             <button type="submit" class="dropdown-item" style="color:#f87171;"><i class="bi bi-box-arrow-right me-2"></i>Logg ut</button>
           </form>
@@ -693,6 +696,7 @@
 {% endcomment %}
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/portal-clock.js' %}"></script>
+<script src="{% static 'js/ui-actions.js' %}"></script>
 <script src="{% static 'js/patients-utils.js' %}"></script>
 <script src="{% static 'js/patients-table.js' %}"></script>
 <script src="{% static 'js/patients-forms.js' %}"></script>

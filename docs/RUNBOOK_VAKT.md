@@ -1266,6 +1266,8 @@ legger vaktlista og mannskapsregisteret (navn, telefon, e-post, ISSI) i nettlese
 lager, så lista er der når nettet er borte. **«Logg ut» er det som rydder** — knappen
 sender `Clear-Site-Data`, og alt lokalt lager slettes. Lukk aldri bare vinduet på en delt
 maskin; logg ut. En kopi eldre enn ett døgn brukes uansett ikke.
+Står det stemplinger som ikke er sendt, spør «Logg ut» først — **Avbryt**, vent på
+dekning til de er sendt, og logg ut etterpå. OK sletter dem.
 
 ---
 

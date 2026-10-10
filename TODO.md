@@ -1163,12 +1163,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       ingenting har endret seg. Gjør den ikke det, koster det en full kropp per bil per 15 s,
       og noe i svaret endrer seg uten at noen skriver (kandidat: posisjonsdelingen fra 4. okt.).
 
-- [ ] **«Logg ut» sletter usendte stemplinger uten å si fra.** Funnet 8. okt. 2026 under L17:
-      utloggingen sender `Clear-Site-Data: "storage"` (H4, 13. sep.), som tømmer
-      offline-køene i vaktlista og bilen sammen med alt annet. Logger en fører ut mens et
-      trykk venter på dekning, er trykket borte, og ingen ser det. Køen per bruker (L17)
-      endrer ikke det. Vurder en advarsel før utlogging når køen ikke er tom — ikke å
-      beholde køen, for da ligger den igjen på en delt PC.
 - [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
       (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er
       riktig for det den prøver, men prisen betales av hver eneste kjøring. Vurder et

@@ -493,7 +493,7 @@ hovedveier.
   omdirigering** (innloggingssiden), og **ingen datakopi eldre enn 24 timer**
   (`erForGammel`). **«Logg ut» sender `Clear-Site-Data: "cache", "storage"`** (13. sep.
   2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;
-  cookies røres ikke. Køen for møtt/av vakt ligger i `vaktliste.js`
+  cookies røres ikke, og står noe i køen, spør knappen først (`ui-actions.js`, 10. okt.). Køen for møtt/av vakt ligger i `vaktliste.js`
   (`koLes`/`koSkriv`, `_leggIKo`, `_projiserKo`, `synkKo`, `tegnOffline`) — samme
   mønster som bilens kø i `oppdrag-enhet.js`. **Nøkkelen er per bruker** (`brukerNokkel()`,
   L17, 8. okt. 2026): en annen konto på samme PC spiller ikke av køen. **Står noe i kø, går alt i kø** —

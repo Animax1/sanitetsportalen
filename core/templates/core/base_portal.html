@@ -294,7 +294,7 @@
           {% endif %}
           <li><hr class="dropdown-divider" style="border-color:var(--portal-border)"></li>
           <li>
-            <form method="post" action="{% url 'accounts:logout' %}">
+            <form method="post" action="{% url 'accounts:logout' %}" data-utlogging>
               {% csrf_token %}
               <button type="submit" class="dropdown-item" style="color:#f87171">
                 <i class="bi bi-box-arrow-right me-2"></i>Logg ut

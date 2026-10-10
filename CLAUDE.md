@@ -334,6 +334,10 @@ alt som arver.
 attributtet: modalen blir liggende eksponert for skjermlesere etter at den visuelt er
 borte. `inert` måtte vært satt per vindu; dette er ett sted.
 
+**«Logg ut» spør før usendte stemplinger slettes** (10. okt. 2026): `Clear-Site-Data` tømmer
+bilens og vaktlistas offline-kø. `ui-actions.js` teller dem på skjemaer med `data-utlogging`;
+prefiksene må følge `koNokkel()` i begge — `core/tests_utlogging.py` krever det.
+
 **Data inn i et `<script>`-element går gjennom `js_json()`**, aldri `json.dumps` + `|safe`:
 `json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet.
 
