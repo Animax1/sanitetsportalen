@@ -35,11 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Sett `PORTAL_MILJO` i Railway før miljømerket går til `main`** (11. okt. 2026):
-      `test` på staging-tjenesten og `drift` på prod-tjenesten — begge web og cron.
-      Uten den viser portalen «UKJENT MILJØ» og server-status står rød
-      (`docs/DEPLOY_GUIDE.md` §2d-2). Staging viser det til den er satt.
-
 - [ ] **Feltprøv Wake Lock på bilskjermen** (på staging fra 9. okt. 2026 — kan ikke prøves i
       node). En iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring —
       én gang med strømsparing av, én gang på. Trykk på skjermen først (låsen hentes ved

@@ -57,8 +57,8 @@ ekte polling i node; KOs titler gjennom `koHendelseKanalMottak` og `koTegnEgetVi
 kalte `_med_miljo()` direkte, og transporttesten kjørte i `drift` — den tredje måten en mutant
 lyver på. Ny test gjennom transporten i `test`; drept.
 
-**Sett før `main`:** `PORTAL_MILJO=test` på staging og `drift` på prod, web og cron — står
-øverst i `TODO.md`. Staging viser «UKJENT MILJØ» til den er satt.
+**`PORTAL_MILJO` er satt i Railway** (André, 11. okt. 2026): `test` på staging og `drift` på
+prod, web og cron. Punktet i «Krever Andre» er slettet.
 
 ## 2026-10-10 — Slettefrist på oppdragsnotatet: fritekst og «Annet sted» slettes 3 dager etter siste aktivitet  `#personvern`
 
