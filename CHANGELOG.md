@@ -16,8 +16,9 @@ leses under vakt, der en feil adresse oppdages i verste øyeblikk. Rettet til
 `TEKNISK_DOKUMENTASJON.md` viser nå de ekte domenene i eksemplene for `ALLOWED_HOSTS` og
 `CSRF_TRUSTED_ORIGINS`, med formatet understreket (uten og med `https://`).
 
-**TODO:** «Koble domenet» og «Sett `ALLOWED_HOSTS`» er slettet. Igjen står å fjerne de
-genererte `.up.railway.app`-domenene og rydde dem ut av variablene — i den rekkefølgen.
+**TODO:** «Koble domenet» og «Sett `ALLOWED_HOSTS`» er slettet. **De genererte
+`.up.railway.app`-adressene er fjernet** fra begge tjenestene (André, 11. okt. 2026), så hver
+portal svarer bare på én adresse, og hele seksjonen «Eget domene» er borte fra TODO.
 
 ## 2026-10-11 — Miljømerket og admins statusmelding i toppmenyen  `#core/drift`
 

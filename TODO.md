@@ -1037,16 +1037,6 @@ sektorer/flere KO: nei). Ingen av dem er bestilt.*
       tiltakskortene står om portalen går ned** (André, 6. okt. 2026) — det argumentet gjelder
       uansett hvor gode kortene i portalen hadde vært.
 
-### Eget domene — portal.sanitet.net
-
-Domenene står (André, 11. okt. 2026): `portal.sanitet.net` er prod, `testportal.sanitet.net`
-staging, og begge svarer 200 på `/healthz/`.
-
-- [ ] **Fjern de genererte `.up.railway.app`-domenene** på begge tjenestene, så hver
-      portal bare svarer på én adresse, og rydd dem ut av `ALLOWED_HOSTS` og
-      `CSRF_TRUSTED_ORIGINS` etterpå — i den rekkefølgen: fjernes variabelen først, svarer
-      den gamle adressen 400 til noen som har den som bokmerke
-
 ### Dokumentgjennomgang — når funksjonaliteten nærmer seg ferdig
 
 Fire dokumenter beholdes fordi de ikke er arbeidslister: de er referanse, formelle
