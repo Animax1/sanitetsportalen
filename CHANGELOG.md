@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-11 — Ingen av listene fikk 304 i prod: Cloudflare gjør ETag-en svak  `#core/drift`
+
+**Hvorfor:** TODO-punktet «Treffer ETag-en på bilens poll?» (7. okt., funnet under «Annet
+sted»-feilen: kortet ble tegnet på nytt *hvert* 15. sekund). I prosess svarte bilens poll 304
+som den skulle — også med `X-Posisjonsdeling`, som var mistenkt. **Men foran Railway står
+Cloudflare** (`server: cloudflare`), og den **komprimerer dynamiske svar selv**
+(`content-encoding: br` på innloggingen, uten `GZipMiddleware` i Django). Når Cloudflare gjør
+det, **gjør den en sterk ETag svak**: samme statiske fil fikk `"6acb52be-38dc7"` når den ble
+sendt slik den lå, og `W/"6acb52be-38dc7"` når Cloudflare pakket den om.
+
+Nettleseren sendte da `W/"v2:…"` tilbake, og hvert endepunkt sammenlignet med `==` mot
+`"v2:…"`. **Ingen poll fikk 304 i prod**: bilen hentet hele lista hvert 15. sekund, sentralbordet
+hver gang endringsnummeret slo til, pasientlista (454 kB ved 1000 pasienter) ved hver
+auto-refresh, og registrene og verdilistene likeså. Statistikken var den ene som virket — den
+sender svak ETag selv.
+
+**Rettingen:** `core/etag.py` — `etag_treffer(request, etag)` med **svak sammenligning**, som
+standarden krever for `If-None-Match` (RFC 9110 §13.1.2): `W/"x"` og `"x"` er samme versjon,
+lister med komma og `*` håndteres. Brukt av alle seks: oppdragslista (bil og sentral),
+enhetslista, pasientlista, registrene, verdilistene og statistikken.
+
+**Testene** (`core/tests_etag.py`, `oppdrag/tests_etag.py`): regelen alene; den svake formen
+gjennom **hvert** endepunkt; bilens ekte poll med `X-Posisjonsdeling` og Cloudflare-formen, to
+ganger på rad, med `X-Enhet-Pa-Vakt` også på 304; og en vakt som krever at ingen kode utenom
+`core/etag.py` leser `HTTP_IF_NONE_MATCH` — et nytt `==` ville virket i testene og aldri i prod.
+
+**11 mutanter, alle drept:** W/ ikke fjernet på klientens side og på vår, `*` fjernet, lista
+ikke delt, tom-ETag-vakten, hvert av fem kallsteder tilbake til `==`, og vakten selv mot en ny
+`==`. Statistikkens kallsted er ikke mutert: den sendte og sammenlignet svak mot svak, så `==`
+virket der, og mutanten ville vært en no-op.
+
+**Dette bør gi merkbart mindre trafikk** — og det endrer grunnlaget for lasttesten (F4):
+den må kjøres gjennom Cloudflare, ikke mot Railway direkte, ellers måler den en annen portal.
+
 ## 2026-10-11 — Domenene står: `portal.sanitet.net` og `testportal.sanitet.net` i dokumentasjonen  `#core/dokumentasjon`
 
 André, 11. okt. 2026: «Domene for prod er allerede satt som portal.sanitet.net mens for

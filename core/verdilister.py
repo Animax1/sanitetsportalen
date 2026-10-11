@@ -29,6 +29,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.etag import etag_treffer
 from core.jsonkropp import json_body, json_feil
 from core.ratelimit import rate_limit
 
@@ -136,7 +137,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
         if request.method == 'GET':
             data = [liste.til_dict(r) for r in liste.rader()]
             etag = _etag(data)
-            if request.META.get('HTTP_IF_NONE_MATCH') == etag:
+            if etag_treffer(request, etag):
                 svar = HttpResponseNotModified()
             else:
                 svar = JsonResponse({'status': 'ok', 'data': data})

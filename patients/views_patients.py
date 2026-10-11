@@ -17,6 +17,7 @@ from core.auth_decorators import (
     er_global_admin, har_tilgang, modul_kreves, nivaa_for,
 )
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
+from core.etag import etag_treffer
 from core.ratelimit import rate_limit
 
 from .choices import validate_patient_choice_fields
@@ -193,7 +194,7 @@ def patients_list_view(request):
                       + hashlib.sha256(kropp.encode('utf-8')).hexdigest()[:16]
                       + '"')
 
-        if request.META.get('HTTP_IF_NONE_MATCH') == etag_value:
+        if etag_treffer(request, etag_value):
             return HttpResponseNotModified()
 
         response = HttpResponse(kropp, content_type='application/json')

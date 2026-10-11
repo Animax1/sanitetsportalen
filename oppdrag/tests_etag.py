@@ -65,6 +65,19 @@ class EtagErHeleSvaretTests(FlereEnheterBasis):
                 res = getattr(self, klient).get(url, HTTP_IF_NONE_MATCH=etag)
                 self.assertEqual(res.status_code, 304)
 
+    def test_bilens_ekte_poll_gir_304_ogsaa_etter_cloudflare(self):
+        """Som bilen poller i prod (11. okt. 2026): med `X-Posisjonsdeling`, og med
+        ETag-en Cloudflare har gjort svak. Uten svak sammenligning ble hver
+        polling en full kropp (`core/etag.py`)."""
+        url = '/oppdrag/api/oppdrag/'
+        hode = {'HTTP_X_POSISJONSDELING': 'deler', 'HTTP_X_PORTAL_INAKTIV': '3'}
+        etag = self.kb.get(url, **hode)['ETag']
+        for gang in range(2):
+            with self.subTest(gang=gang):
+                svar = self.kb.get(url, HTTP_IF_NONE_MATCH='W/' + etag, **hode)
+                self.assertEqual(svar.status_code, 304)
+                self.assertIn(svar['X-Enhet-Pa-Vakt'], ('0', '1'), 'på-vakt følger også 304')
+
     def test_en_verdi_endret_i_vinduet_synes_i_alle_tre(self):
         endringer = {
             'hastegrad': {'hastegrad': 'Haster'},

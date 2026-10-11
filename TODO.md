@@ -558,6 +558,9 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
       minne og CPU i Railway-metrics.
       **Ta MFA-rate-limit med i testplanen** — den delte bøtta (N4) var nettopp den
       feiltypen en lasttest fanger, og som ellers først merkes ved en reell vaktstart.
+      **Kjør gjennom `testportal.sanitet.net`, ikke Railway direkte**, med klienter som sender
+      `Accept-Encoding: gzip, br` og `If-None-Match` som en nettleser: Cloudflare komprimerer og
+      gjør ETag-en svak (`core/etag.py`, 11. okt. 2026), og andelen 304 er halve lasten.
       *Akseptanse:* rapport som viser at konfigurasjonen tåler 25 samtidige uten degradering.
 
 - [ ] **Statistikk-utvidelse (tidligere F6).** ~25–35 t, faseinndelt. Flyttet ut som eget
@@ -1121,13 +1124,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
               plassene; den kunne gitt dem roller.
 
 ### Løse punkter
-
-- [ ] **Treffer ETag-en på bilens poll?** Funnet 7. okt. 2026 under «Annet sted»-feilen: at
-      feltet forsvant *hvert* 15. sekund betyr at `lastMine()` tegnet ved hver polling — og
-      det gjør den bare på 200, eller på 304 mens en delt linje er under ett minutt gammel.
-      Sjekk i nettleserens nettverksfane på staging om `/oppdrag/api/oppdrag/` svarer 304 når
-      ingenting har endret seg. Gjør den ikke det, koster det en full kropp per bil per 15 s,
-      og noe i svaret endrer seg uten at noen skriver (kandidat: posisjonsdelingen fra 4. okt.).
 
 - [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
       (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er

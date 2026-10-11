@@ -27,6 +27,7 @@ from core import kartkobling
 from core.jsonkropp import json_body, les_json
 from core.middleware import PERMISSIONS_POLICY_MED_POSISJON
 from core.jsdata import js_json
+from core.etag import etag_treffer
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
@@ -214,7 +215,7 @@ def enheter_view(request):
     # tavla er en bil ingen husker å sette inn igjen.
     # Hele svaret, ikke en feltliste (A2) — se `etag_for_svar`.
     etag = etag_for_svar(data)
-    if request.META.get('HTTP_IF_NONE_MATCH') == etag:
+    if etag_treffer(request, etag):
         svar = HttpResponseNotModified()
         svar['ETag'] = etag
         return svar
@@ -458,7 +459,7 @@ def oppdrag_liste_view(request):
         # manglet fortsatt hastegrad, lokasjon, antall og notatet. Se
         # `etag_for_svar`. Antallet i historikken står ved siden av.
         etag = etag_for_svar(data, ekstra=None if er_enhetskonto(request.user) else i_historikk)
-        if request.META.get('HTTP_IF_NONE_MATCH') == etag:
+        if etag_treffer(request, etag):
             svar = HttpResponseNotModified()
         else:
             svar = JsonResponse({'status': 'ok', 'data': data,

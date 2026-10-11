@@ -10,6 +10,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.etag import etag_treffer
 from core.ratelimit import rate_limit
 from core.sortering import Norsk
 
@@ -60,7 +61,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             hash_input = str(sorted([(r.id, r.name, r.is_active) for r in rader]))
             etag_value = '"v1:' + hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16] + '"'
 
-            if request.META.get('HTTP_IF_NONE_MATCH') == etag_value:
+            if etag_treffer(request, etag_value):
                 return HttpResponseNotModified()
 
             response = JsonResponse(data, safe=False)

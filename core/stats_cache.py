@@ -25,6 +25,8 @@ from functools import wraps
 from django.core.cache import cache
 from django.http import JsonResponse, HttpResponseNotModified
 
+from core.etag import etag_treffer
+
 
 # Prefix for å unngå kollisjon med andre cache-brukere (rate-limiting osv.)
 CACHE_PREFIX = 'statscache'
@@ -92,8 +94,8 @@ def cached_stats_response(cache_key: str, ttl: int):
                     pass
 
             # 3) Sjekk If-None-Match for 304
-            client_etag = request.META.get('HTTP_IF_NONE_MATCH', '')
-            if client_etag and client_etag == etag:
+            # Svak sammenligning — Cloudflare gjør ETag-en svak (`core/etag.py`).
+            if etag_treffer(request, etag):
                 response = HttpResponseNotModified()
                 response['ETag'] = etag
                 response['Cache-Control'] = f'private, max-age={ttl}'
