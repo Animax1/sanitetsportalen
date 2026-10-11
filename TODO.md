@@ -35,6 +35,11 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Sett `PORTAL_MILJO` i Railway før miljømerket går til `main`** (11. okt. 2026):
+      `test` på staging-tjenesten og `drift` på prod-tjenesten — begge web og cron.
+      Uten den viser portalen «UKJENT MILJØ» og server-status står rød
+      (`docs/DEPLOY_GUIDE.md` §2d-2). Staging viser det til den er satt.
+
 - [ ] **Feltprøv Wake Lock på bilskjermen** (på staging fra 9. okt. 2026 — kan ikke prøves i
       node). En iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring —
       én gang med strømsparing av, én gang på. Trykk på skjermen først (låsen hentes ved
@@ -860,17 +865,6 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       som skal stå her — ikke Google, med mindre domenet ligger hos Google Workspace. Tas i
       dokumentgjennomgangen. Avkrysningen «Ingen andre databehandlere er for øyeblikket i
       bruk» i C.3 kan ikke krysses av så lenge AHASend er i bruk.
-
-- [ ] **Vis hvilket miljø portalen kjører i.** Utløst 29. aug. 2026: en arbeidsøkt gikk
-      med til å feilsøke en innlogging som feilet fordi forsøkene gikk mot prod mens
-      kontoen lå på staging. Ingenting i grensesnittet skiller de to.
-
-      Under en vakt er innsatsen høyere enn en tapt time: forskjellen er om en pasient
-      registreres i den ekte basen eller i en testbase. En liten, tydelig markør på
-      **ikke-prod** (miljønavnet i toppen, gjerne farget) koster lite. Prod skal være den
-      nøytrale tilstanden — en markør der ville blitt visuell støy man slutter å se.
-
-      Miljønavnet finnes allerede som Railway-variabel; det trengs ingen ny innstilling.
 
 - [ ] **VURDER: skal innlogging normalisere passordet?** Funnet 29. aug. 2026.
       `set_password` kaller `make_password` rett på råstrengen, så Django normaliserer

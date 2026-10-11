@@ -51,6 +51,7 @@ class KroppTests(SimpleTestCase):
                          {'email': 'noreply@mail.sanitet.net',
                           'name': 'Sanitetsportalen'})
 
+    @override_settings(PORTAL_MILJO='drift')
     def test_mottakere_og_emne(self):
         m = EmailMessage('Feil i prod', 'Tekst', 'a@b.no',
                          ['en@example.invalid', 'to@example.invalid'])
@@ -58,6 +59,13 @@ class KroppTests(SimpleTestCase):
         self.assertEqual(kropp['subject'], 'Feil i prod')
         self.assertEqual([r['email'] for r in kropp['recipients']],
                          ['en@example.invalid', 'to@example.invalid'])
+
+    @override_settings(PORTAL_MILJO='test')
+    def test_emnet_baerer_miljoet_utenfor_drift(self):
+        """Gjennom transporten, ikke hjelperen: en feil i testmiljøet skal
+        ikke se ut som et prodbrudd i innboksen (11. okt. 2026, `core/miljo.py`)."""
+        _, kropp = self._send_og_fang(EmailMessage('Feil', 'Tekst', 'a@b.no', ['c@d.no']))
+        self.assertEqual(kropp['subject'], '[test] Feil')
 
     def test_tekstinnhold(self):
         m = EmailMessage('E', 'Selve tracebacken', 'a@b.no', ['c@d.no'])

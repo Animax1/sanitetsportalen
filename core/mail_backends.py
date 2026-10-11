@@ -150,7 +150,7 @@ class AhaSendApiBackend(BaseEmailBackend):
         kropp = {
             'from': avsender,
             'recipients': mottakere,
-            'subject': melding.subject or '',
+            'subject': _med_miljo(melding.subject or ''),
         }
 
         tekst, html = self._innhold(melding)
@@ -219,3 +219,12 @@ class AhaSendApiBackend(BaseEmailBackend):
             raise exc
         logger.error('Kunne ikke sende e-post via AHASend: %s', exc)
         return False
+
+
+def _med_miljo(emne: str) -> str:
+    """«[test] …» foran emnet utenfor drift (11. okt. 2026, `core/miljo.py`), så
+    en feil i testmiljøet ikke ser ut som et prodbrudd i innboksen. Står i
+    transporten fordi det er den ene veien all e-post fra Railway går."""
+    from core.miljo import miljo
+    prefiks = miljo()['epost']
+    return emne if not prefiks or emne.startswith(prefiks) else prefiks + emne

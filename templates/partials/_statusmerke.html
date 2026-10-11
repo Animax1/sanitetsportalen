@@ -1,0 +1,51 @@
+{% comment %}
+Miljømerket og admins statusmelding (11. okt. 2026) — `core/miljo.py` og
+`core/statusmelding.py`. Tas med på **hver side med egen <head>**, som
+`_ikoner.html`; `core/tests_statusmerke.py` håndhever det.
+
+- **Miljømerket** har striper i farger meldingen aldri tilbys (lilla, turkis,
+  grått), og står ikke i drift. Det kan ikke redigeres bort.
+- **Statusmeldingen** er ensfarget og skrives av admin. Elementet står alltid i
+  innloggede sider, også tomt og skjult: bjella fyller det når en ny melding
+  kommer (`tegnStatusmelding()` i `notifications.js`).
+
+`variant='side'` er innloggingen og de andre frittstående kortene: miljøet med
+forklaringen under, fordi det var der forvekslingen skjedde 29. aug. 2026.
+
+Stilen står her og ikke i et stilark, fordi de frittstående sidene ikke laster
+noe felles ark. Fargene er satt én gang og gjelder alle sider.
+{% endcomment %}
+<style>
+  .statusmerker { display: inline-flex; align-items: center; gap: 6px; min-width: 0; vertical-align: middle; }
+  .statusmerker-side { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 12px; }
+  .miljomerke, .statusmelding { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px;
+    line-height: 1.2; padding: 3px 9px; white-space: nowrap; font-weight: 700; }
+  .miljomerke { flex: none; color: #fff; letter-spacing: .06em; font-weight: 800; }
+  .miljomerke-test { background: repeating-linear-gradient(-45deg, #7c3aed 0 6px, #6d28d9 6px 12px); }
+  .miljomerke-utvikling { background: repeating-linear-gradient(-45deg, #0d9488 0 6px, #0f766e 6px 12px); }
+  .miljomerke-ukjent { background: repeating-linear-gradient(-45deg, #475569 0 6px, #1f2937 6px 12px); border: 1px solid #94a3b8; }
+  .miljomerke .kort { display: none; }
+  .miljo-forklaring { font-size: 12px; color: #cbd5e1; text-align: center; }
+  .statusmelding { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; min-width: 0; cursor: default; }
+  /* Trykk eller tab viser hele teksten — på telefon finnes ingen hover. */
+  .statusmelding:focus { max-width: none; white-space: normal; outline: 2px solid #e5e7eb; outline-offset: 1px; }
+  .statusmelding[hidden] { display: none; }
+  /* På innloggingen er det plass: hele teksten, over flere linjer om nødvendig. */
+  .statusmerker-side .statusmelding { max-width: 100%; white-space: normal; text-align: center; }
+  .statusmelding-gronn { background: #22c55e; color: #052e16; }
+  .statusmelding-gul { background: #facc15; color: #1f2937; }
+  .statusmelding-oransje { background: #f97316; color: #1c0a00; }
+  .statusmelding-rod { background: #ef4444; color: #fff; }
+  @media (max-width: 575.98px) {
+    .statusmerker:not(.statusmerker-side) .miljomerke .lang { display: none; }
+    .statusmerker:not(.statusmerker-side) .miljomerke .kort { display: inline; }
+    .statusmelding { max-width: 34vw; font-size: 10px; }
+  }
+</style>
+<span class="statusmerker{% if variant == 'side' %} statusmerker-side{% endif %}">
+  {% if miljo.vis %}<span class="miljomerke {{ miljo.klasse }}" title="{{ miljo.forklaring }}"><span class="lang">{{ miljo.merke }}</span><span class="kort">{{ miljo.kort }}</span></span>{% endif %}
+  {% if variant == 'side' and miljo.vis %}<span class="miljo-forklaring">{{ miljo.forklaring }}</span>{% endif %}
+  <span id="portal-statusmelding" tabindex="0" role="status"
+        class="statusmelding{% if statusmelding %} statusmelding-{{ statusmelding.farge }}{% endif %}"
+        title="{{ statusmelding.tekst|default:'' }}"{% if not statusmelding %} hidden{% endif %}>{{ statusmelding.tekst|default:'' }}</span>
+</span>

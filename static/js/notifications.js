@@ -71,12 +71,33 @@
     return res.json();
   }
 
+  /* ── Admins statusmelding (11. okt. 2026, core/statusmelding.py) ───────── */
+  // Bjella poller alt på hver innlogget side, så meldingen følger med i samme
+  // svar — en rød «bruk papirskjema» skal ikke vente på at noen laster siden.
+  // `textContent`, aldri innerHTML: teksten er skrevet av et menneske. Fargen
+  // blir en klasse, og bare de fire kjente slipper gjennom.
+  const STATUSFARGER = ['gronn', 'gul', 'oransje', 'rod'];
+  function tegnStatusmelding(data) {
+    // Et svar uten feltet (en eldre server i deploy-vinduet) sier ingenting —
+    // da står det serveren tegnet, i stedet for at meldingen forsvinner.
+    if (!data || !('statusmelding' in data)) return;
+    const el = document.getElementById('portal-statusmelding');
+    if (!el) return;
+    const m = data.statusmelding;
+    const ok = Boolean(m && m.tekst && STATUSFARGER.includes(m.farge));
+    el.hidden = !ok;
+    el.textContent = ok ? m.tekst : '';
+    el.title = ok ? m.tekst : '';
+    el.className = 'statusmelding' + (ok ? ' statusmelding-' + m.farge : '');
+  }
+
   /* ── Badge-polling (hvert 30 sek, kun når fanen er aktiv) ───────────── */
   async function pollCount() {
     if (document.visibilityState !== 'visible') return;
     try {
       const data = await apiFetch(API_COUNT);
       setBadge(data.unread);
+      tegnStatusmelding(data);
     } catch (_) {}
   }
   setInterval(pollCount, 30_000);

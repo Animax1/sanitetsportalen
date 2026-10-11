@@ -670,6 +670,12 @@ hasher navnene. Merket i `static/img/logo.svg` er et skjold med en person i, bev
 kors og uten rødt; PNG-ene rendres med `python scripts/lag_ikoner.py` (Playwright), aldri
 for hånd. `core/tests_manifest.py` håndhever alle tre og leser hjørnepikslene i PNG-ene.
 
+**Hver mal med eget `<head>` tar også med `partials/_statusmerke.html` og
+`{{ miljo.fane }}` først i `<title>`** (11. okt. 2026): miljømerket (`core/miljo.py`,
+`PORTAL_MILJO` — `drift`, `test`, `utvikling`, alt annet er «ukjent») og admins
+statusmelding (`core/statusmelding.py`). JS som setter `document.title` går gjennom
+`fanetittel()`. `core/tests_statusmerke.py` håndhever.
+
 **`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
 `--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,
 `--text-soft`, `--surface-3` eller `--header-bg`. En udefinert custom property gjør ikke
@@ -991,6 +997,7 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 | `EMAIL_TIMEOUT` | Tidsgrense for utsending, default 10 s. Må aldri være `None` |
 | `OFFSITE_S3_BUCKET`, `OFFSITE_S3_REGION`, `OFFSITE_S3_ENDPOINT`, `OFFSITE_S3_ACCESS_KEY`, `OFFSITE_S3_SECRET_KEY` | Scaleway Object Storage for offsite backup (`core/offsite.py`). Bare prod |
 | `OFFSITE_BACKUP_KEY` | Krypteringsnøkkelen for offsite-backupene. Skal også ligge i en passordbehandler utenfor Railway |
+| `PORTAL_MILJO` | `drift`, `test` eller `utvikling` — lukket liste, **ikke** Railways miljønavn (`core/miljo.py`). Mangler på Railway = «UKJENT MILJØ» |
 | `KART_URL`, `KART_HMAC_NOKKEL` | kart.sanitet.net i **samme** miljø og nøkkelen dit (`core/kartkobling.py`). Tom = av |
 
 ## Deployment

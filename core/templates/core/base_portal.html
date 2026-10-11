@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include "partials/_ikoner.html" %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-<title>{% block title %}Sanitetsportalen{% endblock %}</title>
+<title>{{ miljo.fane }}{% block title %}Sanitetsportalen{% endblock %}</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
@@ -215,6 +215,11 @@
 {% endcomment %}
 <script nonce="{{ csp_nonce }}">window.PORTAL_BRUKER_ID = {{ request.user.pk }};</script>
 {% endif %}
+{% comment %}
+  Miljøet foran fanetittelen også når JS setter den (KO-vinduene, `fanetittel()` i
+  portal-utils.js). Verdien er en av fire faste strenger fra `core/miljo.py`.
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">window.PORTAL_FANEPREFIKS = "{{ miljo.fane|escapejs }}";</script>
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -227,6 +232,7 @@
       <img src="{% static 'img/logo.svg' %}" alt="" class="brand-logo" width="28" height="28">
       <span class="brand-navn">Sanitetsportalen</span>
     </a>
+    {% include "partials/_statusmerke.html" %}
   </div>
   {# Modul-meny — i headeren fra 22. sep. 2026. Ingen Dashboard-lenke: merkenavnet over går dit. nav_modules er filtrert på tilgang og enabled. #}
   <nav class="portal-nav" aria-label="Moduler">

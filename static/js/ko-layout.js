@@ -494,7 +494,7 @@ function koTegnEgetVindu(navn) {
   document.querySelectorAll('.ko-splitter-v, .ko-splitter-h').forEach((sp) => sp.classList.add('d-none'));
   const stripe = document.getElementById('ko-skjulte');
   if (stripe) stripe.classList.add('d-none');
-  document.title = (KO_VINDUSNAVN[navn] || navn) + ' · KO';
+  document.title = fanetittel((KO_VINDUSNAVN[navn] || navn) + ' · KO');
   if (typeof koTavleSynligNaa === 'function') koTavleSynligNaa();
   if (typeof koPlanSynligNaa === 'function') koPlanSynligNaa();
 }

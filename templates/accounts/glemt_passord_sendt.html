@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include "partials/_ikoner.html" %}
-<title>Lenke sendt – Sanitetsportalen</title>
+<title>{{ miljo.fane }}Lenke sendt – Sanitetsportalen</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
 <style>
@@ -28,6 +28,7 @@
 </head>
 <body>
 <div class="login-card">
+  {% include "partials/_statusmerke.html" with variant="side" %}
   <div class="login-title"><i class="bi bi-envelope-check me-2" style="color:#86efac"></i>Sjekk innboksen</div>
   {# Denne teksten vises uansett om adressen finnes eller ikke — §6.7.      #}
   {# Å skille ville fortalt en tilfeldig besøkende hvem som har konto, og   #}

@@ -525,7 +525,7 @@ VINDU_DOM = """
 """
 
 VINDU_HARNESS = HENDELSE_HARNESS + (
-    (PORTAL_UTILS_JS, ('fmtMin',)),
+    (PORTAL_UTILS_JS, ('fmtMin', 'fanetittel')),
     (KO_JS, ('koLoggfilterTreffer', 'koEgetVinduUrl',
              'koTegnHendelser', 'koVisDetaljen', 'koTegnHendelseTittel', 'koHendelseVinduTittel',
              'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj', 'koTegnHSide', 'koHSideRadHtml',
@@ -726,6 +726,17 @@ class HendelsenIHendelsesvinduetTests(SimpleTestCase):
         self.assertEqual(ut[1], '[{"tilstede":true,"viser":6},{"tilstede":true,"viser":6}] 0',
                          'svarer på vis og på spørsmålet; bryr seg ikke om andre vinduer for seg')
         self.assertEqual(ut[2], '{"tilstede":true,"viser":null} Hendelseslogg · KO')
+
+    def test_vinduet_for_seg_baerer_miljoet_i_fanetittelen(self):
+        """«[TEST] H6 · Slagsmål · KO» (11. okt. 2026, `core/miljo.py`): KO setter
+        tittelen selv, og uten `fanetittel()` forsvant prefikset fra malen."""
+        ut = self._kjor("""
+            globalThis.PORTAL_FANEPREFIKS = '[TEST] ';
+            kanal(); koEgetVinduAktivt = 'hendelser';
+            koHendelseKanalMottak({vis: 6});
+            console.log(document.title);
+        """)
+        self.assertEqual(ut[0], '[TEST] H6 · Slagsmål · KO')
 
     def test_sidebarraden_escaper_og_baerer_alle_fire(self):
         ond = '<img src=x onerror=alert(1)>'

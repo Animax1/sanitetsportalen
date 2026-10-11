@@ -110,6 +110,21 @@ Volumets navn er likegyldig; mount path (`/data`) er det som teller.
 
 ---
 
+### 2d-2. Hvilket miljø dette er — `PORTAL_MILJO` (påkrevd)
+
+Settes **per tjeneste**, og er en lukket liste (`core/miljo.py`, 11. okt. 2026):
+
+| Verdi | Brukes til | Merket i toppmenyen |
+|---|---|---|
+| `drift` | Prod — og senere instanser for andre korps | Ingen |
+| `test` | Staging | TESTMILJØ, lilla |
+| `utvikling` | Et utviklingsmiljø | UTVIKLING, turkis |
+
+**Ikke Railways miljønavn**: en instans for et annet korps kan hete hva som helst der.
+Mangler variabelen, eller har den en annen verdi (`production`, `staging`, en skrivefeil),
+viser portalen **«UKJENT MILJØ»** og server-status står rød — oppstarten stoppes ikke.
+E-post fra et miljø utenfor `drift` får `[test]`/`[utvikling]` foran emnet.
+
 ### 2e. Kobling til kart.sanitet.net (valgfritt)
 
 Bilenes posisjon ved stempling og lagenes sted sendes til kartet

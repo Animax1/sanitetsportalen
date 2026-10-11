@@ -7,7 +7,7 @@
 {# Ingen lenke ut av siden skal bære adressen med seg — tokenet står i fragmentet. #}
 <meta name="referrer" content="no-referrer">
 {% include "partials/_ikoner.html" %}
-<title>Lagregistrering – Sanitetsportalen</title>
+<title>{{ miljo.fane }}Lagregistrering – Sanitetsportalen</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
 {% comment %}
@@ -43,6 +43,7 @@
 </head>
 <body>
 <main class="container py-3" style="max-width: 32rem;">
+  {% include "partials/_statusmerke.html" with variant="side" %}
   <div class="d-flex align-items-center justify-content-between mb-3">
     <div class="park-tittel"><i class="bi bi-people me-2"></i>Lagregistrering</div>
     <div class="text-muted small" id="park-vakt"></div>

@@ -144,6 +144,7 @@ TEMPLATES = [
                 'core.context_processors.csp_nonce',
                 'core.context_processors.tilgang',
                 'core.context_processors.versjon',
+                'core.context_processors.statusmerke',
             ],
         },
     },
@@ -258,6 +259,12 @@ if _RUNNING_TESTS:
 # ── Internasjonalisering ──────────────────────────────────────────────────────
 LANGUAGE_CODE = 'nb'
 TIME_ZONE = 'Europe/Oslo'
+
+# Hvilket miljø portalen kjører i (11. okt. 2026, `core/miljo.py`): `drift`, `test`
+# eller `utvikling`, satt per tjeneste i Railway. **Ikke Railways miljønavn** — en
+# instans for et annet korps kan hete hva som helst der. Utenfor Railway er
+# standarden `utvikling`; på Railway uten variabelen viser portalen «UKJENT MILJØ».
+PORTAL_MILJO = os.environ.get('PORTAL_MILJO') or ('' if os.environ.get('RAILWAY_ENVIRONMENT') else 'utvikling')
 USE_I18N = True
 USE_TZ = True
 

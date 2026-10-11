@@ -4,6 +4,62 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-11 — Miljømerket og admins statusmelding i toppmenyen  `#core/drift`
+
+**Hvorfor:** 29. aug. 2026 gikk en arbeidsøkt med til å feilsøke en innlogging som
+feilet fordi forsøkene gikk mot prod mens kontoen lå på staging — **ingenting i
+grensesnittet skilte staging og prod**. Under en vakt er det verre: en ekte pasient kan
+havne i testbasen. André, 11. okt.: «staging sier lite til vanlige folk som tester», og
+«jeg ser litt mer bruksområde enn bare å si hvilket miljø vi har» — admin skal kunne
+skrive en melding i prod og velge grønn, gul, oransje eller rød.
+
+**To ting, som ser forskjellige ut med vilje:**
+
+| | Miljømerket (`core/miljo.py`) | Statusmeldingen (`core/statusmelding.py`) |
+|---|---|---|
+| Hva | Et *vern*: dette er ikke ekte data | En *beskjed* fra admin |
+| Kilde | `PORTAL_MILJO` per Railway-tjeneste | `/portal-admin/innstillinger/`, kortet «Statusmelding i toppmenyen» |
+| Utseende | Striper: TESTMILJØ lilla, UTVIKLING turkis, UKJENT MILJØ grå | Ensfarget: grønn, gul, oransje, rød |
+| Kan fjernes | Nei — bare ved å sette `drift` | Ja: tom tekst, eller «Vis til» |
+| Fanen | `[TEST] `, `[UTV] `, `[?] ` foran tittelen | — |
+
+**`PORTAL_MILJO` er en lukket liste, ikke Railways miljønavn** (André: «kanskje flere
+instanser for ulike korps, og da må det ha et annet navn enn production»). `drift`,
+`test`, `utvikling`; **ingen alias** (`production`, `staging`) — hver ekstra stavemåte er en
+ny vei til feil tolkning. Mangler eller ugyldig gir **«UKJENT MILJØ»**, en rød rad på
+server-status og én advarsel i loggen ved oppstart — **oppstarten stoppes ikke**: en
+skrivefeil skal ikke ta ned prod midt i en vakt. Utenfor Railway er standarden `utvikling`.
+
+**Plassen:** en lomme rett etter «Sanitetsportalen» i toppmenyen — ingen ekstra høyde
+(André: «det tar litt real estate … en slags busslomme»). På innloggingen og de andre
+frittstående sidene står miljøet over tittelen med forklaringen «Ingenting du registrerer
+her er ekte». På pasientsiden står lommen *utenfor* `.brand`: `style.css` demper hver span
+der (opacity .6), og første skjermbilde viste blasse merker.
+
+**Meldingen kommer fram uten sidelasting:** bjella poller alt hvert 30. sekund på hver
+innlogget side, og `ulest-antall`-svaret bærer nå `statusmelding` — ingen ny forespørsel.
+`tegnStatusmelding()` i `notifications.js` skriver med `textContent`, slipper bare de fire
+fargene gjennom, og **rører ingenting når feltet mangler** (en eldre server i deploy-vinduet).
+Lagret som én `AppSetting` (JSON) — én spørring per side, og hver endring står i
+revisjonsloggen. Høyst 40 tegn; «Vis til» kan ikke være passert; en verdi skrevet for hånd
+som ikke lar seg lese gir ingen melding, ikke en side som feiler.
+
+**E-post** utenfor `drift` får `[test]`, `[utvikling]` eller `[ukjent miljø]` foran emnet, i
+AHASend-transporten — den ene veien all e-post fra Railway går. **KO** setter
+fanetittelen selv; den går nå gjennom `fanetittel()` i `portal-utils.js`.
+
+**Testene** (`core/tests_statusmerke.py` m.fl.): den lukkede lista; innloggingen, portalen,
+pasientsiden og lagsiden i alle fire tilstandene; at **hver** mal med `<title>` har prefikset
+og malbiten (unntak: vaktlista som fil); valideringen; escaping gjennom siden; bjellas
+ekte polling i node; KOs titler gjennom `koHendelseKanalMottak` og `koTegnEgetVindu`.
+
+**30 mutanter, 29 drept i første runde.** «E-postens kallsted fjernet» overlevde: testen
+kalte `_med_miljo()` direkte, og transporttesten kjørte i `drift` — den tredje måten en mutant
+lyver på. Ny test gjennom transporten i `test`; drept.
+
+**Sett før `main`:** `PORTAL_MILJO=test` på staging og `drift` på prod, web og cron — står
+øverst i `TODO.md`. Staging viser «UKJENT MILJØ» til den er satt.
+
 ## 2026-10-10 — Slettefrist på oppdragsnotatet: fritekst og «Annet sted» slettes 3 dager etter siste aktivitet  `#personvern`
 
 **Hvorfor:** A.12 hadde det som åpen restrisiko: «selve feltverdien står i oppdragstabellen

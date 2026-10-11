@@ -75,6 +75,15 @@ class CoreConfig(AppConfig):
         from core.kart_innstillinger import register_handlers as registrer_kart_innstillinger
         registrer_kart_innstillinger()
 
+        # Statusmeldingen i toppmenyen (11. okt. 2026), og én linje i loggen om
+        # `PORTAL_MILJO` ikke er en av de kjente verdiene. Se `core/miljo.py`.
+        from core.statusmelding import register_handlers as registrer_statusmelding
+        registrer_statusmelding()
+        import logging
+
+        from core.miljo import advar_ved_ukjent
+        advar_ved_ukjent(logging.getLogger('core.miljo'))
+
         # Backup-klokka (13. sep. 2026). Starter ikke under test, migrate eller
         # engangskommandoer — `klokke.skal_starte()` er det ene stedet den
         # avgjørelsen tas. Den ligger her og ikke i en cron-tjeneste fordi

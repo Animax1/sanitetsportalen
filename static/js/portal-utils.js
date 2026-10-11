@@ -133,6 +133,13 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 // **Ukjent bruker gir `null`, ikke en felles nøkkel.** En reserve til den gamle
 // nøkkelen ville gjenåpnet hullet i det stille den dagen ID-en manglet.
 // `window.PORTAL_BRUKER_ID` settes av `base_portal.html`.
+function fanetittel(tittel) {
+  // Miljøet foran fanetittelen (11. okt. 2026, `core/miljo.py`): «[TEST] H14 · KO».
+  // Sider som setter `document.title` selv, går gjennom denne — ellers står
+  // prefikset bare til første gang JS skriver tittelen.
+  return (globalThis.PORTAL_FANEPREFIKS || '') + tittel;
+}
+
 function brukerNokkel(prefiks) {
   const id = globalThis.PORTAL_BRUKER_ID;
   if (id === undefined || id === null || id === '') return null;

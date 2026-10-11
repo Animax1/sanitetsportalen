@@ -119,7 +119,7 @@ class UnreadCountEndpointTests(TestCase):
         self.client.force_login(self.user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json(), {'unread': 0})
+        self.assertEqual(res.json()['unread'], 0)
 
     def test_counts_only_unread(self):
         notify(self.user, module_slug='patients', kind='k1', message='a')
@@ -128,7 +128,7 @@ class UnreadCountEndpointTests(TestCase):
         Notification.objects.filter(user=self.user, kind='k1').update(is_read=True)
         self.client.force_login(self.user)
         res = self.client.get(self.url)
-        self.assertEqual(res.json(), {'unread': 1})
+        self.assertEqual(res.json()['unread'], 1)
 
     def test_counts_only_own_notifications(self):
         other = CustomUser.objects.create_user(
@@ -138,7 +138,7 @@ class UnreadCountEndpointTests(TestCase):
         notify(other, module_slug='patients', kind='k', message='for ola')
         self.client.force_login(self.user)
         res = self.client.get(self.url)
-        self.assertEqual(res.json(), {'unread': 0})
+        self.assertEqual(res.json()['unread'], 0)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

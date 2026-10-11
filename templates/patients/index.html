@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include "partials/_ikoner.html" %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-<title>Pasientregistrering</title>
+<title>{{ miljo.fane }}Pasientregistrering</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/tabulator/tabulator_bootstrap5.min.css' %}" rel="stylesheet">
@@ -46,6 +46,8 @@
     NB: {# #} er enlinjes i Django — en flerlinjes variant rendres som tekst.
   {% endcomment %}
   <div class="brand">Pasientregistrering <span id="event-name-display">{{ event_name }}</span></div>
+  {# Utenfor .brand: style.css demper hver span der (opacity .6), og merket skal ikke dempes. #}
+  {% include "partials/_statusmerke.html" %}
 
   <div class="stat-chip rod">
     <span class="num" id="hdr-rod">0</span><span>Rød</span>

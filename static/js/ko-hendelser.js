@@ -323,7 +323,7 @@ function koVisDetaljen(vis) {
 // leter etter i oppgavelinja.
 function koTegnHendelseTittel() {
   if (!koErFolger()) return;
-  document.title = koHendelseVinduTittel(koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null);
+  document.title = fanetittel(koHendelseVinduTittel(koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null));
 }
 
 function koHendelseVinduTittel(h) {

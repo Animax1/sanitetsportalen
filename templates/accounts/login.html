@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include "partials/_ikoner.html" %}
-<title>Innlogging – Sanitetsportalen</title>
+<title>{{ miljo.fane }}Innlogging – Sanitetsportalen</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
 <style>
@@ -30,6 +30,7 @@
 </head>
 <body>
 <div class="login-card">
+  {% include "partials/_statusmerke.html" with variant="side" %}
   <div class="text-center mb-3">
     <img src="{% static 'img/logo.svg' %}" alt="" width="64" height="64" style="border-radius:14px">
   </div>

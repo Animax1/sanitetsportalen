@@ -25,11 +25,16 @@ def notification_unread_count_view(request):
 
     Pollet av JS i base_portal.html hvert 30. sekund. Kun innloggede
     brukere, bruker en effektiv COUNT-query.
+
+    **Bærer også admins statusmelding** (11. okt. 2026, `core/statusmelding.py`):
+    bjella poller alt på hver innlogget side, så meldingen kommer fram uten
+    sidelasting og uten en forespørsel til.
     """
     from django.http import JsonResponse
     from core.models import Notification
+    from core.statusmelding import aktiv
     count = Notification.objects.filter(user=request.user, is_read=False).count()
-    return JsonResponse({'unread': count})
+    return JsonResponse({'unread': count, 'statusmelding': aktiv()})
 
 
 @login_required

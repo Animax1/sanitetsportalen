@@ -78,3 +78,19 @@ def versjon(request):
     """
     from core.versjon import hent_versjon
     return {'versjon': hent_versjon()}
+
+
+def statusmerke(request):
+    """Legg til ``miljo`` og ``statusmelding`` — merket i toppmenyen.
+
+    Miljøet er fast for prosessen (`core/miljo.py`); statusmeldingen er én
+    `AppSetting` (`core/statusmelding.py`). **Kaster aldri**: et merke som ikke
+    kan leses skal gi en side uten merke, ikke en side som feiler.
+    """
+    from core.miljo import miljo
+    try:
+        from core.statusmelding import aktiv
+        melding = aktiv()
+    except Exception:   # noqa: BLE001 — databasen kan være nede; siden skal stå
+        melding = None
+    return {'miljo': miljo(), 'statusmelding': melding}

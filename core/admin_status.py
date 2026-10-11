@@ -377,10 +377,20 @@ def _get_konfig_sjekk():
          'ok': bool(settings.ADMINS)},
         _offsiterad(),
         _migrasjonsrad(),
+        _miljorad(),
     ]
     return {'rader': rader, 'alle_ok': all(r['ok'] for r in rader),
             'versjon': {'bygg': ver.get('bygg'), 'dato': ver.get('dato').isoformat() if ver.get('dato') else None,
                         'kilde': ver.get('kilde')}}
+
+
+def _miljorad():
+    """`PORTAL_MILJO` (11. okt. 2026): rød bare når verdien ikke står i lista —
+    `test` og `utvikling` er gyldige miljøer, ikke feil. Se `core/miljo.py`."""
+    from core.miljo import TYPER, miljo
+    m = miljo()
+    verdi = m['verdi'] if m['gyldig'] else f"{m['verdi'] or '(mangler)'} — ikke en av {', '.join(sorted(TYPER))}"
+    return {'nokkel': 'PORTAL_MILJO', 'verdi': verdi, 'ok': m['gyldig']}
 
 
 #: Settes når alle migrasjonene er kjørt. Svaret kan bare endre seg ved en
