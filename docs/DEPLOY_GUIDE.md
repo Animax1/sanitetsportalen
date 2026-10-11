@@ -58,8 +58,8 @@ Klikk på **web**-tjenesten din → **Variables**-fanen → **New Variable**.
 |---|---|---|
 | `SECRET_KEY` | Minst 50 tilfeldige tegn | `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | Referanse, ikke kopi – se 2b |
-| `ALLOWED_HOSTS` | `ditt-domene.up.railway.app` | Oppdater etter at domenet er generert |
-| `CSRF_TRUSTED_ORIGINS` | `https://ditt-domene.up.railway.app` | Må matche `ALLOWED_HOSTS`, med `https://` |
+| `ALLOWED_HOSTS` | `portal.sanitet.net` | Staging: `testportal.sanitet.net`. **Uten** `https://` |
+| `CSRF_TRUSTED_ORIGINS` | `https://portal.sanitet.net` | Må matche `ALLOWED_HOSTS`, **med** `https://` — uten feiler hver POST, innlogging inkludert |
 | `DEBUG` | `false` | Alltid `false` i produksjon |
 | `BACKUP_DIR` | `/data/backups` | Må peke på Volume-stien, se 2d |
 | `RATELIMIT_ENABLE` | `true` | Nødbryter, se kapittel 8 |

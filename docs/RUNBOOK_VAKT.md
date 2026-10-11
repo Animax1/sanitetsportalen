@@ -13,7 +13,7 @@ gjelder portalen der ikke annet står.
 
 ## 1. Første ting før vakten starter
 
-1. **Admin-dashbord åpent i egen fane**: [https://\<din-app\>.railway.app/portal-admin/server-status/](#)
+1. **Admin-dashbord åpent i egen fane**: [https://portal.sanitet.net/portal-admin/server-status/](https://portal.sanitet.net/portal-admin/server-status/)
 2. **Railway-dashbord åpent i egen fane**: [https://railway.app](https://railway.app) → ditt prosjekt → Variables
 3. **Denne runbooken tilgjengelig** (skriv ut eller hold på annen skjerm)
 4. Sjekk at dashbordet oppdaterer seg (grønn pulserende prikk, "Oppdaterer hvert 10. sek")
@@ -97,7 +97,7 @@ Hvis Redis-tjenesten ikke finnes:
 
 Når ny deploy er live (sjekk Deployments → siste "Active"):
 
-1. Åpne `https://<din-app>.railway.app/portal-admin/server-status/`
+1. Åpne `https://portal.sanitet.net/portal-admin/server-status/`
 2. **Cache-backend-kort** skal vise:
    - Backend: `redis`
    - Status: healthy
@@ -1153,12 +1153,12 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 
 | Ressurs | Lenke/handling |
 |---|---|
-| Admin server-status | `https://<din-app>.railway.app/portal-admin/server-status/` |
+| Admin server-status | `https://portal.sanitet.net/portal-admin/server-status/` (staging: `testportal.sanitet.net`) |
 | Railway-dashbord | [https://railway.app](https://railway.app) |
 | Railway Volume backups | Railway → Volumes → Browse |
 | Offsite-backup (Scaleway) | `/portal-admin/backup/` (kortet øverst) · konsollen: console.scaleway.com → Object Storage · §8b |
-| Brukeradmin | `https://<din-app>.railway.app/portal-admin/brukere/` |
-| Innloggingslogg | `https://<din-app>.railway.app/portal-admin/innloggingslogg/` |
+| Brukeradmin | `https://portal.sanitet.net/portal-admin/brukere/` |
+| Innloggingslogg | `https://portal.sanitet.net/portal-admin/innloggingslogg/` |
 | Reserve | `docs/TEKNISK_DOKUMENTASJON.md` §11 |
 | Deploy-guide | `DEPLOY_GUIDE.md` i repoet |
 | Kartet (prod) | `https://kart.sanitet.net` · helsesjekk `https://kart.sanitet.net/healthz` (uten skråstrek til slutt) |

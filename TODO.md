@@ -1039,15 +1039,13 @@ sektorer/flere KO: nei). Ingen av dem er bestilt.*
 
 ### Eget domene — portal.sanitet.net
 
-- [ ] **Koble domenet i Railway** og legg inn DNS-oppføringen. Krever Andre
-- [ ] Sett `ALLOWED_HOSTS=portal.sanitet.net,<dagens>.railway.app` og
-      `CSRF_TRUSTED_ORIGINS=https://portal.sanitet.net,https://<dagens>.railway.app`.
-      Uten den første svarer appen 400 på det nye domenet, uten den andre feiler
-      **hver POST**, innlogging inkludert. Merk formatet: `ALLOWED_HOSTS` uten
-      `https://`, `CSRF_TRUSTED_ORIGINS` med
-- [ ] Fjern det genererte `.up.railway.app`-domenet når portal-domenet er verifisert,
-      så appen kun svarer på én adresse
-- [ ] Rydd Railway-domenet ut av `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` etterpå
+Domenene står (André, 11. okt. 2026): `portal.sanitet.net` er prod, `testportal.sanitet.net`
+staging, og begge svarer 200 på `/healthz/`.
+
+- [ ] **Fjern de genererte `.up.railway.app`-domenene** på begge tjenestene, så hver
+      portal bare svarer på én adresse, og rydd dem ut av `ALLOWED_HOSTS` og
+      `CSRF_TRUSTED_ORIGINS` etterpå — i den rekkefølgen: fjernes variabelen først, svarer
+      den gamle adressen 400 til noen som har den som bokmerke
 
 ### Dokumentgjennomgang — når funksjonaliteten nærmer seg ferdig
 
@@ -1060,14 +1058,10 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 - [ ] **`docs/RUNBOOK_VAKT.md`** (469 linjer) — leses under vakt, på papir eller egen
       skjerm. En feil URL her oppdages i verste øyeblikk.
-      - Seks forekomster av `https://<din-app>.railway.app/...` (linje 10, 61, 400, 403,
-        404) må bli `portal.sanitet.net` når domenet står
       - Sjekk at tersklene i §3 stemmer med ytelsesarbeidet fra 13. aug. (1000 pasienter,
         100 brukere)
 
 - [ ] **`docs/DEPLOY_GUIDE.md`** (205 linjer) — prosedyre for nytt miljø.
-      - `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`-eksemplene (linje 43–44, 81) viser
-        `.up.railway.app`. Oppdater til portal-domenet
       - Legg inn `EMAIL_*`-variablene for AHASend i variabeltabellen — de mangler helt
 
 - [ ] **`docs/PERSONVERN_DOKUMENTASJON.md`** (809 linjer) — formelt art. 30-dokument som

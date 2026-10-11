@@ -1696,8 +1696,8 @@ web: gunicorn myproject.wsgi --workers ${WEB_WORKERS:-1} --threads ${WEB_THREADS
 | `SECRET_KEY` | Ja | Django secret key. Generer med `python -c "import secrets; print(secrets.token_urlsafe(64))"`. Aldri gjenbruk dev-nøkkel. |
 | `DATABASE_URL` | Ja (prod) | PostgreSQL connection string. Settes automatisk av Railway når Postgres-pluginen tilknyttes. |
 | `DEBUG` | Ja | Sett `False` i produksjon. `True` kun lokalt. |
-| `ALLOWED_HOSTS` | Ja | Kommaseparert liste over tillatte vertsnavn. Default (uten variabel): `.localhost,127.0.0.1`. Eksempel prod: `ditt-domene.up.railway.app`. |
-| `CSRF_TRUSTED_ORIGINS` | Ja | Kommaseparert liste over tillatte CSRF-opprinnelser. Eksempel: `https://ditt-prosjekt.up.railway.app` |
+| `ALLOWED_HOSTS` | Ja | Kommaseparert liste over tillatte vertsnavn. Default (uten variabel): `.localhost,127.0.0.1`. Prod: `portal.sanitet.net`, staging: `testportal.sanitet.net`. |
+| `CSRF_TRUSTED_ORIGINS` | Ja | Kommaseparert liste over tillatte CSRF-opprinnelser. Prod: `https://portal.sanitet.net`, staging: `https://testportal.sanitet.net` |
 | `BACKUP_DIR` | Anbefalt | Sti til backup-mappe. Eksempel: `/data/backups` (Railway Volume). |
 | `RATELIMIT_ENABLE` | Anbefalt | `true` for å aktivere rate-limiting (default). Sett `false` som nødbryter. |
 | `DJANGO_SUPERUSER_USERNAME` | Valgfri | For `create_superuser`-kommando ved oppstart. |
@@ -2102,7 +2102,7 @@ eller LocMem, aldri `DatabaseCache` — `createcachetable` er derfor ikke svaret
 
 **Vanlig årsak:** `CSRF_TRUSTED_ORIGINS` inneholder ikke Railway-domenet.
 
-**Løsning:** Legg til `https://ditt-prosjekt.up.railway.app` i `CSRF_TRUSTED_ORIGINS`-miljøvariabelen i Railway Variables.
+**Løsning:** Legg til `https://portal.sanitet.net` (staging: `https://testportal.sanitet.net`) i `CSRF_TRUSTED_ORIGINS`-miljøvariabelen i Railway Variables.
 
 ### 16.6 "DisallowedHost at /"
 

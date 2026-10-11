@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-11 — Domenene står: `portal.sanitet.net` og `testportal.sanitet.net` i dokumentasjonen  `#core/dokumentasjon`
+
+André, 11. okt. 2026: «Domene for prod er allerede satt som portal.sanitet.net mens for
+staging er den testportal.sanitet.net». Kontrollert utenfra: begge svarer 200 på
+`/healthz/`, og innloggingen i prod svarer 200.
+
+**Runbooken viste fortsatt `https://<din-app>.railway.app/…`** fem steder — dokumentet som
+leses under vakt, der en feil adresse oppdages i verste øyeblikk. Rettet til
+`portal.sanitet.net`, med staging nevnt der det hjelper. `DEPLOY_GUIDE.md` og
+`TEKNISK_DOKUMENTASJON.md` viser nå de ekte domenene i eksemplene for `ALLOWED_HOSTS` og
+`CSRF_TRUSTED_ORIGINS`, med formatet understreket (uten og med `https://`).
+
+**TODO:** «Koble domenet» og «Sett `ALLOWED_HOSTS`» er slettet. Igjen står å fjerne de
+genererte `.up.railway.app`-domenene og rydde dem ut av variablene — i den rekkefølgen.
+
 ## 2026-10-11 — Miljømerket og admins statusmelding i toppmenyen  `#core/drift`
 
 **Hvorfor:** 29. aug. 2026 gikk en arbeidsøkt med til å feilsøke en innlogging som
