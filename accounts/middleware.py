@@ -17,6 +17,9 @@ class MustChangePasswordMiddleware:
         '/accounts/logout/',
         '/accounts/login/',
         '/static/',
+        # Lenket fra hver side, også passordbyttet: å lese erklæringen skal
+        # ikke kreve at passordet er byttet først.
+        '/personvern/',
     )
 
     def __init__(self, get_response):
@@ -44,13 +47,22 @@ class DynamicSessionTimeoutMiddleware:
 
     def __call__(self, request):
         if request.user.is_authenticated:
-            try:
-                from core.models import AppSetting
-                hours = int(AppSetting.get('session_timeout_hours', 8))
-                hours = max(1, min(24, hours))
-                request.session.set_expiry(hours * 3600)
-            except Exception:
-                # Ved import-feil eller manglende tabell (før migrering)
-                # fall tilbake til default i settings
-                pass
+            request.session.set_expiry(sesjonstid_timer() * 3600)
         return self.get_response(request)
+
+
+def sesjonstid_timer() -> int:
+    """Sesjonens løpetid i timer, klemt til 1–24. Kaster aldri.
+
+    Egen funksjon fordi personvernsiden (`core/personvern.py`) oppgir den samme
+    tiden til brukerne — og et tall skrevet av for hånd der ville stått igjen den
+    dagen admin flyttet det.
+    """
+    try:
+        from core.models import AppSetting
+        hours = int(AppSetting.get('session_timeout_hours', 8))
+    except Exception:
+        # Ved import-feil eller manglende tabell (før migrering): standarden,
+        # som er den samme som i settings.
+        return 8
+    return max(1, min(24, hours))

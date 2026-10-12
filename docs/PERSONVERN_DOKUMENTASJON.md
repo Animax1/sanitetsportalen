@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 10. oktober 2026  
-**Versjon:** 1.20  
+**Siste oppdatering:** 12. oktober 2026  
+**Versjon:** 1.21  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -19,7 +19,8 @@
 |---|---|
 | Behandlingsansvarlig | Kverneland Røde Kors |
 | Systemansvarlig | André Eritsland |
-| Kontakt | andre.eritsland@gmail.com (systemansvarlig) |
+| Kontakt for personvern | **personvern@sanitet.net** — adressen de registrerte får, på `/personvern/` (fra 12. okt. 2026) |
+| Kontakt, systemansvarlig | andre.eritsland@gmail.com |
 | Geografisk plassering | Rogaland, Norge |
 
 Behandlingsansvaret gjelder både portalen og kart.sanitet.net. Korpset bestemmer formål og
@@ -45,6 +46,18 @@ Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd me
 | Avtalegrunnlag | Data Processing Addendum (DPA) signert |
 | Databehandlingsregion | europe-west4 (Nederland, EU) |
 | Kontakt / DPA-referanse | Railway Amsterdam Data Processing Addendum |
+
+> **Ikke ført inn her ennå (12. okt. 2026): Cloudflare og AhaSend.** Begge behandler
+> personopplysninger for portalen. **Cloudflare** står foran Railway (`server: cloudflare`,
+> funnet 11. okt. 2026, se CHANGELOG): TLS termineres der, så all trafikk — innlogging,
+> pasientdata, posisjoner — går gjennom Cloudflare i klartekst. **AhaSend** er
+> e-posttransporten i prod (`core/mail_backends.py`): invitasjoner, «Glemt passord»,
+> vaktlista som fil (navn, telefon, ISSI, overnatting) og feilvarsler. Begge står navngitt på
+> personvernsiden, fordi de registrerte har krav på å vite det. **AhaSend har en avtale** —
+> `TODO.md` siterer den i punktet om lagring av e-postinnhold — men den er ikke ført inn her.
+> **For Cloudflare er avtalegrunnlaget (art. 28) ikke kontrollert**, og A.8s «ingen
+> overføring utenfor EU/EØS» er ikke vurdert mot noen av dem — Cloudflare er et amerikansk
+> selskap med et globalt nett. Står i `TODO.md` under «Krever Andre».
 
 Databehandleravtale (DPA) er inngått i samsvar med GDPR artikkel 28. Data lagres utelukkende i EU-regionen europe-west4 (Nederland). Ingen behandling skjer utenfor EU/EØS.
 
@@ -906,10 +919,11 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 
 > **Om sletting av brukerkontoer:** En bruker som har arkivert en vakt kan slettes. Referansen fra `VaktArkiv` nulles ut, mens brukernavnet beholdes frosset i `importert_av_navn`. Arkivet viser dermed fortsatt hvem som arkiverte vakten, uten at kontoen må bevares. Dette er samme mønster som `forstehjelper_navn` på arkiverte pasienter, og er nødvendig for at sletterett etter art. 17 ikke skal være blokkert på databasenivå.
 >
-> Det innebærer at brukernavnet til en frivillig består i arkivet også etter at kontoen er slettet. Opplysningen er nødvendig for at dokumentasjonen av vakten skal være etterrettelig, og de registrerte informeres om det i B.8.
+> Det innebærer at brukernavnet til en frivillig består i arkivet også etter at kontoen er slettet. Opplysningen er nødvendig for at dokumentasjonen av vakten skal være etterrettelig, og de registrerte informeres om det på personvernsiden (`/personvern/`, «Har du brukerkonto»).
 
 **Alle henvendelser om rettigheter rettes til:**  
-André Eritsland – andre.eritsland@gmail.com
+personvern@sanitet.net (fra 12. okt. 2026 — adressen personvernsiden oppgir).
+Systemansvarlig, André Eritsland, behandler henvendelsene på vegne av Kverneland Røde Kors.
 
 ---
 
@@ -953,163 +967,38 @@ Alle brudd, uavhengig av om de medfører meldeplikt, skal loggføres skriftlig m
 
 # DEL B: Personvernerklæring
 
-> Denne erklæringen er ment for pasienter og brukere av systemet, og er skrevet i et lettlest språk.
+**Erklæringen er publisert på `/personvern/`, og det er den som gjelder** (12. okt. 2026,
+v1.21). Siden er åpen uten innlogging og lenket fra hver side i portalen — footeren,
+innloggingen, kontoflatene, pasientsidens brukermeny og lagregistreringen.
 
----
-
-## B.1 Hvem er vi?
-
-Denne appen brukes av sanitetsvakter ved arrangementer for å registrere og følge opp pasienter som trenger medisinsk hjelp på stedet.
-
-**Ansvarlig for opplysningene (behandlingsansvarlig):**  
-Kverneland Røde Kors, Rogaland
-
-**Kontakt (systemansvarlig):**  
-André Eritsland — e-post: andre.eritsland@gmail.com
-
----
-
-## B.2 Hvilke opplysninger samler vi inn?
-
-Vi registrerer opplysninger som er nødvendige for å gi deg god helsehjelp under arrangementet. Det er viktig å merke seg hva vi **ikke** samler inn:
-
-**Vi samler ikke inn:**
-- Navn
-- Personnummer eller fødselsnummer
-- Fødselsdato
-- Adresse eller annen kontaktinformasjon
-
-Du registreres kun med et sanitets-pasientnummer (løpenummer) som tildeles under vakten.
-
-**Vi registrerer:**
-- Et pasientnummer (løpenummer, ikke koblet til navn)
-- Hva du oppsøkte sanitetsposten for (problemstilling/årsak) – valgt fra fast liste
-- Triagekategori (rød/gul/grønn) – alvorlighetsgrad av tilstanden
-- Transport til og fra sanitetsposten – valgt fra fast liste
-- Hvem som behandlet deg (førstehjelper og helsepersonell)
-- Om du fikk medisiner
-- Kliniske observasjoner og problemstilling etter fast verdimengde
-- Tidspunkter: ankomst, behandlingsstart, utskrivning (format `dd.mm.åååå tt:mm`)
-- Om det er skrevet journal på deg i helsetjenestens ordinære journalsystem (kun «ja» eller «nei»)
-
-> **Om utrykning med bil eller beredskapsambulanse:** Sendes en enhet ut til deg,
-> registreres selve oppdraget — hendelsestype fra fast liste, hastegrad, sted på
-> arrangementet og tidspunktene for enhetens statusmeldinger. Oppdraget registreres
-> **helt uten identifikator**: ikke noe pasientnummer, ikke noe navn, og ingen kobling
-> til pasienttavlen. Et eventuelt fritekstfelt med beskjed til mannskapet skjules for
-> enheten når oppdraget er avsluttet, og innholdet lagres aldri i endringsloggen.
-
-> **Merk:** Denne appen er en arbeidstavle for sanitetsvakten under arrangementet — den er ikke din pasientjournal. Får du helsehjelp som journalføres, skjer det i helsetjenestens eget journalsystem. Her lagres bare oversikten vakten trenger for å holde styr på hvem som er hvor og hvem som har ansvaret.
-
----
-
-## B.3 Hvorfor registrerer vi disse opplysningene?
-
-Opplysningene brukes til:
-
-1. **Gi deg helsehjelp:** Behandlerne på stedet trenger en oversikt for å gi deg riktig og trygg hjelp, spesielt ved mange pasienter.
-2. **Sikre kontinuitet:** Hvis du har vært inne til behandling og kommer tilbake, kan saniteten raskt se hva som er gjort.
-3. **Lære og forbedre:** Etter arrangementet brukes anonymisert statistikk til å planlegge bedre beredskap ved fremtidige arrangementer.
-
-**Rettslig grunnlag:** Behandlingen er nødvendig for å verne din helse (GDPR art. 6(1)(d)) og for å administrere helsehjelpen som ytes under arrangementet (GDPR art. 9(2)(h)). Alle som har tilgang til opplysningene er underlagt taushetsplikt — helsepersonell i kraft av loven, øvrige gjennom signert taushetserklæring.
-
----
-
-## B.4 Hvem kan se opplysningene?
-
-| Hvem | Tilgang |
+| Hva | Hvor |
 |---|---|
-| Helsepersonell/frivillige på vakten | Kan registrere og se pasientopplysninger i henhold til tildelt rolle |
-| Administrator (teknisk drift) | Begrenset tilgang for å drifte systemet |
-| Alle andre | Ingen tilgang |
+| Teksten | `core/templates/core/personvern.html` |
+| Tallene (frister, sesjonstid, delt posisjon) | `core/personvern.py` — hentet fra koden, ikke skrevet av |
+| At ingen frist er skrevet inn for hånd, og at hver side lenker dit | `core/tests_personvern.py` |
 
-Opplysningene deles **ikke** med tredjeparter, forsikringsselskaper, arbeidsgivere, markedsføringsaktører eller andre.
+**Hvorfor del B ikke står her lenger.** Den sto her som lettlest erklæring, og to
+tekster om det samme hadde glidd fra hverandre: B oppga én backupfrist (de nyeste 50
+filene) og kjente verken Scaleways 730 og 90 dager, mannskapsregisteret, vaktlista som fil
+på e-post, informasjonskapslene eller den lokale lagringen. En side ved siden av en
+dokumentdel ingen av de registrerte leser, er to kilder — og den de faktisk ser, er den som
+må være riktig.
 
----
+**Arbeidsdelingen:** del A er fasit for *hva som gjøres*; siden er fasit for *hva som sies*
+til de registrerte. Endres en behandling i del A, skal siden følge i samme commit.
 
-## B.5 Hvor lenge lagres opplysningene?
+**Hva siden dekker**, i denne rekkefølgen: behandlingsansvarlig og kontakt
+(personvern@sanitet.net); informasjonskapslene (`sessionid`, `csrftoken`,
+`mfa_trusted_<id>`, `messages` — alle strengt nødvendige, derfor ikke samtykke etter
+ekomloven § 3-15) og den lokale lagringen (offline-køene, vaktlista i Cache Storage,
+visningsvalg, lagregistreringens nøkler); brukerkontoen; mannskapsregisteret med
+overnatting og vaktlista som fil; posisjon til kartet; lagregistreringen; pasientene;
+leverandørene (Railway, Scaleway, Cloudflare, AhaSend, kart.sanitet.net); lagringstid;
+sikkerhet; rettigheter og klage til Datatilsynet.
 
-| Type opplysning | Lagringstid |
-|---|---|
-| Opplysningene om deg (aktiv vakt) | Inneværende år i produksjonsdatabasen |
-| Arkivert vakt – opplysninger om deg | 24 måneder. Deretter slettes de permanent, og bare anonym statistikk beholdes |
-| Arkivert vakt – anonym statistikk | Beholdes for å planlegge framtidige arrangementer. Kan ikke spores tilbake til deg |
-| Sikkerhetskopier | De nyeste 50 beholdes; eldre slettes automatisk |
-| Innloggings- og hendelseslogger | 2 år |
-| Sesjondata | Slettes automatisk etter 8 timer (eller ved utlogging) |
-
-Etter at lagringstiden er utløpt slettes opplysningene permanent.
-
----
-
-## B.6 Hvor lagres opplysningene?
-
-Opplysningene lagres hos **Railway** (infrastrukturpartner) i en EU-region (Nederland). Dette betyr:
-
-- Data forlater aldri EU/EØS-området.
-- Alle opplysninger er kryptert med AES-256 i databasen.
-- Overføring mellom deg og systemet skjer alltid kryptert via HTTPS/TLS.
-- Railway er bundet av en databehandleravtale som regulerer deres bruk av dataene.
-
----
-
-## B.7 Dine rettigheter
-
-Som registrert person har du følgende rettigheter etter GDPR:
-
-| Rettighet | Innhold |
-|---|---|
-| **Innsyn (art. 15)** | Du kan be om å få vite hvilke opplysninger vi har registrert om deg. |
-| **Retting (art. 16)** | Du kan be om at feilaktige opplysninger rettes. |
-| **Sletting (art. 17)** | Du kan i visse tilfeller be om at opplysningene slettes. Merk at deler av loggen kan kreves bevart av faglige grunner. |
-| **Begrensning (art. 18)** | Du kan be om at bruken av opplysningene dine begrenses midlertidig. |
-| **Dataportabilitet (art. 20)** | Du kan be om å få opplysningene dine utlevert i et maskinlesbart format. |
-| **Protest (art. 21)** | Du kan protestere mot behandlingen av dine opplysninger. |
-| **Klage** | Du kan klage til **Datatilsynet** (www.datatilsynet.no, tlf. 74 07 70 00). |
-
-> **Merk:** Siden pasientene kun er registrert med løpenummer og ikke med navn eller personnummer, forutsetter utøvelse av rettigheter at du kan identifisere deg på en annen måte (f.eks. tidspunkt for besøket og arrangementsnavnet).
-
----
-
-## B.8 For deg som har brukerkonto (frivillig eller helsepersonell)
-
-Denne delen gjelder deg som logger inn i systemet og registrerer pasienter — ikke pasientene. Også du er registrert, og har de samme rettighetene.
-
-### Hva vi lagrer om deg
-
-| Opplysning | Hvor lenge |
-|---|---|
-| Brukernavn, e-postadresse (valgfritt) og rollenivå | Så lenge kontoen er aktiv |
-| Tidspunkt for siste innlogging | Så lenge kontoen er aktiv |
-| Innloggingshendelser: tidspunkt, IP-adresse, nettleser, om innloggingen lyktes, MFA-hendelser | 2 år |
-| Endringslogg: hvilke endringer du har gjort på pasientopplysninger, med tidspunkt og IP | 2 år |
-| Varsler du har fått i portalen | 30 dager |
-| Navnet ditt på pasienter du har hatt ansvar for under en arkivert vakt | Følger arkivet |
-| Kjører du en bil med enhetsskjerm: bilens posisjon når du stempler, sendt til korpsets kart (ikke lagret i portalen). Slås av med «Del posisjon» på skjermen. Og når du trykker «Send posisjon» | 24 timer i kartet, bare siste posisjon |
-| Er du på et lag og trykker «Send posisjon til KO» i lagregistreringen: lagets posisjon, sendt til korpsets kart (ikke lagret i portalen) | 15 minutter i kartet som standard |
-
-### Hvorfor
-
-Innloggings- og endringsloggen føres for å ivareta informasjonssikkerheten: den gjør det mulig å oppklare hendelser og avdekke uautorisert bruk. Rollen din styrer hva du får tilgang til. Navnet ditt registreres på pasienter du har ansvar for, slik at vakten vet hvem som følger opp hvem.
-
-### Én ting du bør være klar over
-
-Når en vakt arkiveres, **fryses navnet ditt** — både på de pasientene du hadde ansvar for, og på selve arkivet dersom det var du som arkiverte vakten. Det gjøres med vilje: arkivet skal vise hvem som faktisk var på jobb den kvelden, også flere år etterpå. Sletter du brukerkontoen din senere, blir navnet stående i arkivet.
-
-Det betyr at retten til sletting ikke omfatter denne opplysningen fullt ut — den er nødvendig for at dokumentasjonen av vakten skal være etterrettelig. Alt annet vi lagrer om deg kan slettes.
-
-### Dine rettigheter
-
-Du har de samme rettighetene som er beskrevet i B.7 — innsyn, retting, sletting, begrensning, dataportabilitet, protest og klage til Datatilsynet. Henvend deg til kontakten under.
-
----
-
-## B.9 Kontakt
-
-Har du spørsmål om personvern, ønsker innsyn eller vil utøve andre rettigheter, ta kontakt med systemansvarlig, som svarer på vegne av Kverneland Røde Kors:
-
-**André Eritsland**  
-E-post: andre.eritsland@gmail.com
+**Pasientene ser ikke portalen.** Siden har et eget avsnitt for dem, men den når dem bare
+om noen viser dem den. Informasjonen til pasientene på stedet er korpsets sak, utenfor
+portalen.
 
 ---
 
@@ -1258,10 +1147,15 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.19 – sist oppdatert 8. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.21 – sist oppdatert 12. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.21 (12.10.2026):** **Personvernerklæringen er publisert på `/personvern/`**, åpen uten
+  innlogging og lenket fra hver side. Del B er erstattet av en peker dit: den hadde glidd fra
+  del A (én backupfrist, ingen cookies, ingen mannskapsregister). **Kontaktadressen er
+  personvern@sanitet.net** (A.1, A.14). **A.2:** merknad om at Cloudflare og AhaSend behandler
+  personopplysninger uten å være ført inn med avtalegrunnlag — står som åpent punkt.
 - **v1.20 (10.10.2026):** **Slettefrist på oppdragets frie tekst** (A.6 tiltak 5, A.9, A.12):
   `Oppdrag.fritekst` og «Annet sted»-teksten slettes 3 dager etter siste aktivitet på
   oppdraget. Restrisikoen «står i oppdragstabellen til oppdraget slettes eller arkiveres»

@@ -1,0 +1,318 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{# Lenkes fra lagregistreringen, der tokenet står i fragmentet — ingenting herfra skal bære en adresse videre. #}
+<meta name="referrer" content="no-referrer">
+{% include "partials/_ikoner.html" %}
+<title>{{ miljo.fane }}Personvern – Sanitetsportalen</title>
+<link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+{% comment %}
+  Personvernerklæringen (12. okt. 2026) — `core/personvern.py`. Frittstående side
+  uten innlogging, som innloggingen og lagregistreringen: egen <style>, ingen
+  base_portal. Tallene kommer fra koden; skriv ikke en frist inn for hånd her.
+  Teksten er erklæringen — del B i docs/PERSONVERN_DOKUMENTASJON.md peker hit.
+{% endcomment %}
+<style>
+  body { background: #0f172a; color: #e5e7eb; font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; }
+  main { max-width: 46rem; }
+  h1 { font-size: 1.6rem; font-weight: 700; }
+  h2 { font-size: 1.15rem; font-weight: 700; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #334155; }
+  h3 { font-size: 1rem; font-weight: 700; margin-top: 1.25rem; color: #cbd5e1; }
+  a { color: #93c5fd; }
+  a:hover, a:focus { color: #bfdbfe; }
+  .pv-ingress { color: #cbd5e1; font-size: 1.05rem; }
+  .pv-dempet { color: #94a3b8; font-size: .9rem; }
+  .pv-kort { background: #111827; border: 1px solid #334155; border-radius: 12px; padding: 1rem 1.25rem; }
+  .pv-kort ul { margin-bottom: 0; padding-left: 1.2rem; }
+  /* Tabellene ruller i beholderen, ikke på siden — telefonbredde. */
+  .pv-tabell { overflow-x: auto; }
+  .pv-tabell table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  .pv-tabell th, .pv-tabell td { border-bottom: 1px solid #334155; padding: .45rem .5rem; vertical-align: top; text-align: left; }
+  .pv-tabell th { color: #cbd5e1; font-weight: 600; }
+  .pv-tabell code { color: #fbbf24; font-size: .88em; }
+  nav.pv-innhold ol { columns: 2; column-gap: 2rem; padding-left: 1.2rem; margin-bottom: 0; }
+  @media (max-width: 576px) { nav.pv-innhold ol { columns: 1; } }
+</style>
+</head>
+<body>
+<main class="container py-4">
+  {% include "partials/_statusmerke.html" with variant="side" %}
+
+  <p class="mb-3"><a href="/"><i class="bi bi-arrow-left me-1"></i>Til Sanitetsportalen</a></p>
+
+  <h1><i class="bi bi-shield-lock me-2"></i>Personvern og informasjonskapsler</h1>
+  <p class="pv-ingress">
+    Sanitetsportalen er arbeidsverktøyet for sanitetsvaktene til {{ behandlingsansvarlig }}:
+    pasienttavle, oppdrag for biler og lag, vaktlister og koordinering under arrangementer.
+    Her står hvilke opplysninger portalen behandler om deg, hvorfor, hvor lenge, og hvem du
+    kan spørre.
+  </p>
+
+  <div class="pv-kort my-3">
+    <strong>Kort fortalt</strong>
+    <ul class="mt-2">
+      <li>Behandlingsansvarlig er <strong>{{ behandlingsansvarlig }}</strong>. Spørsmål om personvern:
+        <a href="mailto:{{ kontakt }}">{{ kontakt }}</a>.</li>
+      <li>Portalen bruker <strong>bare informasjonskapsler som trengs for at den skal virke</strong> —
+        innlogging og sikkerhet. Ingen analyse, ingen reklame, ingen sporing, ingen tredjeparter.
+        Derfor spør vi ikke om samtykke til dem.</li>
+      <li>Pasienter registreres <strong>uten navn og fødselsnummer</strong>, bare med et løpenummer.</li>
+      <li>Ingenting selges eller deles for markedsføring. Databasen og sikkerhetskopiene ligger i EU.</li>
+    </ul>
+  </div>
+
+  <nav class="pv-innhold pv-kort" aria-label="Innhold">
+    <ol>
+      <li><a href="#ansvarlig">Hvem er ansvarlig</a></li>
+      <li><a href="#cookies">Informasjonskapsler og lokal lagring</a></li>
+      <li><a href="#konto">Har du brukerkonto</a></li>
+      <li><a href="#mannskap">Står du i vaktlista</a></li>
+      <li><a href="#posisjon">Posisjon til kartet</a></li>
+      <li><a href="#lag">Lagregistreringen</a></li>
+      <li><a href="#pasient">Er du pasient</a></li>
+      <li><a href="#hvem">Hvem behandler opplysningene</a></li>
+      <li><a href="#lagring">Hvor lenge</a></li>
+      <li><a href="#sikkerhet">Sikkerhet</a></li>
+      <li><a href="#rettigheter">Dine rettigheter</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="ansvarlig">1. Hvem er ansvarlig</h2>
+  <p>
+    <strong>{{ behandlingsansvarlig }}</strong> er behandlingsansvarlig: korpset bestemmer at det
+    føres pasientregistrering på vakt, hvem som får konto og hva som registreres. Portalen
+    driftes og utvikles av korpsets systemansvarlige på korpsets vegne.
+  </p>
+  <p>
+    Alle henvendelser om personvern — spørsmål, innsyn, retting, sletting — sendes til
+    <a href="mailto:{{ kontakt }}">{{ kontakt }}</a>.
+  </p>
+
+  <h2 id="cookies">2. Informasjonskapsler (cookies) og lokal lagring</h2>
+  <p>
+    Portalen setter bare informasjonskapsler som er <strong>strengt nødvendige</strong> for tjenesten
+    du ber om: å holde deg innlogget og å beskytte skjemaene. Slike krever ikke samtykke
+    (ekomloven § 3-15), men du har krav på å vite hva de er. Det finnes ingen analyse-,
+    reklame- eller sporingskapsler, og ingen fra andre nettsteder — skrift, ikoner og
+    biblioteker leveres fra portalen selv.
+  </p>
+  <div class="pv-tabell">
+    <table>
+      <thead><tr><th>Navn</th><th>Hva den gjør</th><th>Hvor lenge</th></tr></thead>
+      <tbody>
+        <tr><td><code>sessionid</code></td>
+            <td>Holder deg innlogget. Inneholder bare en tilfeldig nøkkel; opplysningene ligger på serveren.</td>
+            <td>Til du logger ut, eller {{ sesjon_timer }} timer etter siste bruk</td></tr>
+        <tr><td><code>csrftoken</code></td>
+            <td>Beskytter skjemaene mot forespørsler sendt fra andre nettsteder i ditt navn.</td>
+            <td>Ett år</td></tr>
+        <tr><td><code>mfa_trusted_…</code></td>
+            <td>Settes bare hvis du huker av for å stole på enheten ved tofaktor-innlogging, og husker at
+                denne nettleseren er godkjent. Blir liggende når du logger ut — det er poenget med den.</td>
+            <td>{{ mfa_dager }} dager</td></tr>
+        <tr><td><code>messages</code></td>
+            <td>En kort beskjed fra én side til den neste, for eksempel «Passordet er endret».</td>
+            <td>Til beskjeden er vist</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Lokal lagring i nettleseren</h3>
+  <p>
+    Noen sider lagrer i tillegg data i nettleseren din (<code>localStorage</code> og
+    <code>Cache Storage</code>), fordi de skal virke også når nettet faller ut under en vakt:
+  </p>
+  <ul>
+    <li><strong>Stemplinger som ikke er sendt ennå</strong> — fra bilens skjerm og vaktlista — til nettet er tilbake.</li>
+    <li><strong>Siste utgave av vaktlista</strong>, med navn og telefonnummer på mannskapet, så den kan leses uten nett.</li>
+    <li><strong>Valgene dine</strong> — filtre, kolonner, lyd av eller på, «Del posisjon» og sist valgte liste.</li>
+  </ul>
+  <p>
+    <strong>«Logg ut» ber nettleseren slette alt dette.</strong> Har du usendte stemplinger,
+    spør portalen først. Bruker du en delt PC, logg alltid ut.
+  </p>
+  <p>
+    Lagregistreringen (uten innlogging) husker lenken laget fikk, sist valgte lag og sted,
+    de siste registreringene så de kan angres, og en tilfeldig nøkkel for telefonen — den er
+    det som gjør at bare telefonen som sendte en registrering kan angre den. Dette blir
+    liggende til du tømmer nettleserdataene for portalen.
+  </p>
+
+  <h2 id="konto">3. Har du brukerkonto</h2>
+  <p>Dette gjelder deg som logger inn — frivillig, helsepersonell, operatør eller administrator.</p>
+  <div class="pv-tabell">
+    <table>
+      <thead><tr><th>Hva</th><th>Hvor lenge</th></tr></thead>
+      <tbody>
+        <tr><td>Brukernavn, e-postadresse (valgfri), kontotype og hvilke moduler du har tilgang til</td>
+            <td>Så lenge kontoen finnes</td></tr>
+        <tr><td>Tidspunktet for siste innlogging, og om du bruker tofaktor</td>
+            <td>Så lenge kontoen finnes</td></tr>
+        <tr><td>Innloggingsloggen: tidspunkt, IP-adresse, nettleser, om innloggingen lyktes</td>
+            <td>{{ logg_dager }} dager</td></tr>
+        <tr><td>Endringsloggen: hva du har endret, når, og fra hvilken IP-adresse</td>
+            <td>{{ logg_dager }} dager</td></tr>
+        <tr><td>Varsler du har fått i portalen</td>
+            <td>{{ varsel_dager }} dager</td></tr>
+        <tr><td>Hvor lenge siden du sist trykket eller skrev i en åpen fane. Administrator ser det i oversikten over
+                hvem som er innlogget — for å skille en glemt fane fra et menneske som er der</td>
+            <td>Til økten er over</td></tr>
+        <tr><td>Navnet ditt på pasienter du hadde ansvar for, og på en vakt du arkiverte</td>
+            <td>Følger arkivet — se under</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3">
+    <strong>Hvorfor:</strong> kontoen trengs for at du skal få tilgang til det du skal gjøre og
+    ikke mer. Innloggings- og endringsloggen føres for informasjonssikkerheten — for å kunne
+    oppklare hendelser og avdekke misbruk. Grunnlaget er korpsets berettigede interesse
+    (personvernforordningen art. 6 nr. 1 bokstav f).
+  </p>
+  <p>
+    <strong>Én ting du bør vite:</strong> når en vakt arkiveres, fryses navnet ditt på pasientene
+    du hadde ansvar for, og på arkivet hvis det var du som arkiverte. Arkivet skal vise hvem
+    som faktisk var på jobb, også etter at kontoen er slettet. Den opplysningen omfattes derfor
+    ikke fullt ut av retten til sletting; alt annet om deg kan slettes.
+  </p>
+
+  <h2 id="mannskap">4. Står du i vaktlista</h2>
+  <p>
+    Korpset fører et register over mannskapet det bemanner vaktene med. Du kan stå der uten å
+    ha brukerkonto.
+  </p>
+  <ul>
+    <li><strong>Om deg:</strong> navn, korps, kompetanser, telefonnummer (valgfritt), kobling til
+      brukerkonto hvis du har en, og et notatfelt for praktiske opplysninger. Helseopplysninger,
+      som matallergi, skal <em>ikke</em> føres der og samles inn utenfor portalen.</li>
+    <li><strong>Om vakta:</strong> hvilken plass og ressurs du er satt på, tidene dine, når du møtte
+      og gikk av, og radio-ID (ISSI) for sambandet.</li>
+    <li><strong>Overnatting:</strong> hvilket rom du sover i, for brannsikkerheten. Slettes
+      {% if frister.vaktliste %}{{ frister.vaktliste }} dager{% else %}en fast tid{% endif %} etter natta.</li>
+    <li><strong>Vaktlista som fil:</strong> under vakt sendes lista — navn, korps, rolle, skift,
+      telefon, ISSI og overnatting — på e-post til en fast mottakerliste satt av administrator,
+      slik at den finnes også om portalen er nede. Fila ber selv om å bli slettet etter vakta.</li>
+  </ul>
+  <p>
+    Grunnlaget er korpsets berettigede interesse: å vite hvem det kan bemanne med, og å nå
+    dem under vakt (art. 6 nr. 1 bokstav f). Du står i registeret så lenge du er aktiv
+    frivillig. Ved avgang deaktiveres du, og du kan slettes når ingen vakt lenger viser til deg.
+  </p>
+
+  <h2 id="posisjon">5. Posisjon til korpsets kart</h2>
+  <p>
+    Portalen kan sende posisjoner til korpsets eget kart, kart.sanitet.net, som har samme
+    behandlingsansvarlige. <strong>Portalen lagrer ingen posisjon selv.</strong>
+  </p>
+  <ul>
+    <li><strong>Bil med enhetsskjerm:</strong> bilens posisjon sendes når mannskapet stempler en
+      status, og når noen trykker «Send posisjon». Telefonen spør om lov først, og et nei stopper
+      ingenting annet. «Del posisjon» på skjermen slår av sendingen ved stempling; KO ser da at
+      den er av, men ikke hvor bilen er. I kartet står bare siste posisjon, og den slettes
+      24 timer etter siste melding.</li>
+    <li><strong>Lag:</strong> lagregistreringen sender lagets posisjon bare når noen trykker «Send
+      posisjon til KO». Den vises i kartet i {{ delt_posisjon_min }} minutter og slettes så.
+      Ellers sendes bare stedsnavnet der KO har plassert laget — ingen koordinater.</li>
+    <li>KO-loggen noterer <em>at</em> en posisjon ble delt, og til når — aldri <em>hvor</em>.</li>
+    <li>Ingen helseopplysninger går til kartet.</li>
+  </ul>
+  <p>
+    Formålet er oversikt over egne ressurser under vakt, og mannskapets sikkerhet: en bil som
+    ikke svarer på sambandet kan finnes der den sist stemplet. Grunnlaget er berettiget
+    interesse (art. 6 nr. 1 bokstav f).
+  </p>
+
+  <h2 id="lag">6. Lagregistreringen</h2>
+  <p>
+    Lagene registrerer på en egen side uten innlogging: tid, sted, lag, problemstilling, antall
+    og utfall. Det registreres <strong>ingen navn eller andre identifikatorer</strong>, men en
+    sjelden problemstilling på et bestemt sted og klokkeslett kan likevel peke på en person.
+    Registreringene slettes {% if frister.park %}{{ frister.park }} dager{% else %}etter en fast tid{% endif %}
+    etter at de kom inn.
+  </p>
+
+  <h2 id="pasient">7. Er du pasient</h2>
+  <p>
+    Pasienter bruker ikke portalen selv, men denne delen gjelder deg som har fått hjelp av
+    sanitetsvakten på et arrangement.
+  </p>
+  <ul>
+    <li><strong>Vi registrerer ikke</strong> navn, fødselsnummer, fødselsdato, adresse eller annen
+      kontaktinformasjon. Du får et løpenummer.</li>
+    <li><strong>Vi registrerer</strong> hva du kom for (fra en fast liste), hastegrad, hvordan du kom
+      og dro, hvem som hjalp deg, om du fikk medisiner, tidspunkter, og om det er ført journal i
+      helsetjenestens eget journalsystem (bare «ja» eller «nei»). Portalen er en arbeidstavle for
+      vakten, ikke journalen din.</li>
+    <li>Rykker en bil ut til deg, registreres oppdraget uten noen identifikator og uten kobling til
+      pasienttavlen.</li>
+    <li><strong>Grunnlag:</strong> å verne liv og helse (art. 6 nr. 1 bokstav d), og administrasjon av
+      helsehjelpen under arrangementet (art. 9 nr. 2 bokstav h). Alle med tilgang har
+      taushetsplikt — helsepersonell etter loven, de andre gjennom signert taushetserklæring.</li>
+    <li>Etter vakta arkiveres opplysningene{% if pasientarkiv_mnd %} i {{ pasientarkiv_mnd }} måneder{% endif %}.
+      Deretter slettes de, og bare anonym statistikk står igjen.</li>
+  </ul>
+  <p>
+    Siden du ikke står med navn, må du kunne vise hvilken registrering som er din for å bruke
+    rettighetene dine — for eksempel med arrangement og omtrentlig tidspunkt.
+  </p>
+
+  <h2 id="hvem">8. Hvem behandler opplysningene</h2>
+  <p>
+    Bare de som trenger det for vakta får tilgang, og bare til de modulene de har fått. I tillegg
+    behandler disse leverandørene opplysninger på korpsets vegne:
+  </p>
+  <div class="pv-tabell">
+    <table>
+      <thead><tr><th>Hvem</th><th>Hva</th></tr></thead>
+      <tbody>
+        <tr><td>Railway</td><td>Driften av portalen og databasen, i EU (Nederland).</td></tr>
+        <tr><td>Scaleway</td><td>Sikkerhetskopier, i EU (Nederland). Krypteres før de forlater portalen, med en nøkkel Scaleway ikke har.</td></tr>
+        <tr><td>Cloudflare</td><td>Nettverket foran portalen: trafikken mellom nettleseren din og portalen går gjennom Cloudflare.</td></tr>
+        <tr><td>AhaSend</td><td>E-post fra portalen: invitasjoner, «Glemt passord», vaktlista som fil og driftsvarsler.</td></tr>
+        <tr><td>kart.sanitet.net</td><td>Korpsets eget kart, se punkt 5.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3">
+    Opplysningene selges ikke og deles ikke med forsikringsselskaper, arbeidsgivere,
+    annonsører eller andre. Utlevering til myndigheter skjer bare der loven krever det.
+  </p>
+
+  <h2 id="lagring">9. Hvor lenge</h2>
+  <p>
+    Fristene står ved hver opplysning over. For sikkerhetskopiene gjelder egne frister:
+    portalens modulkopier ligger {{ offsite_dager }} dager hos Scaleway, og kopien av hele
+    databasen — med brukerkontoene — {{ offsite_full_dager }} dager. Noe som er slettet i
+    portalen kan derfor finnes i en sikkerhetskopi til den fristen er ute. Kopiene brukes bare
+    til å gjenopprette etter en feil.
+  </p>
+
+  <h2 id="sikkerhet">10. Sikkerhet</h2>
+  <ul>
+    <li>All trafikk går kryptert (HTTPS). Passord lagres aldri i klartekst.</li>
+    <li>Tofaktor-innlogging, og sperre etter gjentatte feilede forsøk.</li>
+    <li>Tilgang gis per modul og nivå; uten tilgang ser kontoen ingenting.</li>
+    <li>Endringer logges med hvem, når og hvor fra.</li>
+    <li>Sikkerhetskopiene krypteres før de forlater portalen.</li>
+  </ul>
+
+  <h2 id="rettigheter">11. Dine rettigheter</h2>
+  <p>
+    Du kan be om <strong>innsyn</strong> i hva som er registrert om deg, få feil
+    <strong>rettet</strong>, be om <strong>sletting</strong> eller <strong>begrenset</strong> bruk,
+    få opplysningene <strong>utlevert</strong> i et maskinlesbart format, og <strong>protestere</strong>
+    mot behandling som bygger på berettiget interesse. Skriv til
+    <a href="mailto:{{ kontakt }}">{{ kontakt }}</a>; du får svar innen en måned.
+  </p>
+  <p>
+    Mener du at opplysningene dine behandles i strid med reglene, kan du klage til
+    <a href="https://www.datatilsynet.no" rel="noopener">Datatilsynet</a>.
+  </p>
+
+  <p class="pv-dempet mt-4 mb-0">Sist endret 12. oktober 2026.</p>
+</main>
+</body>
+</html>

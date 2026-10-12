@@ -9,6 +9,7 @@ Struktur (fra Fase 2):
 - /portal-admin/     → all administrasjon (brukere, moduler, logger, backup, status)
 - /healthz/          → health-check (ingen auth, brukes av Railway)
 - /robots.txt        → crawler-sperre (ingen auth)
+- /personvern/       → personvernerklæringen (ingen auth)
 - /django-admin/     → kun i DEBUG/offline, se under
 """
 from django.conf import settings
@@ -16,6 +17,7 @@ from django.contrib import admin
 from django.urls import path, include
 
 from core.manifest import manifest_view
+from core.personvern import personvern_view
 from core.robots import robots_txt
 from core.health import healthz
 
@@ -30,6 +32,11 @@ urlpatterns = [
     # hvorfor denne og X-Robots-Tag-headeren begge trengs.
     path('robots.txt', robots_txt, name='robots_txt'),
     path('manifest.webmanifest', manifest_view, name='manifest'),
+
+    # Personvernerklæringen — INGEN auth: informasjonsplikten gjelder før noen
+    # gir fra seg opplysninger, og lagene på /lag/r/ har ingen konto. Se
+    # core/personvern.py.
+    path('personvern/', personvern_view, name='personvern'),
 
     # Kontoer og administrasjon. Modulen mountes på root fordi den betjener
     # både /accounts/ (innlogging) og /portal-admin/ (brukeradmin) — se

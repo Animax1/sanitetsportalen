@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-12 — Personvernside med informasjonskapsler i footeren: `/personvern/`  `#personvern`
+
+**Hvorfor:** André, 12. okt.: «Vi har ingen personvern side på nettsiden som blant annet
+forklarer om vår bruk av cookies og personopplysninger til brukerene. Jeg tenker den bør stå
+nede i footer.» Brukerne — mannskap, operatører, lagene — er registrerte selv, og har krav på
+informasjon etter art. 13. Erklæringen fantes bare som del B i
+`docs/PERSONVERN_DOKUMENTASJON.md`, som ingen av dem leser.
+
+**Siden:** `/personvern/` (`core/personvern.py`, `core/templates/core/personvern.html`),
+**uten innlogging** — informasjonsplikten gjelder *før* noen gir fra seg opplysninger, og
+lagene på `/lag/r/` har ingen konto. Står i `AAPNE` i `core/sikkerhetsruter.py`, og i
+`MustChangePasswordMiddleware.ALLOWED_PATHS`. Kontakt: **personvern@sanitet.net**.
+Innhold: ansvarlig og kontakt; **informasjonskapslene** (`sessionid`, `csrftoken`,
+`mfa_trusted_<id>`, `messages` — alle strengt nødvendige, så **ingen cookie-banner**,
+ekomloven § 3-15) og **lokal lagring** (offline-køene, vaktlista i Cache Storage,
+visningsvalg, lagregistreringens nøkler — og at «Logg ut» sletter det); brukerkontoen;
+mannskapsregisteret med overnatting og vaktlista som fil på e-post; posisjon til kartet;
+lagregistreringen; pasientene; leverandørene; lagringstid; sikkerhet; rettigheter.
+
+**Lenken** står i footeren i `base_portal`, i brukermenyen på pasientsiden (som ikke har
+footer), og nederst på innloggingen, kontoflatene, 403 og lagregistreringen
+(`partials/_personvernlenke.html`). `core/tests_personvern.py` krever den på **hver mal med
+egen `<head>`** — samme mønster som miljømerket.
+
+**Tallene hentes fra koden, ikke skrevet av.** En erklæring som oppgir feil lagringstid er
+verre enn ingen. Sesjonstiden (`sesjonstid_timer()`, nå én funksjon for middlewaren og siden),
+«delt posisjon», logg- og varselfristene i `purge_old_logs`, offsitefristene
+(`FORVENTET_DAGER`), tofaktor-tilliten og arkivfristen leses der de håndheves; modulenes
+frister (lagene, overnattingen) gjennom `core/opprydding.py`, så `core` ikke importerer en
+modul. **En test feiler hvis en frist skrives inn i malen for hånd** — bare kartets 24 timer
+står som tekst, fordi kartet håndhever den.
+
+**Del B i personverndokumentet er erstattet av en peker** (v1.21): den hadde glidd fra del A
+— én backupfrist, ingen cookies, intet mannskapsregister. To tekster om det samme er to kilder.
+Del A er fasit for hva som gjøres, siden for hva som sies.
+
+**Funnet underveis — står i «Krever Andre»:** **Cloudflare** og **AhaSend** behandler
+personopplysninger uten å stå i A.2. Cloudflare terminerer TLS foran Railway, så all trafikk
+går gjennom den; A.8s «ingen overføring utenfor EU/EØS» er ikke vurdert mot den. Siden
+navngir begge — de registrerte har krav på å vite det — men påstår ingenting om avtale eller
+sted. Og teksten bør godkjennes av korpset før `main`.
+
+**14 mutanter, alle drept.** To overlevde første runde, og ingen av dem var et hull i
+koden: `'logg_dager': 365` gikk grønn fordi `730 dager` også står ved lagene og offsite —
+testen fant tallet et annet sted (mønster 1 i `CLAUDE.md`), og fikk kontrollverdier som bare
+kan stå ett sted. `'pasientarkiv_mnd': 24` var en no-op (mønster 2) og døde med de samme.
+Resten: unntaket i passordmiddlewaren, klemmen og kallstedet i `sesjonstid_timer()`, to
+frister skrevet for hånd i malen, lenken fjernet fra innloggingen og footeren, `try` rundt
+handlerne, `@require_safe`, `AAPNE`-raden, offsitefristene byttet, varselfristen skrevet av.
+
 ## 2026-10-11 — Ingen av listene fikk 304 i prod: Cloudflare gjør ETag-en svak  `#core/drift`
 
 **Hvorfor:** TODO-punktet «Treffer ETag-en på bilens poll?» (7. okt., funnet under «Annet

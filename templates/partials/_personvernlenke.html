@@ -1,0 +1,9 @@
+{% comment %}
+Lenken til personvernerklæringen (12. okt. 2026) på de frittstående sidene —
+innloggingen, kontoflatene, feilsiden og lagregistreringen. Portalsidene har den i
+footeren i base_portal, pasientsiden i brukermenyen. `core/tests_personvern.py`
+krever at hver side med egen <head> har den, på den ene eller andre måten.
+{% endcomment %}
+<p class="personvernlenke" style="text-align:center;margin:1.25rem 0 0;font-size:0.8rem;">
+  <a href="{% url 'personvern' %}" style="color:#94a3b8;">Personvern og informasjonskapsler</a>
+</p>

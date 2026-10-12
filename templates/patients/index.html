@@ -96,6 +96,8 @@
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:#e5e7eb;"><i class="bi bi-person-circle me-2"></i>Min profil</a></li>
         <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
+        {# Pasientsiden har ingen footer — personvernlenken står her (12. okt. 2026). #}
+        <li><a class="dropdown-item" href="{% url 'personvern' %}" style="color:#e5e7eb;"><i class="bi bi-shield-lock me-2"></i>Personvern</a></li>
         {% if er_global_admin %}
         <li><a class="dropdown-item" href="{% url 'portaladmin:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
         {% endif %}

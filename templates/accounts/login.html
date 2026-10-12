@@ -80,6 +80,7 @@
   </form>
   <a href="/accounts/glemt-passord/" class="btn btn-link w-100 mt-2"
      style="color:#94a3b8;font-size:0.85rem;">Glemt passord?</a>
+  {% include "partials/_personvernlenke.html" %}
 </div>
 <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
 <script nonce="{{ csp_nonce }}">

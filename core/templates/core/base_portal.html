@@ -203,6 +203,7 @@
        Footeren står igjen: den bærer byggnummeret staging verifiseres mot. */
     margin-top: 0.5rem;
   }
+  .portal-footer a { color: inherit; }
 
   /* ──── Felles komponenter: se static/css/portal.css ──── */
 </style>
@@ -334,6 +335,7 @@
   <span class="portal-versjon" title="Bygg {{ versjon.bygg }}{% if versjon.dato %} · {{ versjon.dato|date:'j. M Y H:i' }}{% endif %}">
     &middot; {{ versjon.bygg }}{% if versjon.dato %} &middot; {{ versjon.dato|date:'d.m.Y' }}{% endif %}
   </span>
+  &middot; <a href="{% url 'personvern' %}">Personvern</a>
 </footer>
 
 <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>

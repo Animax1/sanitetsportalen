@@ -43,6 +43,19 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       i, og kom tilbake: skjermen skal fortsatt holdes våken. **Bilrutinen:** telefonen står i
       lader — skjerm på hele vakta tømmer batteriet og gjør telefonen varm.
 
+- [ ] **Les `/personvern/` på staging, og få teksten godkjent for Kverneland Røde Kors før
+      den går til `main`** (12. okt. 2026). Det er korpset som er behandlingsansvarlig, og
+      siden taler på korpsets vegne. Sjekk samtidig at **personvern@sanitet.net** finnes og
+      at noen leser den — siden lover svar innen en måned. Teksten står i
+      `core/templates/core/personvern.html`; tallene hentes fra koden.
+
+- [ ] **Cloudflare og AhaSend inn i behandlingsprotokollen** (A.2 og A.8). Begge behandler
+      personopplysninger og står navngitt på `/personvern/`, men ikke i protokollen.
+      **Cloudflare** står foran Railway og terminerer TLS, så all trafikk går gjennom den i
+      klartekst: finn avtalegrunnlaget (art. 28) for kontoen, og vurder A.8s «ingen overføring
+      utenfor EU/EØS» — Cloudflare er amerikansk med et globalt nett. **AhaSend:** før inn
+      avtalen som finnes (se punktet om e-postinnhold under). Merknaden står i A.2.
+
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
       - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:

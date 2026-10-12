@@ -680,6 +680,11 @@ for hånd. `core/tests_manifest.py` håndhever alle tre og leser hjørnepikslene
 statusmelding (`core/statusmelding.py`). JS som setter `document.title` går gjennom
 `fanetittel()`. `core/tests_statusmerke.py` håndhever.
 
+**…og lenker til `/personvern/`** (12. okt. 2026): `partials/_personvernlenke.html`, eller
+`{% url 'personvern' %}` der siden har en meny. Erklæringen er åpen uten innlogging, og
+fristene den oppgir hentes fra koden (`core/personvern.py`) — skriv aldri en frist inn i
+malen. `core/tests_personvern.py` håndhever begge.
+
 **`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
 `--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,
 `--text-soft`, `--surface-3` eller `--header-bg`. En udefinert custom property gjør ikke

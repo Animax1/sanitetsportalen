@@ -31,6 +31,7 @@ AAPNE = {
     'healthz/': 'Railways helsesjekk',
     'robots.txt': 'søkemotorer',
     'manifest.webmanifest': 'ikonene, før innlogging — se core/manifest.py',
+    'personvern/': 'personvernerklæringen — informasjonsplikten gjelder før innlogging, se core/personvern.py',
     'accounts/login/': 'innloggingen',
     'accounts/glemt-passord/': 'glemt passord, før innlogging',
     'accounts/reset/<str:token>/': 'lenken fra glemt passord — tokenet er tilgangen',

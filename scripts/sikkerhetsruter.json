@@ -206,6 +206,7 @@
   "/healthz/",
   "/lag/r/",
   "/manifest.webmanifest",
+  "/personvern/",
   "/robots.txt",
   "/vaktliste/sw.js"
  ],
