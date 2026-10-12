@@ -19,6 +19,7 @@
 |---|---|
 | Behandlingsansvarlig | Kverneland Røde Kors |
 | Systemansvarlig | André Eritsland |
+| Eier av systemene | **André Eritsland** — eier, drifter og utvikler både portalen og kart.sanitet.net. Korpset eier dem ikke (André, 12. okt. 2026) |
 | Kontakt for personvern | **personvern@sanitet.net** — adressen de registrerte får, på `/personvern/` (fra 12. okt. 2026) |
 | Kontakt, systemansvarlig | andre.eritsland@gmail.com |
 | Geografisk plassering | Rogaland, Norge |
@@ -27,6 +28,15 @@ Behandlingsansvaret gjelder både portalen og kart.sanitet.net. Korpset bestemme
 midler — at det føres pasientregistrering på vakt, hvem som får konto, hva som registreres —
 og er derfor behandlingsansvarlig. Systemansvarlig drifter og utvikler systemet på korpsets
 vegne, og er kontaktpunktet for henvendelser etter A.14 og for avvik etter A.15.
+
+> **Eierskap og behandlingsansvar er to ting** (12. okt. 2026). André Eritsland *eier*
+> portalen og kartet; korpset *er behandlingsansvarlig* for opplysningene i dem. Det er en
+> vanlig og gyldig konstruksjon, men den har en konsekvens etter art. 28: den som behandler
+> personopplysninger på vegne av en behandlingsansvarlig, uten å være ansatt der, er
+> **databehandler**, og forholdet skal være regulert i en **skriftlig databehandleravtale**
+> mellom korpset og ham. En slik avtale er ikke dokumentert her. Leverandørene i A.2 er i så
+> fall **underdatabehandlere** til ham dersom kontoene står på ham, og korpset skal ha
+> godkjent bruken av dem (art. 28 nr. 2). Står i `TODO.md` under «Krever Andre».
 
 Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd med gjeldende personvernregelverk, herunder EUs personvernforordning (GDPR) og lov om behandling av personopplysninger (personopplysningsloven) av 2018.
 
@@ -1156,6 +1166,8 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
   del A (én backupfrist, ingen cookies, ingen mannskapsregister). **Kontaktadressen er
   personvern@sanitet.net** (A.1, A.14). **A.2:** merknad om at Cloudflare og AhaSend behandler
   personopplysninger uten å være ført inn med avtalegrunnlag — står som åpent punkt.
+  **A.1:** André Eritsland eier portalen og kartet; korpset er behandlingsansvarlig. Merknad om
+  at han da er databehandler, og at databehandleravtalen (art. 28) ikke er dokumentert.
 - **v1.20 (10.10.2026):** **Slettefrist på oppdragets frie tekst** (A.6 tiltak 5, A.9, A.12):
   `Oppdrag.fritekst` og «Annet sted»-teksten slettes 3 dager etter siste aktivitet på
   oppdraget. Restrisikoen «står i oppdragstabellen til oppdraget slettes eller arkiveres»

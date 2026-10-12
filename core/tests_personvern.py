@@ -46,6 +46,7 @@ class SidenTests(TestCase):
         self.assertEqual(svar.status_code, 200)
         self.assertContains(svar, 'personvern@sanitet.net')
         self.assertContains(svar, 'Kverneland Røde Kors')
+        self.assertContains(svar, 'eies, driftes og utvikles av <strong>André Eritsland</strong>')
         self.assertContains(svar, '<code>sessionid</code>', html=False)
 
     def test_tar_ikke_imot_skriving(self):

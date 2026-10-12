@@ -46,6 +46,15 @@ går gjennom den; A.8s «ingen overføring utenfor EU/EØS» er ikke vurdert mot
 navngir begge — de registrerte har krav på å vite det — men påstår ingenting om avtale eller
 sted. Og teksten bør godkjennes av korpset før `main`.
 
+**Eierskapet rettet samme dag** (André: «Korpset eier ikke sanitetsportalen eller
+kart.sanitet. Det gjør jeg. Korpset står som behandlingsansvarlig for begge.»). Siden sa at
+portalen «driftes av korpsets systemansvarlige på korpsets vegne», og at leverandørene
+behandlet «på korpsets vegne». Nå: eid og driftet av André Eritsland, som behandler på
+oppdrag fra korpset (`EIER` i `core/personvern.py`). **Konsekvensen står i A.1 og «Krever
+Andre»:** eier og behandlingsansvarlig er to parter, og da er eieren **databehandler** —
+forholdet krever en skriftlig **databehandleravtale** (art. 28), og leverandørene blir
+underdatabehandlere korpset skal ha godkjent. Ingen slik avtale er dokumentert.
+
 **14 mutanter, alle drept.** To overlevde første runde, og ingen av dem var et hull i
 koden: `'logg_dager': 365` gikk grønn fordi `730 dager` også står ved lagene og offsite —
 testen fant tallet et annet sted (mønster 1 i `CLAUDE.md`), og fikk kontrollverdier som bare

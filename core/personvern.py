@@ -41,6 +41,9 @@ from core.opprydding import all_handlers
 #: `docs/PERSONVERN_DOKUMENTASJON.md` A.1, A.14 og B.
 KONTAKT = 'personvern@sanitet.net'
 BEHANDLINGSANSVARLIG = 'Kverneland Røde Kors'
+#: Eier og driver portalen og kartet; behandler på oppdrag fra korpset (André, 12. okt. 2026:
+#: «Korpset eier ikke sanitetsportalen eller kart.sanitet. Det gjør jeg.»). Se A.1.
+EIER = 'André Eritsland'
 
 
 def modulfrister() -> dict[str, int]:
@@ -71,6 +74,7 @@ def personvern_kontekst() -> dict:
     return {
         'kontakt': KONTAKT,
         'behandlingsansvarlig': BEHANDLINGSANSVARLIG,
+        'eier': EIER,
         'sesjon_timer': sesjonstid_timer(),
         'logg_dager': DEFAULT_LOG_DAYS,
         'varsel_dager': DEFAULT_NOTIFICATION_DAYS,

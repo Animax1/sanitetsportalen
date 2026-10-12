@@ -49,6 +49,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       at noen leser den — siden lover svar innen en måned. Teksten står i
       `core/templates/core/personvern.html`; tallene hentes fra koden.
 
+- [ ] **Databehandleravtale mellom Kverneland Røde Kors og deg** (art. 28). Du eier og drifter
+      portalen og kart.sanitet.net, korpset er behandlingsansvarlig — da er du databehandler,
+      og forholdet skal stå i en skriftlig avtale: hva du behandler, at du bare gjør det etter
+      korpsets instruks, taushetsplikt, sikkerhet, avvik, sletting når samarbeidet slutter, og
+      at korpset godkjenner leverandørene (Railway, Scaleway, Cloudflare, AhaSend) som
+      underdatabehandlere. Datatilsynet har veiledning om hva den skal inneholde. Før den inn i A.1/A.2 når den er signert.
+      **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
+
 - [ ] **Cloudflare og AhaSend inn i behandlingsprotokollen** (A.2 og A.8). Begge behandler
       personopplysninger og står navngitt på `/personvern/`, men ikke i protokollen.
       **Cloudflare** står foran Railway og terminerer TLS, så all trafikk går gjennom den i
