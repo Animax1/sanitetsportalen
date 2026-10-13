@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-13 — Utskrift av KO-loggen: `/ko/utskrift/`, med alt — også kommentarene i hendelsene  `#ko/hendelseslogg`
+
+**Hvorfor:** §4.2 sa at loggen skal være «utskrivbar», og det var ikke bygget. TODO, 18. sep.:
+«med alt, kronologisk» — loggstrømmen viser ikke kommentarene inne i hendelsene, og
+utskriften er stedet der ingenting «bare ble sagt inne i hendelsen». Den leses rundt et bord
+i gjennomgangen etter et arrangement, og er papirreserve når portalen er nede.
+
+**Hva:** skriverikonet i loggstrømmens hode åpner `/ko/utskrift/` i ny fane — en lys
+dokumentside (ingen Bootstrap), «Skriv ut»-knapp, `@media print` som skjuler verktøylinja og
+gjentar tabellhodet på hver side. **Hendelser** øverst (nummer, tittel, sted, prioritet,
+melder, lag, opprettet/lukket med hvem), deretter **hele loggen** med dagskille, tid,
+H-nummer, hvem (delt konto og ansvarsområde) og tekst. Merker: «rettet, skrevet 11:45»,
+«chat», «delt med enhetene», «festet». Fjernede linjer: «Innholdet er fjernet av …», uten
+tekst. Advarsel øverst om helseopplysninger og makulering.
+
+**Samme rader som skjermen:** `_til_dict` og `_hendelse_til_dict`, i `gjeldende()` sin
+rekkefølge — en rettet linje står der den ble skrevet, med rettet tid; systemlinjene har
+skjermens ordlyd. Tidene går gjennom `localtime` før dag og klokkeslett.
+
+**Tidligere vakter:** `?vakt=<pk>` krever `skriv_leder` (403 for `les`), og vaktvelgeren
+vises bare for dem. Det dekker TODO-punktet **«Historikkflate: lese tidligere vakters
+logg»**, som er slettet: nivået fantes, linjene overlever arkiveringen, og flaten var det
+som manglet. Vil André ha historikken interaktivt i `/ko/` også, er det et nytt punkt.
+
+**Rutene:** 215 (KO 44). `scripts/sikkerhetsruter.json` regenerert — ruta er stengt anonymt.
+
+**13 mutanter, alle drept** (`ko/tests_utskrift.py`, 15 tester). To overlevde første runde,
+begge hull i testene: sortering på `tidspunkt` i stedet for skrivingen (ingen test skrev en
+linje senere med tidligere klokkeslett), og dagskille per linje i stedet for per dag (to
+linjer på to dager gir to skiller begge veier — en tredje linje samme dag skiller dem).
+Resten: tidligere-vakt-sperra fjernet og senket til `les`, alle rader i stedet for
+`gjeldende()`, hendelseskommentarene filtrert bort, `localtime` fjernet, dag tatt av
+UTC-tidspunktet (fanget fordi testen bruker UTC rundt midnatt — prod-formen), porten hevet
+til `skriv_full`, `isdigit`-sjekken fjernet, `|safe` på teksten, fjernet-grenen fjernet,
+lenken fra KO fjernet.
+
 ## 2026-10-13 — Utkast til databehandleravtale for portalen og kartet  `#personvern`
 
 **Hvorfor:** André eier portalen og kart.sanitet.net, mens Kverneland Røde Kors er

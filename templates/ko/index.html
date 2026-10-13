@@ -229,6 +229,10 @@
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="meldinger">Meldinger</button>
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="system">System</button>
           </div>
+          {# Utskriften (13. okt. 2026): hele loggen, også kommentarene i hendelsene. #}
+          <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}"
+             target="_blank" rel="noopener" title="Skriv ut hele loggen — også det som står i hendelsene"
+             aria-label="Skriv ut loggen"><i class="bi bi-printer"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
                   data-action="koApneEgetVindu" data-arg="logg"
                   title="Åpne i eget vindu — for skjerm to" aria-label="Åpne loggstrømmen i eget vindu">

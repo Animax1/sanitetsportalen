@@ -178,7 +178,6 @@ eller sendt på e-post reserven.
 - [ ] **Vaktlista:** les og utskrift offline er i hovedsak på plass (service workeren, 24 t;
       utskriftsstilen; fila på e-post fra `vaktliste/fil.py`). Vurder om **merknadene** skal
       med i fila på e-post — i dag har den telefon og ISSI, men ikke merknad, med vilje.
-- [ ] **`/ko/`: utskrift av loggen** (står også under KO: «utskriften skal ha alt»).
 - [ ] **`/ko/`: logglinjer offline.** Passer naturlig: en linje *legges til*, ingen konflikt,
       og `Logglinje` skiller allerede `tidspunkt` (når det skjedde) fra `registrert_at` (når
       det kom inn). Samme kø-mønster som stemplingene i vaktlista og bilen. Tavla og
@@ -753,26 +752,6 @@ Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i
 *Pulje 2 (loggen) er levert 17. sep. 2026 — se CHANGELOG. De to valgene som blokkerte
 er besvart: 730 dager som en `AppSetting` (ikke en Railway-variabel), ingen SHA-signatur,
 og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
-
-- [ ] **Historikkflate: lese tidligere vakters logg.** Nivået finnes alt
-      (`skriv_leder`, `ko/module.py`) og linjene overlever vaktarkiveringen, så dette er
-      en flate og ikke en datamodell. Den kan tas alene når som helst; billigst sammen
-      med den puljen som uansett trenger en «velg vakt»-kontroll, og det er nå pulje 5
-      (hendelser) etter omstokkingen 17. sep. 2026.
-
-      **Vinduet som betyr noe er de tre ukene etter vakta**, ikke året etter: §4.2 sier
-      loggen er «i praksis et dokument man leser etter et arrangement der noe gikk galt»,
-      og det leses dager til uker etter. Årsgamle logger er sekundærbruken.
-
-      `les` gir aktiv vakt og skal fortsette å gjøre det — en ny operatør på vakt i kveld
-      har ingen operativ grunn til å lese fjorårets helseopplysninger (André, 17. sep.).
-
-- [ ] **Utskrift av loggen.** §4.2 sier den skal være «utskrivbar», og det er ikke bygget.
-      Det er ikke pynt: skal loggen leses i en gjennomgang etter et arrangement, leses den
-      av flere samtidig rundt et bord. Rendres server-side fra de samme `_til_dict`-radene,
-      slik at papiret og skjermen sier det samme. **Og med alt, kronologisk** (18. sep.
-      2026): loggstrømmen på skjermen viser ikke kommentarene inne i hendelsene, og
-      utskriften er stedet der ingenting «bare ble sagt inne i hendelsen».
 
 *Pulje 3 (ressursoversikten) er levert 17. sep. 2026 — se CHANGELOG. Projeksjonen, den
 tredje kilden (`ko.Ressursstatus`) og tavla i venstre kolonne. Rutingflagget er **ikke**

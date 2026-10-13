@@ -6,6 +6,7 @@ nivåer:
 | Handling | Krav |
 |---|---|
 | Se siden, lese loggen og hendelsene, polle | `les` |
+| Skrive ut loggen for aktiv vakt (`/ko/utskrift/`) | `les` — for en tidligere vakt `skriv_leder` |
 | Skrive en linje, rette en linje, feste og løsne en linje | `skriv_full` |
 | Opprette, redigere, prioritere, lukke og gjenåpne en hendelse, bli med | `skriv_full` |
 | Knytte et oppdrag til en hendelse | `skriv_full` i **både** `ko` og `oppdrag` — det skriver på oppdraget |
@@ -29,14 +30,15 @@ fire trengs for å fullføre én handling, og en skjult fane er en fane du ikke 
 har endret seg.
 
 **Loggen er scopet til aktiv vakt**, og det er ikke bare et filter: `les`
-betyr «denne vakta». Tidligere vakters logg er `skriv_leder` og har ennå ingen
-flate — se `ko/module.py` og `TODO.md`.
+betyr «denne vakta». Tidligere vakters logg er `skriv_leder`, og flaten er
+utskriften (`utskrift_view`, 13. okt. 2026) — se `ko/module.py`.
 """
 from __future__ import annotations
 
 
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -350,6 +352,77 @@ def logg_view(request):
         # Delingstilstanden, hel hver gang (19. sep. 2026) — en angret deling
         # er fravær, og fravær kommer aldri gjennom `?siden=`.
         'delte': services.delte_for_vakt(vakt),
+    })
+
+
+@never_cache
+@modul_kreves('ko', 'les')
+@require_http_methods(['GET'])
+@rate_limit(group='ko:utskrift', rate='30/m', method='GET', on_limit='html')
+def utskrift_view(request):
+    """Loggen som papir (§4.2: «utskrivbar»; TODO, 18. sep. 2026).
+
+    **Alt, i fortellingens rekkefølge.** Loggstrømmen på skjermen skjuler
+    kommentarene inne i hendelsene (`koIStrommen`); utskriften er stedet der
+    ingenting «bare ble sagt inne i hendelsen» — den leses rundt et bord i
+    gjennomgangen etter et arrangement, og som reserve når portalen er nede.
+    Rekkefølgen er `gjeldende()` sin, ikke `tidspunkt`: en rettet linje står
+    der den ble skrevet, med den rettede tida, som på skjermen.
+
+    **Samme rader som skjermen:** `_til_dict` og `_hendelse_til_dict` tegner
+    begge, så papiret og skjermen sier det samme — også systemlinjenes
+    ordlyd. Det eneste som legges til er tidene som lokale tidspunkter.
+
+    **`?vakt=<pk>` for en tidligere vakt krever `skriv_leder`** — samme
+    dataminimering som historikken ellers (`ko/CLAUDE.md`, «Nivåene»): `les`
+    betyr «denne vakta». Fjernede linjer står som «fjernet av …», uten tekst.
+    """
+    from core.models import Vakt
+
+    aktiv = hent_aktiv_vakt()
+    kan_historikk = har_tilgang(request.user, 'ko', 'skriv_leder')
+    vakt = aktiv
+    oppgitt = request.GET.get('vakt')
+    if oppgitt:
+        if not oppgitt.isdigit():
+            raise Http404
+        vakt = get_object_or_404(Vakt, pk=int(oppgitt))
+        if vakt.pk != aktiv.pk and not kan_historikk:
+            raise PermissionDenied
+
+    def lokal(tid):
+        return timezone.localtime(tid) if tid else None
+
+    linjer = []
+    for linje in Logglinje.objects.gjeldende(vakt):
+        rad = _til_dict(linje)
+        rad.update(tid=lokal(linje.tidspunkt), registrert=lokal(linje.registrert_at),
+                   fjernet_tid=lokal(linje.fjernet_at), dag=lokal(linje.tidspunkt).date())
+        linjer.append(rad)
+
+    hendelser = []
+    for h in sorted(services.hendelser_for(vakt), key=lambda h: h.hendelsesnummer):
+        rad = _hendelse_til_dict(h)
+        rad.update(opprettet=lokal(h.opprettet_at), lukket=lokal(h.lukket_at),
+                   prioritet_navn=h.get_prioritet_display())
+        hendelser.append(rad)
+
+    vakter = []
+    if kan_historikk:
+        vakter = list(Vakt.objects.filter(ko_logglinjer__isnull=False)
+                      .distinct().order_by('-startet'))
+        if aktiv not in vakter:
+            vakter.insert(0, aktiv)
+
+    return render(request, 'ko/utskrift.html', {
+        'vakt': vakt,
+        'er_aktiv': vakt.pk == aktiv.pk,
+        'linjer': linjer,
+        'hendelser': hendelser,
+        'antall_system': sum(1 for l in linjer if l['systemkode']),
+        'antall_fjernet': sum(1 for l in linjer if l['fjernet']),
+        'vakter': vakter,
+        'utskrevet': timezone.localtime(),
     })
 
 

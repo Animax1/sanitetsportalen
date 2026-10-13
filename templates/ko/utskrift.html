@@ -1,0 +1,149 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% include "partials/_ikoner.html" %}
+<title>{{ miljo.fane }}KO-logg – {{ vakt.navn }}</title>
+{% comment %}
+  Utskriften av KO-loggen (13. okt. 2026) — `utskrift_view` i ko/views.py.
+  **Et dokument, ikke en portalside:** lys, uten Bootstrap og uten portal-utils,
+  som vaktlista som fil. Linjene er de samme radene som skjermen
+  (`_til_dict`), i `gjeldende()` sin rekkefølge, og **med alt** — også
+  kommentarene inne i hendelsene, som loggstrømmen skjuler.
+{% endcomment %}
+<style>
+  :root { --tekst: #111827; --dempet: #4b5563; --linje: #d1d5db; --flate: #f3f4f6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ffffff; color: var(--tekst);
+         font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+  h1 { font-size: 1.35rem; margin: 0 0 .15rem; }
+  h2 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+  .meta, .dempet { color: var(--dempet); }
+  .verktoy { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+             margin: .75rem 0 1rem; padding: .6rem .75rem; background: var(--flate);
+             border-radius: 8px; }
+  .verktoy button, .verktoy select { font: inherit; padding: .3rem .7rem; }
+  .advarsel { border-left: 4px solid #b45309; background: #fffbeb; padding: .5rem .75rem;
+              margin: .5rem 0 1rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: .3rem .4rem;
+           border-bottom: 1px solid var(--linje); }
+  th { font-weight: 600; background: var(--flate); }
+  thead { display: table-header-group; }   /* hodet gjentas på hver side */
+  tr { break-inside: avoid; }
+  .tid { white-space: nowrap; width: 4.6rem; font-variant-numeric: tabular-nums; }
+  .h { white-space: nowrap; width: 3.2rem; font-weight: 600; }
+  .hvem { width: 11rem; }
+  .tekst { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .dag td { background: var(--flate); font-weight: 700; }
+  .system .tekst { color: var(--dempet); font-style: italic; }
+  .fjernet .tekst { color: var(--dempet); }
+  .merke { display: inline-block; font-size: .78em; border: 1px solid var(--linje);
+           border-radius: 4px; padding: 0 .3rem; margin-left: .3rem; color: var(--dempet);
+           font-style: normal; }
+  .tom { color: var(--dempet); font-style: italic; }
+  footer { margin-top: 1.5rem; }
+  @media print {
+    @page { margin: 14mm 12mm; }
+    body { font-size: 10.5pt; }
+    main { max-width: none; padding: 0; }
+    .verktoy, .personvernlenke, .statusmerker-side { display: none !important; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  {% include "partials/_statusmerke.html" with variant="side" %}
+
+  <div class="verktoy">
+    <button type="button" id="skriv-ut">Skriv ut</button>
+    {% if vakter %}
+      <form method="get" action="">
+        <label for="vakt-valg">Vakt:</label>
+        <select name="vakt" id="vakt-valg">
+          {% for v in vakter %}
+            <option value="{{ v.pk }}"{% if v.pk == vakt.pk %} selected{% endif %}>{{ v.navn }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Vis</button>
+      </form>
+    {% endif %}
+    <a href="{% url 'ko_index' %}">Tilbake til KO</a>
+  </div>
+
+  <h1>KO-logg — {{ vakt.navn }}</h1>
+  <div class="meta">
+    {{ linjer|length }} linje{{ linjer|length|pluralize:"r" }}, herav {{ antall_system }} systemlinje{{ antall_system|pluralize:"r" }}{% if antall_fjernet %} og {{ antall_fjernet }} fjernet{% endif %}
+    · {{ hendelser|length }} hendelse{{ hendelser|length|pluralize:"r" }}
+    · Skrevet ut {{ utskrevet|date:"j. F Y H:i" }} av {{ request.user.username }}{% if not er_aktiv %} · tidligere vakt{% endif %}
+  </div>
+  <p class="advarsel">
+    Loggen kan inneholde helseopplysninger. Papiret oppbevares og makuleres etter korpsets rutine,
+    og skal ikke ligge igjen på stedet.
+  </p>
+
+  <h2>Hendelser</h2>
+  {% if hendelser %}
+  <table>
+    <thead>
+      <tr><th class="h">Nr.</th><th>Tittel</th><th>Sted</th><th>Prioritet</th><th>Melder</th>
+          <th>Lag</th><th>Opprettet</th><th>Lukket</th></tr>
+    </thead>
+    <tbody>
+    {% for h in hendelser %}
+      <tr>
+        <td class="h">{{ h.kode }}</td>
+        <td>{{ h.tittel }}</td>
+        <td>{{ h.lokasjon_navn|default:"–" }}</td>
+        <td>{{ h.prioritet_navn }}</td>
+        <td>{{ h.melder_tekst|default:"–" }}</td>
+        <td>{% for l in h.lag %}{{ l.navn }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
+        <td class="tid">{{ h.opprettet|date:"j.n. H:i" }}<br><span class="dempet">{{ h.opprettet_av }}</span></td>
+        <td class="tid">{% if h.lukket %}{{ h.lukket|date:"j.n. H:i" }}<br><span class="dempet">{{ h.lukket_av }}</span>{% else %}Åpen{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="tom">Ingen hendelser i vakta.</p>
+  {% endif %}
+
+  <h2>Loggen</h2>
+  {% if linjer %}
+  <table>
+    <thead>
+      <tr><th class="tid">Tid</th><th class="h">Hendelse</th><th class="hvem">Ført av</th><th>Tekst</th></tr>
+    </thead>
+    <tbody>
+    {% for l in linjer %}
+      {% ifchanged l.dag %}
+        <tr class="dag"><td colspan="4">{{ l.dag|date:"l j. F Y"|capfirst }}</td></tr>
+      {% endifchanged %}
+      <tr class="{% if l.systemkode %}system{% endif %}{% if l.fjernet %} fjernet{% endif %}">
+        <td class="tid">{{ l.tid|date:"H:i" }}</td>
+        <td class="h">{% if l.hendelse_nummer %}H{{ l.hendelse_nummer }}{% endif %}</td>
+        <td class="hvem">{% if l.systemkode %}System{% else %}{{ l.forfatter|default:"–" }}{% if l.delt_konto %} <span class="merke">delt konto</span>{% endif %}{% if l.ansvarsomraade %}<br><span class="dempet">{{ l.ansvarsomraade }}</span>{% endif %}{% endif %}</td>
+        <td class="tekst">{% if l.fjernet %}<span class="tom">Innholdet er fjernet av {{ l.fjernet_av|default:"–" }} {{ l.fjernet_tid|date:"j.n. H:i" }}</span>{% else %}{{ l.tekst }}{% endif %}{% if l.korrigerer %}<span class="merke">rettet, skrevet {{ l.registrert|date:"H:i" }}</span>{% endif %}{% if l.uformell %}<span class="merke">chat</span>{% endif %}{% if l.delt_at %}<span class="merke">delt med enhetene</span>{% endif %}{% if l.festet_at %}<span class="merke">festet</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="tom">Ingen linjer i loggen.</p>
+  {% endif %}
+
+  <footer class="dempet">
+    Rekkefølgen er den linjene ble skrevet i. En rettet linje står der den opprinnelig ble skrevet,
+    med rettet tid.
+  </footer>
+  {% include "partials/_personvernlenke.html" %}
+</main>
+<script nonce="{{ csp_nonce }}">
+  document.getElementById('skriv-ut').addEventListener('click', function () { window.print(); });
+</script>
+</body>
+</html>

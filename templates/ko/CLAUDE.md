@@ -98,7 +98,9 @@ Uten livstegn åpnes klikket her igjen. Én skjerm 2, ingen «fest» (André). *
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`) — og «OBS: … delte posisjon» også
 når den hører til en hendelse (8. okt. 2026), oransje (`ls-posisjon`, `h-linje.posisjon`);
 kommentarene står i hendelsen.
-Utskriften skal ha alt (TODO). **Alle | Meldinger | System** filtrerer strømmen
+**Utskriften har alt** (`/ko/utskrift/`, 13. okt. 2026 — skriverikonet i strømmens hode, ny
+fane): også kommentarene i hendelsene, i `gjeldende()` sin rekkefølge, fra de samme
+`_til_dict`-radene. Se `ko/CLAUDE.md`. **Alle | Meldinger | System** filtrerer strømmen
 (`koLoggfilterTreffer`, huskes per nettleser); **festede står uansett**, og hodet teller
 det filtrerte.
 

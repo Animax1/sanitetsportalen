@@ -62,6 +62,7 @@
   "/ko/api/tavle/plasseringer/1/",
   "/ko/api/tavle/uten-plass/",
   "/ko/api/tilstede/",
+  "/ko/utskrift/",
   "/lag/",
   "/lag/api/lenker/",
   "/lag/api/lenker/1/fjern/",

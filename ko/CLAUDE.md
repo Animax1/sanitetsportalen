@@ -29,6 +29,7 @@ uten at noen rykket ut.
 | Løftet selv | `ko/signals.py` |
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
 | **Hendelsene**: nummer, opprett, rediger, prioritet, bli med, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse`, `HendelseDeltaker` |
+| **Utskriften**: hele loggen og hendelsene, lys side for papir | `utskrift_view` i `ko/views.py`, `templates/ko/utskrift.html`, `ko/tests_utskrift.py` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
 | KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
 | «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
@@ -136,6 +137,15 @@ oppsettet; løft hendelsen, ikke feltet; én linje per ting som skjedde.**
 Vaktlistas stemplinger: «ikke nå» — volumet drukner loggen.
 
 ### 4. Historikk krever `skriv_leder` — se «Nivåene» over.
+
+**Utskriften er flaten for den** (13. okt. 2026): `/ko/utskrift/` gir aktiv vakt på `les`,
+og `?vakt=<pk>` en tidligere på `skriv_leder` (403 ellers) — vaktvelgeren vises bare for
+dem. Den viser **alt**, også kommentarene inne i hendelsene som strømmen skjuler, i
+`gjeldende()` sin rekkefølge og fra de samme `_til_dict`/`_hendelse_til_dict`-radene som
+skjermen; fjernede linjer som «Innholdet er fjernet av …». Tidene går gjennom
+`timezone.localtime` før dag og klokkeslett, og testen bruker UTC-tider rundt midnatt —
+prod-formen. Lesing logges ikke, som ellers (innsynslogg er fravalgt, A.12); siden sier at
+papiret skal makuleres etter korpsets rutine.
 
 ## Logglinja: tre valg i modellen som ser ut som detaljer
 
