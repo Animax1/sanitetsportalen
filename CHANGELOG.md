@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-13 — G2: `ko/views.py` delt etter flate, `user_detail_view` som dispatch-tabell  `#ko` `#accounts` `#gjeld`
+
+**Hvorfor:** Gjeldsplanen 25. sep. 2026, G2. `ko/views.py` var 1 354 linjer med seks flater
+i én fil; `user_detail_view` var 216 linjer med åtte `elif`-grener på `action`. André: «se
+enormt nøye gjennom den og spesielt rundt all ny kode vi har gjort her må vi være nøye og
+varsomme.» Derfor er dette en ren flytting, og hvert ledd er **bevist** uendret, ikke lest.
+
+**KO — seks filer, ingen linje skrevet om.** Fila ble klippet maskinelt på
+seksjonsmerkene: `views.py` (siden, loggen, ansvar, tilstede, hjelperne),
+`views_hendelser.py`, `views_innstillinger.py` (`VERDILISTER`, `NULLSTILL`),
+`views_tavle.py`, `views_program.py`, `views_utskrift.py` (`utskrift_view`, `sw_view`).
+`ko/urls.py` peker på hver. Tilgangstabellen står fortsatt i docstringen til `views.py`,
+med et kart over filene.
+
+**Funnet underveis: tavla brukte en hjelper fra programmet.** `_heltall_eller_none` sto
+under «Programmet», men ble kalt fire steder i tavleseksjonen *over* den — det virket bare
+fordi alt lå i én modul og navnet ble slått opp ved kjøring. Klippet rett, ville
+`views_tavle.py` gitt `NameError` på `folger_id`, `lokasjon_id` og pause-ref-ene. Den er
+flyttet til «Hjelpere» i `views.py`. Pyflakes fant den; en gjennomlesing hadde ikke.
+
+**`user_detail_view` — `_BRUKERHANDLINGER`.** `action` → én funksjon per handling
+(`_handling_rediger`, `_handling_frys`, `_handling_to`, …), kroppene klippet ut maskinelt
+og bare dedentert. En handler returnerer en omdirigering eller `None`; `None` betyr «tegn
+siden med det som ligger i `side`» — de to som gjør det er et ugyldig skjema og
+«Nytt midlertidig passord». Modulenes kontokoblinger slås opp etter tabellen.
+**Rekkefølgen er snudd** — før sto `edit` først og koblingene som nummer to, så en kobling
+med navnet `freeze` ville vunnet; nå ville den aldri blitt kalt. Ingen kobling heter noe
+fra tabellen (`link_patient_role`, `sett_vaktliste_korps`), og
+`accounts/tests_brukerhandlinger.py` holder det slik — da er rekkefølgen uten betydning.
+
+**Bevisene** (skriptene ligger ikke i repoet):
+
+| Hva | Resultat |
+|---|---|
+| Rutekartet før/etter — 319 ruter: navn, funksjon (`__qualname__`), hele dekoratørkjeden | Identisk. 25 KO-ruter har ny `__module__`; de ni verdilistene lages av `core.verdilister` og står uendret |
+| AST per toppnivånavn i alle `ko/views*.py` (59 navn) | **Identisk for alle** — også `_heltall_eller_none` etter flyttingen |
+| AST per toppnivånavn i `accounts/views.py` | Bare `user_detail_view` endret; ti nye navn, ingen borte |
+| Differensialtest, accounts: 20 scenarioer mot gammel og ny fil — hver handling, «deg selv»-sperrene, ugyldig skjema, ukjent og tom `action`, begge koblingene gyldig og ugyldig | **Identisk**: status, `Location`, meldinger, kontoens felter, passord byttet, modultilganger, auditrader, sesjoner, bundne skjemaer og feilfelt, alle 35 kontekstnøkler |
+| Differensialtest, KO: 13 lesestier × 4 profiler, gammel mot ny | Identisk: status, innholdstype, `Cache-Control`, `X-Ko-Kopi`, `Service-Worker-Allowed`, nøklene i JSON-svarene og seksjonene i utskriften. Eneste forskjell var klokkeminuttet i to overskrifter |
+| `scripts/sikkerhetsruter.json` regenerert | Uendret |
+| Pyflakes på alle `ko/views*.py`, `ko/urls.py`, `accounts/views.py` | Rent (unntatt `import string` i `accounts/views.py`, ubrukt også før — ikke rørt) |
+
+**Mutasjonstesting, `_BRUKERHANDLINGER`: 9 mutanter, 9 drept** — svaret returneres ikke;
+`thaw` fjernet; ugyldig redigering legger ikke skjemaene i `side`; midlertidig passord
+legges ikke i `side`; ugyldig kobling legges ikke i `side`; koblingene kalles aldri;
+`freeze` → tø; koblingen sender ikke videre; `reset_mfa` → logg ut. Kjørt mot `accounts` og
+`vaktliste.tests_kontokorps`. **«Tø konto» hadde ingen test før** — den har det nå.
+KO-delingen er ikke mutert: ingen regel ble skrevet om, og AST-likheten er et sterkere
+bevis enn en mutant.
+
+**Gjenstår av G2:** `vaktliste/views.py`, `vaktliste/services.py`, og `oppdrag/services.py`
+etter G6b (TODO).
+
 ## 2026-10-13 — KO-utskriften: alle vinduene alltid, ressursene med, og kopien uten nett  `#ko`
 
 **Hvorfor:** André: «KO har bare personlige brukere med mfa. Så nr 2 er aktuelt. Og husk

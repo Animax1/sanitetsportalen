@@ -19,7 +19,7 @@
  *     etterlater ingenting. Aldri en omdirigering — en utgått sesjon gir
  *     innloggingssiden, og den skal ikke bli «utskriften».
  *
- * Serveres av ko.views.sw_view, ikke fra /static/ — en worker styrer bare
+ * Serveres av ko.views_utskrift.sw_view, ikke fra /static/ — en worker styrer bare
  * stier under sin egen. «Logg ut» sletter cachen og workeren
  * (`Clear-Site-Data`).
  */

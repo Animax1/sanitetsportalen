@@ -410,8 +410,8 @@ Ingen av disse gjør skade i dag. Hver av dem gjør neste endring dyrere.
 | `vaktliste/views.py` | 1 692 | |
 | `vaktliste/services.py` | 1 678 | |
 | `oppdrag/services.py` | 1 619 | |
-| `accounts/views.py` | 1 463 | `user_detail_view` er 216 linjer med åtte `action`-grener, og bør bli en dispatch-tabell |
-| `ko/views.py` | 1 394 | Deles etter flate, som `views_verdier` i oppdrag |
+| `accounts/views.py` | 1 463 | `user_detail_view` er 216 linjer med åtte `action`-grener, og bør bli en dispatch-tabell. *Levert 13. okt. 2026, se CHANGELOG* |
+| `ko/views.py` | 1 394 | Deles etter flate, som `views_verdier` i oppdrag. *Levert 13. okt. 2026: seks filer, se CHANGELOG* |
 
 **G3. Pasientsiden er et eget skall.** Den har egen header, klokke og bjelle. Funn A8 er ett
 eksempel på hva det koster. Fjern `updateClock` og last `portal-clock.js` nå. *(Levert 26. sep. 2026.)* På sikt:

@@ -203,9 +203,11 @@ virkeligheten, og rekkefølgen under følger av det.*
       faner i en time, og tallene inn i `docs/RUNBOOK_VAKT.md` der det står «Mål på
       staging» — se «Skalering mot 2027» under Ideer.
 - [ ] **Etter vakta:** arkivering, deretter G6b, og G6c i en *senere* `main`-push (se under).
-- [ ] **G2 (store filer) før frysingen, men ikke `oppdrag/services.py` før G6b** — ellers
-      skrives samme fil om to ganger med vakta imellom. `accounts/views.py`
-      (`user_detail_view` som dispatch-tabell) og `ko/views.py` er uavhengige.
+- [ ] **G2 (store filer): `vaktliste/views.py`, `vaktliste/services.py` og
+      `oppdrag/services.py` gjenstår — men ikke `oppdrag/services.py` før G6b**, ellers
+      skrives samme fil om to ganger med vakta imellom. Metoden fra `accounts/views.py` og
+      `ko/views.py` (CHANGELOG 13. okt. 2026): AST per toppnivånavn og rutekart før og
+      etter, og en differensialtest mot den gamle fila.
 
 ### Kodegjennomgangen 25. sep. 2026 — se [`docs/PLAN_TEKNISK_GJELD_2026-09-25.md`](./docs/PLAN_TEKNISK_GJELD_2026-09-25.md)
 
@@ -266,7 +268,7 @@ konsertplanlegger. Utenom kjernetid 2 som dekker alt. Minst to skjermer per plas
 
 - [ ] **«+ Planlegg» er `skriv_full` i KO i dag** — André: «Alle i første omgang, kan være vi
       strammer inn på det». Porten sitter i `tavle_pauser_view` og `tavle_pause_view`
-      (`ko/views.py`); skal den bli KO-lederens, er det `_kan_lede_ko(request)` der og
+      (`ko/views_tavle.py`); skal den bli KO-lederens, er det `_kan_lede_ko(request)` der og
       `koKanFjerne()` for knappen i `koTavleRadHtml`. «Flytt nå» bør da fortsatt være
       `skriv_full` — å trykke er å føre tavla, ikke å planlegge.
 

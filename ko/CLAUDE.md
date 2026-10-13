@@ -22,7 +22,7 @@ uten at noen rykket ut.
 | Hvem har KO oppe (sidebaren) | `ko/tilstede.py` |
 | Sesjonsloopen den bygger på | `core/sesjoner.py` — delt med adminflaten |
 | Modulens nivåer | `ko/module.py` — `les`, `skriv_full`, `skriv_leder` fra pulje 2 |
-| Siden og endepunktene | `ko/views.py`, `ko/urls.py` |
+| Siden og endepunktene | `ko/urls.py`; `ko/views.py` (siden, loggen, tilgangstabellen) og `views_hendelser`, `_innstillinger`, `_tavle`, `_program`, `_utskrift` — delt etter flate i G2 |
 | Logglinja og «nyeste i kjeden vinner» | `ko/models.py` |
 | Reglene: tid, tekst, retting, sletting, frist | `ko/services.py` |
 | **Hvilke systemhendelser som løftes inn, og hvorfor** | `ko/systemlinjer.py` |
@@ -31,7 +31,7 @@ uten at noen rykket ut.
 | **Hendelsene**: nummer, opprett, rediger, prioritet, bli med, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse`, `HendelseDeltaker` |
 | **Utskriften** — alle vinduene, og kopien uten nett | `ko/utskrift.py` (delene, gatene, kopiregelen), `utskrift_view`, `sw_view`, `static/js/ko-sw.js`, `koKopiStart` i `ko.js`, `templates/ko/utskrift.html`, `ko/tests_utskrift.py` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
-| KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
+| KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views_innstillinger.py`, fanene via `verdifaner_ekstra` |
 | «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
 | **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |

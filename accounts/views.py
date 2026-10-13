@@ -1111,14 +1111,254 @@ def invitasjon_view(request, token):
     })
 
 
+# ── Brukerdetaljene: én handler per `action` ──────────────────────────────────
+
+def _handling_rediger(request, user, side):
+    """«Lagre» i skjemaet: feltene, rollen og modultilgangene."""
+    mfa_for = user.mfa_required
+    rolle_for = user.role
+    # Verdiene før, for auditraden per endret felt (B2) — `form.save()`
+    # skriver dem over på samme objekt.
+    foer = {f: getattr(user, f) for f in AdminUserEditForm.Meta.fields}
+    form = AdminUserEditForm(request.POST, instance=user)
+    # Som ved opprettelse: gjøres kontoen delt i samme lagring, gjelder
+    # regelen for delte kontoer matrisen også (FORSLAG_KO §5.2). I dag
+    # ville `form.is_valid()` alt ha satt flagget på `user` i minnet —
+    # men da hang regelen på rekkefølgen av to linjer, og de sto i
+    # motsatt rekkefølge fram til 8. okt. 2026.
+    skjema_ok = form.is_valid()
+    tilgang_form = ModulTilgangForm(
+        request.POST, bruker=user,
+        blir_delt=skjema_ok and bool(form.cleaned_data.get('er_delt_konto')))
+    if skjema_ok and tilgang_form.is_valid():
+        # Sletting og frys sperrer «deg selv» og «siste admin»;
+        # redigering gjorde det ikke (13. sep. 2026, M7). Uten
+        # Django-admin i prod finnes ingen nødutgang.
+        sperre = _kan_degraderes(user, request.user, form.cleaned_data.get('role'), rolle_for)
+        if sperre:
+            messages.error(request, sperre)
+            return redirect('portaladmin:user_detail', pk=user.pk)
+        form.save()
+
+        # Rolleendring ble ikke loggført i det hele tatt: frysing og
+        # sletting skrev auditrad, men det å gi noen admin gjorde det
+        # ikke. Modultilgang loggføres per modul som endres.
+        # **Hvert felt som faktisk endret seg** (26. sep. 2026, B2). Bare
+        # rollen ble logget; `email`, `fullt_navn`, `mfa_required` og
+        # `er_delt_konto` kunne endres sporløst — og en endret e-post er
+        # veien til en passordlenke.
+        for felt, gammel in foer.items():
+            ny = getattr(user, felt)
+            if ny != gammel:
+                _log_user_admin_action(
+                    request, user, 'UPDATE', field_name=felt,
+                    old_value=str(gammel), new_value=str(ny),
+                )
+        for slug, fra, til in tilgang_form.save(user):
+            _log_user_admin_action(
+                request, user, 'UPDATE', field_name=slug,
+                old_value=fra or 'ingen', new_value=til or 'ingen',
+                table_name='accounts_modultilgang',
+            )
+
+        # Slås «Krev MFA» på mens brukeren har en levende sesjon,
+        # gjelder kravet ikke for dem før cookien dør — de kan ha
+        # timer igjen. Sesjonene avsluttes derfor med det samme, slik
+        # at neste pålogging faktisk går gjennom MFA-oppsettet.
+        # Dette er en sikkerhetsinnstilling; å la den vente på en
+        # cookie ville gjort den valgfri i praksis.
+        if user.mfa_required and not mfa_for:
+            avslutt_alle_sesjoner(user)
+            messages.success(
+                request,
+                f'Bruker oppdatert. «{user.username}» er logget ut, '
+                f'slik at MFA settes opp ved neste pålogging.',
+            )
+        else:
+            messages.success(request, 'Bruker oppdatert.')
+        return redirect('portaladmin:user_detail', pk=user.pk)
+
+    # Ugyldig: siden tegnes med skjemaene og feilene i dem.
+    side.update(form=form, tilgang_form=tilgang_form)
+
+
+def _handling_kontokobling(request, user, side, handler):
+    """Et skjema en modul har meldt inn gjennom `core/kontokobling.py`."""
+    # Handlingsnavnet peker på nøyaktig én modul — registeret avviser
+    # to handlere som deler det, for da ville den ene lagret den
+    # andres skjema.
+    skjema = handler.skjema(user, request.POST)
+    side['kontokoblinger'][handler.slug] = skjema
+    if skjema.is_valid():
+        skjema.save()
+        messages.success(request, handler.suksessmelding)
+        return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_send_invitasjon(request, user, side):
+    """Ny invitasjonslenke på e-post."""
+    # Ny lenke på forespørsel. Den gamle dør ikke av at en ny lages —
+    # begge peker på samme passord-avtrykk — men begge utløper etter
+    # tre døgn, og den første som brukes dreper resten.
+    if not kan_inviteres(user):
+        messages.error(
+            request,
+            'Kontoen kan ikke inviteres: den mangler e-post, eller '
+            'den er en delt konto.',
+        )
+    elif send_invitasjon(user, request):
+        # En invitasjon er en lenke som setter passord (B2).
+        _log_user_admin_action(request, user, 'UPDATE', field_name='invitasjon',
+                               new_value=user.email)
+        messages.success(
+            request, f'Ny invitasjon er sendt til {user.email}.',
+        )
+    else:
+        messages.error(
+            request,
+            'Invitasjonen kunne ikke sendes. Sjekk e-postoppsettet, '
+            'eller sett et passord manuelt.',
+        )
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_logg_ut(request, user, side):
+    """«Logg ut overalt»."""
+    # Avslutt sesjonene uten å røre kontoen. Til forskjell fra «frys»
+    # kan brukeren logge inn igjen med det samme — poenget er at de
+    # må *gjennom* innloggingen på nytt.
+    #
+    # Utløst av et konkret behov: slår admin på «Krev MFA» mens
+    # brukeren har sju timer igjen av sesjonen, gjelder ikke MFA for
+    # den personen før cookien dør av seg selv.
+    if user.pk == request.user.pk:
+        messages.error(
+            request,
+            'Du kan ikke logge ut deg selv herfra — bruk Logg ut i menyen.',
+        )
+        return redirect('portaladmin:user_detail', pk=user.pk)
+
+    avslutt_alle_sesjoner(user)
+    _log_user_admin_action(
+        request, user, 'UPDATE',
+        field_name='sessions', old_value='active', new_value='cleared',
+    )
+    messages.success(
+        request,
+        f'«{user.username}» er logget ut. Neste pålogging går gjennom '
+        f'hele innloggingen på nytt.',
+    )
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_frys(request, user, side):
+    """Frys kontoen og avslutt sesjonene."""
+    # Frys = deaktiver kontoen OG slett aktive sesjoner i samme
+    # operasjon. Uten sesjonsslettingen kan en allerede innlogget
+    # bruker fortsette å jobbe til cookien utløper.
+    if user.pk == request.user.pk:
+        messages.error(request, 'Du kan ikke fryse din egen konto.')
+        return redirect('portaladmin:user_detail', pk=user.pk)
+
+    user.is_active = False
+    user.save(update_fields=['is_active'])
+    avslutt_alle_sesjoner(user)
+    _log_user_admin_action(
+        request, user, 'UPDATE',
+        field_name='is_active', old_value='True', new_value='False',
+    )
+    tatt_av_vakt = _ta_enhet_av_vakt(user)
+    messages.success(
+        request,
+        f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
+        + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
+        + 'Bruk «Tø konto» for å reversere.',
+    )
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_to(request, user, side):
+    """Tø en frosset konto."""
+    user.is_active = True
+    user.save(update_fields=['is_active'])
+    _log_user_admin_action(
+        request, user, 'UPDATE',
+        field_name='is_active', old_value='False', new_value='True',
+    )
+    messages.success(
+        request,
+        f'Kontoen til «{user.username}» er tødd. Brukeren kan logge inn med samme passord.',
+    )
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_laas_opp(request, user, side):
+    """Lås opp etter for mange feilede forsøk."""
+    laast_til = user.locked_until
+    # Også maskinlåsene på en delt konto — `accounts.kontolaas`.
+    kontolaas.laas_opp(user)
+    _log_user_admin_action(request, user, 'UPDATE', field_name='locked_until',
+                           old_value=str(laast_til), new_value='None')
+    messages.success(request, f'Kontoen til «{user.username}» er låst opp.')
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _handling_nytt_passord(request, user, side):
+    """Midlertidig passord, vist på siden — derfor ingen omdirigering."""
+    temp_password = lag_midlertidig_passord()
+    user.set_password(temp_password)
+    user.must_change_password = True
+    user.save(update_fields=['password', 'must_change_password'])
+
+    avslutt_alle_sesjoner(user)
+    # **Aldri passordet**, bare at det ble byttet (B2). Dette var den
+    # mest inngripende handlingen på en konto, og den eneste uten spor.
+    _log_user_admin_action(request, user, 'UPDATE', field_name='password',
+                           new_value='midlertidig passord satt av admin')
+
+    messages.success(request, 'Nytt midlertidig passord generert (vises nedenfor).')
+    side['temp_password'] = temp_password
+
+
+def _handling_nullstill_mfa(request, user, side):
+    """Nullstill MFA, som `manage.py nullstill_mfa`."""
+    # Samme tjeneste som `manage.py nullstill_mfa` — `accounts/mfa.py`.
+    mfa.nullstill_mfa(
+        user, kilde='av admin', utfort_av=request.user,
+        ip=_get_client_ip(request),
+        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+    )
+    messages.success(
+        request,
+        f'MFA nullstilt for «{user.username}» — de må sette opp på nytt ved neste pålogging.',
+    )
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+#: `action` i skjemaet → handleren (G2, 13. okt. 2026 — var åtte `elif`-grener
+#: i viewet). En handler returnerer en omdirigering, eller `None` når siden skal
+#: tegnes med det den har lagt i `side` (et ugyldig skjema, et midlertidig
+#: passord). **Navnene her går foran modulenes kontokoblinger**, og
+#: `TabellenOgKnappeneTests` i `accounts/tests_brukerhandlinger.py` holder dem fra
+#: hverandre: en kobling som tok et av dem, ville aldri blitt kalt.
+_BRUKERHANDLINGER = {
+    'edit': _handling_rediger,
+    'send_invitasjon': _handling_send_invitasjon,
+    'logg_ut': _handling_logg_ut,
+    'freeze': _handling_frys,
+    'thaw': _handling_to,
+    'unlock': _handling_laas_opp,
+    'reset_password': _handling_nytt_passord,
+    'reset_mfa': _handling_nullstill_mfa,
+}
+
+
 @never_cache
 @admin_required
 @rate_limit(group='accounts:user-detail', rate='60/m', method='POST', on_limit='html')
 def user_detail_view(request, pk):
-    """Vis og rediger brukerdetaljer."""
+    """Vis og rediger brukerdetaljer. Handlingene står i `_BRUKERHANDLINGER`."""
     user = get_object_or_404(CustomUser, pk=pk)
-    form = AdminUserEditForm(instance=user)
-    tilgang_form = ModulTilgangForm(bruker=user)
     # **Modulenes koblinger kommer gjennom registeret** (14. sep. 2026).
     # Fram til da importerte `accounts.forms` `patients.models` direkte —
     # kontoappen kjente altså én modul ved navn. Se `core/kontokobling.py`.
@@ -1126,213 +1366,23 @@ def user_detail_view(request, pk):
         all_handlers as kontokoblingshandlere,
         for_handling as kontokoblingshandler,
     )
-    kontokoblinger = {h.slug: h.skjema(user) for h in kontokoblingshandlere()}
-    temp_password = None
+    side = {
+        'form': AdminUserEditForm(instance=user),
+        'tilgang_form': ModulTilgangForm(bruker=user),
+        'kontokoblinger': {h.slug: h.skjema(user) for h in kontokoblingshandlere()},
+        'temp_password': None,
+    }
     recent_events = LoginEvent.objects.filter(user=user).order_by('-created_at')[:20]
 
     if request.method == 'POST':
         action = request.POST.get('action', '')
-
-        if action == 'edit':
-            mfa_for = user.mfa_required
-            rolle_for = user.role
-            # Verdiene før, for auditraden per endret felt (B2) — `form.save()`
-            # skriver dem over på samme objekt.
-            foer = {f: getattr(user, f) for f in AdminUserEditForm.Meta.fields}
-            form = AdminUserEditForm(request.POST, instance=user)
-            # Som ved opprettelse: gjøres kontoen delt i samme lagring, gjelder
-            # regelen for delte kontoer matrisen også (FORSLAG_KO §5.2). I dag
-            # ville `form.is_valid()` alt ha satt flagget på `user` i minnet —
-            # men da hang regelen på rekkefølgen av to linjer, og de sto i
-            # motsatt rekkefølge fram til 8. okt. 2026.
-            skjema_ok = form.is_valid()
-            tilgang_form = ModulTilgangForm(
-                request.POST, bruker=user,
-                blir_delt=skjema_ok and bool(form.cleaned_data.get('er_delt_konto')))
-            if skjema_ok and tilgang_form.is_valid():
-                # Sletting og frys sperrer «deg selv» og «siste admin»;
-                # redigering gjorde det ikke (13. sep. 2026, M7). Uten
-                # Django-admin i prod finnes ingen nødutgang.
-                sperre = _kan_degraderes(user, request.user, form.cleaned_data.get('role'), rolle_for)
-                if sperre:
-                    messages.error(request, sperre)
-                    return redirect('portaladmin:user_detail', pk=pk)
-                form.save()
-
-                # Rolleendring ble ikke loggført i det hele tatt: frysing og
-                # sletting skrev auditrad, men det å gi noen admin gjorde det
-                # ikke. Modultilgang loggføres per modul som endres.
-                # **Hvert felt som faktisk endret seg** (26. sep. 2026, B2). Bare
-                # rollen ble logget; `email`, `fullt_navn`, `mfa_required` og
-                # `er_delt_konto` kunne endres sporløst — og en endret e-post er
-                # veien til en passordlenke.
-                for felt, gammel in foer.items():
-                    ny = getattr(user, felt)
-                    if ny != gammel:
-                        _log_user_admin_action(
-                            request, user, 'UPDATE', field_name=felt,
-                            old_value=str(gammel), new_value=str(ny),
-                        )
-                for slug, fra, til in tilgang_form.save(user):
-                    _log_user_admin_action(
-                        request, user, 'UPDATE', field_name=slug,
-                        old_value=fra or 'ingen', new_value=til or 'ingen',
-                        table_name='accounts_modultilgang',
-                    )
-
-                # Slås «Krev MFA» på mens brukeren har en levende sesjon,
-                # gjelder kravet ikke for dem før cookien dør — de kan ha
-                # timer igjen. Sesjonene avsluttes derfor med det samme, slik
-                # at neste pålogging faktisk går gjennom MFA-oppsettet.
-                # Dette er en sikkerhetsinnstilling; å la den vente på en
-                # cookie ville gjort den valgfri i praksis.
-                if user.mfa_required and not mfa_for:
-                    avslutt_alle_sesjoner(user)
-                    messages.success(
-                        request,
-                        f'Bruker oppdatert. «{user.username}» er logget ut, '
-                        f'slik at MFA settes opp ved neste pålogging.',
-                    )
-                else:
-                    messages.success(request, 'Bruker oppdatert.')
-                return redirect('portaladmin:user_detail', pk=pk)
-
-        elif kontokoblingshandler(action) is not None:
-            # Handlingsnavnet peker på nøyaktig én modul — registeret avviser
-            # to handlere som deler det, for da ville den ene lagret den
-            # andres skjema.
-            handler = kontokoblingshandler(action)
-            skjema = handler.skjema(user, request.POST)
-            kontokoblinger[handler.slug] = skjema
-            if skjema.is_valid():
-                skjema.save()
-                messages.success(request, handler.suksessmelding)
-                return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'send_invitasjon':
-            # Ny lenke på forespørsel. Den gamle dør ikke av at en ny lages —
-            # begge peker på samme passord-avtrykk — men begge utløper etter
-            # tre døgn, og den første som brukes dreper resten.
-            if not kan_inviteres(user):
-                messages.error(
-                    request,
-                    'Kontoen kan ikke inviteres: den mangler e-post, eller '
-                    'den er en delt konto.',
-                )
-            elif send_invitasjon(user, request):
-                # En invitasjon er en lenke som setter passord (B2).
-                _log_user_admin_action(request, user, 'UPDATE', field_name='invitasjon',
-                                       new_value=user.email)
-                messages.success(
-                    request, f'Ny invitasjon er sendt til {user.email}.',
-                )
-            else:
-                messages.error(
-                    request,
-                    'Invitasjonen kunne ikke sendes. Sjekk e-postoppsettet, '
-                    'eller sett et passord manuelt.',
-                )
-            return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'logg_ut':
-            # Avslutt sesjonene uten å røre kontoen. Til forskjell fra «frys»
-            # kan brukeren logge inn igjen med det samme — poenget er at de
-            # må *gjennom* innloggingen på nytt.
-            #
-            # Utløst av et konkret behov: slår admin på «Krev MFA» mens
-            # brukeren har sju timer igjen av sesjonen, gjelder ikke MFA for
-            # den personen før cookien dør av seg selv.
-            if user.pk == request.user.pk:
-                messages.error(
-                    request,
-                    'Du kan ikke logge ut deg selv herfra — bruk Logg ut i menyen.',
-                )
-                return redirect('portaladmin:user_detail', pk=pk)
-
-            avslutt_alle_sesjoner(user)
-            _log_user_admin_action(
-                request, user, 'UPDATE',
-                field_name='sessions', old_value='active', new_value='cleared',
-            )
-            messages.success(
-                request,
-                f'«{user.username}» er logget ut. Neste pålogging går gjennom '
-                f'hele innloggingen på nytt.',
-            )
-            return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'freeze':
-            # Frys = deaktiver kontoen OG slett aktive sesjoner i samme
-            # operasjon. Uten sesjonsslettingen kan en allerede innlogget
-            # bruker fortsette å jobbe til cookien utløper.
-            if user.pk == request.user.pk:
-                messages.error(request, 'Du kan ikke fryse din egen konto.')
-                return redirect('portaladmin:user_detail', pk=pk)
-
-            user.is_active = False
-            user.save(update_fields=['is_active'])
-            avslutt_alle_sesjoner(user)
-            _log_user_admin_action(
-                request, user, 'UPDATE',
-                field_name='is_active', old_value='True', new_value='False',
-            )
-            tatt_av_vakt = _ta_enhet_av_vakt(user)
-            messages.success(
-                request,
-                f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
-                + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
-                + 'Bruk «Tø konto» for å reversere.',
-            )
-            return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'thaw':
-            user.is_active = True
-            user.save(update_fields=['is_active'])
-            _log_user_admin_action(
-                request, user, 'UPDATE',
-                field_name='is_active', old_value='False', new_value='True',
-            )
-            messages.success(
-                request,
-                f'Kontoen til «{user.username}» er tødd. Brukeren kan logge inn med samme passord.',
-            )
-            return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'unlock':
-            laast_til = user.locked_until
-            # Også maskinlåsene på en delt konto — `accounts.kontolaas`.
-            kontolaas.laas_opp(user)
-            _log_user_admin_action(request, user, 'UPDATE', field_name='locked_until',
-                                   old_value=str(laast_til), new_value='None')
-            messages.success(request, f'Kontoen til «{user.username}» er låst opp.')
-            return redirect('portaladmin:user_detail', pk=pk)
-
-        elif action == 'reset_password':
-            temp_password = lag_midlertidig_passord()
-            user.set_password(temp_password)
-            user.must_change_password = True
-            user.save(update_fields=['password', 'must_change_password'])
-
-            avslutt_alle_sesjoner(user)
-            # **Aldri passordet**, bare at det ble byttet (B2). Dette var den
-            # mest inngripende handlingen på en konto, og den eneste uten spor.
-            _log_user_admin_action(request, user, 'UPDATE', field_name='password',
-                                   new_value='midlertidig passord satt av admin')
-
-            messages.success(request, 'Nytt midlertidig passord generert (vises nedenfor).')
-
-        elif action == 'reset_mfa':
-            # Samme tjeneste som `manage.py nullstill_mfa` — `accounts/mfa.py`.
-            mfa.nullstill_mfa(
-                user, kilde='av admin', utfort_av=request.user,
-                ip=_get_client_ip(request),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            )
-            messages.success(
-                request,
-                f'MFA nullstilt for «{user.username}» — de må sette opp på nytt ved neste pålogging.',
-            )
-            return redirect('portaladmin:user_detail', pk=pk)
+        svar = None
+        if action in _BRUKERHANDLINGER:
+            svar = _BRUKERHANDLINGER[action](request, user, side)
+        elif (kobling := kontokoblingshandler(action)) is not None:
+            svar = _handling_kontokobling(request, user, side, kobling)
+        if svar is not None:
+            return svar
 
     # Sjekk om brukeren har MFA-enheter (for å vise/skjule nullstill-knapp)
     has_totp_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
@@ -1340,11 +1390,8 @@ def user_detail_view(request, pk):
 
     return render(request, 'accounts/user_detail.html', {
         'target_user': user,
-        'form': form,
-        'tilgang_form': tilgang_form,
-        'kontokoblinger': kontokoblinger,
+        **side,
         'kontokoblingsfragmenter': [h.mal for h in kontokoblingshandlere() if h.mal],
-        'temp_password': temp_password,
         'recent_events': recent_events,
         'has_totp_device': has_totp_device,
         'kan_slettes': kan_slettes,

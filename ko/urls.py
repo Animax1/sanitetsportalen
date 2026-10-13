@@ -9,16 +9,17 @@ URL-navnene har `ko_`-prefiks fordi navnerommet er globalt (ingen
 """
 from django.urls import path
 
-from . import views
+from . import (views, views_hendelser, views_innstillinger, views_program, views_tavle,
+               views_utskrift)
 
 urlpatterns = [
     path('', views.index_view, name='ko_index'),
     # Utskriften av loggen (13. okt. 2026): en side, ikke et API — den
     # rendres på serveren fra de samme radene som skjermen.
-    path('utskrift/', views.utskrift_view, name='ko_utskrift'),
+    path('utskrift/', views_utskrift.utskrift_view, name='ko_utskrift'),
     # Service workeren som holder utskriften uten nett. Ingen innlogging —
     # se `sw_view`.
-    path('sw.js', views.sw_view, name='ko_sw'),
+    path('sw.js', views_utskrift.sw_view, name='ko_sw'),
     path('api/tilstede/', views.tilstede_view, name='ko_api_tilstede'),
     # Eget ansvarsmerke (§5.1, pulje 6). Vises, styrer ingenting.
     path('api/ansvar/', views.ansvar_view, name='ko_api_ansvar'),
@@ -39,58 +40,58 @@ urlpatterns = [
          name='ko_api_logg_angre_deling'),
     # Hendelsene (pulje 5). Lesingen går med logg-pollen; skrivingen har
     # navngitte stier, som loggen — én regel per sti.
-    path('api/hendelser/ny/', views.hendelse_ny_view, name='ko_api_hendelse_ny'),
-    path('api/hendelser/<int:pk>/rediger/', views.hendelse_rediger_view,
+    path('api/hendelser/ny/', views_hendelser.hendelse_ny_view, name='ko_api_hendelse_ny'),
+    path('api/hendelser/<int:pk>/rediger/', views_hendelser.hendelse_rediger_view,
          name='ko_api_hendelse_rediger'),
-    path('api/hendelser/<int:pk>/lukk/', views.hendelse_lukk_view,
+    path('api/hendelser/<int:pk>/lukk/', views_hendelser.hendelse_lukk_view,
          name='ko_api_hendelse_lukk'),
-    path('api/hendelser/<int:pk>/gjenapne/', views.hendelse_gjenapne_view,
+    path('api/hendelser/<int:pk>/gjenapne/', views_hendelser.hendelse_gjenapne_view,
          name='ko_api_hendelse_gjenapne'),
-    path('api/hendelser/<int:pk>/prioritet/', views.hendelse_prioritet_view,
+    path('api/hendelser/<int:pk>/prioritet/', views_hendelser.hendelse_prioritet_view,
          name='ko_api_hendelse_prioritet'),
-    path('api/hendelser/<int:pk>/bli-med/', views.hendelse_bli_med_view,
+    path('api/hendelser/<int:pk>/bli-med/', views_hendelser.hendelse_bli_med_view,
          name='ko_api_hendelse_bli_med'),
     # Lesemerket (27. sep. 2026): «nytt siden sist du åpnet hendelsen».
-    path('api/hendelser/<int:pk>/lest/', views.hendelse_lest_view,
+    path('api/hendelser/<int:pk>/lest/', views_hendelser.hendelse_lest_view,
          name='ko_api_hendelse_lest'),
     # Lagene på hendelsen (19. sep. 2026): hele lista, differansen logges.
-    path('api/hendelser/<int:pk>/lag/', views.hendelse_lag_view,
+    path('api/hendelser/<int:pk>/lag/', views_hendelser.hendelse_lag_view,
          name='ko_api_hendelse_lag'),
     # KO-innstillingene: ansvarsområdene (18. sep. 2026).
-    path('api/ansvarsomraader/', views.ansvarsomraader_view, name='ko_api_ansvarsomraader'),
-    path('api/ansvarsomraader/rekkefolge/', views.ansvarsomraader_rekkefolge_view,
+    path('api/ansvarsomraader/', views_innstillinger.ansvarsomraader_view, name='ko_api_ansvarsomraader'),
+    path('api/ansvarsomraader/rekkefolge/', views_innstillinger.ansvarsomraader_rekkefolge_view,
          name='ko_api_ansvarsomraader_rekkefolge'),
-    path('api/ansvarsomraader/<int:pk>/', views.ansvarsomraade_detalj_view,
+    path('api/ansvarsomraader/<int:pk>/', views_innstillinger.ansvarsomraade_detalj_view,
          name='ko_api_ansvarsomraade_detalj'),
     # Nullstilling (18. sep. 2026): global admin, `confirm`, aktiv vakt.
-    path('api/nullstill/<str:hva>/', views.nullstill_view, name='ko_api_nullstill'),
+    path('api/nullstill/<str:hva>/', views_innstillinger.nullstill_view, name='ko_api_nullstill'),
     # Tavla (22. sep. 2026): lesingen i ett svar, skrivingen i navngitte stier.
-    path('api/tavle/', views.tavle_view, name='ko_api_tavle'),
-    path('api/tavle/plasser/', views.tavle_plasser_view, name='ko_api_tavle_plasser'),
-    path('api/tavle/uten-plass/', views.tavle_uten_plass_view, name='ko_api_tavle_uten_plass'),
-    path('api/tavle/plasseringer/<int:pk>/', views.tavle_plassering_view,
+    path('api/tavle/', views_tavle.tavle_view, name='ko_api_tavle'),
+    path('api/tavle/plasser/', views_tavle.tavle_plasser_view, name='ko_api_tavle_plasser'),
+    path('api/tavle/uten-plass/', views_tavle.tavle_uten_plass_view, name='ko_api_tavle_uten_plass'),
+    path('api/tavle/plasseringer/<int:pk>/', views_tavle.tavle_plassering_view,
          name='ko_api_tavle_plassering'),
-    path('api/tavle/pauser/', views.tavle_pauser_view, name='ko_api_tavle_pauser'),
-    path('api/tavle/pauser/<str:ref>/', views.tavle_pause_view, name='ko_api_tavle_pause'),
-    path('api/tavle/pauser/<str:ref>/start/', views.tavle_pause_start_view,
+    path('api/tavle/pauser/', views_tavle.tavle_pauser_view, name='ko_api_tavle_pauser'),
+    path('api/tavle/pauser/<str:ref>/', views_tavle.tavle_pause_view, name='ko_api_tavle_pause'),
+    path('api/tavle/pauser/<str:ref>/start/', views_tavle.tavle_pause_start_view,
          name='ko_api_tavle_pause_start'),
-    path('api/tavle/oppsett/', views.tavle_oppsett_view, name='ko_api_tavle_oppsett'),
+    path('api/tavle/oppsett/', views_tavle.tavle_oppsett_view, name='ko_api_tavle_oppsett'),
     # Programmet (tavleplanleggeren, steg 2 — 23. sep. 2026).
-    path('api/program/', views.program_view, name='ko_api_program'),
-    path('api/program/dekning/', views.program_dekning_view, name='ko_api_program_dekning'),
-    path('api/program/etterpaa/', views.program_etterpaa_view, name='ko_api_program_etterpaa'),
-    path('api/program/kopier/', views.program_kopier_view, name='ko_api_program_kopier'),
-    path('api/program/<int:pk>/', views.program_post_view, name='ko_api_program_post'),
-    path('api/konserttyper/', views.konserttyper_view, name='ko_api_konserttyper'),
-    path('api/konserttyper/rekkefolge/', views.konserttyper_rekkefolge_view,
+    path('api/program/', views_program.program_view, name='ko_api_program'),
+    path('api/program/dekning/', views_program.program_dekning_view, name='ko_api_program_dekning'),
+    path('api/program/etterpaa/', views_program.program_etterpaa_view, name='ko_api_program_etterpaa'),
+    path('api/program/kopier/', views_program.program_kopier_view, name='ko_api_program_kopier'),
+    path('api/program/<int:pk>/', views_program.program_post_view, name='ko_api_program_post'),
+    path('api/konserttyper/', views_innstillinger.konserttyper_view, name='ko_api_konserttyper'),
+    path('api/konserttyper/rekkefolge/', views_innstillinger.konserttyper_rekkefolge_view,
          name='ko_api_konserttyper_rekkefolge'),
-    path('api/konserttyper/<int:pk>/', views.konserttype_detalj_view, name='ko_api_konserttype_detalj'),
-    path('api/kjennetegn/', views.kjennetegn_view, name='ko_api_kjennetegn'),
-    path('api/kjennetegn/rekkefolge/', views.kjennetegn_rekkefolge_view,
+    path('api/konserttyper/<int:pk>/', views_innstillinger.konserttype_detalj_view, name='ko_api_konserttype_detalj'),
+    path('api/kjennetegn/', views_innstillinger.kjennetegn_view, name='ko_api_kjennetegn'),
+    path('api/kjennetegn/rekkefolge/', views_innstillinger.kjennetegn_rekkefolge_view,
          name='ko_api_kjennetegn_rekkefolge'),
-    path('api/kjennetegn/<int:pk>/', views.kjennetegn_detalj_view, name='ko_api_kjennetegn_detalj'),
+    path('api/kjennetegn/<int:pk>/', views_innstillinger.kjennetegn_detalj_view, name='ko_api_kjennetegn_detalj'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
-    path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,
+    path('api/oppdrag/<int:pk>/hendelse/', views_hendelser.oppdrag_hendelse_view,
          name='ko_api_oppdrag_hendelse'),
 ]
