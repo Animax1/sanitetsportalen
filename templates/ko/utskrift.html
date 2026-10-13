@@ -5,27 +5,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include "partials/_ikoner.html" %}
-<title>{{ miljo.fane }}KO-logg – {{ vakt.navn }}</title>
+<title>{{ miljo.fane }}KO – utskrift {{ utskrevet|date:"H:i" }}</title>
 {% comment %}
-  Utskriften av KO-loggen (13. okt. 2026) — `utskrift_view` i ko/views.py.
-  **Et dokument, ikke en portalside:** lys, uten Bootstrap og uten portal-utils,
-  som vaktlista som fil. Linjene er de samme radene som skjermen
-  (`_til_dict`), i `gjeldende()` sin rekkefølge, og **med alt** — også
-  kommentarene inne i hendelsene, som loggstrømmen skjuler.
+  KO på papir (13. okt. 2026) — `utskrift_view` i ko/views.py, delene i
+  ko/utskrift.py. **Et dokument, ikke en portalside:** lys, uten Bootstrap og
+  uten portal-utils, som vaktlista som fil. Hver del bygges av de samme
+  funksjonene skjermen tegnes av.
 {% endcomment %}
 <style>
   :root { --tekst: #111827; --dempet: #4b5563; --linje: #d1d5db; --flate: #f3f4f6; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #ffffff; color: var(--tekst);
          font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
-  main { max-width: 64rem; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+  main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
   h1 { font-size: 1.35rem; margin: 0 0 .15rem; }
-  h2 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+  h2 { font-size: 1.1rem; margin: 1.6rem 0 .3rem; padding-top: .4rem; border-top: 2px solid var(--tekst); }
+  h3 { font-size: .95rem; margin: .9rem 0 .25rem; }
   .meta, .dempet { color: var(--dempet); }
-  .verktoy { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  .verktoy { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center;
              margin: .75rem 0 1rem; padding: .6rem .75rem; background: var(--flate);
              border-radius: 8px; }
-  .verktoy button, .verktoy select { font: inherit; padding: .3rem .7rem; }
+  .verktoy button { font: inherit; padding: .3rem .7rem; }
+  .verktoy label { white-space: nowrap; }
   .advarsel { border-left: 4px solid #b45309; background: #fffbeb; padding: .5rem .75rem;
               margin: .5rem 0 1rem; }
   table { width: 100%; border-collapse: collapse; }
@@ -34,8 +35,8 @@
   th { font-weight: 600; background: var(--flate); }
   thead { display: table-header-group; }   /* hodet gjentas på hver side */
   tr { break-inside: avoid; }
-  .tid { white-space: nowrap; width: 4.6rem; font-variant-numeric: tabular-nums; }
-  .h { white-space: nowrap; width: 3.2rem; font-weight: 600; }
+  .tid { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .nr { white-space: nowrap; width: 3.2rem; font-weight: 600; }
   .hvem { width: 11rem; }
   .tekst { white-space: pre-wrap; overflow-wrap: anywhere; }
   .dag td { background: var(--flate); font-weight: 700; }
@@ -44,14 +45,18 @@
   .merke { display: inline-block; font-size: .78em; border: 1px solid var(--linje);
            border-radius: 4px; padding: 0 .3rem; margin-left: .3rem; color: var(--dempet);
            font-style: normal; }
+  .obs { font-weight: 700; }
   .tom { color: var(--dempet); font-style: italic; }
+  ul.enheter { margin: 0; padding-left: 1rem; }
+  .kolonner { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 1.5rem; }
   footer { margin-top: 1.5rem; }
   @media print {
-    @page { margin: 14mm 12mm; }
-    body { font-size: 10.5pt; }
+    @page { margin: 12mm 10mm; }
+    body { font-size: 10pt; }
     main { max-width: none; padding: 0; }
     .verktoy, .personvernlenke, .statusmerker-side { display: none !important; }
     a { color: inherit; text-decoration: none; }
+    h2 { break-after: avoid; }
   }
 </style>
 </head>
@@ -59,65 +64,144 @@
 <main>
   {% include "partials/_statusmerke.html" with variant="side" %}
 
-  <div class="verktoy">
-    <button type="button" id="skriv-ut">Skriv ut</button>
-    {% if vakter %}
-      <form method="get" action="">
-        <label for="vakt-valg">Vakt:</label>
-        <select name="vakt" id="vakt-valg">
-          {% for v in vakter %}
-            <option value="{{ v.pk }}"{% if v.pk == vakt.pk %} selected{% endif %}>{{ v.navn }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit">Vis</button>
-      </form>
-    {% endif %}
+  <form class="verktoy" method="get" action="">
+    <button type="button" id="skriv-ut"><b>Skriv ut</b></button>
+    {% for slug, navn in alle_deler %}
+      <label><input type="checkbox" name="vis" value="{{ slug }}"{% if slug in deler %} checked{% endif %}> {{ navn }}</label>
+    {% endfor %}
+    <button type="submit">Vis</button>
     <a href="{% url 'ko_index' %}">Tilbake til KO</a>
-  </div>
+  </form>
 
-  <h1>KO-logg — {{ vakt.navn }}</h1>
-  <div class="meta">
-    {{ linjer|length }} linje{{ linjer|length|pluralize:"r" }}, herav {{ antall_system }} systemlinje{{ antall_system|pluralize:"r" }}{% if antall_fjernet %} og {{ antall_fjernet }} fjernet{% endif %}
-    · {{ hendelser|length }} hendelse{{ hendelser|length|pluralize:"r" }}
-    · Skrevet ut {{ utskrevet|date:"j. F Y H:i" }} av {{ request.user.username }}{% if not er_aktiv %} · tidligere vakt{% endif %}
-  </div>
+  <h1>KO — {{ vakt.navn }}</h1>
+  <div class="meta">Skrevet ut {{ utskrevet|date:"l j. F Y H:i" }} av {{ request.user.username }}. Et øyeblikksbilde: det som skjer etterpå står ikke her.</div>
   <p class="advarsel">
-    Loggen kan inneholde helseopplysninger. Papiret oppbevares og makuleres etter korpsets rutine,
+    Kan inneholde helseopplysninger. Papiret oppbevares og makuleres etter korpsets rutine,
     og skal ikke ligge igjen på stedet.
   </p>
 
-  <h2>Hendelser</h2>
+{% for del in deler %}
+  {% if del == 'hendelser' %}
+  <h2>Åpne hendelser</h2>
   {% if hendelser %}
   <table>
-    <thead>
-      <tr><th class="h">Nr.</th><th>Tittel</th><th>Sted</th><th>Prioritet</th><th>Melder</th>
-          <th>Lag</th><th>Opprettet</th><th>Lukket</th></tr>
-    </thead>
+    <thead><tr><th class="nr">Nr.</th><th>Tittel</th><th>Sted</th><th>Prioritet</th><th>Melder</th>
+               <th>Lag</th><th>Oppdrag</th><th>Opprettet</th></tr></thead>
     <tbody>
     {% for h in hendelser %}
       <tr>
-        <td class="h">{{ h.kode }}</td>
+        <td class="nr">{{ h.kode }}</td>
         <td>{{ h.tittel }}</td>
         <td>{{ h.lokasjon_navn|default:"–" }}</td>
         <td>{{ h.prioritet_navn }}</td>
         <td>{{ h.melder_tekst|default:"–" }}</td>
         <td>{% for l in h.lag %}{{ l.navn }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
+        <td>{{ h.apne_oppdrag }} åpne av {{ h.antall_oppdrag }}</td>
         <td class="tid">{{ h.opprettet|date:"j.n. H:i" }}<br><span class="dempet">{{ h.opprettet_av }}</span></td>
-        <td class="tid">{% if h.lukket %}{{ h.lukket|date:"j.n. H:i" }}<br><span class="dempet">{{ h.lukket_av }}</span>{% else %}Åpen{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {% else %}<p class="tom">Ingen åpne hendelser.</p>{% endif %}
+
+  {% elif del == 'oppdrag' %}
+  <h2>Aktive oppdrag</h2>
+  {% if stengt.oppdrag %}<p class="tom">{{ stengt.oppdrag }}</p>
+  {% elif oppdrag %}
+  <table>
+    <thead><tr><th class="nr">Nr.</th><th>Opprettet</th><th>Hastegrad</th><th>Problemstilling</th>
+               <th>Sted</th><th>Status</th><th>Enheter</th><th>H</th><th>Notat</th></tr></thead>
+    <tbody>
+    {% for o in oppdrag %}
+      <tr>
+        <td class="nr">O{{ o.nummer }}</td>
+        <td class="tid">{{ o.opprettet_tid|date:"H:i" }}</td>
+        <td>{{ o.hastegrad }}{% if o.grovsortering_navn %}<br><span class="dempet">{{ o.grovsortering_navn }}</span>{% endif %}</td>
+        <td>{{ o.problemstilling }}{% if o.antall %} · {{ o.antall }}{% endif %}</td>
+        <td>{{ o.lokasjon_navn }}</td>
+        <td>{{ o.status_navn }}{% if o.status_tid %} <span class="tid dempet">{{ o.status_tid|date:"H:i" }}</span>{% endif %}
+            {% if o.trenger_ressurs %}<br><span class="obs">Trenger ressurs</span>{% endif %}
+            {% if o.avbrutt_av %}<br><span class="dempet">Avbrutt av {{ o.avbrutt_av|join:", " }}</span>{% endif %}
+            {% if o.avventer_av %}<br><span class="dempet">Avventer: {{ o.avventer_av|join:", " }}</span>{% endif %}</td>
+        <td>{% if o.enheter %}<ul class="enheter">{% for e in o.enheter %}<li>{{ e.enhet_navn }} — {{ e.status_navn }}{% if e.status_tid %} {{ e.status_tid|date:"H:i" }}{% endif %}{% if e.sted_navn %} · {{ e.sted_navn }}{% endif %}</li>{% endfor %}</ul>{% else %}–{% endif %}</td>
+        <td class="nr">{% if o.hendelse_nummer %}H{{ o.hendelse_nummer }}{% endif %}</td>
+        <td class="tekst">{{ o.fritekst }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="tom">Ingen aktive oppdrag.</p>{% endif %}
+
+  {% elif del == 'tavle' %}
+  <h2>Tavla</h2>
+  {% if stengt.tavle %}<p class="tom">{{ stengt.tavle }}</p>
   {% else %}
-    <p class="tom">Ingen hendelser i vakta.</p>
+  {% if not tavle.med_biler %}<p class="dempet">Bilene står ikke med — de krever lesetilgang i oppdragsmodulen.</p>{% endif %}
+  <table>
+    <thead><tr><th style="width:14rem">Sted</th><th>Står der nå</th></tr></thead>
+    <tbody>
+    {% for s in tavle.steder %}
+      <tr><td><b>{{ s.navn }}</b></td>
+          <td>{% for r in s.ressurser %}{{ r.navn }} <span class="dempet tid">fra {{ r.fra|date:"H:i" }}{% if r.planlagt_til %}, til {{ r.planlagt_til|date:"H:i" }}{% endif %}</span>{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>
+    {% empty %}
+      <tr><td colspan="2" class="tom">Ingen står plassert på et sted.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="kolonner">
+    <div>
+      <h3>Opptatt</h3>
+      {% for r in tavle.opptatt %}<div>{{ r.navn }} — {{ r.tekst }} <span class="dempet tid">fra {{ r.fra|date:"H:i" }}</span></div>{% empty %}<div class="tom">Ingen.</div>{% endfor %}
+    </div>
+    <div>
+      <h3>Pause</h3>
+      {% for r in tavle.pause %}<div>{{ r.navn }} <span class="dempet tid">fra {{ r.fra|date:"H:i" }}{% if r.planlagt_til %}, til {{ r.planlagt_til|date:"H:i" }}{% endif %}</span></div>{% empty %}<div class="tom">Ingen.</div>{% endfor %}
+    </div>
+    <div>
+      <h3>Uten plass</h3>
+      {% for navn in tavle.uten_plass %}<div>{{ navn }}</div>{% empty %}<div class="tom">Ingen.</div>{% endfor %}
+    </div>
+  </div>
+  <h3>Planlagt fram til {{ tavle.til|date:"j.n. H:i" }}</h3>
+  {% if tavle.planlagt %}
+  <table>
+    <thead><tr><th>Tid</th><th>Ressurs</th><th>Til</th></tr></thead>
+    <tbody>
+    {% for q in tavle.planlagt %}
+      <tr><td class="tid">{{ q.fra|date:"H:i" }}–{{ q.til|date:"H:i" }}</td><td>{{ q.navn }}</td><td>{{ q.hvor }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="tom">Ingen planlagte pauser eller flyttinger.</p>{% endif %}
   {% endif %}
 
-  <h2>Loggen</h2>
+  {% elif del == 'program' %}
+  <h2>Konsertplanleggeren — nå til {{ program.til|date:"j.n. H:i" }}</h2>
+  {% if program.poster %}
+  <table>
+    <thead><tr><th>Tid</th><th>Sted</th><th>Konsert</th><th>Beredskap</th><th>Publikum</th><th>Behov</th><th>Kjennetegn</th></tr></thead>
+    <tbody>
+    {% for p in program.poster %}
+      {% ifchanged p.fra_tid.date %}<tr class="dag"><td colspan="7">{{ p.fra_tid|date:"l j. F"|capfirst }}</td></tr>{% endifchanged %}
+      <tr>
+        <td class="tid">{{ p.fra_tid|date:"H:i" }}–{{ p.til_tid|date:"H:i" }}{% if p.pagar %}<br><span class="obs">Pågår</span>{% endif %}</td>
+        <td>{{ p.lokasjon_navn }}</td>
+        <td>{{ p.navn|default:p.konserttype_navn }}{% if p.navn and p.konserttype_navn %}<br><span class="dempet">{{ p.konserttype_navn }}</span>{% endif %}</td>
+        <td>{{ p.beredskap_navn|default:"–" }}</td>
+        <td>{{ p.publikum|default:"–" }}</td>
+        <td>{% for b in p.behov %}{{ b.gruppe_navn }}: {{ b.antall }}{% if not forloop.last %}<br>{% endif %}{% empty %}–{% endfor %}</td>
+        <td>{% for k in p.kjennetegn %}{{ k.navn }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="tom">Ingen konserter pågår eller kommer i vinduet.</p>{% endif %}
+
+  {% elif del == 'logg' %}
+  <h2>Loggen — siste {{ logg_timer }} timer, fra {{ logg_fra|date:"j.n. H:i" }}</h2>
   {% if linjer %}
   <table>
-    <thead>
-      <tr><th class="tid">Tid</th><th class="h">Hendelse</th><th class="hvem">Ført av</th><th>Tekst</th></tr>
-    </thead>
+    <thead><tr><th class="tid" style="width:4.6rem">Tid</th><th class="nr">H</th><th class="hvem">Ført av</th><th>Tekst</th></tr></thead>
     <tbody>
     {% for l in linjer %}
       {% ifchanged l.dag %}
@@ -125,21 +209,18 @@
       {% endifchanged %}
       <tr class="{% if l.systemkode %}system{% endif %}{% if l.fjernet %} fjernet{% endif %}">
         <td class="tid">{{ l.tid|date:"H:i" }}</td>
-        <td class="h">{% if l.hendelse_nummer %}H{{ l.hendelse_nummer }}{% endif %}</td>
+        <td class="nr">{% if l.hendelse_nummer %}H{{ l.hendelse_nummer }}{% endif %}</td>
         <td class="hvem">{% if l.systemkode %}System{% else %}{{ l.forfatter|default:"–" }}{% if l.delt_konto %} <span class="merke">delt konto</span>{% endif %}{% if l.ansvarsomraade %}<br><span class="dempet">{{ l.ansvarsomraade }}</span>{% endif %}{% endif %}</td>
         <td class="tekst">{% if l.fjernet %}<span class="tom">Innholdet er fjernet av {{ l.fjernet_av|default:"–" }} {{ l.fjernet_tid|date:"j.n. H:i" }}</span>{% else %}{{ l.tekst }}{% endif %}{% if l.korrigerer %}<span class="merke">rettet, skrevet {{ l.registrert|date:"H:i" }}</span>{% endif %}{% if l.uformell %}<span class="merke">chat</span>{% endif %}{% if l.delt_at %}<span class="merke">delt med enhetene</span>{% endif %}{% if l.festet_at %}<span class="merke">festet</span>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
-  {% else %}
-    <p class="tom">Ingen linjer i loggen.</p>
+  <p class="dempet">Rekkefølgen er den linjene ble skrevet i. En rettet linje står der den opprinnelig ble skrevet, med rettet tid. Kommentarene i hendelsene er med.</p>
+  {% else %}<p class="tom">Ingen linjer de siste {{ logg_timer }} timene.</p>{% endif %}
   {% endif %}
+{% endfor %}
 
-  <footer class="dempet">
-    Rekkefølgen er den linjene ble skrevet i. En rettet linje står der den opprinnelig ble skrevet,
-    med rettet tid.
-  </footer>
   {% include "partials/_personvernlenke.html" %}
 </main>
 <script nonce="{{ csp_nonce }}">

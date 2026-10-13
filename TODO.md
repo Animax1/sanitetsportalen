@@ -753,6 +753,12 @@ Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i
 er besvart: 730 dager som en `AppSetting` (ikke en Railway-variabel), ingen SHA-signatur,
 og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
 
+- [ ] **Historikkflate: lese tidligere vakters logg.** Nivået finnes alt
+      (`skriv_leder`, `ko/module.py`) og linjene overlever vaktarkiveringen, så dette er
+      en flate og ikke en datamodell. Utskriften (`/ko/utskrift/`) dekket den én dag, til
+      André 13. okt. 2026 gjorde papiret til et øyeblikksbilde av aktiv vakt (siste 8 t).
+      Tas den opp: helst i `/ko/`, med samme vaktvelger som konsertplanleggerens «Etterpå».
+
 *Pulje 3 (ressursoversikten) er levert 17. sep. 2026 — se CHANGELOG. Projeksjonen, den
 tredje kilden (`ko.Ressursstatus`) og tavla i venstre kolonne. Rutingflagget er **ikke**
 bygget; det flyttet til `/lag/`-punktet nederst, der det hører hjemme.*

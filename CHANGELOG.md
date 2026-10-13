@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-13 — KO på papir: tavla, konsertplanleggeren og oppdragene; loggen bare siste 8 timer  `#ko`
+
+**Hvorfor:** André, etter første versjon samme dag: «Vi trenger ikke vise lukkede hendelser
+og trenger nok bare loggstrøm fra de siste 8 timer. Og så må vi få utskrift av tavlen og
+ikke minst konsertplanleggeren og oppdragene.» Utskriften er dermed **papirreserven midt i
+en vakt** — et øyeblikksbilde av hva som pågår og kommer — ikke et arkiv for gjennomgangen.
+
+**Fem deler** (`ko/utskrift.py`), i papirets rekkefølge: **åpne hendelser** (lukkede står
+ikke), **aktive oppdrag** (eldste først: nr., tid, hastegrad, problemstilling, sted, status
+med «Trenger ressurs», avbrutt og avventer, hver enhet med status og tid, H-nummer, notat),
+**tavla** (hvert sted med hvem som står der og fra når, Opptatt, Pause, Uten plass, og
+planlagte pauser/flyttinger i tavlas vindu), **konsertplanleggeren** (konsertene som pågår
+— merket «Pågår» — eller kommer i tavlas vindu, med beredskap, publikum, behov per gruppe og
+kjennetegn) og **loggen siste 8 timer** (`LOGG_TIMER`), fortsatt med kommentarene i
+hendelsene og linjene i hendelser som er lukket siden.
+
+**Skriverikon i hvert vindu** — hendelsesloggen, loggstrømmen, oppdragslista, tavla og
+konsertplanleggeren — åpner sin del (`?vis=`) i ny fane; avkrysninger øverst på papiret
+velger flere. Uten `vis` kommer alt.
+
+**Samme funksjoner som skjermen, samme gater:** loggen `_til_dict`, oppdragene
+`oppdrag.views.sentralbord_liste` (skilt ut av `oppdrag_liste_view` — samme liste, ikke en
+kopi av spørringen), tavla `tavle_data`, programmet `program.poster`. Oppdragene krever
+`les` i oppdrag, tavla `les` i vaktliste og bilene `les` i oppdrag; mangler en, står en
+setning der delen skulle stått, og resten skrives ut.
+
+**Vaktvelgeren er borte, og TODO-punktet «Historikkflate» er tilbake** — 8 timer fra nå gir
+ingenting for en avsluttet vakt.
+
+**Funnet underveis:** da `sentralbord_liste` ble skilt ut, havnet funksjonen under
+`@never_cache`-dekoratoren til oppdragslista, som da mistet den. Testene fant det
+(«never_cache didn't receive an HttpRequest»); dekoratoren står igjen på viewet.
+
+**Mutasjonene: 20 — 19 drept, og den tjuende traff død kode som er fjernet** (`ko/tests_utskrift.py`, 23 tester). Første runde var
+**ugyldig** — grunnlinjen var rød av en ny test, så alle mutantene «døde» av feil grunn;
+rettet og kjørt på nytt. To overlevde den gyldige runden: forrangsfilteret for opptatte på
+tavla var **død kode** (tavla lukker plassen når ressursen blir opptatt) og er fjernet, og
+tidsvinduet for planlagte pauser var udekket — fikk en pause etter vinduet. Resten: lukkede
+hendelser med, 8-timersfilteret, `gjeldende()` byttet, `localtime` fjernet, rekkefølgen på
+oppdragene, alle tre gatene, bilene uten oppdragstilgang, «Uten plass» med de plasserte,
+konsert ferdig og konsert etter vinduet, «Pågår» alltid, standardvalget av deler, delenes
+rekkefølge, dagskille per linje, `|safe`, ikonet i tavla.
+
 ## 2026-10-13 — Utskrift av KO-loggen: `/ko/utskrift/`, med alt — også kommentarene i hendelsene  `#ko/hendelseslogg`
 
 **Hvorfor:** §4.2 sa at loggen skal være «utskrivbar», og det var ikke bygget. TODO, 18. sep.:

@@ -381,6 +381,32 @@ def enhet_vakt_view(request, pk):
 
 # ── Oppdrag ──────────────────────────────────────────────────────────────────
 
+def sentralbord_liste(vakt) -> list[dict]:
+    """Sentralbordets aktive oppdrag, nyeste først — slik `oppdrag_liste_view`
+    sender dem. Egen funksjon fordi KO-utskriften (`ko/utskrift.py`) skal skrive
+    ut **samme liste** som tavla viser, ikke en kopi av spørringen.
+
+    Ferdigstilte er ute av den aktive lista. De er ikke borte — de ligger i
+    `historikk_liste_view`, søkbare på nummer.
+    """
+    qs = list(fritekstfrist.med_siste_aktivitet(
+                  Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True))
+              .select_related('lokasjon', 'hendelse')
+              .prefetch_related('enheter__enhet', 'hendelse__lag')
+              .order_by('-created_at'))
+    gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
+    status_tid = status_tidspunkt_for(qs, gjeldende)
+    avbrutt = services.avbrutt_av_bulk([o.pk for o in qs])
+    avventer = services.avventer_av_bulk([o.pk for o in qs])
+    delte = delte_linjer_for_liste(qs)
+    return [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
+                             meldinger=gjeldende[o.pk],
+                             avbrutt_av=avbrutt.get(o.pk, []),
+                             avventer_av=avventer.get(o.pk, []),
+                             delte_linjer=delte[o.pk])
+            for o in qs]
+
+
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
@@ -426,24 +452,7 @@ def oppdrag_liste_view(request):
                                           if m.oppdragsenhet_id != kobling.pk]
                 data.append(rad)
         else:
-            # Ferdigstilte er ute av den aktive lista. De er ikke borte —
-            # de ligger i `historikk_liste_view`, søkbare på nummer.
-            qs = list(fritekstfrist.med_siste_aktivitet(
-                          Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True))
-                      .select_related('lokasjon', 'hendelse')
-                      .prefetch_related('enheter__enhet', 'hendelse__lag')
-                      .order_by('-created_at'))
-            gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
-            status_tid = status_tidspunkt_for(qs, gjeldende)
-            avbrutt = services.avbrutt_av_bulk([o.pk for o in qs])
-            avventer = services.avventer_av_bulk([o.pk for o in qs])
-            delte = delte_linjer_for_liste(qs)
-            data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
-                                     meldinger=gjeldende[o.pk],
-                                     avbrutt_av=avbrutt.get(o.pk, []),
-                                     avventer_av=avventer.get(o.pk, []),
-                                     delte_linjer=delte[o.pk])
-                    for o in qs]
+            data = sentralbord_liste(vakt)
             # **Ferdige oppdrag i historikken telles med** (André, 21. sep.
             # 2026: «ferdige oppdrag som vises i historikk vises ikke som
             # ferdig i tallstatistikken»). Et ferdig oppdrag går til
