@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 12. oktober 2026  
-**Versjon:** 1.21  
+**Siste oppdatering:** 13. oktober 2026  
+**Versjon:** 1.22  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -816,13 +816,14 @@ gate på global admin.
 ## A.11 Reserve ved bortfall av portalen og personvern
 
 Den gamle offline-modusen (lokal SQLite-kopi av pasientdata på en laptop) ble lagt ned
-13. sep. 2026. Reserven er nå avgrenset til **vaktlista**:
+13. sep. 2026. Reserven er nå **vaktlista** og, fra 13. okt. 2026, **KO-utskriften**:
 
 | Aspekt | Beskrivelse |
 |---|---|
 | Vaktlista som fil på e-post | Én HTML-fil med navn, korps, rolle, skift, telefon og ISSI — ikke e-post, notat eller merknad. Fra 25. sep. 2026 også **brannlista**: hvem som sover i hvilket rom per natt, med telefon. Sendes ukryptert til en fast mottakerliste satt av global admin, ved «Sett i drift», på knapp og på intervall mens lista er i drift. Hver utsending logges (hvem, når, hvilke adresser). Fila sier selv «slett etter vakta». Vurdering: alminnelige personopplysninger, se `docs/BESLUTNING_VAKTLISTE.md` §12 |
 | Offline drift på drifts-PC-en | Nettleseren holder siden og siste vaktliste lokalt (service worker). Møtt/av vakt legges i kø når serveren ikke svarer og sendes når den svarer igjen. Kopien inneholder de samme opplysningene som fila, i nettleserens cache på den PC-en |
-| Pasientdata | Ingen lokal kopi. Ved bortfall føres pasienter på papir/Excel etter organisasjonens rutine |
+| KO-utskriften på KO-PC-en (13. okt. 2026) | `/ko/utskrift/` — åpne hendelser, ressursene med besetning (navn, telefon, ISSI), aktive oppdrag med notat, tavla, konsertplanleggeren og KO-loggen siste 8 timer — hentes hvert femte minutt og legges i nettleserens cache (`ko/utskrift.py`, `static/js/ko-sw.js`), så den kan skrives ut uten nett. **Inneholder helseopplysninger** i KO-loggen og oppdragsnotatene (indirekte identifiserende, A.6). Vurdering: forsvarlig fordi **KO har bare personlige kontoer med MFA** (delte kontoer slipper ikke inn i modulen, og kopien lagres uansett aldri for en delt konto), kopien er høyst 24 timer, og «Logg ut» sletter den. Ingen redigering uten nett. Utskrift på papir gjør det samme som før: papiret makuleres etter korpsets rutine, og siden sier det |
+| Pasientdata | Ingen lokal kopi av pasientregisteret. Ved bortfall føres pasienter på papir/Excel etter organisasjonens rutine |
 
 **To tekniske begrensninger på den lokale kopien** (13. sep. 2026), som er grunnen til at
 risikoen under er vurdert som håndterbar og ikke bare akseptert:
@@ -1158,10 +1159,13 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.21 – sist oppdatert 12. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.22 – sist oppdatert 13. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.22 (13.10.2026):** **A.11: KO-utskriften uten nett.** KO-PC-en holder siste utskrift av
+  KO i nettleseren (helseopplysninger i loggen og notatene), bare for personlige kontoer, høyst
+  24 timer, slettes ved «Logg ut». Personvernsiden sier det samme.
 - **v1.21 (12.10.2026):** **Personvernerklæringen er publisert på `/personvern/`**, åpen uten
   innlogging og lenket fra hver side. Del B er erstattet av en peker dit: den hadde glidd fra
   del A (én backupfrist, ingen cookies, ingen mannskapsregister). **Kontaktadressen er

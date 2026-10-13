@@ -41,6 +41,9 @@
     admin: {{ er_global_admin|yesno:"true,false" }}
   };
   window.KO_BRUKERNAVN = "{{ request.user.username|escapejs }}";
+  // Kopien uten nett (13. okt. 2026): bare personlige kontoer, se ko/utskrift.py.
+  window.KO_KOPI = {{ ko_kopi|yesno:"true,false" }};
+  window.KO_KOPI_MS = {{ ko_kopi_minutter }} * 60 * 1000;
   window.KO_PRIORITETER = {{ prioriteter_json }};
   window.KO_MELDER_VALG = {{ melder_valg_json }};
   window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
@@ -62,6 +65,18 @@
           <i class="bi bi-sliders me-1"></i>KO-innstillinger
         </button>
         {% endif %}
+        {% comment %}
+          Utskriften (13. okt. 2026): **alle vinduene, alltid** — ett valg for
+          hele sida, og derfor her og ikke i vinduene. Uten nett åpner den
+          kopien `/ko/sw.js` holder (`koKopiStart()` i ko.js); merket ved siden
+          av sier når den sist ble lagret.
+        {% endcomment %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'ko_utskrift' %}" target="_blank" rel="noopener"
+           title="Skriv ut alt i KO — hendelser, ressurser, oppdrag, tavla, konsertplanleggeren og loggen">
+          <i class="bi bi-printer me-1"></i>Skriv ut
+        </a>
+        <span class="small text-muted align-self-center d-none" id="ko-kopi-status"
+              title="Utskriften ligger i nettleseren og kan skrives ut uten nett. «Logg ut» sletter den."></span>
         {% if kan_se_oppdrag and kan_skrive %}
         <button type="button" class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#arkivModal"
@@ -178,10 +193,6 @@
               <i class="bi bi-plus-lg me-1"></i>Ny hendelse
             </button>
             {% endif %}
-            {# Utskrift (13. okt. 2026): ko/utskrift.py, delen «hendelser». #}
-            <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}?vis=hendelser"
-               target="_blank" rel="noopener" title="Skriv ut de åpne hendelsene"
-               aria-label="Skriv ut de åpne hendelsene"><i class="bi bi-printer"></i></a>
             <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-h-listevalg"
                   data-action="koApneEgetVindu" data-arg="hendelser"
                   title="Åpne i eget vindu — for skjerm to. Klikk på en hendelse her i hovedvinduet oppdaterer det" aria-label="Åpne hendelsesloggen i eget vindu">
@@ -233,10 +244,6 @@
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="meldinger">Meldinger</button>
             <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="system">System</button>
           </div>
-          {# Utskrift (13. okt. 2026): ko/utskrift.py, delen «logg». #}
-          <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}?vis=logg"
-             target="_blank" rel="noopener" title="Skriv ut loggen de siste 8 timene, også det som står i hendelsene"
-             aria-label="Skriv ut loggen de siste 8 timene, også det som står i hendelsene"><i class="bi bi-printer"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
                   data-action="koApneEgetVindu" data-arg="logg"
                   title="Åpne i eget vindu — for skjerm to" aria-label="Åpne loggstrømmen i eget vindu">
@@ -397,10 +404,6 @@
               <i class="bi bi-clock-history me-1"></i>Historikk
             </button>
           </span>
-          {# Utskrift (13. okt. 2026): ko/utskrift.py, delen «oppdrag». #}
-          <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}?vis=oppdrag"
-             target="_blank" rel="noopener" title="Skriv ut de aktive oppdragene"
-             aria-label="Skriv ut de aktive oppdragene"><i class="bi bi-printer"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
                   data-action="koApneEgetVindu" data-arg="oppdrag"
                   title="Åpne i eget vindu — for skjerm to" aria-label="Åpne oppdragslista i eget vindu">
@@ -463,10 +466,6 @@
                     data-action="koByttPar" data-arg="tavle" title="Bytt til ressursoversikten">
               <i class="bi bi-arrow-left-right me-1"></i>Ressursoversikt
             </button>
-            {# Utskrift (13. okt. 2026): ko/utskrift.py, delen «tavle». #}
-            <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}?vis=tavle"
-               target="_blank" rel="noopener" title="Skriv ut tavla slik den står nå"
-               aria-label="Skriv ut tavla slik den står nå"><i class="bi bi-printer"></i></a>
             <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="koApneEgetVindu" data-arg="tavle"
                     title="Åpne i eget vindu — for skjerm to" aria-label="Åpne tavla i eget vindu">
@@ -526,10 +525,6 @@
                     data-action="koByttPar" data-arg="plan" title="Bytt til oppdragslista">
               <i class="bi bi-arrow-left-right me-1"></i>Oppdragsliste
             </button>
-            {# Utskrift (13. okt. 2026): ko/utskrift.py, delen «program». #}
-            <a class="btn btn-outline-secondary btn-sm ms-1" href="{% url 'ko_utskrift' %}?vis=program"
-               target="_blank" rel="noopener" title="Skriv ut konsertene som pågår og kommer"
-               aria-label="Skriv ut konsertene som pågår og kommer"><i class="bi bi-printer"></i></a>
             <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="koApneEgetVindu" data-arg="plan"
                     title="Åpne i eget vindu — for skjerm to" aria-label="Åpne konsertplanleggeren i eget vindu">

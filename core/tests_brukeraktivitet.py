@@ -270,6 +270,7 @@ class IngenRaaFetchTests(SimpleTestCase):
         'portal-utils.js': 'eier `apiFetch`',
         'notifications.js': 'lastes også der `portal-utils.js` ikke finnes; prøvd over',
         'vaktliste-sw.js': 'service workeren videresender sidens egne forespørsler, med hodene',
+        'ko-sw.js': 'samme — workeren for KO-utskriften videresender, med hodene',
         'park-lag.js': 'parksiden uten innlogging: ingen sesjon å måle aktivitet på, og '
                        'portal-utils.js lastes ikke der (FORSLAG_PARK.md §4)',
     }

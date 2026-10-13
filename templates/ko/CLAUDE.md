@@ -98,9 +98,9 @@ Uten livstegn åpnes klikket her igjen. Én skjerm 2, ingen «fest» (André). *
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`) — og «OBS: … delte posisjon» også
 når den hører til en hendelse (8. okt. 2026), oransje (`ls-posisjon`, `h-linje.posisjon`);
 kommentarene står i hendelsen.
-**Utskriften** (`/ko/utskrift/`, 13. okt. 2026): skriverikonet i hodet på hendelsesloggen,
-strømmen, oppdragslista, tavla og planleggeren åpner sin del (`?vis=`) i ny fane; øverst på
-papiret velges flere. Loggen der har kommentarene i hendelsene med. Se `ko/CLAUDE.md`. **Alle | Meldinger | System** filtrerer strømmen
+**Utskriften** (`/ko/utskrift/`, 13. okt. 2026): «Skriv ut» i verktøylinja — én knapp, fordi
+den gjelder hele sida — åpner alle vinduene på papir i ny fane. «Klar uten nett · 21:40» ved
+siden av sier når kopien uten nett sist ble lagret. Se `ko/CLAUDE.md`. **Alle | Meldinger | System** filtrerer strømmen
 (`koLoggfilterTreffer`, huskes per nettleser); **festede står uansett**, og hodet teller
 det filtrerte.
 

@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-13 — KO-utskriften: alle vinduene alltid, ressursene med, og kopien uten nett  `#ko`
+
+**Hvorfor:** André: «KO har bare personlige brukere med mfa. Så nr 2 er aktuelt. Og husk
+loggstrømmen er ikke nødvendigvis det viktige her, alt sammen av info i ko er viktig. Så
+utskrift siden må printe ut alle vinduer og ikke la oss selektere.» Og før det: «Offline logg
+er bare ment for å kunne ta utskrift av det som er. Ikke redigere offline for å så få
+konflikter med andre brukere etterpå.»
+
+**Alle vinduene, alltid:** delvalget (`?vis=`, avkrysningene) og de fem skriverikonene i
+vinduene er borte. **Én «Skriv ut» i verktøylinja**, fordi den gjelder hele sida. Papiret
+følger vinduene: åpne hendelser, **ressursoversikten** (ny: bilene med status, aktivt oppdrag
+og besetning — navn, rolle, telefon, ISSI, møtt — og lagene på vakt med mannskap), aktive
+oppdrag, tavla, konsertplanleggeren, loggen siste 8 timer. Ressursene bygges av
+`enhetskort_liste`, `vaktliste.services.besetning` og `ressurser_uten_enhet`, med modulenes
+gater — også i dataene (`ressurser_del` henter ikke det som ikke skal vises).
+
+**Kopien uten nett:** «Klar uten nett · 21:40» i verktøylinja. `koKopiStart()` i `ko.js`
+registrerer **`/ko/sw.js`** (`static/js/ko-sw.js`, servert av `ko.views.sw_view`, ingen
+innlogging) og henter utskriften hvert `KOPI_MINUTTER` (5) med `apiFetch`. Workeren lagrer
+**bare svar merket `X-Ko-Kopi`**, som settes for personlige kontoer (`kan_lagres_lokalt` —
+KO slipper uansett ikke inn delte, `tillat_delt_konto`). Uten nett gir `/ko/utskrift/` **og
+`/ko/`** kopien; API og POST lagres aldri. Høyst 24 timer. Sida sier selv hvor gammel den er,
+med rødt, også på papiret (`koKopiVarsel`: «Lagret kopi fra 21:40 (12 min siden)»).
+
+**Prøvd i nettleser** (Playwright, Chromium): serveren stoppet → `/ko/utskrift/` og `/ko/` gir
+kopien, API-kallet feiler; «Logg ut» → cachen er `[]` og workerne 0. **Merk:** Playwrights
+`setOffline` gjelder ikke service workerens egne forespørsler — første prøve «gikk» fordi
+sidene nådde serveren. Den ekte prøven stoppet serveren.
+
+**Fanget av hele suiten, ikke av de målrettede testene:** hentingen står i
+`core/tests_js_polling.UNNTAK` med grunnen — kopien skal være fersk også når KO-fana ligger
+bak, og den koster én henting per fem minutter. Og `koKopiStart()` må gå etter
+`koOppsettStart()`: den hopper over vinduer åpnet for seg (skjerm 2), så bare hovedvinduet
+henter.
+
+**Ingen logglinjer uten nett:** TODO-punktet er slettet. En linje i kø på én PC er en linje
+ingen andre i rommet ser — og den ville landet med et klokkeslett fra før.
+
+**Personvern:** protokollen v1.22 (A.11) og personvernsiden sier at KO-PC-en holder kopien —
+med helseopplysninger, bare personlige kontoer, høyst et døgn, slettet ved «Logg ut».
+Runbooken: se etter merket før vakta, logg ut etter. Rutene: 216 (KO 45), JS-filer 38.
+
+**18 mutanter, alle drept** (`ko/tests_utskrift.py`, 32 tester). To overlevde første runde:
+tilgangssjekken i `ressurser_del` lot seg fjerne fordi malen sjekket det samme flagget — begge
+lag virket, men det som ikke skal vises skal heller ikke hentes, så funksjonen prøves nå
+direkte. Resten: kopiregelen (to veier), hodet og flagget i viewene, workerens tre regler
+(`avgjor` fem veier, `kanLagres` to, `erForGammel`), merket og varselet, besetningsgaten,
+setningen for manglende tilgang.
+
 ## 2026-10-13 — KO på papir: tavla, konsertplanleggeren og oppdragene; loggen bare siste 8 timer  `#ko`
 
 **Hvorfor:** André, etter første versjon samme dag: «Vi trenger ikke vise lukkede hendelser

@@ -163,7 +163,7 @@ og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. 
       signatursjekken står fortsatt i pasientmodulens og oppdragsmodulens egne vinduer. Å samle
       dem krever en visning gjennom `core.arkiv`-registeret, ikke to modul-API-er kalt fra `core`.
 
-### Offline og papir som reserve — avklart 27. sep. 2026, ikke påbegynt
+### Offline og papir som reserve — avklart 27. sep. 2026; KO levert 13. okt. 2026
 
 André meldte at merknader ikke kan redigeres offline i vaktlista («virker ut som bare
 stemplingen fungerer»). Etter en gjennomgang av alternativene (siste vinner, versjonsnummer,
@@ -171,17 +171,15 @@ felt for felt, hendelser, CRDT) var konklusjonen hans: **konfliktene er usannsyn
 som trengs offline er å *ha* dataene og kunne skrive dem ut — redigeringen kan gjøres på
 papiret og føres inn når nettet er tilbake.** Full redigering offline bygges derfor ikke.
 
-**Skillet som styrer hva som hjelper:** offline-kopien i nettleseren hjelper når *én PC* har
-mistet nett. Er *portalen eller Railway* nede, har ingen den — da er det som alt er skrevet ut
-eller sendt på e-post reserven.
+**Skillet som styrer hva som hjelper:** en kopi i nettleseren finnes bare der den ble lagt.
+Vaktlista henter sin når noen åpner den; **KO henter utskriften hvert femte minutt**
+(`ko/utskrift.py`), så KO-PC-en har den også når portalen eller Railway er nede — så lenge
+den er under et døgn gammel. Alle andre steder er det som alt er skrevet ut eller sendt på
+e-post reserven.
 
 - [ ] **Vaktlista:** les og utskrift offline er i hovedsak på plass (service workeren, 24 t;
       utskriftsstilen; fila på e-post fra `vaktliste/fil.py`). Vurder om **merknadene** skal
       med i fila på e-post — i dag har den telefon og ISSI, men ikke merknad, med vilje.
-- [ ] **`/ko/`: logglinjer offline.** Passer naturlig: en linje *legges til*, ingen konflikt,
-      og `Logglinje` skiller allerede `tidspunkt` (når det skjedde) fra `registrert_at` (når
-      det kom inn). Samme kø-mønster som stemplingene i vaktlista og bilen. Tavla og
-      sentralbordet offline gir lite — bilene får ingenting før nettet er tilbake uansett.
 - [ ] **`/pasienter/`: papirskjema som reserve, ingen offline-kopi av lista.** Det er
       helseopplysninger på delte PC-er — samme grunn som at backupen ikke kan lastes ned.
       Utskrift av pasientlister krever en rutine (hvem har arket, destruksjon) og hører

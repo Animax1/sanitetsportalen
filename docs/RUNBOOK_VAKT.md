@@ -388,6 +388,7 @@ hentingen står igjen som **sikkerhetsnett** — for det klokka endrer uten at n
 | Konsertplanleggeren | 60 s (`KO_PLAN_MS`) | ja | planleggeren står ikke framme | `ko-plan.js` · `koHentPlan` |
 | Vaktlistas ressurser uten enhet (lagene) | 30 s (`KO_RESSURSER_MS`) | ja | uten vaktlistetilgang | `ko.js` · `koHentRessurser` |
 | «Pålogget»-lista | 30 s (`KO_TILSTEDE_MS`) | ja | nedtrekket er lukket (standard) | `ko.js` · `koHentTilstede` |
+| Utskriften til kopien uten nett («Klar uten nett · 21:40») | 5 min (`KOPI_MINUTTER` i `ko/utskrift.py`) | ja | — (bare personlige kontoer, og KO har bare dem) | `ko.js` · `koKopiHent` |
 | Skjerm 2 sier «jeg lever» til hovedvinduet | 5 s (`KO_FOLGER_PULS_MS`) | nei — mellom vinduene i nettleseren | uten hendelsesvindu for seg | `ko-hendelser.js` · `koMeldTilstede` |
 | «12 min siden» på oppdrag og enheter | 60 s | nei | — | `oppdrag-sentral-lasting.js` |
 
@@ -1268,6 +1269,14 @@ sender `Clear-Site-Data`, og alt lokalt lager slettes. Lukk aldri bare vinduet p
 maskin; logg ut. En kopi eldre enn ett døgn brukes uansett ikke.
 Står det stemplinger som ikke er sendt, spør «Logg ut» først — **Avbryt**, vent på
 dekning til de er sendt, og logg ut etterpå. OK sletter dem.
+
+**KO-PC-en holder hele KO-utskriften lokalt** (13. okt. 2026, `ko/utskrift.py`): åpne
+hendelser, ressursene med besetning (telefon, ISSI), oppdragene med notat, tavla,
+konsertplanleggeren og loggen siste 8 timer — **helseopplysninger**. Hentes på nytt hvert
+femte minutt; «Klar uten nett · 21:40» i verktøylinja sier når. Mister PC-en nettet, gir
+«Skriv ut» — og en lasting av `/ko/` — kopien, med rødt varsel om hvor gammel den er. Ingen
+redigering uten nett: før loggen på papir, og inn når nettet er tilbake. **Før vakta:** se
+at merket står på hver KO-PC. **Etter vakta: logg ut** — det sletter kopien.
 
 ---
 

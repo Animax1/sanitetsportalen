@@ -36,6 +36,8 @@ UNNTAK = {
     # ikke gi en worker som er innloggingssiden.
     'vaktliste_sw':
         'statisk skript uten data; registreres fra den innloggede siden',
+    'ko_sw':
+        'statisk skript uten data; holder KO-utskriften uten nett (ko/utskrift.py)',
 }
 
 

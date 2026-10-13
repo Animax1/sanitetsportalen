@@ -29,7 +29,7 @@ uten at noen rykket ut.
 | Løftet selv | `ko/signals.py` |
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
 | **Hendelsene**: nummer, opprett, rediger, prioritet, bli med, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse`, `HendelseDeltaker` |
-| **Utskriften**: åpne hendelser, oppdragene, tavla, programmet og loggen siste 8 t — papir som reserve | `ko/utskrift.py` (delene og gatene), `utskrift_view`, `templates/ko/utskrift.html`, `ko/tests_utskrift.py` |
+| **Utskriften** — alle vinduene, og kopien uten nett | `ko/utskrift.py` (delene, gatene, kopiregelen), `utskrift_view`, `sw_view`, `static/js/ko-sw.js`, `koKopiStart` i `ko.js`, `templates/ko/utskrift.html`, `ko/tests_utskrift.py` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
 | KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
 | «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
@@ -138,25 +138,15 @@ Vaktlistas stemplinger: «ikke nå» — volumet drukner loggen.
 
 ### 4. Historikk krever `skriv_leder` — se «Nivåene» over.
 
-## Utskriften: et øyeblikksbilde, ikke et arkiv (13. okt. 2026)
+## Utskriften: alt i KO på papir, også uten nett (13. okt. 2026)
 
-`/ko/utskrift/`, skriverikonet i hvert vindu (`?vis=<del>`), reglene i `ko/utskrift.py`.
-André, samme dag som første versjon: «Vi trenger ikke vise lukkede hendelser og trenger nok
-bare loggstrøm fra de siste 8 timer. Og så må vi få utskrift av tavlen og ikke minst
-konsertplanleggeren og oppdragene.» Papiret er **reserven når portalen er borte midt i en
-vakt** — hva som pågår nå og hva som kommer, ikke historikken.
-
-| Regel | Hvorfor |
-|---|---|
-| Hver del bygges av **skjermens funksjon** (`_til_dict`, `sentralbord_liste`, `tavle_data`, `program.poster`) — utvalget og lokal tid er alt som legges til | En egen spørring blir uenig med skjermen første gang en av dem endres |
-| **Hver del har sin moduls gate**; mangler den, står en setning, og resten skrives ut | Komposisjonsregelen (rollemodellen §5) — som på skjermen |
-| Loggen: `LOGG_TIMER` (8) på `tidspunkt`, **med** kommentarene i hendelsene og linjene i hendelser som er lukket siden | Loggen er fasit; en linje som forsvant fordi hendelsen ble lukket fem minutter før, er hullet papiret skal dekke |
-| Tavla og programmet: tavlas vindu (`tavle.timer()`) fra nå | Ett vindu, som på skjermen |
-| Aktiv vakt alltid | Et øyeblikksbilde av en avsluttet vakt er ingenting. **Tidligere vakters logg har ingen flate** (TODO) |
-| Tidene gjennom `localtime` før dag og klokkeslett; testen bruker UTC rundt midnatt | Prod-formen — se «fjerde måte en mutant lyver» i rota |
-
-Lesing logges ikke, som ellers (innsynslogg er fravalgt, A.12); papiret sier at det skal
-makuleres etter korpsets rutine.
+`/ko/utskrift/`, «Skriv ut» i verktøylinja. **Alle vinduene, alltid** (André: «alt sammen
+av info i ko er viktig … ikke la oss selektere»), bygget av skjermens egne funksjoner og
+med hver moduls gate — også i dataene. KO-PC-en holder siste utskrift **uten nett**
+(`/ko/sw.js`, hentet hvert femte minutt; bare personlige kontoer, høyst et døgn, «Logg ut»
+sletter den). **Ingen redigering uten nett** (André: «bare ment for å kunne ta utskrift av
+det som er»). Reglene og hvorfor står i docstringen til `ko/utskrift.py` og i
+`static/js/ko-sw.js`; personvernet i A.11.
 
 ## Logglinja: tre valg i modellen som ser ut som detaljer
 

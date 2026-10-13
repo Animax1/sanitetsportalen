@@ -1,4 +1,4 @@
-"""KO på papir — `/ko/utskrift/` (13. okt. 2026).
+"""KO på papir — `/ko/utskrift/` (13. okt. 2026), og den lagrede kopien uten nett.
 
 **Et øyeblikksbilde, ikke et arkiv** (André, 13. okt. 2026: «Vi trenger ikke
 vise lukkede hendelser og trenger nok bare loggstrøm fra de siste 8 timer. Og
@@ -7,9 +7,14 @@ oppdragene»). Papiret er reserven når portalen eller nettet er borte midt i en
 vakt: det man trenger da er hva som pågår *nå* og hva som kommer, ikke hele
 historikken.
 
+**Alt, alltid, ingen valg** (André, samme dag: «alt sammen av info i ko er
+viktig. Så utskrift siden må printe ut alle vinduer og ikke la oss
+selektere»). Delene følger KOs vinduer:
+
 | Del | Hva | Gate |
 |---|---|---|
 | `hendelser` | De åpne hendelsene | `les` i KO |
+| `ressurser` | Bilene med status og besetning, lagene med mannskap — navn, rolle, telefon, ISSI, møtt | Bilene: `les` i oppdrag; besetningen og lagene: `les` i vaktliste |
 | `logg` | Loggen de siste `LOGG_TIMER` timene — **med** kommentarene i hendelsene | `les` i KO |
 | `oppdrag` | Sentralbordets aktive oppdrag | `les` i oppdrag |
 | `tavle` | Hvor hver ressurs står nå, og planlagte pauser og flyttinger i tavlas vindu | `les` i vaktliste; bilene bare med `les` i oppdrag |
@@ -23,9 +28,23 @@ setning på papiret, ikke som en 403 for hele utskriften.
 **Samme rader som skjermen.** Loggen og hendelsene tegnes av `_til_dict` og
 `_hendelse_til_dict` i `ko/views.py`, oppdragene av
 `oppdrag.views.sentralbord_liste`, tavla av `tavle.tavle_data`, programmet av
-`program.poster`. Det som legges til her er bare utvalget (tidsvinduet, de
-åpne) og tidene som lokale tidspunkter — aldri en egen spørring som kan bli
-uenig med skjermen.
+`program.poster`, ressursene av `oppdrag.services.enhetskort_liste`,
+`vaktliste.services.besetning` og `ressurser_uten_enhet`. Det som legges til
+her er bare utvalget (tidsvinduet, de åpne) og tidene som lokale tidspunkter —
+aldri en egen spørring som kan bli uenig med skjermen.
+
+**Uten nett** (André: «KO har bare personlige brukere med mfa. Så nr 2 er
+aktuelt»): KO-siden henter utskriften i bakgrunnen hvert `KOPI_MINUTTER`, og
+`/ko/sw.js` legger den i nettleseren. Mister PC-en nettet, åpner
+«Skriv ut» kopien, merket med hvor gammel den er. **Bare personlige kontoer**:
+svaret bærer `KOPI_HODE` bare når kontoen ikke er delt, og workeren lagrer
+ingenting uten det — en delt konto på en delt PC skal ikke etterlate
+helseopplysninger i nettleseren. Høyst 24 timer, og «Logg ut» sletter den.
+
+**Ingen redigering uten nett** (André: «Offline logg er bare ment for å kunne ta
+utskrift av det som er»). En logglinje i kø på én PC er en linje ingen andre i
+rommet ser, og den ville landet med et klokkeslett fra før — lappen og muntlig
+beskjed er tryggere, og føres inn når nettet er tilbake.
 """
 from __future__ import annotations
 
@@ -42,15 +61,14 @@ from .models import HENDELSE_APEN, PRIORITET_NAVN, Logglinje
 #: omtrent — det den neste operatøren trenger å vite, ikke hele vakta.
 LOGG_TIMER = 8
 
-#: Delene i den rekkefølgen de står på papiret.
-DELER: tuple[tuple[str, str], ...] = (
-    ('hendelser', 'Hendelser'),
-    ('oppdrag', 'Oppdrag'),
-    ('tavle', 'Tavla'),
-    ('program', 'Konsertplanleggeren'),
-    ('logg', 'Loggen'),
-)
-DEL_NAVN: dict[str, str] = dict(DELER)
+#: Hvor ofte KO-siden henter utskriften i bakgrunnen, så kopien uten nett er
+#: fersk. Fem minutter: en kopi er aldri mer enn det bak, og det koster én
+#: sidegenerering per KO-PC i kvarteret tre ganger — tavla poller hvert 2,5 s.
+KOPI_MINUTTER = 5
+
+#: Hodet som gir workeren lov til å lagre svaret. Satt bare for personlige
+#: kontoer (`kan_lagres_lokalt`).
+KOPI_HODE = 'X-Ko-Kopi'
 
 
 def lokal(tid):
@@ -61,11 +79,16 @@ def lokal(tid):
     return timezone.localtime(tid) if tid else None
 
 
-def valgte_deler(raa: list[str]) -> list[str]:
-    """`?vis=logg&vis=tavle` → delene i papirets rekkefølge. Ukjente navn
-    ignoreres; ingen (eller bare ukjente) betyr alle."""
-    valgt = [slug for slug, _ in DELER if slug in set(raa)]
-    return valgt or [slug for slug, _ in DELER]
+def kan_lagres_lokalt(bruker) -> bool:
+    """Kopien uten nett er for **personlige** kontoer. En delt konto er
+    nettopp den som sitter på en PC flere bruker — der skal ingen
+    helseopplysninger bli liggende i nettleseren.
+
+    I dag kommer en delt konto ikke inn i KO i det hele tatt (`ko.module`
+    sier ikke ja til `tillat_delt_konto`). Dette er laget under: åpnes KO en
+    dag for delte kontoer, skal ikke kopien følge med uten at noen bestemmer det.
+    """
+    return bool(bruker.is_authenticated) and not getattr(bruker, 'er_delt_konto', False)
 
 
 # ── Delene ────────────────────────────────────────────────────────────────────
@@ -173,6 +196,42 @@ def tavle_del(vakt, naa, *, med_biler: bool) -> dict:
     }
 
 
+def ressurser_del(vakt, *, med_biler: bool, med_vaktliste: bool) -> dict:
+    """Ressursoversikten: bilene med status, aktivt oppdrag og besetning, og
+    vaktlistas lag som er på vakt nå, med mannskapet.
+
+    **Telefon og ISSI står på papiret** — det er det man trenger når
+    sambandet eller portalen er borte. Samme felter som besetningen bak et
+    klikk på skjermen (`vaktliste.services.besetning`), ikke flere: notat og
+    kompetanser står heller ikke der.
+    """
+    from oppdrag.models import Enhet
+    from oppdrag.services import enhetskort_liste, ledig_siden_bulk
+
+    from core.sortering import Norsk
+
+    biler = []
+    if med_biler:
+        enheter = list(Enhet.objects.filter(er_aktiv=True)
+                       .select_related('user', 'enhetstype').order_by(Norsk('navn')))
+        for kort in enhetskort_liste(enheter, vakt, ledig_siden_bulk(enheter, vakt)):
+            kort['status_tid'] = lokal(kort.get('status_tidspunkt'))
+            kort['ledig_tid'] = lokal(kort.get('ledig_siden'))
+            kort['besetning'] = None
+            biler.append(kort)
+        if med_vaktliste:
+            from vaktliste.services import besetning
+            for kort in biler:
+                kort['besetning'] = besetning(kort['id'])
+        # På vakt først, så av vakt — samme deling som sentralbordet.
+        biler.sort(key=lambda k: not k['pa_vakt'])
+    lag = []
+    if med_vaktliste:
+        from vaktliste.services import ressurser_uten_enhet
+        lag = ressurser_uten_enhet()
+    return {'biler': biler, 'lag': lag, 'med_biler': med_biler, 'med_vaktliste': med_vaktliste}
+
+
 def program_del(vakt, naa) -> dict:
     """Konsertene som pågår eller begynner innen tavlas vindu, i tidsrekkefølge,
     med beredskap, publikum, kjennetegn og behov — konsertplanleggerens liste."""
@@ -191,31 +250,30 @@ def program_del(vakt, naa) -> dict:
 
 # ── Hele papiret ──────────────────────────────────────────────────────────────
 
-def bygg(request, vakt, deler: list[str], naa=None) -> dict:
-    """Konteksten til malen: hver valgt del, eller `None` og en grunn når den
-    som skriver ut mangler tilgang til modulen delen viser."""
+def bygg(request, vakt, naa=None) -> dict:
+    """Konteksten til malen: hver del, eller en grunn i `stengt` når den som
+    skriver ut mangler tilgang til modulen delen viser."""
     from oppdrag.views_common import er_enhetskonto
 
     naa = naa or timezone.now()
     bruker = request.user
     kan_oppdrag = har_tilgang(bruker, 'oppdrag', 'les') and not er_enhetskonto(bruker)
-    ut = {'deler': deler, 'stengt': {}, 'naa': lokal(naa), 'logg_timer': LOGG_TIMER}
-    for slug in deler:
-        if slug == 'hendelser':
-            ut['hendelser'] = hendelser_del(vakt)
-        elif slug == 'logg':
-            ut['linjer'] = logg_del(vakt, naa)
-            ut['logg_fra'] = lokal(naa - timedelta(hours=LOGG_TIMER))
-        elif slug == 'oppdrag':
-            if kan_oppdrag:
-                ut['oppdrag'] = oppdrag_del(vakt)
-            else:
-                ut['stengt']['oppdrag'] = 'Oppdragene krever lesetilgang i oppdragsmodulen.'
-        elif slug == 'tavle':
-            if har_tilgang(bruker, 'vaktliste', 'les'):
-                ut['tavle'] = tavle_del(vakt, naa, med_biler=kan_oppdrag)
-            else:
-                ut['stengt']['tavle'] = 'Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.'
-        elif slug == 'program':
-            ut['program'] = program_del(vakt, naa)
+    kan_vaktliste = har_tilgang(bruker, 'vaktliste', 'les')
+    ut = {'stengt': {}, 'naa': lokal(naa), 'logg_timer': LOGG_TIMER,
+          'hendelser': hendelser_del(vakt),
+          'ressurser': ressurser_del(vakt, med_biler=kan_oppdrag, med_vaktliste=kan_vaktliste),
+          'program': program_del(vakt, naa),
+          'linjer': logg_del(vakt, naa),
+          'logg_fra': lokal(naa - timedelta(hours=LOGG_TIMER))}
+    if not kan_oppdrag and not kan_vaktliste:
+        ut['stengt']['ressurser'] = ('Ressursoversikten krever lesetilgang i oppdragsmodulen '
+                                     'eller vaktlista.')
+    if kan_oppdrag:
+        ut['oppdrag'] = oppdrag_del(vakt)
+    else:
+        ut['stengt']['oppdrag'] = 'Oppdragene krever lesetilgang i oppdragsmodulen.'
+    if kan_vaktliste:
+        ut['tavle'] = tavle_del(vakt, naa, med_biler=kan_oppdrag)
+    else:
+        ut['stengt']['tavle'] = 'Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.'
     return ut

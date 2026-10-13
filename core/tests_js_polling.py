@@ -16,6 +16,7 @@ from patients.js_test_utils import JS_DIR, PORTAL_UTILS_JS, build_harness, node_
 #: (fil, det som kalles) → hvorfor det skal gå også når fana er skjult.
 UNNTAK = {
     ('ko-hendelser.js', 'koMeldTilstede'): 'BroadcastChannel mellom to vinduer, ikke nett — skjerm 2 ligger ofte bak',
+    ('ko.js', 'koKopiHent'): 'kopien uten nett skal være fersk også når KO-fana ligger bak; hvert femte minutt',
     ('notifications.js', 'pollCount'): 'sjekker synligheten selv, og henter når fana kommer fram',
     ('oppdrag-enhet.js', '() => lydTikk()'): 'bilens lydvarsel — skal pipe med skjermen av',
     ('oppdrag-enhet.js', 'lastBilinnstillinger'): 'tersklene lydvarselet bruker, hvert femte minutt',

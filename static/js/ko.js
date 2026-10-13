@@ -798,6 +798,49 @@ async function koHentRessurser() {
 // en ReferenceError før noe er tegnet (CLAUDE.md).
 // ════════════════════════════════════════════════════════════════════════════
 
+// ── Utskriften uten nett (13. okt. 2026) ─────────────────────────────────────
+//
+// KO-siden henter /ko/utskrift/ i bakgrunnen, og `/ko/sw.js` legger svaret i
+// nettleseren — så «Skriv ut» virker også når PC-en har mistet nettet. Bare
+// når serveren sier at kontoen er personlig (`window.KO_KOPI`, se
+// ko/utskrift.py). Ingen redigering uten nett: dette er papiret, ikke loggen.
+
+// «Klar uten nett · 21:40». Egen funksjon fordi den avgjør hva merket påstår:
+// uten et tidspunkt sier det ingenting, heller enn noe som ikke er sant.
+function koKopiTekst(lagret) {
+  if (!(lagret instanceof Date) || Number.isNaN(lagret.getTime())) return '';
+  const tt = String(lagret.getHours()).padStart(2, '0');
+  const mm = String(lagret.getMinutes()).padStart(2, '0');
+  return `Klar uten nett · ${tt}:${mm}`;
+}
+
+async function koKopiHent() {
+  const el = document.getElementById('ko-kopi-status');
+  try {
+    // `apiFetch`, ikke `fetch`: hodet med sekunder siden siste trykk følger
+    // med, så en bakgrunnshenting ikke ser ut som et menneske i fana.
+    const svar = await apiFetch('/ko/utskrift/');
+    if (!svar.ok || svar.headers.get('X-Ko-Kopi') !== '1') return;
+    if (el) {
+      el.textContent = koKopiTekst(new Date());
+      el.classList.remove('d-none');
+    }
+  } catch (e) { /* uten nett: merket står med forrige tid */ }
+}
+
+function koKopiStart() {
+  // Bare hovedvinduet: et vindu åpnet for seg (skjerm 2, `?vindu=`) henter ikke
+  // en kopi til — én henter per KO-PC holder. Leses etter `koOppsettStart()`.
+  if (!window.KO_KOPI || !globalThis.navigator?.serviceWorker || koEgetVinduAktivt) return;
+  navigator.serviceWorker.register('/ko/sw.js', { scope: '/ko/' })
+    .then(() => navigator.serviceWorker.ready)
+    .then(() => koKopiHent())
+    .catch(() => { /* uten worker: utskriften virker som før, bare ikke uten nett */ });
+  const ms = window.KO_KOPI_MS || 5 * 60 * 1000;
+  setInterval(koKopiHent, ms);
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
   koOppsettStart();
   koHendelseVinduStart();
@@ -806,6 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
   koPlanStart();
   koSidebarLyttere();
   koLestStart();
+  koKopiStart();
   setInterval(naarSynlig(() => {
     // Ikke poll en liste ingen ser på: flere operatører sitter på samme side
     // hele vakta, og nedtrekket er lukket som standard.

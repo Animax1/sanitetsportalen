@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **215 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **216 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 27 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
-| `/ko/` | 44 | `ko/urls.py` | Sida, sidebaren, ansvarsmerket, loggen (les, utskrift, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
+| `/ko/` | 45 | `ko/urls.py` | Sida, utskriften med service workeren for kopien uten nett, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
 | `/backlog/` | 9 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, kommentartråd, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 15 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/`, `/personvern/`, endringsnumrene (`/api/endringer/`, `core/endringer.py`) og videresendingen fra `/api/` |
 
@@ -627,6 +627,7 @@ tett. Samme grep i vaktlistas `drift/<start|stopp>/`.
 | `/manifest.webmanifest` | Må være en view og ikke en statisk fil, fordi ikonstiene skal gjennom `{% static %}` — WhiteNoise hasher navnene |
 | `/robots.txt` | Holder portalen ute av søk |
 | `/personvern/` | Personvernerklæringen (`core/personvern.py`). Informasjonsplikten gjelder før innlogging, og lagene på `/lag/r/` har ingen konto |
+| `/ko/sw.js` | Holder KO-utskriften uten nett (`ko/utskrift.py`); samme grunn som vaktlistas |
 | `/vaktliste/sw.js` | En service worker styrer bare stier under sin egen, og kan ikke kreve sesjon. Egen CSP begrenset til `'self'` |
 | `/accounts/login/`, passord-reset, invitasjon | Selvsagt |
 
@@ -1526,7 +1527,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 37 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 38 filer i `static/js/`, fordelt
 på ti sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
 grensesnittene under `/oppdrag/`, og de to i park: `/lag/` og parksiden `/lag/r/`.
 

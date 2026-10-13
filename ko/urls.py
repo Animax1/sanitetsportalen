@@ -16,6 +16,9 @@ urlpatterns = [
     # Utskriften av loggen (13. okt. 2026): en side, ikke et API — den
     # rendres på serveren fra de samme radene som skjermen.
     path('utskrift/', views.utskrift_view, name='ko_utskrift'),
+    # Service workeren som holder utskriften uten nett. Ingen innlogging —
+    # se `sw_view`.
+    path('sw.js', views.sw_view, name='ko_sw'),
     path('api/tilstede/', views.tilstede_view, name='ko_api_tilstede'),
     # Eget ansvarsmerke (§5.1, pulje 6). Vises, styrer ingenting.
     path('api/ansvar/', views.ansvar_view, name='ko_api_ansvar'),

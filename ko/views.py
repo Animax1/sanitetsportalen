@@ -6,7 +6,7 @@ nivåer:
 | Handling | Krav |
 |---|---|
 | Se siden, lese loggen og hendelsene, polle | `les` |
-| Skrive ut KO (`/ko/utskrift/`): hendelser, logg, program | `les` — oppdrag og tavla med sine modulers gater |
+| Skrive ut KO (`/ko/utskrift/`), alle vinduene | `les` — ressursene, oppdragene og tavla med sine modulers gater |
 | Skrive en linje, rette en linje, feste og løsne en linje | `skriv_full` |
 | Opprette, redigere, prioritere, lukke og gjenåpne en hendelse, bli med | `skriv_full` |
 | Knytte et oppdrag til en hendelse | `skriv_full` i **både** `ko` og `oppdrag` — det skriver på oppdraget |
@@ -58,6 +58,7 @@ from . import services, systemlinjer
 from .models import (MELDER_VALG, PRIORITET_VALG, Ansvarsmerke, Ansvarsomraade, Hendelse,
                      Kjennetegn, Konserttype, Logglinje)
 from .tilstede import tilstede
+from .utskrift import KOPI_MINUTTER, kan_lagres_lokalt
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -221,6 +222,10 @@ def index_view(request):
         'ansvarsomraader': services.ansvarsomraader_aktive(),
         'mitt_ansvar': services.ansvar_for(request.user),
         'vakt_navn': hent_aktiv_vakt().navn,
+        # Utskriften uten nett (13. okt. 2026): KO-siden henter den i
+        # bakgrunnen bare for personlige kontoer — se `ko/utskrift.py`.
+        'ko_kopi': kan_lagres_lokalt(request.user),
+        'ko_kopi_minutter': KOPI_MINUTTER,
         'kan_skrive_ko': har_tilgang(request.user, 'ko', 'skriv_full'),
         # Hendelsesskjemaet (18. sep. 2026): prioritetene, og melderne
         # (19. sep. 2026) — fast liste i kode. Lagene fylles av klienten fra
@@ -359,20 +364,45 @@ def logg_view(request):
 @require_http_methods(['GET'])
 @rate_limit(group='ko:utskrift', rate='30/m', method='GET', on_limit='html')
 def utskrift_view(request):
-    """KO på papir — åpne hendelser, oppdragene, tavla, konsertplanleggeren og
-    loggen de siste åtte timene. Se `ko/utskrift.py`.
+    """KO på papir — alle vinduene, alltid. Se `ko/utskrift.py`.
 
-    `?vis=<del>` (gjentas) velger delene; skriverikonet i hvert vindu sender sin
-    egen. Uten `vis` kommer alt. **Aktiv vakt alltid**: et øyeblikksbilde av
-    hva som pågår har ingen mening for en vakt som er avsluttet.
+    **Aktiv vakt alltid**: et øyeblikksbilde av hva som pågår har ingen mening
+    for en vakt som er avsluttet. Hentes også i bakgrunnen av KO-siden, så
+    `/ko/sw.js` har en kopi når nettet er borte — og **bare svar med
+    `KOPI_HODE` lagres**, som settes for personlige kontoer.
     """
     from . import utskrift
 
-    deler = utskrift.valgte_deler(request.GET.getlist('vis'))
-    kontekst = utskrift.bygg(request, hent_aktiv_vakt(), deler)
-    kontekst.update(vakt=hent_aktiv_vakt(), alle_deler=utskrift.DELER,
-                    utskrevet=timezone.localtime())
-    return render(request, 'ko/utskrift.html', kontekst)
+    vakt = hent_aktiv_vakt()
+    kontekst = utskrift.bygg(request, vakt)
+    kontekst.update(vakt=vakt, utskrevet=timezone.localtime())
+    svar = render(request, 'ko/utskrift.html', kontekst)
+    if utskrift.kan_lagres_lokalt(request.user):
+        svar[utskrift.KOPI_HODE] = '1'
+    return svar
+
+
+@require_http_methods(['GET'])
+def sw_view(request):
+    """Service workeren for `/ko/` — utskriften uten nett (13. okt. 2026).
+
+    Serveres fra en view og ikke fra `/static/` av samme grunn som
+    vaktlistas (`vaktliste.views.sw_view`): en worker styrer bare stier under
+    sin egen. **Ingen innlogging** — fila bærer ingen data, og en utgått
+    sesjon skal ikke gi en worker som er en innloggingsside. `no-cache` så
+    nettleseren ser etter ny versjon ved hver sidelasting.
+    """
+    from pathlib import Path
+
+    from django.conf import settings as _settings
+    from django.http import HttpResponse
+    sti = Path(_settings.BASE_DIR) / 'static' / 'js' / 'ko-sw.js'
+    svar = HttpResponse(sti.read_text(encoding='utf-8'),
+                        content_type='application/javascript; charset=utf-8')
+    svar['Cache-Control'] = 'no-cache'
+    svar['Service-Worker-Allowed'] = '/ko/'
+    svar['Content-Security-Policy'] = "default-src 'self'; connect-src 'self'"
+    return svar
 
 
 @modul_kreves('ko', 'skriv_full', svar='json')
