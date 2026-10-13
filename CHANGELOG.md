@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-13 — Utkast til databehandleravtale for portalen og kartet  `#personvern`
+
+**Hvorfor:** André eier portalen og kart.sanitet.net, mens Kverneland Røde Kors er
+behandlingsansvarlig — da er han **databehandler**, og art. 28 krever en skriftlig
+**databehandleravtale (DPA)**. André: «det skal jeg ordne etterhvert med dpa med korpset», og
+«inkluder kart-sanitet med i den. Begge er mine apper.»
+
+**Utkastet:** `docs/DATABEHANDLERAVTALE_UTKAST.md`, skrevet i Claude Docs og kopiert hit så
+det følger koden til staging. Parter, formål, registrerte og opplysninger for begge appene,
+pliktene, sikkerhetstiltakene slik de er i koden, underdatabehandlerne (Railway, Scaleway,
+Cloudflare, AhaSend), avvik, lagringstid og sletting ved opphør, signatur. Tall i klammer er
+forslag. **Åpne punkter** nederst: hvordan kartet driftes og hva det lagrer om brukerne,
+Cloudflare-grunnlaget, AhaSend, sikkerhetskopiene ved opphør, og hvem som overtar hvis André
+ikke kan drifte. Ikke juridisk kvalitetssikret. Pekere fra TODO og protokollen A.1.
+
 ## 2026-10-12 — Personvernside med informasjonskapsler i footeren: `/personvern/`  `#personvern`
 
 **Hvorfor:** André, 12. okt.: «Vi har ingen personvern side på nettsiden som blant annet

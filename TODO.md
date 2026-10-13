@@ -54,7 +54,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       og forholdet skal stå i en skriftlig avtale: hva du behandler, at du bare gjør det etter
       korpsets instruks, taushetsplikt, sikkerhet, avvik, sletting når samarbeidet slutter, og
       at korpset godkjenner leverandørene (Railway, Scaleway, Cloudflare, AhaSend) som
-      underdatabehandlere. Datatilsynet har veiledning om hva den skal inneholde. Før den inn i A.1/A.2 når den er signert.
+      underdatabehandlere. **Utkast:** [`docs/DATABEHANDLERAVTALE_UTKAST.md`](./docs/DATABEHANDLERAVTALE_UTKAST.md)
+      (13. okt. 2026), dekker begge appene; de åpne punktene står nederst i den. Før den inn i A.1/A.2 når den er signert.
       **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
 
 - [ ] **Cloudflare og AhaSend inn i behandlingsprotokollen** (A.2 og A.8). Begge behandler

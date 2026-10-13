@@ -36,7 +36,8 @@ vegne, og er kontaktpunktet for henvendelser etter A.14 og for avvik etter A.15.
 > **databehandler**, og forholdet skal være regulert i en **skriftlig databehandleravtale**
 > mellom korpset og ham. En slik avtale er ikke dokumentert her. Leverandørene i A.2 er i så
 > fall **underdatabehandlere** til ham dersom kontoene står på ham, og korpset skal ha
-> godkjent bruken av dem (art. 28 nr. 2). Står i `TODO.md` under «Krever Andre».
+> godkjent bruken av dem (art. 28 nr. 2). Står i `TODO.md` under «Krever Andre»; utkastet,
+> for begge appene, er `docs/DATABEHANDLERAVTALE_UTKAST.md`.
 
 Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd med gjeldende personvernregelverk, herunder EUs personvernforordning (GDPR) og lov om behandling av personopplysninger (personopplysningsloven) av 2018.
 
