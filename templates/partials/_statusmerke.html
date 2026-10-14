@@ -15,7 +15,7 @@ forklaringen under, fordi det var der forvekslingen skjedde 29. aug. 2026.
 Stilen står her og ikke i et stilark, fordi de frittstående sidene ikke laster
 noe felles ark. Fargene er satt én gang og gjelder alle sider.
 {% endcomment %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .statusmerker { display: inline-flex; align-items: center; gap: 6px; min-width: 0; vertical-align: middle; }
   .statusmerker-side { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 12px; }
   .miljomerke, .statusmelding { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px;

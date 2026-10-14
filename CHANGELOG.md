@@ -4,6 +4,63 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — CSP: `<style>` krever nonce (`style-src-elem`), attributtene tas gradvis  `#sikkerhet` `#csp`
+
+**Hvorfor:** Nr. 3 på lista André satte 14. okt. («Kjør nr 1 først G2 og så tar vi nr 3
+etterpå»). `style-src 'unsafe-inline'` sto som kjent avvik siden F5 (13. aug.).
+
+**Delt i to, etter hva som er farlig.** CSP 3 skiller `style-src-elem` (`<style>`) fra
+`style-src-attr` (`style="…"`). En injisert `<style>` restyler **hele siden** med selektorer
+— skjuler en advarsel, legger en knapp over en annen. Et attributt rører bare sitt eget
+element. Elementene er stengt nå; de 334 attributtene (230 i malene, 104 i JS-bygget
+markup) er mye arbeid og tas gradvis. `style-src` står igjen med `'unsafe-inline'` som
+reserve for nettlesere uten CSP 3.
+
+**Nonce på alle 22 `<style>`-blokkene** (`nonce="{{ csp_nonce }}"`, samme nonce som
+skriptene). To «<style>» i kommentarer (`park/lag.html`, `personvern.html`) står urørt —
+bare linjer der taggen står alene ble endret.
+
+**Fella, og en antakelse som var feil.** Noncen kommer fra context-processoren, så en mal
+rendret uten request får ingen. Den ene som gjør det er `vaktliste/fil.html`
+(`render_to_string`). Jeg trodde den ville miste stilene i nettleseren og la noncen inn —
+**en prøve i Chromium viste at `fil_view` sender den som nedlasting** (`Content-Disposition:
+attachment`), som åpnes fra disk uten CSP. Endringen ble tatt ut igjen; fila står i
+`UNNTATT` med begrunnelse, og en test krever at den fortsatt lastes ned — blir den en side i
+nettleseren, er testen rød og sier hva som må til.
+
+**`core/tests_inline_stiler.py`:**
+
+| Test | Hva |
+|---|---|
+| `EkteSvarTests` | **Hver GET-rute** i portalen, som admin og anonym: hver `<style>` i svaret må bære nøyaktig headerens nonce. Fanger en mal rendret uten request. Krever minst ti sider med `<style>`, så den ikke kan være grønn på ingenting |
+| `MaleneTests` | Hver `<style>` i malene har `nonce=` (kommentarer strippet) |
+| `DirektiveneTests` | `-elem` har nonce og ikke `'unsafe-inline'`, `-attr` står eksplisitt, samme nonce som `script-src` |
+| `VaktlistefilaTests` | Unntaket holder bare så lenge fila lastes ned |
+| `StilattributteneGaarBareNedTests` | **Sperrehake**: 230 og 104 som tak, og rød også når tallet går *ned* — så taket senkes i samme commit |
+
+**Prøvd i Chromium** (Playwright, innlogget som admin): 19 sider — innlogging, dashbord,
+pasienter (Tabulator), statistikk (Chart.js), KO, utskriften, vaktlisten, oppdrag, backlog,
+server-status, backup, brukere, profil, personvern, auditlogg, innstillinger, vakt, `/lag/` —
+**null CSP-brudd**. **Motprøve:** en `<style>` uten nonce injisert i siden blokkeres
+(`outline: 0px`) og meldes. Ingen av bibliotekene under `static/vendor/` lager
+`<style>`-elementer (sjekket i kilden). Djangos 404-side i drift har ingen `<style>`;
+**CSRF-feilsiden har, og vises uten stiler** — kosmetisk, i TODO.
+
+**Mutasjonstesting: 6 mutanter, 6 drept** — `base_portal` uten nonce, `-elem` slipper inline,
+`-elem` fjernet, `-attr` fjernet, fila vist i nettleseren i stedet for lastet ned, og
+**innloggingen med `nonce="feil"`** — den siste går forbi den statiske testen og fanges bare
+av `EkteSvarTests`.
+
+**Tre tester ble røde, og det var riktig av dem:** `accounts.tests_passord_reset` beviser at
+«Glemt passord» ikke avslører hvilke kontoer som finnes, ved å kreve **byte-like** svar for
+kjent og ukjent adresse. Siden har en `<style>`, og noncen er ny for hver forespørsel. De
+sammenligner nå med `_uten_nonce()`: bare den noncen som står i svarets *egen* header byttes
+ut, og den må faktisk stå i siden. Prøvd med en mutant som lekker kontoens eksistens med ett
+tegn — fortsatt rød.
+
+`scripts/sikkerhetssjekk.py` sjekker `style-src-elem` mot staging og prod.
+`TEKNISK_DOKUMENTASJON.md` (tabellen, §15.6) og `PERSONVERN_DOKUMENTASJON.md` C oppdatert.
+
 ## 2026-10-14 — CI henter PostgreSQL fra tre registre: «toomanyrequests: Data limit exceeded»  `#ci`
 
 **Hvorfor:** CI stoppet på nedlastingen av PostgreSQL-imaget fire ganger: to ganger fra Docker

@@ -124,13 +124,25 @@ class BackupSchedulerMiddleware:
 #      serveres av WhiteNoise. Med cdn.jsdelivr.net i lista kunne én
 #      HTML-injeksjon laste en hvilken som helst npm-pakke, nonce eller ei.
 #
-# style-src beholder 'unsafe-inline' med vilje: markup har ~50 inline
-# style-attributter, og statistikk-tabellene bygger flere. Det er utenfor
-# akseptansekriteriet for F5 og et eget stykke arbeid.
+# ── style-src: elementene med nonce, attributtene gradvis (14. okt. 2026) ──
+#
+# CSP 3 deler stilene i to: `style-src-elem` for <style> og stilark,
+# `style-src-attr` for style="…". **Elementene er de farlige**: en injisert
+# <style> restyler hele siden med selektorer — skjuler en advarsel, legger en
+# knapp over en annen. Et attributt rører bare sitt eget element. Derfor får
+# elementene nonce nå, som skriptene, mens de 334 attributtene (230 i malene,
+# 104 i JS-bygget markup) tas gradvis — `core/tests_inline_stiler.py` holder
+# tallet på vei ned. Utlekking gjennom CSS er alt stengt: `img-src`,
+# `font-src` og stilarkene er låst til 'self'.
+#
+# `style-src` står med 'unsafe-inline' som reserve for nettlesere uten CSP 3;
+# de som kan `-elem` og `-attr`, bruker dem og ser bort fra `style-src`.
 _CSP_DIRECTIVES = [
     "default-src 'self'",
     "script-src 'self' 'nonce-{nonce}'",
     "style-src 'self' 'unsafe-inline'",
+    "style-src-elem 'self' 'nonce-{nonce}'",
+    "style-src-attr 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self' data:",
     # ── media-src: blob: for den stille lydbæreren (14. sep. 2026) ──────────

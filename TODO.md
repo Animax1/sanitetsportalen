@@ -428,16 +428,18 @@ og 15.6. Det tredje er delvis løst.*
       avgjørende argumentet er et annet: **du kan ikke tegne et godt grensesnitt fra ett
       eksempel.** Ta den den dagen en modul nummer to trenger en kontotype — da er det to
       tilfeller å abstrahere fra, og jobben gjøres én gang riktig.
-- [ ] **`style-src 'unsafe-inline'`.** 313 inline stiler talt 26. sep. 2026 (209 `style="`
-      i maler, 104 `style=` i JS-bygget markup; `el.style.x = …` er CSSOM og rammes ikke av
-      CSP). Tallet sto som 271 her og «~50» i et annet punkt — de to er slått sammen.
-      **Nonce hjelper ikke** — et CSP-nonce dekker `<style>`-elementer, men ikke
-      `style=`-attributter; det er derfor CSP 3 måtte innføre `style-src-attr`.
-      Restrisikoen er lavere enn den ser ut: CSS-eksfiltrasjon går gjennom
-      `background-image`, fonter eller `@import`, og **alle tre er allerede låst til
-      `'self'`** av `img-src`, `font-src` og `style-src`. Det som står igjen er
-      defacement. Ryddes gradvis: fjern inline-stilene i en mal når den likevel skrives om.
-      Står som kjent avvik i personverndokumentasjonen (§ sikkerhetstiltak).
+- [ ] **`style-src-attr 'unsafe-inline'` — attributtene.** Elementene er stengt 14. okt. 2026
+      (`style-src-elem` med nonce). Igjen: **230 `style="…"` i malene og 104 i JS-bygget
+      markup** — `core/tests_inline_stiler.py` er sperrehaken og ber om at taket senkes når
+      tallet går ned. Malene: klasser i stilarket. JS: klasser, eller `el.style.x = …` etter
+      innsetting der verdien er dynamisk (tavla, planleggeren) — CSSOM rammes ikke av CSP.
+      **Pass på `display:none`**: JS som viser med `el.style.display = ''` virker ikke mot en
+      klasse som skjuler. Når tallet er null: `style-src-attr 'none'`, og fjern
+      `'unsafe-inline'` fra reserven `style-src`. Største filer: `patients/index.html` (33),
+      `server_status.html` (23), `statistikk.js` (24).
+- [ ] **Djangos CSRF-feilside vises uten stiler** under `style-src-elem` (egen `<style>` uten
+      nonce). Bare kosmetisk. Egen `CSRF_FAILURE_VIEW` med portalens 403-mal, når man er i
+      nærheten.
 
 *Samlet her med vilje: begge lå opprinnelig som uavkryssede barn under avkryssede
 foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*

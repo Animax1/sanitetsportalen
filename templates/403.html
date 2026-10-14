@@ -7,7 +7,7 @@
 {% include "partials/_ikoner.html" %}
 <title>{{ miljo.fane }}403 – Ingen tilgang</title>
 <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
-<style>
+<style nonce="{{ csp_nonce }}">
   body { background: #0f172a; color: #e5e7eb; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .box { text-align: center; }
   /* Bootstraps dempede tekstfarger er laget for lys bakgrunn og

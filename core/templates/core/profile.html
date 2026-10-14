@@ -4,7 +4,7 @@
 {% block title %}Min profil – Sanitetsportalen{% endblock %}
 
 {% block extra_head %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .profile-card {
     background: var(--portal-surface);
     border: 1px solid var(--portal-border);

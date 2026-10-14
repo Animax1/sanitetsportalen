@@ -13,7 +13,7 @@
   uten portal-utils, som vaktlista som fil. Hver del bygges av de samme
   funksjonene skjermen tegnes av.
 {% endcomment %}
-<style>
+<style nonce="{{ csp_nonce }}">
   :root { --tekst: #111827; --dempet: #4b5563; --linje: #d1d5db; --flate: #f3f4f6; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #ffffff; color: var(--tekst);

@@ -202,6 +202,10 @@ def test_transport(base, r):
     if csp:
         r.sjekk("'unsafe-inline'" not in csp.split('script-src')[-1].split(';')[0] if 'script-src' in csp else True,
                 'CSP script-src uten unsafe-inline', 'CSP script-src tillater unsafe-inline')
+        direktiver = {d.strip().split(' ', 1)[0]: d.strip() for d in csp.split(';') if d.strip()}
+        elem = direktiver.get('style-src-elem', '')
+        r.sjekk(bool(elem) and "'unsafe-inline'" not in elem and 'nonce-' in elem,
+                'CSP style-src-elem med nonce', f'CSP style-src-elem mangler eller slipper inline: {elem or "mangler"}')
         r.sjekk("'unsafe-eval'" not in csp, 'CSP uten unsafe-eval', 'CSP tillater unsafe-eval')
         r.sjekk('nonce-' in csp, 'CSP bruker nonce', 'CSP uten nonce (inline-script må da være hvitelistet på annen måte)')
         r.info(f'CSP: {csp[:400]}')

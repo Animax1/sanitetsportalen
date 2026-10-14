@@ -16,7 +16,7 @@ helseopplysningsdump utenfor portalens kontroll.
 {% block title %}Backup – Sanitetsportalen{% endblock %}
 
 {% block extra_head %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .bk-kort {
     background: var(--portal-surface);
     border: 1px solid var(--portal-border);

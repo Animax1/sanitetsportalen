@@ -96,7 +96,8 @@ class CspNonceTests(TestCase):
         self.assertRegex(self._direktiver(resp)['script-src'], r"'nonce-[\w-]{16,}'")
 
     def test_style_src_beholder_unsafe_inline(self):
-        """Bevisst: markup har ~50 inline style-attributter. Eget arbeid."""
+        """Som reserve for nettlesere uten CSP 3. Elementene og attributtene har
+        egne direktiver fra 14. okt. 2026 — `core/tests_inline_stiler.py`."""
         resp = self.client.get('/accounts/login/')
         self.assertIn("'unsafe-inline'", self._direktiver(resp)['style-src'])
 

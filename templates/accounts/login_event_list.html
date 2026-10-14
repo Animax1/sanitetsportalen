@@ -3,7 +3,7 @@
 {% block title %}Innloggingslogg – Sanitetsportalen{% endblock %}
 
 {% block extra_head %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .filter-card {
     background: var(--portal-surface);
     border: 1px solid var(--portal-border);

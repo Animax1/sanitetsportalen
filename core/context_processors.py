@@ -46,9 +46,9 @@ def portal_modules(request):
 def csp_nonce(request):
     """Gjør request-ets CSP-nonce tilgjengelig som {{ csp_nonce }}.
 
-    Settes av ``SecurityHeadersMiddleware``. Enhver inline <script> må ha
-    ``nonce="{{ csp_nonce }}"`` — uten det kjører den ikke, siden script-src
-    ikke lenger tillater 'unsafe-inline' (F5).
+    Settes av ``SecurityHeadersMiddleware``. Enhver inline <script> og <style>
+    må ha ``nonce="{{ csp_nonce }}"`` — uten det kjører skriptet ikke og stilene
+    brukes ikke (script-src fra F5, style-src-elem fra 14. okt. 2026).
 
     Faller tilbake til tom streng hvis middlewaren ikke har kjørt, slik at
     templates som rendres utenfor request/response-syklusen (feilsider,

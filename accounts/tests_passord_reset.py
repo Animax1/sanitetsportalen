@@ -20,6 +20,20 @@ from accounts.test_helpers import gi_standardtilgang
 from core.tests_ratelimit import nok_til_a_bryte
 
 
+def _uten_nonce(svar) -> bytes:
+    """Innholdet med denne forespørselens CSP-nonce byttet ut.
+
+    Siden har en `<style nonce=…>` fra 14. okt. 2026, og noncen er ny for hver
+    forespørsel — tilfeldig, og uavhengig av kontoen. Bare **den** noncen byttes,
+    lest fra svarets egen header, og den må faktisk stå der: ellers kunne en
+    forskjell i resten av innholdet gjemt seg bak byttet.
+    """
+    import re
+    nonce = re.search(r"'nonce-([\w-]+)'", svar.headers['Content-Security-Policy']).group(1)
+    assert nonce.encode() in svar.content, 'noncen skulle stått i siden'
+    return svar.content.replace(nonce.encode(), b'NONCE')
+
+
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class ResetTokenTests(TestCase):
 
@@ -142,7 +156,7 @@ class ResetFlytTests(TestCase):
         finnes_ikke = self._be_om('ingen@eksempel.no')
 
         self.assertEqual(finnes.status_code, finnes_ikke.status_code)
-        self.assertEqual(finnes.content, finnes_ikke.content)
+        self.assertEqual(_uten_nonce(finnes), _uten_nonce(finnes_ikke))
         self.assertEqual(len(mail.outbox), 0)
 
     def test_delt_konto_gir_ogsaa_identisk_svar(self):
@@ -154,7 +168,7 @@ class ResetFlytTests(TestCase):
         mail.outbox.clear()
         delt = self._be_om('bil@eksempel.no')
 
-        self.assertEqual(vanlig.content, delt.content)
+        self.assertEqual(_uten_nonce(vanlig), _uten_nonce(delt))
         self.assertEqual(len(mail.outbox), 0,
                          'en delt konto skal ikke få reset-lenke')
 
@@ -164,7 +178,7 @@ class ResetFlytTests(TestCase):
         with patch('django.core.mail.EmailMessage.send',
                    side_effect=OSError('SMTP nede')):
             feilet = self._be_om('kari@eksempel.no')
-        self.assertEqual(vanlig.content, feilet.content)
+        self.assertEqual(_uten_nonce(vanlig), _uten_nonce(feilet))
 
     def test_brukeren_setter_nytt_passord(self):
         url = reverse('accounts:passord_reset', args=[lag_token(self.bruker)])

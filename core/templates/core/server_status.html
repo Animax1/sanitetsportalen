@@ -4,7 +4,7 @@
 {% block title %}Server-status – Sanitetsportalen{% endblock %}
 
 {% block extra_head %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
   .status-card { background: var(--portal-surface); border: 1px solid var(--portal-border); border-radius: 10px; padding: 1rem; }
   .status-card h3 { font-size: 0.85rem; color: var(--portal-text-muted); text-transform: uppercase; margin: 0 0 0.5rem; letter-spacing: 0.5px; }
