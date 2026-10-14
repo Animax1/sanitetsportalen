@@ -28,20 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      postgres:
-        # Fra AWS' offentlige speil av de offisielle Docker-imagene, ikke Docker Hub
-        # (9. okt. 2026): runnerne deler IP-er, og Docker Hubs grense for anonyme
-        # nedlastinger («toomanyrequests») stoppet CI to ganger før en test kjørte.
-        # Samme image, samme versjon.
-        image: public.ecr.aws/docker/library/postgres:18   # som Railway (server-status viste 18.6, 26. sep. 2026)
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       # Migrasjonsprøvene lager og sletter sin egen engangsbase på samme server.
@@ -54,6 +40,43 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # **Samme offisielle image, fra tre registre etter hverandre** (14. okt. 2026).
+      # Runnerne deler IP-er, og hvert register har en grense for anonyme
+      # nedlastinger: Docker Hub stoppet CI to ganger før 9. okt., AWS-speilet to
+      # ganger 13.–14. okt. («toomanyrequests: Data limit exceeded») — hver gang før
+      # en test kjørte, og Railway hoppet over bygget. En tjenestecontainer har ingen
+      # reserve, derfor et eget steg. Ikke apt: imaget er det Railway kjører, med
+      # samme locale og standardinnstillinger, og det er hele grunnen til at CI
+      # kjører PostgreSQL (André valgte dette 14. okt.).
+      #
+      # Klar-sjekken går over **TCP**: imaget starter først en midlertidig server
+      # som bare lytter på socketen mens det setter opp basen, og den ville svart
+      # «klar» før den ekte serveren er oppe.
+      - name: PostgreSQL 18 (som Railway — server-status viste 18.6, 26. sep. 2026)
+        run: |
+          BILDE=""
+          for kandidat in public.ecr.aws/docker/library/postgres:18 \
+                          mirror.gcr.io/library/postgres:18 \
+                          docker.io/library/postgres:18; do
+            for forsok in 1 2; do
+              if docker pull -q "$kandidat"; then BILDE="$kandidat"; break 2; fi
+              echo "::warning::Fikk ikke $kandidat (forsøk $forsok)"
+              sleep 5
+            done
+          done
+          if [ -z "$BILDE" ]; then
+            echo "::error::Ingen av de tre registrene ga PostgreSQL-imaget"
+            exit 1
+          fi
+          echo "PostgreSQL fra $BILDE"
+          docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 "$BILDE"
+          for i in $(seq 1 60); do
+            if docker exec postgres pg_isready -h 127.0.0.1 -U postgres -q; then break; fi
+            sleep 1
+          done
+          docker exec postgres pg_isready -h 127.0.0.1 -U postgres
+          docker exec postgres psql -U postgres -h 127.0.0.1 -tAc 'select version()'
 
       - uses: actions/setup-python@v5
         with:

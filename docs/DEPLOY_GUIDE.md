@@ -330,6 +330,7 @@ suite failed») — og blir stående slik selv om en ny kjøring av samme commit
 Da må den deployes for hånd: **⋮ → Redeploy** på kortet. Ikke en tom commit for å tvinge
 den ut: da peker byggnummeret i footeren på en commit uten innhold. (`fa17627`,
 13. okt. 2026: CI døde på nedlasting av PostgreSQL-imaget før en test hadde kjørt.)
+Fra 14. okt. henter CI samme image fra tre registre etter hverandre, så det bør bli sjeldent.
 
 ### Migrasjoner og release-vinduet
 

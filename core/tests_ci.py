@@ -40,10 +40,15 @@ class WorkflowenTests(SimpleTestCase):
 
     def test_node_kreves_og_basen_er_postgresql(self):
         self.assertRegex(self.tekst, r"KREV_NODE: '1'")
-        # Registeret foran er lov (9. okt. 2026: `public.ecr.aws/docker/library/`,
-        # fordi Docker Hub stoppet CI på nedlastingsgrensen) — men det er
-        # PostgreSQL, med en fast hovedversjon, ikke `latest`.
-        self.assertRegex(self.tekst, r'image: (?:[\w.-]+/)*postgres:\d+')
+        # Registrene foran er lov og står flere (14. okt. 2026: samme image fra
+        # tre registre, fordi hvert av dem har stoppet CI på nedlastingsgrensen)
+        # — men det er PostgreSQL med en fast hovedversjon, ikke `latest`, og
+        # **samme** versjon fra alle: en reserve med en annen versjon ville
+        # prøvd koden mot noe annet enn prod uten at noen så det.
+        versjoner = re.findall(r'(?:[\w.-]+/)+postgres:(\w+)', self.tekst)
+        self.assertGreaterEqual(len(versjoner), 2, 'Minst ett register i reserve')
+        self.assertTrue(all(v.isdigit() for v in versjoner), versjoner)
+        self.assertEqual(len(set(versjoner)), 1, versjoner)
         self.assertIn('verifiser_migrasjoner', self.tekst)
 
     def test_tblib_installeres(self):

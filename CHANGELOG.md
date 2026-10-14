@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — CI henter PostgreSQL fra tre registre: «toomanyrequests: Data limit exceeded»  `#ci`
+
+**Hvorfor:** CI stoppet på nedlastingen av PostgreSQL-imaget fire ganger: to ganger fra Docker
+Hub før 9. okt., så to ganger fra AWS-speilet 13. og 14. okt. (`fa17627`, `5a3fa93`) — hver gang
+før en test kjørte, og hver gang hoppet Railway over bygget (SKIPPED). Runnerne deler IP-er, og
+hvert register har en grense for anonyme nedlastinger.
+
+**André valgte nr. 2 av tre** (14. okt.): samme offisielle image, fra
+`public.ecr.aws` → `mirror.gcr.io` → `docker.io`, to forsøk hver. Forkastet: **apt** —
+fjerner registrene, men gir en annen installasjon enn Railway, med annen locale
+(`C.UTF-8` mot imagets `en_US.utf8`) der dere har tester for nettopp databasens alfabet;
+og **innlogget Docker Hub** — krever en token å vedlikeholde, og er fortsatt ett register. Den
+er neste steg om også dette svikter.
+
+**Tjenestecontaineren ble et eget steg**, fordi den ikke har noen reserve. Klar-sjekken går
+over **TCP** (`pg_isready -h 127.0.0.1`): imaget starter først en midlertidig server som bare
+lytter på socketen mens basen settes opp, og den svarer «klar» før den ekte er oppe. Steget
+skriver hvilket register som ga imaget og `select version()`, så loggen viser hva som ble prøvd.
+
+**Prøvd før push** mot en falsk `docker`: AWS nede → Google-speilet; AWS og Google nede →
+Docker Hub; alle nede → tydelig feil og exit 1, ingen container. **`core/tests_ci.py`** krever
+nå minst to registre, fast hovedversjon og **samme** versjon fra alle — en reserve med en
+annen versjon ville prøvd koden mot noe annet enn prod uten at noen så det. **3 mutanter,
+3 drept** (en reserve på 17, `latest`, bare ett register — den siste traff feil første gang,
+sed-en endret ikke det den skulle; laget på nytt og diffen kontrollert).
+
 ## 2026-10-14 — G2: `vaktliste/services.py` delt — `planlegger.py`, `belastning.py`, `vaktdrift.py`  `#vaktliste` `#ko` `#park` `#gjeld`
 
 **Hvorfor:** G2, steg to i vaktlista. `services.py` var 1 858 linjer, og to av seksjonene
