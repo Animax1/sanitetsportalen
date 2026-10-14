@@ -18,6 +18,7 @@ arkiveres med `arkivert_at` og slettes med vakta. Se `docs/BESLUTNING_VAKTLISTE.
 | Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
 | Pausene | `vaktliste/pauser.py`, `vaktliste.Pause` |
 | Overnattingen og brannlista | `vaktliste/overnatting.py`, `Overnattingsrom`, `Overnatting`, `Vaktliste.brannrutine` |
+| Viewene, delt etter flate (G2) | Kartet i docstringen til `vaktliste/views.py` |
 
 **Flaten — fanene, ressurskortene, regnearket, tidsfeltene og JS-filene — står i
 `templates/vaktliste/CLAUDE.md`** (delt 23. sep. 2026).
@@ -485,7 +486,7 @@ hovedveier.
   fra forrige *forsøk*. Middlewaren tas ut under test i `settings.py`, som
   backup-planleggeren.
 - **Offline drift på `/vaktliste/`** (13. sep. 2026, notatet §13): service workeren
-  `static/js/vaktliste-sw.js` serveres av `vaktliste.views.sw_view` på `/vaktliste/sw.js`
+  `static/js/vaktliste-sw.js` serveres av `vaktliste.views_drift.sw_view` på `/vaktliste/sw.js`
   (en worker styrer bare stier under sin egen; uten innlogging, unntatt i
   `patients/tests_modul_dekorator.py`, med egen CSP begrenset til `'self'`).
   `avgjor()` er den ene regelen: API-GET nett først med kopi som reserve (header

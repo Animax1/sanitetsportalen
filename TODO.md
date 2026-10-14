@@ -209,8 +209,8 @@ virkeligheten, og rekkefølgen under følger av det.*
       server-status i §9** (14. okt. 2026), før staging gjenopprettes.
 - [ ] **Etter vakta:** arkivering, «Broer i oppdrag» på server-status, deretter G6b — og G6c i
       en *senere* `main`-push (se under).
-- [ ] **G2 (store filer): `vaktliste/views.py`, `vaktliste/services.py` og
-      `oppdrag/services.py` gjenstår — men ikke `oppdrag/services.py` før G6b**, ellers
+- [ ] **G2 (store filer): `vaktliste/services.py` og `oppdrag/services.py` gjenstår — men
+      ikke `oppdrag/services.py` før G6b**, ellers
       skrives samme fil om to ganger med vakta imellom. Metoden fra `accounts/views.py` og
       `ko/views.py` (CHANGELOG 13. okt. 2026): AST per toppnivånavn og rutekart før og
       etter, og en differensialtest mot den gamle fila.

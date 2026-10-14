@@ -9,14 +9,15 @@ URL-navnene har `vaktliste_`-prefiks fordi navnerommet er globalt (ingen
 """
 from django.urls import path
 
-from . import views, views_registre
+from . import (views, views_drift, views_grupper, views_overnatting, views_planlegger,
+               views_registre, views_ressurser)
 
 urlpatterns = [
     path('', views.index_view, name='vaktliste_index'),
     path('veiledning/', views.veiledning_view, name='vaktliste_veiledning'),
     # Service workeren for offline drift (13. sep. 2026). Må ligge under
     # `/vaktliste/` — en worker styrer bare stier under sin egen.
-    path('sw.js', views.sw_view, name='vaktliste_sw'),
+    path('sw.js', views_drift.sw_view, name='vaktliste_sw'),
 
     # **Registersiden er lagt ned (30. aug. 2026).** Mannskapet er en fane på
     # planleggingssiden, korps og kompetanser ligger i «Innstillinger». Et
@@ -39,65 +40,65 @@ urlpatterns = [
     # Ressurser henger under én vaktliste; vaktposter under én ressurs.
     # Stiene speiler eierskapet, slik at et feilkoblet id ikke kan treffe
     # noe i en annen liste.
-    path('api/vaktlister/<int:pk>/ressurser/', views.ressurser_view,
+    path('api/vaktlister/<int:pk>/ressurser/', views_ressurser.ressurser_view,
          name='vaktliste_api_ressurser'),
-    path('api/ressurser/<int:pk>/', views.ressurs_detalj_view,
+    path('api/ressurser/<int:pk>/', views_ressurser.ressurs_detalj_view,
          name='vaktliste_api_ressurs_detalj'),
-    path('api/ressurser/<int:pk>/vaktposter/', views.vaktposter_view,
+    path('api/ressurser/<int:pk>/vaktposter/', views_ressurser.vaktposter_view,
          name='vaktliste_api_vaktposter'),
-    path('api/ressurser/<int:pk>/pauser/', views.pauser_view,
+    path('api/ressurser/<int:pk>/pauser/', views_planlegger.pauser_view,
          name='vaktliste_api_pauser'),
-    path('api/pauser/<int:pk>/', views.pause_detalj_view,
+    path('api/pauser/<int:pk>/', views_planlegger.pause_detalj_view,
          name='vaktliste_api_pause_detalj'),
-    path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
+    path('api/vaktposter/<int:pk>/', views_ressurser.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 
     # Overnatting (25. sep. 2026): rommene under vaktlista, plasseringene
     # under rommet. Brannrutinen står på vaktlista og settes i dens PUT.
-    path('api/vaktlister/<int:pk>/overnattingsrom/', views.overnattingsrom_view,
+    path('api/vaktlister/<int:pk>/overnattingsrom/', views_overnatting.overnattingsrom_view,
          name='vaktliste_api_overnattingsrom'),
-    path('api/overnattingsrom/<int:pk>/', views.overnattingsrom_detalj_view,
+    path('api/overnattingsrom/<int:pk>/', views_overnatting.overnattingsrom_detalj_view,
          name='vaktliste_api_overnattingsrom_detalj'),
-    path('api/overnattingsrom/<int:pk>/plasser/', views.overnatting_plasser_view,
+    path('api/overnattingsrom/<int:pk>/plasser/', views_overnatting.overnatting_plasser_view,
          name='vaktliste_api_overnatting_plasser'),
-    path('api/overnattinger/<int:pk>/', views.overnatting_detalj_view,
+    path('api/overnattinger/<int:pk>/', views_overnatting.overnatting_detalj_view,
          name='vaktliste_api_overnatting_detalj'),
 
     # Koblingen til /oppdrag (fase 6). **Vaktlista eier endepunktet**;
     # sentralbordet henter det fra nettleseren. Oppdragsmodulen importerer
     # ikke vaktlista — se §6 i beslutningsnotatet.
-    path('api/enhet/<int:pk>/besetning/', views.besetning_view,
+    path('api/enhet/<int:pk>/besetning/', views_ressurser.besetning_view,
          name='vaktliste_api_besetning'),
     # KOs tavle (pulje 6): ressursene som ikke er koblet til en oppdragsenhet.
-    path('api/ressurser/uten-enhet/', views.ressurser_uten_enhet_view,
+    path('api/ressurser/uten-enhet/', views_ressurser.ressurser_uten_enhet_view,
          name='vaktliste_api_ressurser_uten_enhet'),
 
     # Planleggingstall (fase 5). Belastningen henger under én vaktliste;
     # grensene varslene måler mot er organisasjonens og gjelder alle.
-    path('api/vaktlister/<int:pk>/belastning/', views.belastning_view,
+    path('api/vaktlister/<int:pk>/belastning/', views_planlegger.belastning_view,
          name='vaktliste_api_belastning'),
     # Planleggeren (15. sep. 2026): oppsettet som lager grunnlaget for lista.
     # `{"forhaandsvis": true}` i kroppen skriver ingenting — det er samme
     # endepunkt, fordi forhåndsvisningen skal regnes av samme kode som gjør
     # jobben. Et eget endepunkt ville vært to steder å komme i utakt.
-    path('api/vaktlister/<int:pk>/generer/', views.generer_view,
+    path('api/vaktlister/<int:pk>/generer/', views_planlegger.generer_view,
          name='vaktliste_api_generer'),
-    path('api/vaktlister/<int:pk>/del-ut/', views.del_ut_view,
+    path('api/vaktlister/<int:pk>/del-ut/', views_planlegger.del_ut_view,
          name='vaktliste_api_del_ut'),
-    path('api/grenser/', views.grenser_view, name='vaktliste_api_grenser'),
+    path('api/grenser/', views_planlegger.grenser_view, name='vaktliste_api_grenser'),
 
     # Drift (fase 4). Retningen og overgangen står i URL-en, ikke i kroppen:
     # et veksle-endepunkt gir et kappløp når to trykk kommer tett, og den som
     # trykket sist vet ikke hva hun endte på. Samme grep som oppdragsmodulen.
-    path('api/vaktlister/<int:pk>/drift/<str:tilstand>/', views.drift_view,
+    path('api/vaktlister/<int:pk>/drift/<str:tilstand>/', views_drift.drift_view,
          name='vaktliste_api_drift'),
     # Reserven (12. sep. 2026): vaktlista som fil — last ned, eller send til
     # mottakerne admin har satt.
-    path('api/vaktlister/<int:pk>/fil/', views.fil_view, name='vaktliste_api_fil'),
-    path('api/vaktlister/<int:pk>/fil/send/', views.send_fil_view,
+    path('api/vaktlister/<int:pk>/fil/', views_drift.fil_view, name='vaktliste_api_fil'),
+    path('api/vaktlister/<int:pk>/fil/send/', views_drift.send_fil_view,
          name='vaktliste_api_send_fil'),
     path('api/vaktposter/<int:pk>/stempling/<str:handling>/',
-         views.stempling_view, name='vaktliste_api_stempling'),
+         views_drift.stempling_view, name='vaktliste_api_stempling'),
 
     # Registrene. Mannskapet er hovedlista; de tre verdimengdene bygges av
     # samme fabrikk — se views_registre.py.
@@ -114,11 +115,11 @@ urlpatterns = [
          name='vaktliste_api_kompetanse_detalj'),
     # Ressursgruppene. Egen sti, ikke en av verdimengdene i views_registre:
     # gruppa har ikon og rekkefølge, og administreres på planleggingssiden.
-    path('api/grupper/', views.grupper_view, name='vaktliste_api_grupper'),
-    path('api/grupper/<int:pk>/', views.gruppe_detalj_view,
+    path('api/grupper/', views_grupper.grupper_view, name='vaktliste_api_grupper'),
+    path('api/grupper/<int:pk>/', views_grupper.gruppe_detalj_view,
          name='vaktliste_api_gruppe_detalj'),
     # Rekkefølgen før detaljruta: et fritt ledd der ville fanget «rekkefolge».
-    path('api/roller/rekkefolge/', views.roller_rekkefolge_view,
+    path('api/roller/rekkefolge/', views_grupper.roller_rekkefolge_view,
          name='vaktliste_api_roller_rekkefolge'),
     path('api/roller/', views_registre.roller_view, name='vaktliste_api_roller'),
     path('api/roller/<int:pk>/', views_registre.rolle_detalj_view,

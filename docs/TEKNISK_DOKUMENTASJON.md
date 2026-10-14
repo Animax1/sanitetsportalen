@@ -1653,7 +1653,7 @@ drift**, og den dekkes av to ting:
   sendt ved «Sett i drift», på knapp, og på intervall mens lista er i drift.
   Mottakere settes under portalinnstillingene. Se `docs/BESLUTNING_VAKTLISTE.md` §12.
 - **Offline drift på `/vaktliste/`** (`static/js/vaktliste-sw.js`, servert av
-  `vaktliste.views.sw_view`): en service worker holder siden og siste liste lokalt,
+  `vaktliste.views_drift.sw_view`): en service worker holder siden og siste liste lokalt,
   og møtt/av vakt legges i kø på drifts-PC-en når serveren ikke svarer, med tida
   trykket skjedde. Køen sendes når serveren svarer igjen.
 

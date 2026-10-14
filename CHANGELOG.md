@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — G2: `vaktliste/views.py` delt etter flate, sju filer  `#vaktliste` `#gjeld`
+
+**Hvorfor:** G2 i gjeldsplanen. `vaktliste/views.py` var 1 840 linjer — vokst fra 1 692 da
+planen ble skrevet 25. sep. André 14. okt.: «Kjør nr 1 først G2». Ren flytting, bevist
+uendret som `ko/views.py` dagen før.
+
+**Delt på funksjon, ikke på seksjonsmerkene.** Merkene fulgte ikke innholdet: «Drift» bar
+`sw_view` og `ressurs_detalj_view`, og `vaktpost_detalj_view` sto nederst under
+«Overnatting». Hver toppnivåfunksjon ble flyttet maskinelt med dekoratørene og
+kommentarene over seg (AST), fordelt etter en eksplisitt liste per navn — skriptet stoppet
+på et navn som manglet eller sto to ganger:
+
+| Fil | Flaten |
+|---|---|
+| `views.py` (631 linjer) | Siden, veiledningen, vaktlistene, hjelperne |
+| `views_ressurser.py` | Ressursene, skiftene, besetningen `/oppdrag/` og `/ko/` leser |
+| `views_grupper.py` | Ressursgruppene, rekkefølgen på rollene |
+| `views_planlegger.py` | Planleggeren, «Del ut», belastningen og grensene, pausene |
+| `views_drift.py` | Drift, stemplingene, fila på e-post, `sw_view` |
+| `views_overnatting.py` | Overnattingen |
+
+Importene ble bygget av hvilke navn hver bit faktisk bruker. **`from . import fil` er
+beholdt som modulimport**: `vaktliste/tests_oppsett.py` patcher `vaktliste.fil.send_fil`, og
+med `from .fil import send_fil` ville patchen stille sluttet å treffe.
+
+**Funnet underveis — samme felle som i KO:** `vaktliste_detalj_view` brukte
+`_rolle_til_dict`, `_gruppe_til_dict` og `_enheter`, som sto *lenger ned* i fila. Det virket
+fordi alt var én modul; klippet rett, ville «Rediger vaktliste» gitt `NameError`. Pyflakes
+fant dem. De tre er hjelpere for flere filer og står nå blant hjelperne i `views.py`, så
+alt peker inn mot den fila og ingen vei ut.
+
+**Bevisene:**
+
+| Hva | Resultat |
+|---|---|
+| Rutekartet, 319 ruter: navn, `__qualname__`, hele dekoratørkjeden | Identisk; 24 ruter med ny `__module__` |
+| AST per toppnivånavn i alle `vaktliste/views*.py` (69 navn) | **Identisk for alle**, også de tre som flyttet seg |
+| Differensialtest gammel mot ny: 70 kall i én kjede — opprett vaktliste, ressurs, skift, rediger, pause, overnattingsrom og plass, planleggerens forhåndsvisning, drift inn, møtt, av vakt, drift ut, grensene, ny gruppe, så lesestiene og en redigering for `les`, `skriv_full`, `skriv_leder` og admin, og sletting | **Identisk**: status og hele JSON-kroppen (tidspunkter normalisert). Første utkast fikk 403 på oppsettet og målte ingenting — rettet før det ble brukt |
+| Pyflakes | Rent |
+
+Ingen mutasjonstesting: ingen regel ble skrevet om, og AST-likheten er det sterkere beviset.
+Hele suiten grønn mot PostgreSQL.
+
+**Gjenstår av G2:** `vaktliste/services.py`, og `oppdrag/services.py` etter G6b.
+
 ## 2026-10-14 — Generalprøven leser av broene  `#oppdrag` `#generalprove`
 
 André 14. okt. 2026, etter at staging viste «Aldri brukt»: «Jeg antar at det og er verdifullt

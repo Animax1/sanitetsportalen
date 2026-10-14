@@ -16,7 +16,7 @@
  *     bakgrunnen. Filnavnene er hashet av WhiteNoise, så en gammel kopi er
  *     aldri feil versjon.
  *
- * Serveres av vaktliste.views.sw_view, ikke fra /static/ — en worker styrer
+ * Serveres av vaktliste.views_drift.sw_view, ikke fra /static/ — en worker styrer
  * bare stier under sin egen.
  */
 // Bumpes når en gammel kopi skal kastes, ikke ved hver endring: `activate`
