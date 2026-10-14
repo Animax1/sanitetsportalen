@@ -815,7 +815,7 @@ setter følgende på alle responser:
 | `script-src` | `'self' 'nonce-…'` | **Ingen vertsnavn** (13. sep. 2026). Bootstrap, ikonene, Tabulator og Chart.js ligger under `static/vendor/`. Med `cdn.jsdelivr.net` i lista kunne én HTML-injeksjon lastet en vilkårlig npm-pakke, nonce eller ei |
 | `style-src` | `'self' 'unsafe-inline'` | Reserve for nettlesere uten CSP 3 — de andre bruker de to under |
 | `style-src-elem` | `'self' 'nonce-…'` | **14. okt. 2026.** Hver `<style>` med nonce, som skriptene: en injisert `<style>` restyler hele siden. Samme nonce som `script-src` |
-| `style-src-attr` | `'unsafe-inline'` | **Kjent avvik**, krymper: 230 `style="…"` i malene og 104 i JS-bygget markup. `core/tests_inline_stiler.py` holder tallet på vei ned; se §15.6 |
+| `style-src-attr` | `'unsafe-inline'` | **Kjent avvik**, krymper — tallet står i §15.6, og `core/tests_inline_stiler.py` holder det på vei ned |
 | `img-src` | `'self' data:` | QR-koder rendres som data-URL |
 | `font-src` | `'self' data:` | |
 | `media-src` | `'self' blob:` | **14. sep. 2026.** `_stilleLydbaerer()` i `oppdrag-enhet.js` bygger en stum WAV som Blob — uten den demper iOS' ringebryter lydvarselet, fordi Web Audio alene regnes som «ambient». `default-src` dekker ikke `blob:`, så direktivet må stå eksplisitt. Å slakke `default-src` i stedet ville sluppet blob-er inn i alt som arver |
@@ -2003,15 +2003,16 @@ død». Verifiseringen står fortsatt i den årlige revisjonssjekklisten
 
 **Elementene er stengt** (14. okt. 2026): `style-src-elem` krever nonce, og en injisert
 `<style>` blokkeres — prøvd i Chromium på 19 sider uten ett brudd fra portalens egne, og
-med en injisert blokk som motprøve. **Attributtene står åpne**: 230 `style="…"` i malene
+med en injisert blokk som motprøve. **Attributtene står åpne**: 216 `style="…"` i malene
 og 104 i markup bygget av JS. Et attributt kan bare endre sitt eget element, ikke
 restyle siden med selektorer, og utlekking gjennom CSS er alt stengt (`img-src`,
 `font-src` og stilarkene er låst til `'self'`). Det som står igjen er at en injeksjon kan
 endre utseendet på det den injiserer.
 
 `core/tests_inline_stiler.py` holder tallet på vei ned, og når det er null, blir
-`style-src-attr` til `'none'`. **Djangos CSRF-feilside** har en egen `<style>` uten nonce
-og vises derfor uten stiler — teksten og funksjonen er de samme.
+`style-src-attr` til `'none'`. **En avvist CSRF-sjekk** får portalens 403-side
+(`core/csrf_feil.py`) — Djangos egen hadde en `<style>` uten nonce — og et
+`apiFetch`-kall får JSON med en melding det kan vise.
 
 ### 15.7 Kontoopprettelsen har en sideeffekt i oppdragsmodulen
 

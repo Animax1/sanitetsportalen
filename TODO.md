@@ -427,17 +427,17 @@ og 15.6. Det tredje er delvis løst.*
       eksempel.** Ta den den dagen en modul nummer to trenger en kontotype — da er det to
       tilfeller å abstrahere fra, og jobben gjøres én gang riktig.
 - [ ] **`style-src-attr 'unsafe-inline'` — attributtene.** Elementene er stengt 14. okt. 2026
-      (`style-src-elem` med nonce). Igjen: **230 `style="…"` i malene og 104 i JS-bygget
-      markup** — `core/tests_inline_stiler.py` er sperrehaken og ber om at taket senkes når
+      (`style-src-elem` med nonce). Igjen: **216 `style="…"` i malene og 104 i JS-bygget
+      markup** (header, brukermeny, bjelle og personvernlenka er tatt) — `core/tests_inline_stiler.py` er sperrehaken og ber om at taket senkes når
       tallet går ned. Malene: klasser i stilarket. JS: klasser, eller `el.style.x = …` etter
       innsetting der verdien er dynamisk (tavla, planleggeren) — CSSOM rammes ikke av CSP.
       **Pass på `display:none`**: JS som viser med `el.style.display = ''` virker ikke mot en
-      klasse som skjuler. Når tallet er null: `style-src-attr 'none'`, og fjern
+      klasse som skjuler. **Mål før og etter** med `getComputedStyle`, også ved `:hover` —
+      et attributt vinner over Bootstraps hover, en klasse gjør det ikke uten to klasser.
+      Og start `runserver` på nytt mellom målingene: med `--noreload` er malene bufret,
+      og «etter» måler da de gamle (14. okt.). Når tallet er null: `style-src-attr 'none'`, og fjern
       `'unsafe-inline'` fra reserven `style-src`. Største filer: `patients/index.html` (33),
       `server_status.html` (23), `statistikk.js` (24).
-- [ ] **Djangos CSRF-feilside vises uten stiler** under `style-src-elem` (egen `<style>` uten
-      nonce). Bare kosmetisk. Egen `CSRF_FAILURE_VIEW` med portalens 403-mal, når man er i
-      nærheten.
 
 *Samlet her med vilje: begge lå opprinnelig som uavkryssede barn under avkryssede
 foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*

@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — CSP: header, brukermeny, bjelle og personvernlenke uten `style=""` — målt før og etter  `#core/sikkerhet` `#core/grensesnitt`
+
+**Første pulje av de 334 attributtene, valgt etter hvor de vises:** det som står på
+*hver* side. `base_portal.html` 10 → 0, bjella 1 → 0, personvernlenka 2 → 0, 403-sida
+1 → 0. Malene: 230 → **216**, `MAKS_MALER` senket.
+
+**Målt, ikke antatt.** Et attributt vinner over Bootstraps `:hover`; en klasse gjør det
+ikke uten høyere spesifisitet. Profil- og passordlenka og «Logg ut» har derfor to klasser
+(`.dropdown-item.brukermeny-lenke`), så fargen holder ved hover slik den gjorde. Et
+Playwright-skript leste `getComputedStyle` for 16 elementer — 13 egenskaper, også ved
+hover — før og etter: **195 verdier, 0 ulike, 0 CSP-brudd.**
+
+**Målingen løy første gang.** `runserver --noreload` bufrer malene, så «etter» ble målt
+mot de gamle malene med nye CSS og JS — og viste 0 ulike. Bjelleprøven avslørte det:
+merket sto fremme med «0» etter «Marker alle lest», fordi det gamle attributtet
+(`display:inline-flex`) overstyrte den nye klassen. Med serveren startet på nytt: 0 ulike,
+og merket vises med 1 ulest og skjules etter «Marker alle lest». Fella står i TODO.
+
+- **Bjella** skjules med klassen `tom` (`.notif-badge.tom`), i malen og i `setBadge()`.
+  `el.style.display` ville vært lov (CSSOM rammes ikke av CSP), men to mekanismer for
+  samme tilstand er to som kan komme i utakt.
+- **Personvernlenka** bærer sin egen `<style nonce>`: sidene den står på laster ingen
+  felles stilark.
+- Den falske merkelappen i `BjellaTegnerMeldingenTests` hadde bare `style` — den speilet
+  den gamle koden, ikke DOM-en — og fikk en `classList`.
+- Nye tester: merket skjules ved 0 og vises ellers gjennom den ekte pollingen
+  (`2`, `0`, `150` → «99+», `'0'`, `undefined`), og malen tegner riktig klasse før første
+  polling. **3 mutanter** (grensen `<= 0` → `< 0`, kallet fjernet, `tom` ut av malen),
+  3 drept. CSS og maler ellers: målingen er prøven, ikke mutanter.
+
+## 2026-10-14 — CSRF-avvisning: portalens 403-side på norsk, og JSON til `apiFetch`  `#core/sikkerhet`
+
+**Djangos egen side hadde en `<style>` uten nonce** og sto uten stiler etter
+`style-src-elem` — hvit tekst på hvitt, på engelsk, skrevet for utviklere. Den vanlige
+grunnen her er ikke et angrep, men en fane som har stått over en utlogging.
+
+`CSRF_FAILURE_VIEW = 'core.csrf_feil.csrf_feil'`:
+- **Skjema:** `403.html` med «Siden må lastes på nytt» og «Økten din er utløpt, eller
+  siden har stått åpen lenge. Last siden på nytt og prøv igjen.» Malen tar `tittel` og
+  `melding`, og vanlig 403 sier fortsatt «Ingen tilgang».
+- **`apiFetch`:** `{'status': 'error', 'message': …}` med 403 — klienten fikk HTML,
+  `res.json()` kastet, og brukeren så en nettverksfeil om noe som var en utløpt økt.
+  Kjennetegnet er `X-Portal-Inaktiv`, som `apiFetch` alltid sender, eller JSON-typen.
+- **Grunnen (`reason`) logges, vises ikke:** den sier hvilken sjekk som feilet.
+- 403-sidas eget `style=""` er flyttet inn i blokka.
+
+`core/tests_csrf_feil.py`: 4 tester. **3 mutanter** (innstillingen fjernet, aldri JSON,
+kjennetegnet fjernet), 3 drept.
+
 ## 2026-10-14 — Kommentarråte-testen var rød i CI på `6e3ff12`: den leste sin egen docstring  `#core/tester`
 
 **Grønn lokalt, rød i CI, og grunnen er verdt å huske.** `_filer()` i

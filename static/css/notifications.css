@@ -48,6 +48,8 @@
   padding: 0 3px;
   pointer-events: none;
 }
+/* Ingen uleste: skjult. En klasse, ikke style="" (CSP) — `notifications.js` slår den av og på. */
+.notif-badge.tom { display: none; }
 
 /* ── Dropdown-panel ──────────────────────────────────────────────────────── */
 .notif-panel {

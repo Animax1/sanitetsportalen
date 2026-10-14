@@ -43,7 +43,7 @@
   function setBadge(n) {
     n = parseInt(n, 10) || 0;
     badgeEl.textContent = n > 99 ? '99+' : String(n);
-    badgeEl.style.display = n > 0 ? 'inline-flex' : 'none';
+    badgeEl.classList.toggle('tom', n <= 0);
   }
 
   /* ── Er det et menneske i fana? ─────────────────────────────────────── */

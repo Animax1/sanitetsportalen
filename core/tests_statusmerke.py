@@ -225,7 +225,9 @@ class BjellaTegnerMeldingenTests(SimpleTestCase):
 
     OPPSETT = """
     const el = { hidden: true, textContent: '', title: '', className: 'statusmelding' };
-    const badge = { textContent: '', style: {} };
+    const _klasser = new Set();
+    const badge = { textContent: '', style: {},
+      classList: { toggle: (k, p) => (p ? _klasser.add(k) : _klasser.delete(k)), contains: (k) => _klasser.has(k) } };
     globalThis.document = { visibilityState: 'visible',
       getElementById: (id) => ({ 'portal-statusmelding': el, 'notification-badge': badge })[id] || null,
       querySelector: () => null, addEventListener() {} };
@@ -262,6 +264,23 @@ class BjellaTegnerMeldingenTests(SimpleTestCase):
         self.assertEqual(rader[1], rader[0])
         self.assertEqual(rader[2], {'hidden': True, 'tekst': '', 'klasse': 'statusmelding'})
         self.assertEqual(rader[3], {'hidden': True, 'tekst': '', 'klasse': 'statusmelding'})
+
+    def test_merket_skjules_ved_null_og_vises_ellers(self):
+        """Merket skjules med klassen `tom`, ikke med `style.display` (CSP, 14. okt.
+        2026) — og malen tegner den samme klassen før første polling."""
+        kode = """
+          (async () => {
+            const ut = [];
+            for (const n of [2, 0, 150, '0', undefined]) {
+              svar = { unread: n }; await tikk();
+              ut.push([badge.textContent, badge.classList.contains('tom')]);
+            }
+            console.log(JSON.stringify(ut));
+          })();
+        """
+        ut = run_node(read_js(JS_DIR / 'notifications.js'), kode, preamble=self.OPPSETT)
+        (rader,) = [json.loads(linje) for linje in ut.splitlines() if linje != 'OK']
+        self.assertEqual(rader, [['2', False], ['0', True], ['99+', False], ['0', True], ['0', True]])
 
 
 class FanetittelenTests(SimpleTestCase):
@@ -305,3 +324,26 @@ class KoVinduetForSegTests(SimpleTestCase):
             console.log(document.title);
         """)
         self.assertEqual(ut.splitlines()[0], '[TEST] Logg · KO')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class BjellemerketFoerPollingenTests(TestCase):
+    """Malen tegner merket skjult eller synlig før `notifications.js` har spurt."""
+
+    def _merket(self, uleste):
+        from core.notifications import notify
+        bruker = CustomUser.objects.create_user(username=f'bjelle{uleste}', password='x', role='admin',
+                                                must_change_password=False)
+        gi_standardtilgang(bruker, 'admin')
+        for i in range(uleste):
+            notify(bruker, module_slug='core', kind=f'prove{i}', title=f'Prøve {i}')
+        c = Client()
+        c.force_login(bruker)
+        tekst = c.get('/portal-admin/vakt/').content.decode()
+        return re.search(r'<span id="notification-badge"\s+class="([^"]*)"', tekst).group(1)
+
+    def test_null_uleste_er_skjult(self):
+        self.assertEqual(self._merket(0).split(), ['notif-badge', 'tom'])
+
+    def test_uleste_vises(self):
+        self.assertEqual(self._merket(2).split(), ['notif-badge'])

@@ -311,6 +311,8 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
+# Portalens 403-side, og JSON til `apiFetch` — se modulen.
+CSRF_FAILURE_VIEW = 'core.csrf_feil.csrf_feil'
 
 # Proxy (Railway terminerer TLS foran appen)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

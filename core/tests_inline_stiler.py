@@ -169,7 +169,7 @@ class VaktlistefilaTests(TestCase):
 class StilattributteneGaarBareNedTests(SimpleTestCase):
     """Sperrehaken: senk tallene når en mal ryddes. Aldri opp."""
 
-    MAKS_MALER = 230
+    MAKS_MALER = 216
     MAKS_JS = 104
 
     def test_malene(self):

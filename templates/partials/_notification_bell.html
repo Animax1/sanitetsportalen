@@ -10,8 +10,7 @@
           aria-label="Varsler">
     <i class="bi bi-bell-fill"></i>
     <span id="notification-badge"
-          class="notif-badge"
-          style="display:{% if notification_unread_count %}inline-flex{% else %}none{% endif %};">
+          class="notif-badge{% if not notification_unread_count %} tom{% endif %}">
       {{ notification_unread_count|default:0 }}
     </span>
   </button>
