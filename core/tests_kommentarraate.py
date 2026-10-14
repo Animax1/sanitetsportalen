@@ -82,8 +82,16 @@ STI = re.compile(r'(?<![\w/.-])([a-z_][a-z_0-9]*(?:/[a-z_0-9.-]+)+\.(?:py|js|htm
 KALL = re.compile(r'`(_[A-Za-z]\w*|[a-z]+[A-Z]\w*)\(\)`')
 
 
+#: Docstringen her er en katalog over mønstrene, med oppdiktede eksempler.
+SELV = 'core/tests_kommentarraate.py'
+
+
 def _filer() -> list[Path]:
-    ut = subprocess.run(['git', '-c', 'core.quotepath=off', 'ls-files', '*.py', '*.js', '*.html'],
+    """Sporede **og** nye filer. Med bare `ls-files` ble en fil som ikke var
+    committet hoppet over lokalt og skannet i CI — denne fila selv var grønn
+    lokalt og rød på `6e3ff12` (14. okt. 2026)."""
+    ut = subprocess.run(['git', '-c', 'core.quotepath=off', 'ls-files', '--cached', '--others',
+                         '--exclude-standard', '*.py', '*.js', '*.html'],
                         capture_output=True, text=True, cwd=ROT).stdout.split('\n')
     return [ROT / p for p in ut if p and not any(
         d in Path(p).parts for d in ('migrations', 'vendor', 'staticfiles'))]
@@ -174,6 +182,8 @@ class KommentareneTests(SimpleTestCase):
         for p in cls.filer:
             linjer = p.read_text(encoding='utf-8').split('\n')
             rel = str(p.relative_to(ROT))
+            if rel == SELV:
+                continue
             for lnr, linje in _kommentarer(p):
                 for sti in STI.findall(linje):
                     cls.sett['sti'] += 1
@@ -207,3 +217,12 @@ class KommentareneTests(SimpleTestCase):
         self.assertGreater(self.sett['sti'], 100, self.sett)
         self.assertGreater(self.sett['punkt'], 50, self.sett)
         self.assertGreater(self.sett['kall'], 50, self.sett)
+
+    def test_nye_filer_skannes_ogsaa(self):
+        """En fil som ikke er committet ennå, skal skannes lokalt slik CI skanner den."""
+        ny = ROT / 'core' / '_kommentarraate_proeve.py'
+        ny.write_text('# Se `_finnes_ikke_i_det_hele_tatt()`.\n', encoding='utf-8')
+        try:
+            self.assertIn(ny, _filer())
+        finally:
+            ny.unlink()

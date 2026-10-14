@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Kommentarråte-testen var rød i CI på `6e3ff12`: den leste sin egen docstring  `#core/tester`
+
+**Grønn lokalt, rød i CI, og grunnen er verdt å huske.** `_filer()` i
+`core/tests_kommentarraate.py` hentet filene med `git ls-files`, og fila selv var ikke
+committet da jeg kjørte den. I CI var den sporet, og docstringen — en katalog over
+mønstrene, med `_should_run_now()`, `core.views` og `app/fil.py` som eksempler — ble
+meldt som seks døde referanser. Railway hoppet over `6e3ff12`.
+
+- **Fila hopper over seg selv** (`SELV`): docstringen er eksempler, ikke påstander.
+- **`_filer()` tar med nye filer** (`--others --exclude-standard`), så en fil som ikke er
+  committet ennå skannes lokalt slik CI skanner den. `test_nye_filer_skannes_ogsaa`
+  holder det.
+- 2 mutanter (`--others` fjernet, `SELV`-hoppet fjernet), 2 drept.
+
+**Feilen er reprodusert lokalt etter commit** før rettelsen, og hele suiten er kjørt mot
+PostgreSQL: 4 479 + 1 192 grønne.
+
 ## 2026-10-14 — CHANGELOG: 143 entries hadde løse tagger som «#ko» og «#gjeld» — søkeordet fant dem ikke  `#core/dokumentasjon`
 
 **Funnet da nr. 4 skulle merke halen.** TODO sa «182 av 280 uten søkeord»; `manage.py
