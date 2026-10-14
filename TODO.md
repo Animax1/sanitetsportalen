@@ -486,13 +486,14 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
-- [ ] **Merk resten av CHANGELOG — 182 av 280 entries står uten søkeord.**
-      13.–17. sep. er gjort (97 entries, 15 temaer); halen er 29. aug. og bakover.
+- [ ] **Merk resten av CHANGELOG — 182 av 505 entries står uten søkeord.**
+      13. sep.–14. okt. er gjort (36 temaer); halen er 12. sep. og bakover, 140 av dem
+      fra august.
       `python manage.py changelog --umerkede` viser hva som gjenstår.
 
       **Det haster ikke, og det er verdt å si hvorfor:** de merkede er de siste fem
       dagene, som er der oppslagene faktisk gjøres. For halen duger `manage.py changelog`
-      alene — 280 titler mot 11 651 linjer. Ta den når du likevel er inne i en gammel
+      alene — 505 titler mot 10 000+ linjer. Ta den når du likevel er inne i en gammel
       entry.
 
       **Merk med en eksplisitt tittel-til-tema-tabell, ikke nøkkelordsgjetting**, og la

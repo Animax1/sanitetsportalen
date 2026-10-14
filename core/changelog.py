@@ -64,14 +64,22 @@ SOKEORD = re.compile(r'`#([a-z_]+)/([a-z-]+)`')
 #: `test_hvert_registrert_sokeord_er_i_bruk` håndhever rekkefølgen: merk
 #: entriene først, registrer temaet i samme commit.
 TEMAER: dict[str, dict[str, str]] = {
+    'accounts': {
+        'innlogging': 'passord, MFA, låsing, bilkontoenes innlogging, rate-limit på innloggingen',
+    },
     'core': {
         'audit': 'auditlogg, hva som logges og hva som med vilje ikke gjør det',
         'backup': 'handlere, planen, klokka, offsite, gjenoppretting',
         'dokumentasjon': 'CLAUDE.md, TODO, CHANGELOG, vaktene rundt dem',
         'drift': 'Railway, cron, server-status, sesjoner, flyttingen til `core`',
+        'gjeld': 'teknisk gjeld: G-, E-, D- og F-puljene, delinger, død kode, ett sted i stedet for fem',
         'grensesnitt': 'base_portal: headeren, modulmenyen, avatar-menyen, footeren',
+        'kartkobling': 'kart.sanitet.net: posisjonene fra bil, lag og KO, HMAC, staging-kartet',
+        'personvern': '/personvern/, databehandleravtalen, slettefristene, behandlingsansvarlig',
         'sikkerhet': 'gjennomgangene, rate-limiting, CSP, hodene',
+        'tester': 'CI, PostgreSQL i CI, pip-audit, flaky tester og vaktene mot dem',
         'tilgang': 'ModulTilgang, nivåstigen, dekoratørene, superbrukeren',
+        'vakt': 'vakt-siden, aktiv vakt, «Avslutt vakt», sletting av tidligere vakter',
     },
     'backlog': {
         'modulen': 'innspill, angrefristen, løst-flagget, filteret',
@@ -83,11 +91,15 @@ TEMAER: dict[str, dict[str, str]] = {
         'sentralbordet': 'sentralbordet flyttet inn i /ko/, delingen og gatene',
         'hendelseslogg': 'hendelsesloggen som egen flate: prioritet, bli med, festing, lagene på hendelsen, loggen i hendelsen med deling, melder',
         'oppsett': '2×2-rutenettet: bytte plass, skillelinjer, oppsettet i localStorage',
+        'planleggeren': 'konsertplanleggeren og programmet: konserter, behov, plan mot faktisk',
     },
     'oppdrag': {
         'enhetsskjerm': 'bilens side, offline-køen, lydvarselet',
         'sentralbord': 'operatørens side, oppdragslista, tidslinja',
         'statusmaskin': 'overganger, stemplinger, passiv vakt, avvente',
+    },
+    'park': {
+        'modulen': 'lagregistreringen på /lag/: lenkene, oppsettet, statistikkfanen, lagringstida',
     },
     'statistikk': {
         'oppdragsfanen': 'oppdragsfanen på /statistikk/: tidsledd, ventetida i to, køen, KO mot bilen, p90',

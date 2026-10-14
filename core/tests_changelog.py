@@ -49,6 +49,23 @@ class SokeordeneErRegistrerteTests(SimpleTestCase):
             + '\n  '.join(f'#{s}' for s in changelog.ubrukte())
             + '\n\nMerk entriene som hører til, eller ta temaet ut av TEMAER.'))
 
+    def test_ingen_lose_tagger(self) -> None:
+        """**En tagg uten `/tema` er ingen tagg — og den ser ut som en** (14. okt. 2026).
+
+        Fra ca. 19. sep. ble entriene merket `` `#ko` ``, `` `#gjeld` `` og
+        `` `#park #sikkerhet` ``: 143 av dem, og ingen av reglene over så det,
+        fordi `OVERSKRIFT` leser slikt som en del av tittelen. Søkeordet ga da
+        ingen treff, og `--umerkede` vokste fra 182 til 328 mens det så ut som
+        arkivet ble merket. En skrivemåte som ser riktig ut og ikke virker er
+        verre enn ingen — samme feilklasse som `test_hvert_registrert_sokeord_er_i_bruk`.
+        """
+        funn = [f"{e['dato']} — {e['tittel']}" for e in changelog.entries()
+                if '`#' in e['tittel']]
+        self.assertEqual(funn, [], (
+            'Tagger i overskriften som ikke er på formen `#<app>/<tema>`:\n  '
+            + '\n  '.join(funn)
+            + '\n\nSkriv `#app/tema` med et tema fra TEMAER (`manage.py changelog --temaer`).'))
+
     def test_appdelen_er_en_ekte_modul(self) -> None:
         """App-halvdelen utledes og skal ikke kunne finne på seg selv.
 

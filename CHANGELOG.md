@@ -4,7 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-10-14 — F4: 23 råtne kommentarer rettet, og en test for kommentarer i koden  `#dokumentasjon` `#gjeld`
+## 2026-10-14 — CHANGELOG: 143 entries hadde løse tagger som «#ko» og «#gjeld» — søkeordet fant dem ikke  `#core/dokumentasjon`
+
+**Funnet da nr. 4 skulle merke halen.** TODO sa «182 av 280 uten søkeord»; `manage.py
+changelog --umerkede` sa 328 av 505. Halen hadde ikke vokst — det hadde **toppen**. Fra
+ca. 19. sep. ble entriene merket `` `#ko` ``, `` `#gjeld` ``, `` `#sikkerhet` `` og
+`` `#park #sikkerhet` `` i én backtick, også alle mine fra i dag. Formen er
+`` `#<app>/<tema>` ``, og `OVERSKRIFT` leser alt annet som en del av tittelen: et oppslag på
+`#ko/ressursbildet` svarte med sju der det fantes over tjue, og ingen test sa fra.
+
+**Hva som er gjort:**
+
+- **143 + 1 overskrifter oversatt** med en eksplisitt tabell — linje, tittelens start og
+  søkeordene — og skriptet krevde at tittelen sto på linja. Ingen nøkkelordsgjetting:
+  `#kart`, `#kartkobling` og `#tavla` ble ett tema hver, `#todo` og `#docs` ble
+  `core/dokumentasjon`, `#deploy` og `#runbook` ble `core/drift`. Én linje hadde både
+  riktige og løse tagger (`#ko` `#oppdrag/sentralbord`, 23. sep.) og ble fanget av den
+  nye testen, ikke av skanningen min.
+- **Åtte nye temaer** i `core/changelog.py`, hvert i bruk minst to ganger:
+  `accounts/innlogging`, `core/gjeld`, `core/kartkobling`, `core/personvern`,
+  `core/tester`, `core/vakt`, `ko/planleggeren`, `park/modulen`.
+- **`test_ingen_lose_tagger`** i `core/tests_changelog.py`: en backtick som begynner med
+  `#` og står i tittelen, er en tagg som ikke virker. 2 mutanter (en løs `#ko` lagt til,
+  og `#park #sikkerhet` i stedet for to riktige), 2 drept.
+
+**Igjen: 182 av 505**, alle 12. sep. og eldre — den samme halen TODO beskrev, og den
+haster like lite. Det som gjøres oppslag i, de siste fire ukene, er merket.
+
+**Lærdommen er den samme som for skannerne:** regelen sa hvordan et søkeord *skal* se ut,
+men ingenting avviste et som så nesten riktig ut. Merket virket i sju uker uten å virke.
+
+## 2026-10-14 — F4: 23 råtne kommentarer rettet, og en test for kommentarer i koden  `#core/dokumentasjon` `#core/gjeld`
 
 **Hvorfor:** Nr. 4 på Andrés liste 14. okt. («… og så nr 4»): pulje F i gjeldsplanen,
 «rundt 40 utdaterte kommentarer». Det fantes ingen liste, bare seks eksempler. Og
@@ -48,7 +78,7 @@ historisk setning og den kjente luken er grønne. **Én av dem fant en feil i te
 `core.vakt.finnes_ikke` gikk grønt fordi `core.vakt` også er modellen `Vakt`. Et modellnavn
 godtas nå bare alene eller med et felt etter.
 
-## 2026-10-14 — CSP: `<style>` krever nonce (`style-src-elem`), attributtene tas gradvis  `#sikkerhet` `#csp`
+## 2026-10-14 — CSP: `<style>` krever nonce (`style-src-elem`), attributtene tas gradvis  `#core/sikkerhet`
 
 **Hvorfor:** Nr. 3 på lista André satte 14. okt. («Kjør nr 1 først G2 og så tar vi nr 3
 etterpå»). `style-src 'unsafe-inline'` sto som kjent avvik siden F5 (13. aug.).
@@ -105,7 +135,7 @@ tegn — fortsatt rød.
 `scripts/sikkerhetssjekk.py` sjekker `style-src-elem` mot staging og prod.
 `TEKNISK_DOKUMENTASJON.md` (tabellen, §15.6) og `PERSONVERN_DOKUMENTASJON.md` C oppdatert.
 
-## 2026-10-14 — CI henter PostgreSQL fra tre registre: «toomanyrequests: Data limit exceeded»  `#ci`
+## 2026-10-14 — CI henter PostgreSQL fra tre registre: «toomanyrequests: Data limit exceeded»  `#core/tester`
 
 **Hvorfor:** CI stoppet på nedlastingen av PostgreSQL-imaget fire ganger: to ganger fra Docker
 Hub før 9. okt., så to ganger fra AWS-speilet 13. og 14. okt. (`fa17627`, `5a3fa93`) — hver gang
@@ -131,7 +161,7 @@ annen versjon ville prøvd koden mot noe annet enn prod uten at noen så det. **
 3 drept** (en reserve på 17, `latest`, bare ett register — den siste traff feil første gang,
 sed-en endret ikke det den skulle; laget på nytt og diffen kontrollert).
 
-## 2026-10-14 — G2: `vaktliste/services.py` delt — `planlegger.py`, `belastning.py`, `vaktdrift.py`  `#vaktliste` `#ko` `#park` `#gjeld`
+## 2026-10-14 — G2: `vaktliste/services.py` delt — `planlegger.py`, `belastning.py`, `vaktdrift.py`  `#core/gjeld` `#vaktliste/planlegging`
 
 **Hvorfor:** G2, steg to i vaktlista. `services.py` var 1 858 linjer, og to av seksjonene
 bar noe annet enn navnet: «Hvem får røre hva» inneholdt belastningen og
@@ -183,7 +213,7 @@ modulen, og ville ikke sagt fra.
 
 **G2 gjenstår:** `oppdrag/services.py`, etter G6b.
 
-## 2026-10-14 — G2: `vaktliste/views.py` delt etter flate, sju filer  `#vaktliste` `#gjeld`
+## 2026-10-14 — G2: `vaktliste/views.py` delt etter flate, sju filer  `#core/gjeld`
 
 **Hvorfor:** G2 i gjeldsplanen. `vaktliste/views.py` var 1 840 linjer — vokst fra 1 692 da
 planen ble skrevet 25. sep. André 14. okt.: «Kjør nr 1 først G2». Ren flytting, bevist
@@ -228,7 +258,7 @@ Hele suiten grønn mot PostgreSQL.
 
 **Gjenstår av G2:** `vaktliste/services.py`, og `oppdrag/services.py` etter G6b.
 
-## 2026-10-14 — Generalprøven leser av broene  `#oppdrag` `#generalprove`
+## 2026-10-14 — Generalprøven leser av broene  `#core/drift` `#oppdrag/statusmaskin`
 
 André 14. okt. 2026, etter at staging viste «Aldri brukt»: «Jeg antar at det og er verdifullt
 når vi tester appen og ikke minst general prøven?» Ja — prøven kjører de samme veiene som
@@ -238,7 +268,7 @@ nullstille telleren, og «Etterpå»-tabellen en rad for utfallet. Staging kan i
 gamle statusmeldinger uten koblingsrad finnes bare i prod, så telleren må fortsatt til `main`
 før vakta.
 
-## 2026-10-14 — G6b-forarbeid: broene telles i drift, kaster under test, og ingen test går gjennom dem  `#oppdrag` `#gjeld`
+## 2026-10-14 — G6b-forarbeid: broene telles i drift, kaster under test, og ingen test går gjennom dem  `#core/gjeld` `#oppdrag/statusmaskin`
 
 **Hvorfor:** G6b fjerner broene fra deploy 1 av flere enheter etter neste vakt. André
 14. okt. 2026, om advarselen som skulle bevise at de ikke brukes: «Hvordan ser vi
@@ -293,7 +323,7 @@ den ikke — **⋮ → Redeploy**.
 **Etter vakta:** «Broer i oppdrag» på server-status. «Aldri brukt» → G6b. Et tall → et funn
 først (TODO).
 
-## 2026-10-13 — G2: `ko/views.py` delt etter flate, `user_detail_view` som dispatch-tabell  `#ko` `#accounts` `#gjeld`
+## 2026-10-13 — G2: `ko/views.py` delt etter flate, `user_detail_view` som dispatch-tabell  `#core/gjeld` `#ko/skallet`
 
 **Hvorfor:** Gjeldsplanen 25. sep. 2026, G2. `ko/views.py` var 1 354 linjer med seks flater
 i én fil; `user_detail_view` var 216 linjer med åtte `elif`-grener på `action`. André: «se
@@ -346,7 +376,7 @@ bevis enn en mutant.
 **Gjenstår av G2:** `vaktliste/views.py`, `vaktliste/services.py`, og `oppdrag/services.py`
 etter G6b (TODO).
 
-## 2026-10-13 — KO-utskriften: alle vinduene alltid, ressursene med, og kopien uten nett  `#ko`
+## 2026-10-13 — KO-utskriften: alle vinduene alltid, ressursene med, og kopien uten nett  `#ko/skallet` `#ko/ressursbildet`
 
 **Hvorfor:** André: «KO har bare personlige brukere med mfa. Så nr 2 er aktuelt. Og husk
 loggstrømmen er ikke nødvendigvis det viktige her, alt sammen av info i ko er viktig. Så
@@ -395,7 +425,7 @@ direkte. Resten: kopiregelen (to veier), hodet og flagget i viewene, workerens t
 (`avgjor` fem veier, `kanLagres` to, `erForGammel`), merket og varselet, besetningsgaten,
 setningen for manglende tilgang.
 
-## 2026-10-13 — KO på papir: tavla, konsertplanleggeren og oppdragene; loggen bare siste 8 timer  `#ko`
+## 2026-10-13 — KO på papir: tavla, konsertplanleggeren og oppdragene; loggen bare siste 8 timer  `#ko/skallet` `#ko/planleggeren`
 
 **Hvorfor:** André, etter første versjon samme dag: «Vi trenger ikke vise lukkede hendelser
 og trenger nok bare loggstrøm fra de siste 8 timer. Og så må vi få utskrift av tavlen og
@@ -474,7 +504,7 @@ UTC-tidspunktet (fanget fordi testen bruker UTC rundt midnatt — prod-formen), 
 til `skriv_full`, `isdigit`-sjekken fjernet, `|safe` på teksten, fjernet-grenen fjernet,
 lenken fra KO fjernet.
 
-## 2026-10-13 — Utkast til databehandleravtale for portalen og kartet  `#personvern`
+## 2026-10-13 — Utkast til databehandleravtale for portalen og kartet  `#core/personvern`
 
 **Hvorfor:** André eier portalen og kart.sanitet.net, mens Kverneland Røde Kors er
 behandlingsansvarlig — da er han **databehandler**, og art. 28 krever en skriftlig
@@ -489,7 +519,7 @@ forslag. **Åpne punkter** nederst: hvordan kartet driftes og hva det lagrer om 
 Cloudflare-grunnlaget, AhaSend, sikkerhetskopiene ved opphør, og hvem som overtar hvis André
 ikke kan drifte. Ikke juridisk kvalitetssikret. Pekere fra TODO og protokollen A.1.
 
-## 2026-10-12 — Personvernside med informasjonskapsler i footeren: `/personvern/`  `#personvern`
+## 2026-10-12 — Personvernside med informasjonskapsler i footeren: `/personvern/`  `#core/personvern`
 
 **Hvorfor:** André, 12. okt.: «Vi har ingen personvern side på nettsiden som blant annet
 forklarer om vår bruk av cookies og personopplysninger til brukerene. Jeg tenker den bør stå
@@ -654,7 +684,7 @@ lyver på. Ny test gjennom transporten i `test`; drept.
 **`PORTAL_MILJO` er satt i Railway** (André, 11. okt. 2026): `test` på staging og `drift` på
 prod, web og cron. Punktet i «Krever Andre» er slettet.
 
-## 2026-10-10 — Slettefrist på oppdragsnotatet: fritekst og «Annet sted» slettes 3 dager etter siste aktivitet  `#personvern`
+## 2026-10-10 — Slettefrist på oppdragsnotatet: fritekst og «Annet sted» slettes 3 dager etter siste aktivitet  `#core/personvern` `#oppdrag/sentralbord`
 
 **Hvorfor:** A.12 hadde det som åpen restrisiko: «selve feltverdien står i oppdragstabellen
 til oppdraget slettes eller arkiveres». Beskyttelsen var bygget helt mot bilen; i
@@ -729,7 +759,7 @@ taket følger ned, ellers gror plassen igjen.
 
 ---
 
-## 2026-10-10 — «Logg ut» spør før usendte stemplinger slettes  `#sikkerhet`
+## 2026-10-10 — «Logg ut» spør før usendte stemplinger slettes  `#core/sikkerhet` `#oppdrag/enhetsskjerm` `#vaktliste/offline`
 
 **Hvorfor:** funnet 8. okt. 2026 under L17. «Logg ut» sender `Clear-Site-Data: "cache",
 "storage"` (H4, 13. sep.), og det tømmer **offline-køene** i bilen (`oppdrag_ko_v1:u<id>`) og
@@ -836,7 +866,7 @@ mutanter (`latest`, en annen database) er drept.
 
 ---
 
-## 2026-10-09 — Delte KO-kontoer ryddet på staging  `#todo` `#sikkerhet`
+## 2026-10-09 — Delte KO-kontoer ryddet på staging  `#core/tilgang` `#ko/skallet`
 
 **André, 9. okt. 2026 kl. 23:** «Da er det ordnet i staging og ingen slike brukere på prod.»
 `verifiser_modultilgang` på staging (bygg `13c7ead1`, 17 kontoer): «Delte kontoer med rader
@@ -849,7 +879,7 @@ sekunder.
 
 ---
 
-## 2026-10-09 — TODO: Wake Lock på bilskjermen, bestilt  `#todo` `#oppdrag`
+## 2026-10-09 — TODO: Wake Lock på bilskjermen, bestilt  `#core/dokumentasjon` `#oppdrag/enhetsskjerm`
 
 **Hvorfor:** André, 9. okt. 2026: «legge dette inn i todo ift wake lock på bil kontoer når de
 er inne i /oppdrag». Bilskjermen sovner i holderen, og da stopper pollingen og lydvarselet —
@@ -868,7 +898,7 @@ den blokkerer ingenting før koden er på staging.
 
 ---
 
-## 2026-10-09 — Delte KO-kontoer: valg A, og hybrid er to kontoer  `#todo` `#sikkerhet` `#ko`
+## 2026-10-09 — Delte KO-kontoer: valg A, og hybrid er to kontoer  `#core/tilgang` `#ko/skallet`
 
 **Hvorfor:** André, 9. okt. 2026, om `ko1` og `rk01`: «ja vi må vel nesten ta A da det er bare
 1-2 brukere som har behov for en hybrid løsning» — mail og MFA som de andre, men både sende
@@ -888,7 +918,7 @@ selv og er på saken»).
 
 ---
 
-## 2026-10-09 — Rota av CLAUDE.md: fire kopier ble pekere, ~1 100 tegn å gå på; delte KO-kontoer på staging  `#claude-md` `#todo` `#sikkerhet`
+## 2026-10-09 — Rota av CLAUDE.md: fire kopier ble pekere, ~1 100 tegn å gå på; delte KO-kontoer på staging  `#core/dokumentasjon` `#core/tilgang`
 
 **Hvorfor:** André, 9. okt. 2026: «du kan gjøre nr 4» — rota av `CLAUDE.md` sto **113 tegn**
 under taket (67 687 av 67 800), og taket var hevet seks ganger på to uker. Neste avsnitt i
@@ -922,7 +952,7 @@ tatt: den kjører den gamle koden, og kontrollen må kjøres der igjen etter `ma
 
 ---
 
-## 2026-10-08 — Backup-klokka «av» gjelder reservenettet, offline-køene per bruker (L17), delt konto bare i oppdrag  `#backup` `#sikkerhet` `#oppdrag` `#vaktliste` `#ko`
+## 2026-10-08 — Backup-klokka «av» gjelder reservenettet, offline-køene per bruker (L17), delt konto bare i oppdrag  `#core/backup` `#core/sikkerhet` `#oppdrag/enhetsskjerm` `#vaktliste/offline`
 
 **Hvorfor:** André, 8. okt. 2026: «Start 2,3,4» — punkt 2–4 på nivå 1 i rangeringen av
 `TODO.md` 7. okt.
@@ -1000,7 +1030,7 @@ regelen ikke henger på rekkefølgen av to linjer, som sto omvendt fram til i da
 
 ---
 
-## 2026-10-08 — Behandlingsansvarlig er Kverneland Røde Kors; TODO ryddet for duplikater  `#personvern` `#todo`
+## 2026-10-08 — Behandlingsansvarlig er Kverneland Røde Kors; TODO ryddet for duplikater  `#core/personvern` `#core/dokumentasjon`
 
 **Hvorfor:** André, 8. okt. 2026, på tilbakemeldingene om `TODO.md`: «organisasjonsnavnet er
 Kverneland Røde Kors», og «fiks det» om det gjennomstrekte punktet og `leder`-nivået som sto
@@ -1034,7 +1064,7 @@ eget punkt (tilbakemelding 5 og 6).
 
 ---
 
-## 2026-10-08 — «OBS: Lag 3 delte posisjon» i KO-loggen  `#ko` `#kartkobling`
+## 2026-10-08 — «OBS: Lag 3 delte posisjon» i KO-loggen  `#core/kartkobling` `#ko/loggen`
 
 **Hvorfor:** André, 8. okt. 2026: «vises det i hendelsesloggen at lag eller bil enheter har sendt
 posisjon?» — det gjorde det ikke; portalen lagret ingenting, og KO så delingen bare med kartet
@@ -1067,7 +1097,7 @@ viewene, og begge reglene i strømmen og merket.
 
 ---
 
-## 2026-10-07 — «OBS: Posisjon delt»: nøytrale tekster, bilene med, én varighet  `#oppdrag` `#park` `#kartkobling`
+## 2026-10-07 — «OBS: Posisjon delt»: nøytrale tekster, bilene med, én varighet  `#core/kartkobling` `#oppdrag/enhetsskjerm` `#park/modulen`
 
 **Hvorfor:** André, 7. okt. 2026: «Ikke bruk bokstavelig finner ikke frem, ta det mer nøytralt.
 Gjelder og i sanitetsportalen.» Og: «bil enheter som trykker på send posisjon må og vises under
@@ -1103,7 +1133,7 @@ og slettingen, og registreringen av kortet i `apps.ready()`. I kartet: fem av fe
 
 ---
 
-## 2026-10-07 — Kartets mottak for «Vi finner ikke fram» er ute  `#kartkobling`
+## 2026-10-07 — Kartets mottak for «Vi finner ikke fram» er ute  `#core/kartkobling`
 
 André, 7. okt. 2026: «Ja så flett den». Grenen `lag-posisjon` er flettet inn i `main` i
 `kart-sanitet` (`cd4c7d4`), etter de to commit-ene som hadde kommet til der i mellomtiden; ruff,
@@ -1112,7 +1142,7 @@ Punktet i TODO, «Krever Andre», er slettet.
 
 ---
 
-## 2026-10-07 — Posisjonsknappene: 424, ikke 502, når kartet ikke tar imot  `#oppdrag` `#park`
+## 2026-10-07 — Posisjonsknappene: 424, ikke 502, når kartet ikke tar imot  `#core/kartkobling` `#oppdrag/enhetsskjerm` `#park/modulen`
 
 **Hvorfor:** André prøvde lagenes knapp på staging fra en iPhone (Chrome) etter rettingen under.
 Telefonen ga posisjonen, og kallet nådde portalen. Kartet svarte 404, fordi `lag-posisjon` ennå
@@ -1128,7 +1158,7 @@ gjør en ikke-sendt posisjon til et «ok» for alt som bare leser statuskoden.
 
 ---
 
-## 2026-10-07 — Posisjonsknappene: «Henter posisjon…» frøs  `#oppdrag` `#park`
+## 2026-10-07 — Posisjonsknappene: «Henter posisjon…» frøs  `#core/kartkobling` `#oppdrag/enhetsskjerm` `#park/modulen`
 
 **Hvorfor:** André, 7. okt. 2026, fra staging: «når jeg forsøker å sende posisjon så fryses det
 ved å sende posisjon, det står bare: "Henter posisjon..." Det samme skjer med lag. … På lag så får
@@ -1162,7 +1192,7 @@ begge, nei-sjekken fjernet i begge, reserven fjernet): fem drept.
 
 ---
 
-## 2026-10-07 — «Send posisjon» i bilen og «Vi finner ikke fram» for lagene  `#oppdrag` `#park` `#kartkobling`
+## 2026-10-07 — «Send posisjon» i bilen og «Vi finner ikke fram» for lagene  `#core/kartkobling` `#oppdrag/enhetsskjerm` `#park/modulen`
 
 **Hvorfor:** André, 7. okt. 2026: «En posisjonsknapp som brukes til å sende posisjon som er
 tiltenkt for "jeg her er, hvor skal jeg?" Skal stå uansett om det er oppdrag eller ei. Knappen
@@ -1234,7 +1264,7 @@ klienten i `core` (4xx-unntaket, `utloper`, endepunktet, returverdien, grensene 
 
 ---
 
-## 2026-10-07 — Bilen: «Annet sted»-feltet hopper ikke ut ved pollingen  `#oppdrag`
+## 2026-10-07 — Bilen: «Annet sted»-feltet hopper ikke ut ved pollingen  `#oppdrag/enhetsskjerm`
 
 **Hvorfor:** André, 7. okt. 2026: «Når enheter skriver i annet sted i /oppdrag så hopper den
 ut etter ca 15 sekunder, det må vi fikse.»
@@ -1280,7 +1310,7 @@ undersøkt; det koster en full kropp per bil per 15 s, men er ikke lenger det so
 
 ---
 
-## 2026-10-06 — TODO: fem «vurder»-punkter fra gjennomgangen mot 48-timersvakta  `#todo` `#kart`
+## 2026-10-06 — TODO: fem «vurder»-punkter fra gjennomgangen mot 48-timersvakta  `#core/dokumentasjon` `#core/drift`
 
 **Hvorfor:** André, 5. okt. 2026: «gå gjennom appen og gjerne husk kart.sanitets funksjon
 […] se det opp imot den 48 timers vakten vi skal ha og se om det er noe andre moduler/apper
@@ -1321,7 +1351,7 @@ systemlinje ved kvittering.
 
 ---
 
-## 2026-10-04 — Hvem deler posisjon: ikonet på enhetskortet, tilstanden fra bilskjermen  `#oppdrag` `#ko` `#kart` `#personvern`
+## 2026-10-04 — Hvem deler posisjon: ikonet på enhetskortet, tilstanden fra bilskjermen  `#core/kartkobling` `#oppdrag/sentralbord` `#ko/ressursbildet`
 
 **Hvorfor:** André, 4. okt. 2026, etter skissene: «Jeg liker A best for min del. Kan sikkert
 bare kode det.» A er enhetskortet i KO og på sentralbordet; B, C og D er det som må til for
@@ -1396,7 +1426,7 @@ få tilstanden og tegne markøren grå — står igjen som «Kartkoblingen — v
 
 ---
 
-## 2026-10-04 — Hvem deler posisjon: KO ser det ikke, og det er besluttet at den skal  `#oppdrag` `#ko` `#kart` `#personvern`
+## 2026-10-04 — Hvem deler posisjon: KO ser det ikke, og det er besluttet at den skal  `#core/kartkobling` `#ko/ressursbildet`
 
 **Hvorfor:** André, 4. okt. 2026: «Bil enhetene har mulighet til å slå av sporing, men /ko
 har vel ingen oversikt over hvem som har slått av sporing? Det er vel noe som kan være
@@ -1422,7 +1452,7 @@ hvor.
 
 ---
 
-## 2026-10-04 — Lastplanen for en 48-timers vakt: web-laget holder, databasen måles  `#drift` `#dokumentasjon`
+## 2026-10-04 — Lastplanen for en 48-timers vakt: web-laget holder, databasen måles  `#core/drift`
 
 **Hvorfor:** André, 4. okt. 2026: «Jeg kjenner litt usikkerhet igjen på om vi har nailet
 planen for skalering av server for håndtering av alt belastning på nettsiden. På den
@@ -1469,7 +1499,7 @@ føres inn i `TODO.md` den dagen han bestemmer noe.
 
 ---
 
-## 2026-10-04 — Runbooken tar med kart.sanitet.net, serverless og Better Stack  `#drift` `#kart`
+## 2026-10-04 — Runbooken tar med kart.sanitet.net, serverless og Better Stack  `#core/drift` `#core/kartkobling`
 
 **Hvorfor:** André, 4. okt. 2026: «Disse to appene skal brukes i tandem til en sanitetsvakt.
 Jeg trenger at runbook.md i sanitetsportal repoet også tar med seg kart.sanitet. Vær obs at
@@ -1512,7 +1542,7 @@ Kartets filer omtales uten sti i runbooken: `core/tests_dokumentråte.py` sjekke
 
 ---
 
-## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#backup`
+## 2026-10-04 — «Backup-klokka svarer ikke» rett etter «Lagre plan», og «Av» som ikke slo av  `#core/backup`
 
 **Hvorfor:** André, 4. okt. 2026, med to skjermbilder fra telefon: «Når jeg skal sette
 planen av så får jeg av og til dette». Rett etter «Backupplanen for «arkiv» er lagret» sto
@@ -1557,7 +1587,7 @@ i `_fristen_regnes_fra()` når alle tider mangler. Den er utilgjengelig i drift,
 **Funnet underveis, ikke rettet:** reservenettet i middlewaren hører ikke på
 `BACKUP_KLOKKE=av`. Står i TODO under «Løse punkter».
 
-## 2026-10-03 — Tidsbombe i vaktlistetesten: «testen kan ikke skille i dag»  `#vaktliste` `#ci`
+## 2026-10-03 — Tidsbombe i vaktlistetesten: «testen kan ikke skille i dag»  `#core/tester` `#vaktliste/planlegging`
 
 **Hvorfor:** CI ble rød på `176fdbb` (KO-rettingen under, som bare rører CSS og mal):
 `NyVaktpostFyllerDatoenTests.test_datoen_er_vaktas_og_ikke_dagens` — `ASSERT: testen kan ikke
@@ -1569,7 +1599,7 @@ vært rød uansett commit.
 år, som er feilen testen skal fange (`new Date()` ville satt feil år). Ingen produksjonskode
 endret.
 
-## 2026-10-03 — KO på mobil: hendelsen, verktøylinja og oppdragshodet holder seg innenfor boksen  `#ko`
+## 2026-10-03 — KO på mobil: hendelsen, verktøylinja og oppdragshodet holder seg innenfor boksen  `#ko/skallet`
 
 **Hvorfor:** André, 3. okt. 2026, skjermbilde fra telefon: «Her går deler av ui utenfor boks
 i /ko — på mobil». Hendelsen åpnet ved siden av sidebaren sto kuttet i begge kanter
@@ -1840,7 +1870,7 @@ stund. Ahasend vi bruker eu sine, serverstatus ser bra ut.»
 DPIA-kjeden, personvern for `/lag/`) — André: «signeringer med behandlingsansvar så venter
 vi med det».
 
-## 2026-10-01 — Vaktlista, pulje 5: «Veiledning» på `/vaktliste/` — ordene, hvem gjør hva, og én del per rolle — og `vaktliste/CLAUDE.md` krympet fra 44 733 til 37 624 tegn  `#vaktliste` `#veiledning` `#dokumentasjon`
+## 2026-10-01 — Vaktlista, pulje 5: «Veiledning» på `/vaktliste/` — ordene, hvem gjør hva, og én del per rolle — og `vaktliste/CLAUDE.md` krympet fra 44 733 til 37 624 tegn  `#vaktliste/tilgang` `#core/dokumentasjon`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at det som sviktet var **inngangen** for hver
 rolle: tilgangstabellen i `docs/TESTSJEKKLISTE_VAKTLISTE.md` §16 var den beste
@@ -1883,7 +1913,7 @@ byttet, admin-grenen fjernet) og lenken fra vaktlisten.
 Ruten teller: 211 endepunkter, 38 under `/vaktliste/` (`docs/TEKNISK_DOKUMENTASJON.md`,
 `scripts/sikkerhetsruter.json`).
 
-## 2026-09-30 — Kartkobling prøvd på staging — «Det fungerte!» — og `ko/CLAUDE.md` er under taket igjen  `#kartkobling` `#staging` `#dokumentasjon`
+## 2026-09-30 — Kartkobling prøvd på staging — «Det fungerte!» — og `ko/CLAUDE.md` er under taket igjen  `#core/kartkobling` `#core/dokumentasjon`
 
 **Hvorfor:** André stemplet fra en bil i staging-portalen og så markøren i
 `testkart.sanitet.net` («Det fungerte!»). Det er planens krav til «ferdig» (§0), og da skal
@@ -1901,7 +1931,7 @@ pushe til main»).
   stedet for to som glir fra hverandre. Modulfila står igjen med en peker, og er på 19 596 tegn.
   Unntaket i `FOR_STORE_I_DAG` er strøket.
 
-## 2026-09-30 — Kartkobling: dokumentasjonen kjenner staging-kartet (testkart.sanitet.net)  `#kartkobling` `#dokumentasjon` `#staging`
+## 2026-09-30 — Kartkobling: dokumentasjonen kjenner staging-kartet (testkart.sanitet.net)  `#core/kartkobling` `#core/dokumentasjon`
 
 **Hvorfor:** André satte opp et eget staging-miljø for kartet 30. sep. («vi skal kjøre dette på
 staging»), og la `KART_URL` inn i staging-portalen. Planen, TODO, `DEPLOY_GUIDE.md`,
@@ -1913,7 +1943,7 @@ staging-adressen. TODO-punktet øverst er nå «Bekreft kartkoblingen på stagin
 blokkerer — og prod-nøkkelen står som et vanlig punkt under kartkoblingen, siden prod venter på
 at André sier fra om `main`.
 
-## 2026-09-30 — Kartkobling: 403 «error code: 1010» fra Cloudflare — egen User-Agent  `#kartkobling` `#feilretting` `#staging`
+## 2026-09-30 — Kartkobling: 403 «error code: 1010» fra Cloudflare — egen User-Agent  `#core/kartkobling`
 
 **Hvorfor:** Første stempling mot staging-kartet ga «✗ 30.9., 23:21 (enhet, 403)» på
 server-status (André). Kartet svarer aldri 403 — alle avvisninger der er 401. Svaret kom fra
@@ -1931,7 +1961,7 @@ forespørsel med den User-Agenten ga 403, med en annen 401 fra kartet.
 **Tester:** `test_egen_user_agent_ikke_urllibs`, og 403-hintet i node. Mutant: headeren fjernet
 → rød.
 
-## 2026-09-30 — Kartkobling, pulje F: personvernet og dokumentasjonen — «historikk over posisjoner er en ny behandling»  `#kartkobling` `#personvern` `#dokumentasjon`
+## 2026-09-30 — Kartkobling, pulje F: personvernet og dokumentasjonen — «historikk over posisjoner er en ny behandling»  `#core/kartkobling` `#core/personvern`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §8. Posisjonen til en bil med mannskap i er en
 personopplysning, og avveiningen skal stå skrevet før noe sendes (B13).
@@ -1955,7 +1985,7 @@ personopplysning, og avveiningen skal stå skrevet før noe sendes (B13).
   staging», men B14 og §9 sier at staging-portalens `KART_URL` skal stå tom til et staging-kart
   finnes. Prøven må tas i prod, eller kartet må få et staging-miljø.
 
-## 2026-09-30 — Kartkobling, pulje E: lagene fra KO til kartet — «Lag 3 står på Parkscene»  `#kartkobling` `#ko` `#tavla`
+## 2026-09-30 — Kartkobling, pulje E: lagene fra KO til kartet — «Lag 3 står på Parkscene»  `#core/kartkobling` `#ko/ressursbildet`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §7 (B5): lagnavn og stedsnavn ved plassering på tavla,
 og hendelsens sted når laget går på en hendelse; tomt når laget tas av tavla, settes i pause,
@@ -1985,7 +2015,7 @@ andre kallstedene, KO-sjekken, `on_commit` → direkte, åpen-hendelse-filteret 
 **Dokumentasjon:** `ko/CLAUDE.md` sto 24 tegn under `MODUL_TEGNGRENSE`, så pekeren i tavle-raden
 fikk et bevisst unntak i `FOR_STORE_I_DAG` (22 200) og et TODO-punkt om å dele fila.
 
-## 2026-09-30 — Kartkobling, pulje D: bilens posisjon rir på stemplingen til kartet  `#kartkobling` `#oppdrag` `#bilen` `#personvern`
+## 2026-09-30 — Kartkobling, pulje D: bilens posisjon rir på stemplingen til kartet  `#core/kartkobling` `#oppdrag/statusmaskin` `#core/personvern`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` §6 (André, 30. sep.): «Ved stempling, som del av samme
 forespørsel bilen alt sender. Ingen løpende sending, ingen puls. Sist kjente posisjon, ikke
@@ -2031,7 +2061,7 @@ begge ledd i `posisjonTilKo`, kallstedet i `_stemple`, feltet i `synk()`, `Permi
 gaten og områdesjekken — alle røde. «Navnet lest fra kroppen» overlevde alene fordi det lukkede
 skjemaet gir 400 på `navn` før linja nås (ekvivalent); sammen med skjemasperren fjernet er den rød.
 
-## 2026-09-30 — Kartkobling, pulje C: `core/kartkobling.py` sender til kart.sanitet.net, signert med HMAC  `#kartkobling` `#core` `#sikkerhet`
+## 2026-09-30 — Kartkobling, pulje C: `core/kartkobling.py` sender til kart.sanitet.net, signert med HMAC  `#core/kartkobling` `#core/sikkerhet`
 
 **Hvorfor:** `docs/PLAN_KARTKOBLING.md` (André, 30. sep.): bilenes posisjon ved stempling og
 lagenes sted skal vises i kart.sanitet.net. Både oppdrag og KO skal sende, og ingen av dem
@@ -2064,7 +2094,7 @@ pausen fjernet; pausen aldri satt; et felt lagt til i kroppen; `except Exception
 
 **Krever André:** nøklene i Railway (TODO, toppseksjonen). Ingenting sendes før de er satt.
 
-## 2026-09-30 — Vaktlista, pulje 4: «Del ut» som navngitt handling — «Ureservert» heter «N plasser ikke delt ut», og en tømt reservasjon gjør plassene åpne for alle  `#vaktliste` `#utdeling` `#tilgang`
+## 2026-09-30 — Vaktlista, pulje 4: «Del ut» som navngitt handling — «Ureservert» heter «N plasser ikke delt ut», og en tømt reservasjon gjør plassene åpne for alle  `#vaktliste/tilgang`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at utdelingen fantes — å sette reservasjonen *er*
 å dele ut — men ikke sto på skjermen: den var felt nummer tre i «Rediger enhet», og kortet
@@ -2129,7 +2159,7 @@ Nye tester: `vaktliste/tests_del_ut.py` (endepunktet, tilgangen, frigjøringen) 
 `handlinger.js` gikk over 1 800 linjer; planleggerens del-ut-hjelpere står i
 `vaktliste-oversikt.js`, ved tabellen de tegner.
 
-## 2026-09-30 — CI rød på pip-audit: urllib3 2.7.0 har tre CVE-er (CVE-2026-97687/-97688/-97689), låst til 2.8.0  `#ci` `#avhengigheter` `#sikkerhet`
+## 2026-09-30 — CI rød på pip-audit: urllib3 2.7.0 har tre CVE-er (CVE-2026-97687/-97688/-97689), låst til 2.8.0  `#core/tester` `#core/sikkerhet`
 
 **Hvorfor:** CI-kjøring #60 på `a30bc2d` (flettingen av kartkoblingsplanen) var grønn på alle
 testene og rød på steget «Kjente sårbarheter (pip-audit)»: `urllib3 2.7.0` fikk tre
@@ -2144,7 +2174,7 @@ det er hele poenget med steget, jf. kommentaren i `tester.yml`.
 - Verifisert: `pip-audit` grønn; `pip install --require-hashes` i et rent 3.13-venv, som på
   Railway; `core.tests_offsite` (boto3-stien) grønn i det miljøet.
 
-## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste` `#ordbok` `#tekst`
+## 2026-09-30 — Vaktlista, pulje 3: ordboka på skjermen — «Ny ressurs» heter «Ny enhet», «Ressursgrupper» heter «Ressurstyper», «Opprett vakt» heter «Nytt skift», og det heter «vakten»  `#vaktliste/planlegging`
 
 **Hvorfor:** Gjennomgangen 30. sep. fant at skjermen brukte portalens ord, ikke Andrés — og
 han lærer opp korpsene. André: «ressurs er ambulanse, et lag, mannskapsbil. Enhet er det
@@ -2193,7 +2223,7 @@ lagre, fjerne, sette opp skift, pauser. Hele suiten var grønn; node-testene stu
 bruker de nye etikettene med det gamle navnet i parentes, og har fått punktet «Ordboka».
 Skissene: https://claude.ai/artifact/KRgfWuv1ZdetietLmBZ5m8
 
-## 2026-09-30 — Kartkobling planlagt: bilens posisjon ved stempling og lagenes sted fra KO sendes til kart.sanitet.net  `#kart` `#oppdrag` `#ko` `#personvern` `#plan`
+## 2026-09-30 — Kartkobling planlagt: bilens posisjon ved stempling og lagenes sted fra KO sendes til kart.sanitet.net  `#core/kartkobling` `#core/personvern`
 
 **Hvorfor:** André, 30. sep.: «enhver bilressurs som bruker /oppdrag gir enhetsnavn og
 posisjon til kart.sanitet-appen», og «/ko når de plasserer lag så vil det vises litt på
@@ -2209,7 +2239,7 @@ del av stemplingen den alt sender, og kartet tegner «sist kjente», ikke live.
   med hensyn til at `/vaktliste/` arbeides på samtidig.
 - Ingen kode ennå. Arbeidslista står i `TODO.md` under «Kartkobling».
 
-## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#ci` `#tester` `#vaktliste`
+## 2026-09-30 — CI rød på pulje 2: «connection already closed» — middlewarens klokke lukket testens databasetilkobling  `#core/tester`
 
 **Hvorfor:** CI-kjøring #57 på `e81709d` feilet med tre feil, alle `InterfaceError: connection
 already closed`, mens hele suiten var grønn lokalt. André: «Sjekk ci, den mislyktes. Når du
@@ -2234,7 +2264,7 @@ databasen etterpå.
   suiten kjøres mot en lokal PostgreSQL før push. For å holde rota under taket er
   historikken om at to-grener-regelen bare sto i deploy-guiden til 17. sep. tatt ut.
 
-## 2026-09-30 — Vaktlista, pulje 2: lista settes i drift av seg selv ved vaktas start — «Sett i drift» er overstyringen  `#vaktliste` `#drift` `#audit`
+## 2026-09-30 — Vaktlista, pulje 2: lista settes i drift av seg selv ved vaktas start — «Sett i drift» er overstyringen  `#vaktliste/planlegging` `#core/audit`
 
 **Hvorfor:** André, 14. sep.: «fjern i drift-knappen og heller ha det slik at når vaktlisten
 starter så er den automatisk i drift». Avgjort 15. sep. (`FORSLAG_VAKTLISTE_UTBEDRINGER.md`
@@ -2280,7 +2310,7 @@ og admin-bryteren, alle fire kallstedene, feilskillet i middlewaren, at requeste
 tilbake, og begge grenene av teksten. **Ikke prøvd:** at `select_for_update` hindrer to
 samtidige klokker — SQLite i testene har ingen radlås. Regelen hviler på PostgreSQL.
 
-## 2026-09-30 — Vaktlista, pulje 1 etter gjennomgangen: korps-føreren lander på «Mitt korps», «Ikke plassert» viste folk som sto på lista, kompetanser som avkryssinger, og e-posthintet som lovet for mye  `#vaktliste` `#dokumentasjon`
+## 2026-09-30 — Vaktlista, pulje 1 etter gjennomgangen: korps-føreren lander på «Mitt korps», «Ikke plassert» viste folk som sto på lista, kompetanser som avkryssinger, og e-posthintet som lovet for mye  `#vaktliste/tilgang` `#vaktliste/roller`
 
 **Hvorfor:** André ba om en plan for `/vaktliste/` ut fra en ekstern gjennomgang (Fable),
 «gjerne sjekk du og». Hver påstand ble kontrollert mot koden før planen ble skrevet. Planen
@@ -2333,7 +2363,7 @@ koblingen. **M6** (kallet til `startfane()` ved sidelasting fjernet) er **udekke
 sitter i den anonyme `DOMContentLoaded`-lytteren i `vaktliste-register.js`, som ingen test
 kjører. Kallet i `byttVaktliste()` er dekket.
 
-## 2026-09-29 — Vakt mot rate-limit-tester som teller for hånd, enhetstimer telte en bil to ganger, og KO-loggen glemte bilen ved flytt i Venter  `#tester` `#statistikk` `#ko`
+## 2026-09-29 — Vakt mot rate-limit-tester som teller for hånd, enhetstimer telte en bil to ganger, og KO-loggen glemte bilen ved flytt i Venter  `#core/tester` `#statistikk/oppdragsfanen` `#ko/loggen`
 
 **Hvorfor:** De tre neste punktene på lista etter sikkerhetsgjennomgangen (André: «Du kan ta
 2a, b og c»).
@@ -2384,7 +2414,7 @@ Enhetstimer 4/4 (ingen union, union over alle biler, gammel sum, lag med). KO 8/
 overlevde lagret raden i to omganger med `enhet` i den andre — atferdslik, linja skrives
 riktig. Varianten som faktisk bryter, `rad.save()` uten `update_fields`, ble rød.
 
-## 2026-09-29 — Siste runde, bilkontoenes innlogging: maskinlåsen stengte ikke den som gjettet, og et tvetydig brukernavn ble aldri låst  `#sikkerhet` `#innlogging`
+## 2026-09-29 — Siste runde, bilkontoenes innlogging: maskinlåsen stengte ikke den som gjettet, og et tvetydig brukernavn ble aldri låst  `#accounts/innlogging` `#core/sikkerhet`
 
 **Hvorfor:** André ba om en siste runde. En agent uten kontekst prøvde å bryte én egenskap: at
 den som kjenner en bilkontos navn ikke kan prøve passord uten grense, hvor mange IP-er hun enn
@@ -2411,7 +2441,7 @@ tråder (3); ikke verdt en ekstra spørring på hver innlogging.
 **Tester:** `MaskinlaasenStengerDenSomGjetterTests`, `TvetydigBrukernavnTellesTests`.
 **Mutasjoner: 2, begge drept.**
 
-## 2026-09-29 — Tredje gjennomgang: minuttene i låsemeldingen røpte passordet, navneknappen som førte til en vegg, og tre kappløp som ga 500  `#sikkerhet` `#innlogging` `#vaktliste`
+## 2026-09-29 — Tredje gjennomgang: minuttene i låsemeldingen røpte passordet, navneknappen som førte til en vegg, og tre kappløp som ga 500  `#accounts/innlogging` `#core/sikkerhet`
 
 **Hvorfor:** En tredje gjennomgang uten kontekst (egen agent, 29. sep.) av `8df4f1d..0adefda`, bedt
 om å se særlig på de to siste rettecommitene og på modulene de forrige så minst på. Fem funn,
@@ -2442,7 +2472,7 @@ alle kontrollert mot koden.
 
 **Mutasjoner: 6, alle drept.**
 
-## 2026-09-29 — Andre gjennomgang: låst bilkonto røpte passordet, vaktsletting under gjenåpning, og MFA-innlogginger som ikke ble talt  `#sikkerhet` `#innlogging` `#vakt`
+## 2026-09-29 — Andre gjennomgang: låst bilkonto røpte passordet, vaktsletting under gjenåpning, og MFA-innlogginger som ikke ble talt  `#accounts/innlogging` `#core/sikkerhet` `#core/vakt`
 
 **Hvorfor:** En gjennomgang uten kontekst fra arbeidet (egen agent, 29. sep.) av `8df4f1d..acd4a97`.
 Tre funn, alle kontrollert mot koden og prøvd før rettingen.
@@ -2482,7 +2512,7 @@ virker igjen.
 det ekte endepunktet, midt i backupen.
 **Mutasjoner: 7, alle drept.**
 
-## 2026-09-29 — Etter gjennomgangen av pulje 1–4: 500 på feil passord for bilen når Redis er nede, og rate-limiten før kontooppslaget  `#sikkerhet` `#innlogging`
+## 2026-09-29 — Etter gjennomgangen av pulje 1–4: 500 på feil passord for bilen når Redis er nede, og rate-limiten før kontooppslaget  `#accounts/innlogging` `#core/sikkerhet`
 
 **Hvorfor:** En uavhengig gjennomgang av de fire puljene (André la den fram) fant én ekte feil
 og to ting verdt å rette. Alle tre er kontrollert mot koden før rettingen.
@@ -2511,7 +2541,7 @@ allerede i runbooken (§8b-tabellen).
 
 **Mutasjoner: 2, begge drept** (hver retting tatt tilbake → testen rød).
 
-## 2026-09-29 — Sikkerhet, pulje 4: escaping i pasienttabellen, plantet e-post i vaktlista, bilkontoen på sentralbordets endepunkter, og `pip-audit` i CI  `#sikkerhet` `#vaktliste` `#oppdrag` `#park` `#ci`
+## 2026-09-29 — Sikkerhet, pulje 4: escaping i pasienttabellen, plantet e-post i vaktlista, bilkontoen på sentralbordets endepunkter, og `pip-audit` i CI  `#core/sikkerhet` `#core/tester`
 
 **Hvorfor:** Pulje 4 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — siste pulje før
 `staging` kan gå til `main`. Ingen av funnene er kritiske alene; flere er stille, og de er
@@ -2574,7 +2604,7 @@ lederens (testene gikk bare gjennom PUT — ny test gjennom POST), standarden fo
 `KLIENTIP_BAK_PROXY` (ingen test lastet settings med og uten `RAILWAY_ENVIRONMENT`), og én med
 tvetydig mønster (to treff, felle 1 i `CLAUDE.md`) som ble gjort entydig og så drept.
 
-## 2026-09-29 — Sikkerhet, pulje 3: offsite-filene bundet til navnet, og gjenopprettingen laster bare det fila gir seg ut for  `#sikkerhet` `#backup` `#offsite`
+## 2026-09-29 — Sikkerhet, pulje 3: offsite-filene bundet til navnet, og gjenopprettingen laster bare det fila gir seg ut for  `#core/sikkerhet` `#core/backup`
 
 **Hvorfor:** Pulje 3 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`. André: «vær forsiktig» — dette
 er katastrofeveien, og en feil her viser seg den dagen backupen trengs.
@@ -2649,7 +2679,7 @@ ikke var en backup). Begge testene prøver nå sin egen sperre.
 **Etter deploy til `main`: kjør `verifiser_backup` i prod** (runbook §8b) — prøven på at
 sperrene slipper gjennom filene som faktisk ligger der. Står i `TODO.md`.
 
-## 2026-09-29 — Sikkerhet, pulje 2: fritekst i frosne tall, arkivsletting uten backup, og aktiv vakt uten lås  `#sikkerhet` `#vakt` `#personvern`
+## 2026-09-29 — Sikkerhet, pulje 2: fritekst i frosne tall, arkivsletting uten backup, og aktiv vakt uten lås  `#core/sikkerhet` `#core/vakt` `#core/personvern`
 
 **Hvorfor:** Pulje 2 i `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md` — det som måtte på plass før
 `staging` går til `main`, fordi all koden var ny der. André: «vi har tid til å gjøre oss ferdig
@@ -2717,7 +2747,7 @@ vakt ikke koster backup) og sperren på arkiv (ingen test prøvde samtidig slett
 en test. **Overlevde:** stemplingen tilbake til `json.loads` — `klienttid` som ikke er tekst
 avvises uansett, så to lag holder; testen holder utfallet.
 
-## 2026-09-28 — Sikkerhet, pulje 1: MFA-oppsettet overlevde passordreset, og seks hull til i innloggingen  `#sikkerhet` `#mfa` `#innlogging`
+## 2026-09-28 — Sikkerhet, pulje 1: MFA-oppsettet overlevde passordreset, og seks hull til i innloggingen  `#accounts/innlogging` `#core/sikkerhet`
 
 **Hvorfor:** André bad om en kodegjennomgang med sikkerhet i fokus. Den ble gjort to ganger
 uavhengig av hverandre og slått sammen — `docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`, med
@@ -2805,7 +2835,7 @@ først:** nullstillingen kunne slutte å sette `mfa_required`, fordi testbrukere
 fra før — fiksturen er rettet. Og testen for bøtta per brukernavn sendte 12 forsøk mot
 10/5 min, som bare dreper mutanten når vinduskanten faller riktig; nå `nok_til_a_bryte(10)`.
 
-## 2026-09-28 — /lag er lagt til side: det som gjenstår står i TODO  `#lag` `#todo`
+## 2026-09-28 — /lag er lagt til side: det som gjenstår står i TODO  `#park/modulen` `#core/dokumentasjon`
 
 André: «Sett de gjenstående på todo om de ikke er det så er vi inntil videre ferdig med /lag».
 Personvernet (B23) og sensitiv-merket (punkt 4) sto der fra før. Nytt under `/lag/` i
@@ -2813,7 +2843,7 @@ Personvernet (B23) og sensitiv-merket (punkt 4) sto der fra før. Nytt under `/l
 `/park/`-lenka er borte, og tokenet vises bare én gang) og tilgangsradene — og en påminnelse om at
 **de frosne Lag-tallene ikke har frist** før punkt 4 er gjort. Ingen kodeendring.
 
-## 2026-09-28 — Lagringstid for lagregistreringene: slettes etter 730 dager  `#lag` `#personvern`
+## 2026-09-28 — Lagringstid for lagregistreringene: slettes etter 730 dager  `#park/modulen` `#core/personvern`
 
 **Hvorfor:** André: «Punkt 2 må vi nå gjøre». Registreringene på `/lag/` sto til noen slettet
 dem, og personvernbeskrivelsen (B23) kan ikke skrives ferdig uten en frist å vise til.
@@ -2841,7 +2871,7 @@ gjennom hjelperen. Grensen prøves med én time på hver side av fristen.
 fristen ± én dag, slettede rader unntatt, `delete()` fjernet, tørrkjøringen og den skarpe
 returnerer 0, fristen satt til 365.
 
-## 2026-09-28 — Vakt-siden: listene minimeres og ruller, og tidligere vakter og arkiver kan slettes  `#vakt` `#admin`
+## 2026-09-28 — Vakt-siden: listene minimeres og ruller, og tidligere vakter og arkiver kan slettes  `#core/vakt`
 
 **Hvorfor:** André: «jeg vil gjerne ha dem som en scroll liste og minimer på arkiver og tidligere
 vakter. Og ja jeg vil ha en slett knapp. Noen er test vakter som kan og skal slettes.»
@@ -2882,7 +2912,7 @@ ekte hull:
 valgliste. **Røyktest i Chromium:** minimering, rulling, sletting av arkivet LS2026, og sletting
 av vakta «2026» — med feil navn først (avvist), så riktig.
 
-## 2026-09-28 — Vakta har fått sin egen side: `/portal-admin/vakt/`  `#vakt` `#admin`
+## 2026-09-28 — Vakta har fått sin egen side: `/portal-admin/vakt/`  `#core/vakt`
 
 **Hvorfor:** André: «Hvordan avslutter jeg vakten nå da?» — og etter svaret: «Ja hvorfor er den
 der nå? Kanskje vi skal ha den på et mer logisk sted??» Knappen som avslutter *hele* portalen sto
@@ -2930,7 +2960,7 @@ navn — orkestratoren avviser det uansett, men først etter en backup av hver m
 nå at det ikke tas noen. **Røyktest i Chromium:** menylenken, sperren med knappen av, avslutning
 med melding og ny aktiv vakt, «Statistikk»-lenken som velger vakta, og pasientsidens kort.
 
-## 2026-09-28 — «Avslutt vakt» arkiverer alt, statistikken fryses, og tidligere vakter i `/statistikk`  `#vakt` `#statistikk` `#arkiv`
+## 2026-09-28 — «Avslutt vakt» arkiverer alt, statistikken fryses, og tidligere vakter i `/statistikk`  `#core/vakt`
 
 **Hvorfor:** André: «etter hver vakt så tar admin og [...] arkiveres modulene samtlige som admin
 trykker. Da er det ikke bare å arkivere hver eneste modul men alt blir gjort i ett. Og statistikk
@@ -2994,7 +3024,7 @@ tømmingen, LS2026 med pasienttallene fra aggregatet og «Ingen tall» på de an
 **Ikke gjort ennå (steg 4, `TODO.md`):** de frosne settene holder vaktas tall i detalj **uten
 frist**. Sensitiv-merket og den grovere frysingen når radene slettes må dekke dem også.
 
-## 2026-09-28 — Admin fikk opprette pasienter, men ikke redigere dem  `#pasienter` `#bug`
+## 2026-09-28 — Admin fikk opprette pasienter, men ikke redigere dem  `#core/tilgang`
 
 **Meldt av André fra staging og prod:** «Du får opprette pasienter men ikke redigere når du trykker
 på dem» — både i **pasientlista** og på **tavla**. Klikket gjorde ingenting, uten feilmelding.
@@ -3028,7 +3058,7 @@ admin lagrer (`PUT 200`).
 **Planen for arkiv og tidligere vakter** (avklart samme dag) står i `TODO.md` under «Avslutt vakt,
 arkiv og tidligere vakter i statistikken».
 
-## 2026-09-28 — `/park/` heter nå «Lagregistrering» på `/lag/`  `#park`
+## 2026-09-28 — `/park/` heter nå «Lagregistrering» på `/lag/`  `#park/modulen`
 
 **Hvorfor:** André: «Bør vi for tydelighetens skyld endre navn fra /park til /lag? Da appen skal
 kanskje brukes til andre arrangementer og?» — og etter forslaget: «Ja, Lagregistrering og /lag/,
@@ -3049,7 +3079,7 @@ kjør på. Jeg fjerner linken som er. Da trenger vi ikke kode videresending.»
   Samme skille som `patients` på `/pasienter/`; skrevet ned i `park/CLAUDE.md` så det ikke leses
   som en glipp. `vaktliste/0026` er bare hjelpeteksten på rutingflagget.
 
-## 2026-09-28 — `/park/`: registreringslista minimeres, filtreres og tar ikke over siden  `#park`
+## 2026-09-28 — `/park/`: registreringslista minimeres, filtreres og tar ikke over siden  `#park/modulen`
 
 **Hvorfor:** André: «Inne i /park disse registreringene. De blir fort mellom 500-1500 går de vare
 nedover eller har vi en minimerings knapp slik at den ikke tar over siden?» Svaret var nei — og
@@ -3070,7 +3100,7 @@ grensen, utfallet ikke søkbart, grensen tilbake til 500.
 **Prøvd i Chromium** med 1 526 registreringer: 200 tegnet, «Viser 200 av 1526»,
 «stavanger kramper» → «181 av 1526», «Skjul» står seg etter ny lasting.
 
-## 2026-09-28 — `/park/`: steder skjult for lagene, og «Kopiert ✓» på lenken  `#park`
+## 2026-09-28 — `/park/`: steder skjult for lagene, og «Kopiert ✓» på lenken  `#park/modulen`
 
 **Hvorfor:** André: «kan vi skjule noen lokasjoner for lagenes nedtrekksvindu? Det er enkelte
 lokasjoner som er uaktuelt for dem men ikke bil ressurser.» Valgte B — parks egen liste, ikke et
@@ -3101,7 +3131,7 @@ Sjekken er fjernet.
 **Prøvd i Chromium:** Club skjult → parksidens nedtrekk viser bare «Parkscene»; trykk i
 lenkefeltet → «Kopiert ✓», og utklippstavla inneholder nøyaktig adressen. Ingen konsollfeil.
 
-## 2026-09-28 — `/park/` pulje 3: statistikkfanen «Lag»  `#park #statistikk`
+## 2026-09-28 — `/park/` pulje 3: statistikkfanen «Lag»  `#park/modulen`
 
 **Hvorfor:** André: «Fortsett med pulje 3 så skal jeg teste imens» (B12: «skal genereres
 statistikk som heter Lag»). Pulje 2 står på `staging` som `77749bf`.
@@ -3135,7 +3165,7 @@ ekte inngangen; andelen lest på posisjon i stedet for navn). **Overlevde:** «t
 «Behandlet på stedet 20 · 32 % av kontaktene», «Slettet 1». Grafene og tabellene tegnes, ingen
 konsollfeil.
 
-## 2026-09-28 — `/park/` pulje 2: oppsettet — lenker, sletting, verdimengdene, bryterne  `#park #sikkerhet`
+## 2026-09-28 — `/park/` pulje 2: oppsettet — lenker, sletting, verdimengdene, bryterne  `#park/modulen`
 
 **Hvorfor:** André: «Ja legg på staging og bare begynn med pulje 2 og legg den ut på staging
 også når du er ferdig med den.» Pulje 1 gikk til `staging` som `6b52246`. Til nå måtte en lenke
@@ -3173,7 +3203,7 @@ parksiden i en fane uten innlogging → registreringen står på `/park/` → sl
 
 Suiten: 4 004 + 915 tester grønne. Tallene i dokumentene: 203 ruter, 36 JS-filer, ti sider.
 
-## 2026-09-27 — `/park/` pulje 1: modellen og siden lagene registrerer på  `#park #ny-modul #sikkerhet`
+## 2026-09-27 — `/park/` pulje 1: modellen og siden lagene registrerer på  `#park/modulen`
 
 **Hvorfor:** André, etter fire avklaringsrunder på `docs/FORSLAG_PARK.md`: «Enig med bryter.
 La oss kjøre.» Lagene ute på området registrerer hva de har gjort — problemstilling ×
@@ -3239,7 +3269,7 @@ bein/fot» → registrer → kvittering; ny lasting uten fragment husker laget o
 Suiten: 3 980 + 915 tester grønne. Migrasjonsprøvene mot PostgreSQL er ikke kjørt her — de
 to nye datamigrasjonene skriver bare rader og endrer ikke skjema etterpå.
 
-## 2026-09-27 — `/park/`: trusselbildet og risikovalgene inn i notatet  `#docs #park #sikkerhet`
+## 2026-09-27 — `/park/`: trusselbildet og risikovalgene inn i notatet  `#park/modulen` `#core/sikkerhet`
 
 **Hvorfor:** André: «på hvilken måte utsetter dette nettsiden sikkerhetshull messig?» — og etter
 svaret: «Husk og i notatet de ulike alternativene til det som bringer risiko her. Da kan vi lett
@@ -3262,7 +3292,7 @@ bytte om.»
 - **Personvern utsatt til modulen er ferdig** (B23), med eget punkt i `TODO.md` så det skjer
   før lansering.
 
-## 2026-09-27 — `/park/`: avklart — nyeste sted vinner, sletting for `skriv_leder`  `#docs #park #forslag`
+## 2026-09-27 — `/park/`: avklart — nyeste sted vinner, sletting for `skriv_leder`  `#park/modulen`
 
 **Hvorfor:** Andrés tredje runde. «Sted fra ko, hva om vi bruker nyeste av de?»
 
@@ -3277,7 +3307,7 @@ bytte om.»
   grunn, logget. Raden står og statistikken utelater den.
 - §9 er tom. Tre puljer.
 
-## 2026-09-27 — `/park/`: andre avklaringsrunde, to spørsmål igjen  `#docs #park #forslag`
+## 2026-09-27 — `/park/`: andre avklaringsrunde, to spørsmål igjen  `#park/modulen`
 
 **Hvorfor:** Andrés andre runde svar på `docs/FORSLAG_PARK.md`. «Gå gjennom svarene mine så ser
 vi om vi er klare til å kode.»
@@ -3299,7 +3329,7 @@ vi om vi er klare til å kode.»
 - Igjen i §9: KO-forhåndsvalget, og hvem som sletter en feilregistrering etter fem minutter.
   Anslaget er ned fra 4–5 til 3 økter.
 
-## 2026-09-27 — `/park/`: Andrés svar inn i notatet, fire spørsmål igjen  `#docs #park #forslag`
+## 2026-09-27 — `/park/`: Andrés svar inn i notatet, fire spørsmål igjen  `#park/modulen`
 
 **Hvorfor:** André svarte på første utkast av `docs/FORSLAG_PARK.md` og sa «Vi starter ikke
 kode før vi har alt av punkter på plass». Notatet er skrevet om med svarene som
@@ -3327,7 +3357,7 @@ beslutninger (§2, B1–B16), og det som gjenstår står samlet i §9.
 - Rate-limit per lenke er hevet (`120/m`) fordi alle lagene deler den, og **ikke per IP på
   gyldige tokens**: telefoner på mobilnett deler IP bak operatørens NAT.
 
-## 2026-09-27 — Forslag: `/park/`-modulen  `#docs #park #forslag`
+## 2026-09-27 — Forslag: `/park/`-modulen  `#park/modulen`
 
 **Hvorfor:** André: «Vi skal lage /park/-modulen … Skriv et notat med forslag og åpne
 spørsmål, og avklar med meg før du skriver kode.» Park hadde stått som spredte punkter i
@@ -3350,7 +3380,7 @@ spørsmål, og avklar med meg før du skriver kode.» Park hadde stått som spre
   forhåndsutfylling av sted fra tavla ennå), offline fra første brukbare versjon.
 - Ti åpne spørsmål i §9 — verdimengdene for problemstilling og utfall er de viktigste.
 
-## 2026-09-27 — Innloggingens rate-limit-tester tåler vinduskanten  `#test #ci #flaky`
+## 2026-09-27 — Innloggingens rate-limit-tester tåler vinduskanten  `#core/tester` `#accounts/innlogging`
 
 **Hvorfor:** CI på `main` (`50bdcdf`, omgang 3) ble rød på
 `test_per_ip_limit_protects_against_username_spraying`: «AssertionError: 200 not found in
@@ -3372,7 +3402,7 @@ skrevet om.
   og `main` (run 32, 18:55:04 UTC). Samme commit `50bdcdf` hadde vært grønn på `staging` og rød
   på `main` — identisk kode, to utfall, som bare en tidsavhengig test gir.
 
-## 2026-09-27 — `main` omgang 3 av 3: `staging` er i produksjon  `#drift #deploy`
+## 2026-09-27 — `main` omgang 3 av 3: `staging` er i produksjon  `#core/drift`
 
 **Hvorfor:** André, etter å ha sett over det som kom 27. sep.: «Kjør omgang 3». CI på omgang 2
 (`68fed55`) var grønn (ferdig 18:16:52 UTC) før pushen. `main` spoles fram til siste commit
@@ -3387,7 +3417,7 @@ nytt i hendelsene. **Én migrasjon:** `ko.0023`, en ny tabell.
 `docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md` er flyttet til `docs/archived/`, slik den
 selv sa, og punktet i `TODO.md` er slettet.
 
-## 2026-09-27 — `main` omgang 2 av 3: kolonneslettingen `68fed55` er i produksjon  `#drift #deploy`
+## 2026-09-27 — `main` omgang 2 av 3: kolonneslettingen `68fed55` er i produksjon  `#core/drift`
 
 **Hvorfor:** André tok en manuell backup av prod og sa: «Vent til ci er grønn og da kan du pushe
 etter 3 minutter». CI på `0660da0` (omgang 1) ble grønn 18:10:09 UTC; `main` ble spolt fram
@@ -3397,7 +3427,7 @@ etter 3 minutter». CI på `0660da0` (omgang 1) ble grønn 18:10:09 UTC; `main` 
 **Verifiseres** ved at byggnummeret i footeren på prod er `68fed55`: feiler `migrate` i
 release-fasen, bytter ikke Railway container. `/portal-admin/moduler/` skal virke som før.
 
-## 2026-09-27 — `main` omgang 1 av 3: `0660da0` er i produksjon  `#drift #deploy`
+## 2026-09-27 — `main` omgang 1 av 3: `0660da0` er i produksjon  `#core/drift`
 
 **Hvorfor:** André har gått gjennom testsjekklista for `staging` til `main`, og sa «Kjør
 omgang 1». `main` er spolt fram `4813cee..0660da0`: tekniske runder 6 og 7, felles
@@ -3408,7 +3438,7 @@ planen sier (`core.0013` alene i omgang 2, `ko.0023` i omgang 3).
 **Verifiseres på prod** ved at byggnummeret i footeren er `0660da0`. Raden «Migrasjoner» på
 server-status finnes først fra omgang 3.
 
-## 2026-09-27 — Offline: papir og utskrift som reserve, ikke full redigering  `#docs #offline`
+## 2026-09-27 — Offline: papir og utskrift som reserve, ikke full redigering  `#vaktliste/offline`
 
 **Hvorfor:** André meldte at merknader ikke kan redigeres offline i vaktlista. Etter en
 gjennomgang av måtene å løse redigering på samme rad offline og online (siste vinner,
@@ -3423,7 +3453,7 @@ papirskjema som reserve og **ingen** offline-kopi — helseopplysninger på delt
 pasientnummeret deles ut av serveren. Seksjonen «Meldt fra staging 27. sep.» er slettet: alle
 punktene i den er gjort eller flyttet hit.
 
-## 2026-09-27 — Nytt i hendelsene: tall og fet tittel siden sist du åpnet  `#ko #hendelser`
+## 2026-09-27 — Nytt i hendelsene: tall og fet tittel siden sist du åpnet  `#ko/hendelseslogg`
 
 **Hvorfor:** André: «Varselstegn i hendelselogg og sidebar ved noe nytt, kan være en
 sirkulær gul prikk eller noe» — og på spørsmålet om hva «nytt» er: «Nytt siden sist du
@@ -3475,7 +3505,7 @@ no-op (nøklene i et JS-objekt er alltid tekst), og er fjernet før den ble mute
 ordbøkene. `docs/TEKNISK_DOKUMENTASJON.md` (186 ruter, 43 under `/ko/`) og
 `scripts/sikkerhetsruter.json` er oppdatert for det nye endepunktet.
 
-## 2026-09-27 — `/oppdrag/` i menyen bare for bilene og admin  `#oppdrag #meny`
+## 2026-09-27 — `/oppdrag/` i menyen bare for bilene og admin  `#core/grensesnitt` `#core/tilgang`
 
 **Hvorfor:** André: «Skjule /oppdrag i burgermenyen og i dashbordet for de som ikke har
 skrive:handling og er admin. De kan fortsatt nå siden gjennom f.eks
@@ -3496,7 +3526,7 @@ sperres. skriv_handling er bilene og de skal bare være i /oppdrag som vi har sn
   **Mutanter: 6, alle drept** — menyens og dashbordets kallsted hver for seg, admin-unntaket,
   tomt felt tolket som ingen, regelen invertert, feltet fjernet i oppdrag.
 
-## 2026-09-27 — Historikksøket finner enheter med og uten mellomrom  `#oppdrag #bug`
+## 2026-09-27 — Historikksøket finner enheter med og uten mellomrom  `#oppdrag/sentralbord`
 
 **Hvorfor:** André: «Når vi søker i oppdragshistorikk etter ressurser så må det ta høyde
 for ressursnavn med og uten mellomrom.» «Haugesund56» fant ikke «Haugesund 56».
@@ -3513,7 +3543,7 @@ for ressursnavn med og uten mellomrom.» «Haugesund56» fant ikke «Haugesund 5
   og navnet ikke komprimert.
 - `TODO.md`: de andre punktene fra samme melding står under «Meldt fra staging 27. sep.».
 
-## 2026-09-27 — Server-status viser om migrasjonene er kjørt  `#drift #server-status`
+## 2026-09-27 — Server-status viser om migrasjonene er kjørt  `#core/drift`
 
 **Hvorfor:** André, om punktet i testsjekklista «Deploy-loggen for staging viser at `migrate`
 gikk gjennom»: «punktet fant jeg ikke i railway noe særlig enkelt». Release-loggen er
@@ -3535,7 +3565,7 @@ fjernet, ukjørt meldt grønt, planen alltid tom, feil meldt grønt, og «caches
 **Den siste overlevde først:** testen sjekket bare at raden ble grønn etterpå, og det ble
 den også med feilen. Den krever nå rødt på andre kall mens noe fortsatt er ukjørt.
 
-## 2026-09-27 — Tilbake: admin kommer inn i en avslått modul, med vilje  `#tilgang #ko`
+## 2026-09-27 — Tilbake: admin kommer inn i en avslått modul, med vilje  `#core/tilgang`
 
 **Hvorfor:** André, etter endringen over: «jeg liker resonnementet at admin skal kunne jobbe
 med det i kulissene så det kan du fint reversere. Det fungerer som det skal på vanlige
@@ -3554,7 +3584,7 @@ brukere.» Del 1 av endringen «En avslått modul er stengt også for admin» er
 - **Mutant: 1, drept** — modulsjekken flyttet foran admin-grenen (altså endringen som ble
   rullet tilbake) gjør tre tester røde.
 
-## 2026-09-27 — En avslått modul er stengt også for admin, og «Opprett» gir ett oppdrag  `#tilgang #oppdrag #ko #bug`
+## 2026-09-27 — En avslått modul er stengt også for admin, og «Opprett» gir ett oppdrag  `#core/tilgang` `#oppdrag/sentralbord`
 
 > **Del 1 er rullet tilbake samme dag** — se oppføringen over. Del 2 står.
 
@@ -3596,7 +3626,7 @@ pasientregistreringen:
 node), og de omskrevne i `ko/tests.py`, `statistikk/tests.py` og
 `accounts/tests_modultilgang.py`. **Mutanter: 15, alle drept** — tilgang tungt (aktiv-sjekken før admin fjernet, `is_core`-unntaket fjernet, sidebarsperra fjernet og invertert), serveren middels (ferdig-grenen, 409 `pagar`, `forkast` ved unntak, `fullfor`, nøkkel ikke per bruker, nøkkel ignorert), knappen middels (låsen, nullstilling etter suksess, nøkkel i kroppen, 409-grenen, ny nøkkel ved åpning). Én ble først hoppet over fordi mønsteret traff **to** steder — stemplingsviewet har samme `elif` — og kjørt på nytt med et entydig mønster. Hele suiten fant i tillegg to eldre harnesser i `oppdrag/tests_runde_d.py` som hentet `opprettOppdrag`/`nullstillNyttOppdrag` uten de nye hjelperne; de har fått dem.
 
-## 2026-09-27 — Bilen: dobbelttrykk ga «Oppdraget står i Leverer — skjermen er oppdatert»  `#oppdrag #bug #bilen`
+## 2026-09-27 — Bilen: dobbelttrykk ga «Oppdraget står i Leverer — skjermen er oppdatert»  `#oppdrag/enhetsskjerm` `#oppdrag/statusmaskin`
 
 **Hvorfor:** André, fra bilskjermen midt i en vanlig kjøring: en rød boks med «Oppdraget står
 i Leverer — skjermen er oppdatert.» — «Det trenger vi absolutt ikke og er støy!»
@@ -3626,7 +3656,7 @@ kallstedet i `renderAlt` fjernet og kallstedet gjort ubetinget. Kallstedet **ove
 de fem første testene stubbet `renderAlt`, og da kunne regelen forsvinne uten at noe ble rødt
 (mutantfelle 3 i `CLAUDE.md`). Testklassen `KnappeneErGraaMensDetSendesTests` ble lagt til for den.
 
-## 2026-09-26 — Testsjekkliste for `staging` til `main`  `#docs #drift`
+## 2026-09-26 — Testsjekkliste for `staging` til `main`  `#core/drift` `#core/dokumentasjon`
 
 **Hvorfor:** André: «Er det noe spesifikt jeg skal teste på staging som følge av det vi har
 gjort før vi pusher til main?» `docs/TESTSJEKKLISTE_STAGING_TIL_MAIN_2026-09.md` dekker bare det
@@ -3637,7 +3667,7 @@ KO-tavla, bakgrunnsfaner, vaktlista offline), så utseendet og Railway. Den har 
 kommandoene for pushen i **tre framspolinger** — `0660da0`, så `68fed55` (kolonneslettingen
 alene, med backup før), så resten. `TODO.md` sa «to omganger»; det er rettet til tre.
 
-## 2026-09-26 — Veien til neste vakt, og en generalprøve  `#docs #drift`
+## 2026-09-26 — Veien til neste vakt, og en generalprøve  `#core/drift` `#core/dokumentasjon`
 
 **Hvorfor:** neste vakt er om rundt 240 dager, og den blir **første gang flere biler per
 oppdrag brukes i virkeligheten** — det har ikke vært en vakt siden modellen kom 11. sep.
@@ -3660,7 +3690,7 @@ statistikk med «oppdrag» mot «enhetsinnsatser», avslutt vakt, backup og offs
 `TESTSJEKKLISTE_KO.md` og `TESTSJEKKLISTE_VAKTLISTE.md` for detaljene i stedet for å gjenta
 dem. Funn går i `/backlog/`.
 
-## 2026-09-26 — Ingen kode leser `Oppdrag.enhet` lenger (G6a, deploy 2 i oppdrag, første steg)  `#oppdrag #ko`
+## 2026-09-26 — Ingen kode leser `Oppdrag.enhet` lenger (G6a, deploy 2 i oppdrag, første steg)  `#core/gjeld` `#oppdrag/statusmaskin`
 
 **Hvorfor:** `Oppdrag.enhet` er arven fra én bil per oppdrag. Siden flere enheter kom
 (11. sep.) er koblingsradene (`Oppdragsenhet`) fasit, og kolonnen følger «den primære»
@@ -3685,7 +3715,7 @@ andre felt.
 **Mutasjon:** 3 mutanter, alle røde — serializeren, historikksøket og arkivet satt til å lese
 kolonnen igjen (5, 1 og 2 røde).
 
-## 2026-09-26 — Å slette kontoen til bil nummer to ga 500  `#accounts #oppdrag`
+## 2026-09-26 — Å slette kontoen til bil nummer to ga 500  `#core/tilgang`
 
 **Hvorfor:** funnet under kartleggingen til G6. Når en bil-konto slettes, sletter
 `_rydd_enhet_ved_sletting` enheten hvis ingen oppdrag peker på den — og pensjonerer den
@@ -3706,7 +3736,7 @@ relasjon som kommer til senere er dermed dekket uten at noen husker å føre den
 kaster `ProtectedError` før noe SQL sendes, så transaksjonen er aldri ødelagt. Savepointet er
 derfor fjernet fra koden i stedet for å stå som et vern det ikke er.
 
-## 2026-09-26 — To utdaterte punkter øverst i TODO: rollemodellens deploy 2 og 3  `#docs`
+## 2026-09-26 — To utdaterte punkter øverst i TODO: rollemodellens deploy 2 og 3  `#core/dokumentasjon`
 
 **Hvorfor:** øverst i `TODO.md`, under «Krever Andre», sto «Deploy 2 til prod — krever din
 avgjørelse» (`role` krympet til `admin`/`bruker`) og «Deploy 3 til prod» (de fem
@@ -3714,7 +3744,7 @@ avgjørelse» (`role` krympet til `admin`/`bruker`) og «Deploy 3 til prod» (de
 roller enn admin og bruker» — og `accounts/0014_fjern_modulflagg` ligger på `main`. Punktene
 var rester som aldri ble slettet, i den ene seksjonen som skal si hva som venter på ham. Slettet.
 
-## 2026-09-26 — `appsetting`, `kollaps_arkiv` og `AppSetting`-adminen ut av `patients` (G1, andre del)  `#core`
+## 2026-09-26 — `appsetting`, `kollaps_arkiv` og `AppSetting`-adminen ut av `patients` (G1, andre del)  `#core/gjeld` `#core/drift`
 
 **Hvorfor:** tre ting i `patients` var rammeverk. `AppSettingAdmin` (i `patients/admin.py`),
 `manage.py appsetting` (nødverktøyet for portalinnstillingene) og **`manage.py kollaps_arkiv`**
@@ -3737,7 +3767,7 @@ Begge kommandoene er kjørt for alvor etter flyttingen (`appsetting --list`,
 
 **Mutasjon:** 1 mutant — en kopi av `appsetting` lagt tilbake i `patients` — rød.
 
-## 2026-09-26 — Pasientsiden bruker den felles klokka (G3, kort del)  `#patients #frontend`
+## 2026-09-26 — Pasientsiden bruker den felles klokka (G3, kort del)  `#core/gjeld`
 
 **Hvorfor:** pasientsiden er et eget skall og hadde sin egen `updateClock` i
 `patients-utils.js` — samme navn og samme markup som `portal-clock.js`, som alle andre sider
@@ -3755,7 +3785,7 @@ en ombygging av hovedflaten, og hører hjemme når siden likevel redesignes.
 **Mutasjon:** 2 mutanter, begge røde — en `updateClock` lagt tilbake i `patients-utils.js`, og
 `portal-clock.js` fjernet fra malen.
 
-## 2026-09-26 — Kolonnen `backup_enabled` slettes (D4, deploy 2)  `#core #migrasjon`
+## 2026-09-26 — Kolonnen `backup_enabled` slettes (D4, deploy 2)  `#core/gjeld` `#core/backup`
 
 **Hvorfor:** steg 2 av to. `core/0012` (på `main` fra `6b59293`) lot Django glemme feltet og ga
 kolonnen en standardverdi i basen; ingen kode har nevnt den siden. `core/0013` sletter den
@@ -3771,7 +3801,7 @@ kjenne kolonnen. Står `main` på `4813cee` og prod-footeren viser det, er det o
 forutsetter) → fram til `0013` igjen. `verifiser_migrasjoner` grønn. Raden i
 `core.backup.UTGAATTE_FELT` blir stående: backupfilene med feltet lever 730 dager.
 
-## 2026-09-26 — Historikksøket fant ikke bil nummer to  `#oppdrag`
+## 2026-09-26 — Historikksøket fant ikke bil nummer to  `#oppdrag/sentralbord`
 
 **Hvorfor:** søket i historikken («Søk på nummer, problemstilling, lokasjon eller enhet»)
 så på `Oppdrag.enhet` — **den primære bilen**. Et oppdrag der Karmøy 12 var bil nummer to,
@@ -3786,7 +3816,7 @@ ferdig oppdrag tar det ut av historikken, og da ville testen målt noe annet enn
 **Mutasjon:** 2 mutanter, begge røde — leddet for alle enhetene fjernet, og `distinct()`
 fjernet.
 
-## 2026-09-26 — Én fabrikk for vakter: to like vaktnavn samtidig gir 400, ikke 500  `#core #vaktliste #patients`
+## 2026-09-26 — Én fabrikk for vakter: to like vaktnavn samtidig gir 400, ikke 500  `#core/vakt` `#core/gjeld`
 
 **Hvorfor:** tre steder laget `Vakt`-rader, hvert med sin egen sjekk av navnet, og `Vakt.navn`
 er unik. En `exists()` foran `create()` er et kappløp — **to samtidige innsendinger av samme
@@ -3812,7 +3842,7 @@ pekeren står. `IngenAndreLagerVakterTests` leser koden med AST og avviser
 `vakt_for_year` uten fangst og uten sin `raise`, kopien utenfor transaksjonen, «avslutt vakt»
 uten fangst.
 
-## 2026-09-26 — Server-status ut av `patients`, og 531 linjer JS som ingen test så (G1, første del)  `#core #frontend`
+## 2026-09-26 — Server-status ut av `patients`, og 531 linjer JS som ingen test så (G1, første del)  `#core/gjeld` `#core/drift`
 
 **Hvorfor:** `/portal-admin/server-status/` er rammeverk, men malen lå i
 `templates/patients/admin_status.html`, med **531 linjer inline-JS** — der ingen XSS-skanner,
@@ -3850,7 +3880,7 @@ testinfrastrukturen.
 pollingen uten `naarSynlig`, en egen `escapeHtml` uten `'` lagt tilbake i fila, og en
 `data-url-*` fjernet fra malen.
 
-## 2026-09-26 — Endepunktene som polles koster like mange spørringer for 3 og 30 enheter (G4)  `#oppdrag #ko #ytelse`
+## 2026-09-26 — Endepunktene som polles koster like mange spørringer for 3 og 30 enheter (G4)  `#core/gjeld` `#oppdrag/sentralbord` `#ko/ressursbildet`
 
 **Hvorfor:** enhetslista, oppdragslista og KO-tavla polles hvert tiende sekund fra hver fane
 med sentralbordet eller KO åpen. Hver av dem slo opp noe *per rad*. Målt med samme scenario
@@ -3893,7 +3923,7 @@ Ekvivalente: `OPPTATT_STATUSER`-filteret på tavla er nøyaktig de påbegynte st
 som vern mot en ny status), og hendelsesjekken på delingene ble gjort to ganger — den ene er
 fjernet.
 
-## 2026-09-26 — `sett_status` sto uten transaksjon i en uke: dekoratøren hadde havnet på en lesefunksjon  `#oppdrag #data`
+## 2026-09-26 — `sett_status` sto uten transaksjon i en uke: dekoratøren hadde havnet på en lesefunksjon  `#oppdrag/statusmaskin`
 
 **Hvorfor:** funnet mens G4 ble lest, ikke i planen. `sett_status` skriver tre rader —
 statusmeldingen, koblingsraden og oppdraget — og **bilens stempling kaller den direkte**,
@@ -3921,7 +3951,7 @@ for statusen lest inn i det gamle — **overlevde, og er ekvivalent**: `Oppdrag.
 property som spør hver gang, så ingen kaller holder et objekt som kunne blitt foreldet. En
 test jeg skrev for det motsatte ble fjernet — den prøvde ingenting.
 
-## 2026-09-26 — `requirements.txt` under 3.13, skallcachen som vokste, polling i skjulte faner, død CSS (G5)  `#drift #frontend #vaktliste #ko`
+## 2026-09-26 — `requirements.txt` under 3.13, skallcachen som vokste, polling i skjulte faner, død CSS (G5)  `#core/gjeld` `#core/drift`
 
 **`requirements.txt`** var kompilert med Python 3.11 mens `runtime.txt` sier 3.13. Kompilert
 på nytt under 3.13 med de samme pinnene: **oppløsningen ble identisk**, bare overskriften
@@ -3958,7 +3988,7 @@ Pollingen: `naarSynlig` snudd, `fanenErSkjult` alltid nei, KO-loggen uten gate, 
 `core.tests_endringer` og ikke `core.tests_endringer_js`; med riktig modul er den rød. To
 harnesser som bygde `koTavleStart` alene tar nå med `naarSynlig` fra `portal-utils.js`.
 
-## 2026-09-26 — Offsite-feilen ble vist uvasket to av tre steder; vaskingen og helseprobene ett sted (E6)  `#core #sikkerhet #drift`
+## 2026-09-26 — Offsite-feilen ble vist uvasket to av tre steder; vaskingen og helseprobene ett sted (E6)  `#core/gjeld` `#core/sikkerhet` `#core/backup`
 
 **Vaskingen.** `core/offsite.py` hadde sin egen `_vask`, som byttet ut S3-nøklene men ikke
 URL-legitimasjon — `core.vask.vask` gjorde det motsatte. Å slå dem sammen avdekket det
@@ -3992,7 +4022,7 @@ av (8), opplastingsfeilen uvasket, den generelle livssyklusfeilen uvasket, `secr
 oppgitt, `/healthz/` med detaljert tekst, radsjekken fjernet, server-status' cache alltid
 frisk, databasefeil uten `return`.
 
-## 2026-09-26 — Intervallene i vaktlista ett sted, og bilskjermens kopier kan ikke gli (E5, fjerde del)  `#vaktliste #oppdrag`
+## 2026-09-26 — Intervallene i vaktlista ett sted, og bilskjermens kopier kan ikke gli (E5, fjerde del)  `#core/gjeld` `#oppdrag/enhetsskjerm`
 
 **Intervallene.** «Slå sammen `(fra, til)` som overlapper eller møtes» sto tre ganger:
 `statistikk.union`, `pauser._slaa_sammen` og som egen løkke i `services._overlappstimer`
@@ -4025,7 +4055,7 @@ sammen), `max` fjernet, filteret for tomme fjernet, overlappet uten sammenslåin
 den nye testen. JS: `oppdragsnr` endret i bilen — rød; «Plassering» fjernet igjen — rød
 (det er den opprinnelige koden).
 
-## 2026-09-26 — Fem HTML-escapere, to som ikke escapet `'` — og fire byggere utenfor skanningen (E5, tredje del)  `#frontend #sikkerhet #patients`
+## 2026-09-26 — Fem HTML-escapere, to som ikke escapet `'` — og fire byggere utenfor skanningen (E5, tredje del)  `#core/gjeld` `#core/sikkerhet`
 
 **Hvorfor:** `static/js/` hadde fem escapere. `_escHtml` (i `portal-utils.js`) og `esc` (i
 `notifications.js`) escapet ikke `'` — trygge i tekst og i `"`-attributter, ikke i
@@ -4059,7 +4089,7 @@ den samme feilen, i en fil der vernet ikke var kopiert.
 på nytt); `${a.tittel}` rå — **overlevde**, rød etter rettingen; `${d.notat}` rå — rød;
 `visArkivDetalj` tatt ut av lista — rød.
 
-## 2026-09-26 — Sesjonsdekodingen ett sted, og passordbyttet tåler en rar sesjon (E5, andre del)  `#core #accounts #sikkerhet`
+## 2026-09-26 — Sesjonsdekodingen ett sted, og passordbyttet tåler en rar sesjon (E5, andre del)  `#core/gjeld` `#accounts/innlogging`
 
 **Hvorfor:** Djangos sesjonstabell ble dekodet fire steder med tre ulike feilhåndteringer:
 `_invalidate_other_sessions` og `_invalidate_all_sessions` i `accounts/views.py` fanget
@@ -4083,7 +4113,7 @@ hvert av de to kallstedene i `accounts` fjernet (2 og 4), `unntatt` ikke sendt (
 bruker_id is None: continue` i `aktive_sesjoner` fjernet — ekvivalent, `brukere.get(None)`
 tre linjer lenger ned hopper over den samme raden. Sjekken står for lesbarhetens skyld.
 
-## 2026-09-26 — Én `json_body` og én `json_feil`, i `core` (E5, første del)  `#core`
+## 2026-09-26 — Én `json_body` og én `json_feil`, i `core` (E5, første del)  `#core/gjeld`
 
 **Hvorfor:** `_json_body` sto i fem moduler (`patients`, `vaktliste`, `backlog`, `ko`,
 `oppdrag`) og `_feil` i fire, pluss én i `core.verdilister`. **Innholdet hadde ikke glidd** —
@@ -4105,7 +4135,7 @@ utenfor `core/jsonkropp.py` — en ny modul er dekket den dagen den kommer. Meto
 `isinstance`-sjekken fjernet (3 tester røde, i tre apper), `message` → `melding` i
 feilsvaret.
 
-## 2026-09-26 — TODO som ikke stemte, og resten av `hent_aktiv_vakt`-flyttingen (F3)  `#docs #core`
+## 2026-09-26 — TODO som ikke stemte, og resten av `hent_aktiv_vakt`-flyttingen (F3)  `#core/dokumentasjon` `#core/vakt`
 
 **Hvorfor:** tre punkter i `TODO.md` sa noe annet enn koden.
 
@@ -4129,7 +4159,7 @@ feilsvaret.
 **Mutasjon:** 1 mutant — `statistikk/views.py` importerer `hent_aktiv_vakt` fra
 `patients.services` igjen — rød nå som `TILLATT` er tom.
 
-## 2026-09-26 — Rot-`CLAUDE.md`: audit-avsnittet sa det motsatte av koden (F2)  `#docs`
+## 2026-09-26 — Rot-`CLAUDE.md`: audit-avsnittet sa det motsatte av koden (F2)  `#core/dokumentasjon` `#core/audit`
 
 **Hvorfor:** avsnittet «Audit-logging» sa at feltendringer logges automatisk av
 `audit/signals.py`, og «legg aldri til manuell audit-kode». Begge deler var feil:
@@ -4149,7 +4179,7 @@ må logges der den skjer. Den som fulgte regelen ordrett, laget nettopp hullene 
 
 **Mutasjon:** 1 mutant — `_REGISTERED_MODULES` tilbake i rota — rød.
 
-## 2026-09-26 — Én verdilistefabrikk for oppdrag og KO, i `core` (E2)  `#core #oppdrag #ko`
+## 2026-09-26 — Én verdilistefabrikk for oppdrag og KO, i `core` (E2)  `#core/gjeld`
 
 **Hvorfor:** lokasjonene, enhetstypene og problemstillingene i oppdrag og ansvarsområdene,
 konserttypene og kjennetegnene i KO administreres likt — liste for `les`, opprett/endre/
@@ -4178,7 +4208,7 @@ prøver hver forskjell i modulen der den *før* var feil, gjennom den ekte URL-e
 **Mutanter: 8, alle drept** — hver av de fem forskjellene satt tilbake, og de tre portene
 (409 ved bruk, `confirm`, admin for sletting).
 
-## 2026-09-26 — Arkivene verifiseres og logges ett sted (E3)  `#core #patients #oppdrag`
+## 2026-09-26 — Arkivene verifiseres og logges ett sted (E3)  `#core/gjeld`
 
 **Verifiseringen:** `patients/views_arkiv.py` hadde regelen for «er arkivet tuklet med»
 skrevet ut i viewet — radsignaturen, eller aggregatets etter kollaps — mens oppdrag kalte
@@ -4198,7 +4228,7 @@ sto — bruddet er datert, og `'backup'` → `patients` i `audit/signals.py` bli
 arkivets ID og admin som bruker — det var udekket. **Mutanter: 5, alle drept** — verifiseringen
 alltid «ok», feil tabell i hjelperen, brukeren glemt, slettingen og kollapsen uten logg.
 
-## 2026-09-26 — «Kan lede» i oppdrag: knappen og døra svarer likt (E4)  `#oppdrag #ko #vaktliste`
+## 2026-09-26 — «Kan lede» i oppdrag: knappen og døra svarer likt (E4)  `#core/gjeld` `#core/tilgang`
 
 **Hvorfor:** «kan sette opp verdimengdene» sto to steder med to ulike regler. Knappen
 «Valglister» i sentralbordet (`sentralbordkontekst`) sa `er_global_admin or skriv_leder`;
@@ -4218,7 +4248,7 @@ alle drept** — knappen med den gamle regelen; enhetskontoen sluppet inn; nivå
 i oppdrag, KO og vaktlista. Den tredje overlevde først i et for smalt testutvalg; hele
 oppdrag-suiten ga 7 røde, og den nye testen dekker den nå selv.
 
-## 2026-09-26 — Ankomster per time: samme svar i begge statistikkene, og i riktig rekkefølge (E1)  `#patients #statistikk`
+## 2026-09-26 — Ankomster per time: samme svar i begge statistikkene, og i riktig rekkefølge (E1)  `#core/gjeld`
 
 **Hvorfor:** pasientstatistikken ble regnet to steder, og de ga **ulike tall for samme
 vakt**. Grunnstatistikken grupperte ankomst per døgn og time (`'%d.%m %H:00'`), full
@@ -4239,7 +4269,7 @@ med signatur og viser fortsatt klokketimene — de røres ikke.
 data over et månedsskifte. **Mutanter: 3, alle drept** — tilbake til klokketime, sortering på
 etiketten, og full statistikk med sin egen regel igjen.
 
-## 2026-09-26 — Tilgangsreglene i docstringene sa det motsatte av koden (F1)  `#vaktliste #accounts #oppdrag`
+## 2026-09-26 — Tilgangsreglene i docstringene sa det motsatte av koden (F1)  `#core/dokumentasjon` `#core/tilgang`
 
 **Hvorfor først i pulje F:** den som leser en docstring før hun endrer en tilgangsport, leser
 feil regel. Fasit er `vaktliste.services.ser_alle_korps()`: **`les` ser sitt eget korps,
@@ -4267,7 +4297,7 @@ som ville hoppet stille over seg selv den dagen URL-en faktisk forsvant; nå `as
 **Mutant: 1 gyldig, drept.** Den første kjøringen traff `url=None` i *docstringen* til
 `oppdrag/module.py` og gikk grønn — løgn nr. 1 i mutasjonsavsnittet. Mot kodelinjen: rød.
 
-## 2026-09-26 — Brytere og ruter uten virkning: `/api/` gir 410, `backup_enabled` ut, `createcachetable` ut (D4)  `#core`
+## 2026-09-26 — Brytere og ruter uten virkning: `/api/` gir 410, `backup_enabled` ut, `createcachetable` ut (D4)  `#core/gjeld`
 
 **`/api/…` svarer 410 i stedet for 301.** Adressene flyttet til `/pasienter/api/` i fase 2.
 En **301 gjør en POST om til en GET** i nettleseren, så en gammel klient som lagret noe fikk
@@ -4309,7 +4339,7 @@ prøvene** — CI (D1) ville stoppet den før deploy.
 nøyaktig det prod ville fått); raden i `UTGAATTE_FELT` fjernet; ruten tilbake i
 `OMDIRIGERER`.
 
-## 2026-09-26 — Én skanner for markup bygget med `+`, for alle JS-filene (D3)  `#core #backlog #ko`
+## 2026-09-26 — Én skanner for markup bygget med `+`, for alle JS-filene (D3)  `#core/gjeld` `#core/sikkerhet`
 
 **Hvorfor:** `backlog.js` bygger markup med `'<…' + x` og hadde ingen statisk skanner. KO
 hadde sin egen, i `ko/tests_js.py`. Prøvd på alle filene: **elleve** bygger markup slik.
@@ -4334,7 +4364,7 @@ oppførselsprøvene motmiddelet. TODO-punktet om vaktlistas `+`-hull er skrevet 
 skanning. Ingen kommentar i dag slo ut, så ingenting merket det. Prøvd nå gjennom `byggere()`
 med en midlertidig fil — ikke ved å kalle hjelperen, så også et fjernet kallsted blir rødt.
 
-## 2026-09-26 — Død kode som testene holdt i live (D2)  `#vaktliste #patients #statistikk`
+## 2026-09-26 — Død kode som testene holdt i live (D2)  `#core/gjeld` `#core/tester`
 
 **Hvorfor:** «løgn nr. 3» fra mutasjonsavsnittet i `CLAUDE.md`, i praksis — tester som kaller
 en funksjon ingen annen kode kaller. Suiten ser da ut til å dekke mer enn den gjør, og
@@ -4364,7 +4394,7 @@ tilbake i `views_patients.py` (vakten rød).
 **TODO:** C3 og C4 står som åpne valg som venter til utviklingen er der (André: «vi er ikke
 ferdig med å utvikle og kan holde de der de er inntil videre»).
 
-## 2026-09-26 — Norsk alfabetisk rekkefølge i hele portalen: Æ Ø Å sist, likt overalt  `#core`
+## 2026-09-26 — Norsk alfabetisk rekkefølge i hele portalen: Æ Ø Å sist, likt overalt  `#core/grensesnitt`
 
 **Hvorfor:** raden på server-status viste staging: **«Blandet inn (Æ=AE, Ø=O, Å=A)» —
 `en_US.utf8`, PostgreSQL 18.6**. Korps-nedtrekket i vaktlista sto som «Ærø · Ålesund ·
@@ -5069,7 +5099,7 @@ noen URL ennå».
 **Kontroll av funnene:** fem lesere tok hvert sitt område. Alle funn merket «Høy» er
 kontrollert mot koden en gang til. «Vurder GitHub Actions» er slått inn i pulje D1.
 
-## 2026-09-25 — Overnatting: plasseringene slettes 30 dager etter natta, og personvernprotokollen  `#vaktliste` `#personvern`
+## 2026-09-25 — Overnatting: plasseringene slettes 30 dager etter natta, og personvernprotokollen  `#vaktliste/planlegging` `#core/personvern`
 
 André valgte «A» av tre: hvem som sov hvor har ingen verdi etter vakta, og fila sa
 allerede «slett etter vakta». **Plasseringene slettes 30 dager etter natta** av
@@ -5097,7 +5127,7 @@ slettingen, signalets sjekk, registreringen i `apps.ready()` og tørrkjøringen.
 Datomutanten ville overlevd uten testen med et tidspunkt etter midnatt: testene går på
 dagtid, der UTC og norsk dato er like.
 
-## 2026-09-25 — Staging-grenen heter `staging`, ikke `rollemodell`  `#drift` `#deploy`
+## 2026-09-25 — Staging-grenen heter `staging`, ikke `rollemodell`  `#core/drift`
 
 André ga grenen nytt navn i GitHub og byttet grenen staging-tjenesten deployer fra i
 Railway. **«rollemodell» betydde to ting**: staging-grenen og tilgangsmodellen
@@ -5115,7 +5145,7 @@ het det før.
 Lokale kloner: `git branch -m rollemodell staging`, `git fetch origin`,
 `git branch -u origin/staging staging`, `git remote set-head origin -a`.
 
-## 2026-09-25 — Overnatting i vaktlista: hvem sover hvor, og brannlista på papir  `#vaktliste` `#brannsikkerhet`
+## 2026-09-25 — Overnatting i vaktlista: hvem sover hvor, og brannlista på papir  `#vaktliste/planlegging` `#vaktliste/offline`
 
 André: «Vi skal jobbe med /vaktliste. Jeg vil ha en overnatting-del hvor vi registrerer
 hvilke mannskap som skal sove der og hvor. Det må gå an å sette dette opp samt romnavn.
@@ -5189,7 +5219,7 @@ oppdages før noe skrives — ny test simulerer en kollisjon midt i skrivingen.
 og mobil (390 px). Papirutgaven fikk fast kolonnebredde etter første bilde — «Telefon»
 flyttet seg fra rom til rom.
 
-## 2026-09-25 — Databasekortet på server-status: henger, eldste transaksjon, låskø og deadlocks  `#drift` `#database`
+## 2026-09-25 — Databasekortet på server-status: henger, eldste transaksjon, låskø og deadlocks  `#core/drift`
 
 André: «Ja gjør det» og «la oss gjøre det du skisserte» (Artifact «Databasekortet»), med
 svarene: rødt løfter beredskapstrinnet, deadlocks med nå, grensene som foreslått.
@@ -5226,7 +5256,7 @@ samme objekt til kortet og banneret, så to databasekall var usynlige; og Postgr
 Runbook §2 (løftet av trinnet) og §8 (radene, grensene og hva man gjør når svartiden er grønn
 og kortet rødt). `docs/TEKNISK_DOKUMENTASJON.md`: panelraden oppdatert.
 
-## 2026-09-25 — Runbook §8a: helsesjekk av databasen, og første avlesning av indeksene  `#drift` `#database`
+## 2026-09-25 — Runbook §8a: helsesjekk av databasen, og første avlesning av indeksene  `#core/drift`
 
 André: «Okei kan du skrive det viktigste i runbooken for meg?» og «helt ærlig jeg vet ikke om
 dette er fra prod elelr staging».
@@ -5256,7 +5286,7 @@ Alt på én linje per spørring: en skrivefeil (`ORDERY BY`) forkaster hele spø
 Avlesningen står som punkt 4 i §10a, **før** arkiveringen, som sletter oppdragene.
 TODO-punktet er skrevet om til å peke hit.
 
-## 2026-09-24 — TODO: les av indeksene i Postgres etter en vakt  `#drift` `#database`
+## 2026-09-24 — TODO: les av indeksene i Postgres etter en vakt  `#core/drift`
 
 André: «Den databasen om indekserte kan du skrive det som en todo for meg med konkret
 instruks og så poster jeg det til deg for vurdering.» Punktet står under «Krever Andre»:
@@ -5266,7 +5296,7 @@ vurderes. Tallene skal leses **etter en vakt med ekte last**; statistikken gjeld
 Postgres sist startet, og spørring A sier når det var. Ingenting tyder på et
 indeksproblem i dag; dette er en helsesjekk.
 
-## 2026-09-24 — Oversikt over oppdateringsintervallene: runbook §3d  `#drift` `#dokumentasjon`
+## 2026-09-24 — Oversikt over oppdateringsintervallene: runbook §3d  `#core/drift` `#core/dokumentasjon`
 
 André: «Kan du skrive ned i runbook evt en annen plass som er egnet
 oppdateringsintervallene på enhver ting /pasiwnter /ko /vaktliste osv så vi har oversikt?»
@@ -5290,7 +5320,7 @@ har ingen løkke, og henter bare når den lastes, så rådet hjalp ikke. Det er 
 ekstra faner av samme side». Vaktlista henter heller ikke data av seg selv; bare køen av
 stemplinger gjort uten nett sendes hvert 15. s.
 
-## 2026-09-24 — Endringsnummeret for resten av /ko: loggen og sentralbordet oppdaterer seg på 2,5 sekunder  `#ko` `#oppdrag` `#rammeverk`
+## 2026-09-24 — Endringsnummeret for resten av /ko: loggen og sentralbordet oppdaterer seg på 2,5 sekunder  `#ko/loggen` `#ko/sentralbordet`
 
 André: «Okei la oss ta resten av /ko som vi snakket om». Skissen fra tavla (Artifact
 «Tavlas endringsnummer») sa: «Loggen og oppdragslista kobles på samme tall i neste runde,
@@ -5339,7 +5369,7 @@ og tallet øker ved commit, etter delingene.
   linje i hendelsen, så `Hendelse` og `Linjedeling` alene ble aldri prøvd. **To tester lagt
   til** — redigering av hodet (ingen systemlinje) og deling med ett oppdrag.
 
-## 2026-09-24 — Hendelsen åpnes i hendelsesloggen, med de pågående i en sidebar, og skjerm 2 følger klikkene  `#ko` `#hendelser`
+## 2026-09-24 — Hendelsen åpnes i hendelsesloggen, med de pågående i en sidebar, og skjerm 2 følger klikkene  `#ko/hendelseslogg`
 
 André: «Så må vi se på det med å åpne hendelser fra hendelsesloggen som vises over
 loggstrømmen. Der lurer jeg på om vi heller bør ha hendelser i hendelsesloggen men når det
@@ -5391,7 +5421,7 @@ fram på et H-merke. Ingen JS-feil.
 - Kallstedet i ko.js prøves ved å kjøre den ekte `DOMContentLoaded`-kroken med hvert navn
   byttet mot en opptaker — også rekkefølgen (`koOppsettStart` før `koHendelseVinduStart`).
 
-## 2026-09-24 — Endringsnummeret: tavla oppdaterer seg på 2,5 sekunder, med «Per · nå» på stolpen  `#ko` `#tavle` `#rammeverk`
+## 2026-09-24 — Endringsnummeret: tavla oppdaterer seg på 2,5 sekunder, med «Per · nå» på stolpen  `#ko/ressursbildet`
 
 André: «ta core og tavla fyst». Skissert først (Artifact «Tavlas endringsnummer»), med
 forslagene derfra: 2,5 s, merket i 30 s og bare for andre enn deg, ingen kollisjonssperre
@@ -5440,7 +5470,7 @@ setter uansett en ny start ved neste lesing. Fjernet fra koden. Resten drept.
 **Dokumenter:** 181 ruter (tallfasit), registeret i rot-CLAUDE.md (taket hevet til 65 800
 med begrunnelse), pollingsetningen der rettet, tavlas rad i `templates/ko/CLAUDE.md`.
 
-## 2026-09-24 — TODO: kontooppryddingen i prod er gjort  `#todo`
+## 2026-09-24 — TODO: kontooppryddingen i prod er gjort  `#core/dokumentasjon` `#core/tilgang`
 
 André: «Kontooppryddingen er gjort, slett punktet». Punktet «⚠️ Kontoopprydding i prod —
 MÅ gjøres før deploy til prod» (besluttet 28. aug. 2026: slett alle kontoer unntatt
@@ -5448,7 +5478,7 @@ admin og én les/skriv-konto, backup av `accounts` først, kontroller at en admi
 igjen) er slettet fra TODO. Punktet om `skriv_handling` for bilkontoer sto under samme
 overskrift og har fått sin egen.
 
-## 2026-09-24 — Tråderegelen står på dashbordet, ved tiltakstabellen  `#drift` `#server-status`
+## 2026-09-24 — Tråderegelen står på dashbordet, ved tiltakstabellen  `#core/drift`
 
 André: «er du ikke enig i å legge inn flere tråder i runbook/beredskap under vakt da tråder
 gir kjappere database?» Nei — **tråder gjør ikke databasen raskere**, de lar appen sende
@@ -5464,7 +5494,7 @@ stress.
   `core/admin_status.py`), og testen som holder §5 og tilkoblingstaket i takt leser
   samme konstant.
 
-## 2026-09-24 — Runbooken: workers eller tråder (se CPU), og taket på databasetilkoblinger  `#drift` `#runbook`
+## 2026-09-24 — Runbooken: workers eller tråder (se CPU), og taket på databasetilkoblinger  `#core/drift`
 
 André: «Det skal bare øke workers og ikke tråder?» og «kan jeg i teorien ha 10 workers og
 8 tråder og da er jeg på 80 connections?»
@@ -5482,7 +5512,7 @@ André: «Det skal bare øke workers og ikke tråder?» og «kan jeg i teorien h
 - **Test:** `BeredskapstrinnTilkoblingerTests` — høyeste trinn med §5-trådene (4 × 6 → ~32)
   holder seg under 100 minus 20 i margin, og §5 sier fortsatt 6 tråder.
 
-## 2026-09-24 — Server-status og runbooken regnet fra vakt-modus: P95 først, trinnene ett sted  `#drift` `#runbook` `#server-status`
+## 2026-09-24 — Server-status og runbooken regnet fra vakt-modus: P95 først, trinnene ett sted  `#core/drift`
 
 André: «før vakten skal starte spinner vi opp redis og 2 workers og 4 tråder», og Railway
 Pro på vakt. Gjennomgangen av runbooken mot dashbordet viste at begge var skrevet som om
@@ -5540,7 +5570,7 @@ for et vindu som ikke begynner på en hel time.
 **TODO:** KO med fem operatører — endringsnummeret, hendelsen i et skjult loggvindu,
 oppsett per rolle og måling av KO-trafikken.
 
-## 2026-09-23 — ↗ på en åpen hendelse åpner hendelsen, ikke loggstrømmen  `#ko` `#vinduer`
+## 2026-09-23 — ↗ på en åpen hendelse åpner hendelsen, ikke loggstrømmen  `#ko/hendelseslogg`
 
 André: «Når vi skal åpne en hendelse som ligger i loggstrøms vinduets plass og vil åpne som
 et eget vindu så åpner du loggstrøms vinduet istedenfor.»
@@ -5562,7 +5592,7 @@ et eget vindu så åpner du loggstrøms vinduet istedenfor.»
 prøves gjennom `koOppsettStart` med en tom DOM, ikke bare lesingen av adressen. Prøvd i
 nettleseren: H1 åpen → ↗ → nytt vindu med H1, hovedvinduet viser strømmen.
 
-## 2026-09-23 — Tavla og konsertplanleggeren, runde 2: framover i tid, «+ Planlegg» på alle rader, «Flytt nå», felles tidslinje og egne vinduer  `#ko` `#tavle` `#planlegger`
+## 2026-09-23 — Tavla og konsertplanleggeren, runde 2: framover i tid, «+ Planlegg» på alle rader, «Flytt nå», felles tidslinje og egne vinduer  `#ko/planleggeren` `#ko/ressursbildet`
 
 André etter test på staging: «Tidslinjen på tavlen er litt rar. Når du drar over en enhet så
 begynner navnet i "fortid", det må heller gå fremover i fremtid. Og planleggeren ser ut til å
@@ -5643,7 +5673,7 @@ plan på et sted uten at noe ble rødt — byggeren var prøvd, men ikke veien g
 `koTegnTavle` og `koTegnPlan` gjennom den ekte inngangen), og de eksisterende tavle- og
 planleggertestene skrevet om til et eksplisitt anker der de forutsatte ⅔ bakover.
 
-## 2026-09-23 — Forslag: kartmodul med værlag (vind, nedbør, farevarsler)  `#kart` `#docs`
+## 2026-09-23 — Forslag: kartmodul med værlag (vind, nedbør, farevarsler)  `#core/kartkobling`
 
 Ingen kode. Utredning lagt i `docs/FORSLAG_KARTMODUL.md` og som eget prosjekt under
 «Ideer / backlog» i `TODO.md` — **ikke noe som gjøres i år** (André, 23. sep. 2026), men
@@ -5670,7 +5700,7 @@ for Norge i bilder; den nye tjenesten krever GeoID-token og er for parter i Norg
 digitalt. Står som åpent spørsmål i notatet (§6.1), med Sentinel-2 som reserve.
 
 ---
-## 2026-09-23 — Avtalte pauser i vaktlista, og KO-tavla henter dem  `#vaktliste` `#ko` `#pauser`
+## 2026-09-23 — Avtalte pauser i vaktlista, og KO-tavla henter dem  `#vaktliste/planlegging` `#ko/ressursbildet`
 
 André: «vi har planer om å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er
 lagt inn enda». Svarene før koden: **1. per lag/ressurs · 2. teller i timene: ja · 3. leder ·
@@ -5752,7 +5782,7 @@ Alt annet ble drept, blant annet:
 - «bare lista i bruk»
 - escapingen
 
-## 2026-09-23 — Planleggeren: endringshistorikk, plan mot faktisk og «kopier programmet»  `#ko` `#planlegger`
+## 2026-09-23 — Planleggeren: endringshistorikk, plan mot faktisk og «kopier programmet»  `#ko/planleggeren`
 
 Steg 5 og siste av tavleplanleggeren. André: «det er egentlig kjempesmart. Og fint for videre
 år på samme arrangement å kunne se hva vi hadde på de konsertene og risikovurdering/
@@ -5802,7 +5832,7 @@ bruker nå 05:30. Den åttende var en ekvivalent mutant: et ekstra `transaction.
 JS: 12 av 12 drept (ledergaten, «ikke på aktiv vakt», «opprinnelig» bare ved endring, «–»
 for ukjent, escaping av historikken og raden).
 
-## 2026-09-23 — Planleggeren: tidslinja over døgnet, og dekningen mot vaktlista  `#ko` `#planlegger`
+## 2026-09-23 — Planleggeren: tidslinja over døgnet, og dekningen mot vaktlista  `#ko/planleggeren`
 
 Steg 4 av tavleplanleggeren — «tabletoppen» fra skissene: **hvor mange trengs, og har vi
 dem?**
@@ -5836,7 +5866,7 @@ overlevde**, begge grensetilfeller testen ikke berørte: en gruppe uten id (ble 
 skjermbildet viste gammel kode («Kunne ikke hente dekningen», knappene manglet). Ikke en feil
 i koden, men verdt å vite neste gang et skjermbilde ser rart ut.
 
-## 2026-09-23 — Tavla: behovet i drift, «Lag 2/4» per sted  `#ko` `#tavle`
+## 2026-09-23 — Tavla: behovet i drift, «Lag 2/4» per sted  `#ko/ressursbildet`
 
 Steg 3 av tavleplanleggeren. Under stedsnavnet på tavla står nå **behovet til konserten
 som pågår — mot det som står der**: «Lag 2/4», «Ambulanse 0/1». **Gult når noe mangler,
@@ -5855,7 +5885,7 @@ grønt når det holder**, og verktøytipset sier det med ord.
 sted, `kommer`, summeringen (`+=`), lukket plassering, opptatt på stedet, navnematchen,
 «mangler» på grensen, og begge kallstedene (`koTavleRader` og `koTavleRadHtml`). Alle drept.
 
-## 2026-09-23 — Programmet: konserter med beredskapsnivå og behov, planleggervinduet, bånd på tavla  `#ko` `#tavle` `#planlegger`
+## 2026-09-23 — Programmet: konserter med beredskapsnivå og behov, planleggervinduet, bånd på tavla  `#ko/planleggeren` `#ko/ressursbildet`
 
 Steg 2 av tavleplanleggeren. André: «Kunne legge inn type konserter på ulike konsertsteder.
 … Risikonivå med farge. Og planlegge for antall lag og andre ressurser», og svarene før
@@ -5919,7 +5949,7 @@ nøyaktig fella CLAUDE.md beskriver. Tettet.
 `--bf` på grunnregelen, senere i fila enn `.ko-beredskap-*` og med samme spesifisitet — den
 vant. Står nå i `var(--bf, …)`.
 
-## 2026-09-23 — Tavla: planlagt slutt på plasseringen, og overtid  `#ko` `#tavle`
+## 2026-09-23 — Tavla: planlagt slutt på plasseringen, og overtid  `#ko/ressursbildet`
 
 Steg 1 av tavleplanleggeren. André: «planlegge tid per plassering med beskjed/tegn på
 overtid i faktisk drift. Både i planlegger men og generelt i tavlen.» Skissene
@@ -5952,7 +5982,7 @@ alene. Én mutant jeg skrev var en no-op, og er ikke talt med. **Én test jeg sk
 ingenting** (`all(True for _ in …)`) — skrevet om til den ene situasjonen der noe står fram
 i tid i samme rad: en planlagt pause i Pause-raden.
 
-## 2026-09-23 — Ressursoversikten: «Vis»-meny (synlighetsknapp) i stedet for minimering og Alle | Biler | Lag  `#ko` `#oppdrag/sentralbord`
+## 2026-09-23 — Ressursoversikten: «Vis»-meny (synlighetsknapp) i stedet for minimering og Alle | Biler | Lag  `#ko/ressursbildet` `#oppdrag/sentralbord`
 
 André: «istedenfor minimer som tar plass at vi har en synlighetsknapp istedenfor på
 ressursoversikt», og etter forslaget: «ja jeg vil ha forslaget ditt i ressursoversikten».
@@ -5989,7 +6019,7 @@ var ekte hull: kallet i `tegnEnhetsliste` er det *eneste* som tegner menyen i `/
 men testen hadde alltid KO-funksjonene til stede; og at lagene kommer inn i menyen når
 `koHentRessurser` henter dem, var ikke prøvd. Begge har egen test nå.
 
-## 2026-09-23 — Opprydding: «Velg…» i nedtrekkene, hastegraden som forsvant, ledig i enhetsvalget, to kolonner som overlappet  `#oppdrag/sentralbord` `#ko` `#vaktliste`
+## 2026-09-23 — Opprydding: «Velg…» i nedtrekkene, hastegraden som forsvant, ledig i enhetsvalget, to kolonner som overlappet  `#oppdrag/sentralbord`
 
 André: «Neste ledd er litt opprydning».
 
@@ -6731,7 +6761,7 @@ køen mister teksten, projeksjonen uten «Utført» (overlevde først).
 
 ---
 
-## 2026-09-19 — Testsjekklister for `/ko` og `/vaktliste`  `#ko` `#vaktliste` `#dokumentasjon`
+## 2026-09-19 — Testsjekklister for `/ko` og `/vaktliste`  `#core/dokumentasjon`
 
 André, 19. sep. 2026: «Kan du lage to sjekklister for testing av appen? En for /ko og en
 for /vaktliste?»
