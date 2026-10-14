@@ -152,7 +152,7 @@ def patients_list_view(request):
         filter_name = request.GET.get('filter', 'alle')
         include_archived = request.GET.get('include_archived') == '1'
         # Fase 5: "mine"-filter — default AV, slås på via ?mine=1.
-        # Filtrerer på Behandler.user ELLER Helsepersonell.user lik innlogget bruker.
+        # Filtrerer på Forstehjelper.user ELLER Helsepersonell.user lik innlogget bruker.
         # Tilgjengelig for alle med lesetilgang til modulen.
         mine_only = request.GET.get('mine') == '1'
 

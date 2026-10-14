@@ -819,8 +819,8 @@ def _lag_enhet_om_bedt_om(form, user):
     """Opprett `Enhet` når kontotypen er bil eller ambulanse.
 
     **Retningen er `accounts` → `oppdrag`, og det er verdt å merke seg.**
-    Importen er lokal i funksjonen, som `core.views` gjør mot
-    `patients.models`. Skal en modul nummer to også kunne opprettes fra
+    Importen er lokal i funksjonen, og står i `KJENTE_UNNTAK_RAMMEVERK`
+    (`core/tests_avhengighetsretning.py`). Skal en modul nummer to også kunne opprettes fra
     brukerskjemaet, er det her et registry hører hjemme — etter samme idiom
     som `core.backup` og `core.arkiv`. Med én modul ville registeret vært mer
     maskineri enn nytte.

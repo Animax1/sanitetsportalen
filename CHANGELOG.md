@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — F4: 23 råtne kommentarer rettet, og en test for kommentarer i koden  `#dokumentasjon` `#gjeld`
+
+**Hvorfor:** Nr. 4 på Andrés liste 14. okt. («… og så nr 4»): pulje F i gjeldsplanen,
+«rundt 40 utdaterte kommentarer». Det fantes ingen liste, bare seks eksempler. Og
+`core/tests_dokumentråte.py` holder bare Markdown — kommentarer og docstrings i koden hadde
+ingen vakt, så de råtnet hver gang noe flyttet.
+
+**Funnet ved å skanne, ikke ved å lete:** filstier, punkterte navn og egne hjelpere i
+kommentarer og docstrings i `.py`, `.js` og `.html`, slått opp mot koden. Hvert funn
+kontrollert i konteksten før det ble rettet — flere var riktige historiske setninger («kom
+hit fra», «Delt ut av», «forsvant med») og står.
+
+| Rettet | Var |
+|---|---|
+| `myproject/settings.py` | `_should_run_now()` → `core.backup.klokke.forfalt()`; «testes i patients-testene» → `core/tests_backup.py`; `patients/stats_cache.py` |
+| `core/idempotency.py`, `core/ratelimit.py` | `patients/stats_cache.py` — den bor i `core/` |
+| `audit/signals.py` | Migrasjonen heter `0003_auditlog_app_label`, ikke `0002_` |
+| `static/js/vaktliste-handlinger.js`, tre steder | `_planleggerUtenStart()` og `_planleggerSkift()` finnes ikke — `utenStart` i `mkPlanlegger()`, og kommentaren over `_planleggerVindutall()` |
+| `core/auth_decorators.py` | **«`accounts/decorators.py` re-eksporterer fortsatt `admin_required`»** — fila ble slettet 14. sep. |
+| `accounts/views.py` | «som `core.views` gjør mot `patients.models`» — begge er borte; peker nå på `KJENTE_UNNTAK_RAMMEVERK` |
+| `oppdrag/services.py` | `ko.services.ressursbildet` finnes ikke — de to leserne er sentralbordet (også i `/ko/`) og KO-utskriften |
+| `core/robots.py` | `X-Robots-Tag` settes i `core/middleware.py`, ikke `patients/middleware.py` |
+| `ko/models.py` | `oppdrag.StatusmeldingManager` → `oppdrag.models.StatusmeldingManager` |
+| `ko/views.py` ×2, `ko/services.py`, `static/js/ko-hendelser.js` | **«hvert 15. sekund»** — KO-loggen følger endringsnummeret (2,5 s, 30 s som sikkerhetsnett) siden 24. sep. Bilens «hvert 15. sekund» stemmer og står |
+| `patients/models.py`, `views_patients.py`, `tests.py`, `tests_fase5.py`, `import_offline_data.py` | «Behandler», som heter `Forstehjelper` siden migrasjon 0011. I offline-importen er `patients_behandler` riktig — den gamle basen har tabellen — og det står nå |
+
+**`core/tests_kommentarraate.py`** holder det. Punkterte navn slås opp ved å **importere**
+modulen (modellnavn som `core.Vakt` gjennom app-registeret), egne hjelpere bare `_privat()`
+og `camelCase()` — ikke `update()` og `lower()`.
+
+**Kontekstvinduet ble justert tre ganger, og det er verdt å vite hvorfor.** Tre linjer på
+hver side, som i dokumentråte-testen: to mutanter slapp gjennom fordi de sto ved siden av
+en ekte forklaring om noe annet. Linja alene: fant to råtne referanser til (re-eksporten og
+en `_planleggerSkift()` til), men meldte fem setninger som bryter over to linjer. Landet på
+**linja og den neste** — forklaringen følger navnet, men står ikke foran det — og uten
+«var » og «før », som står i nesten hver norsk setning. **Kjent luke**, skrevet i testen:
+et dødt navn på linja rett over en ekte forklaring slipper gjennom.
+
+**Mutasjonstesting: 7 prøver, alle oppførte seg riktig** — død sti, død hjelper, dødt
+punktert navn, død JS-hjelper og den slettede re-eksporten påstått igjen er røde; en riktig
+historisk setning og den kjente luken er grønne. **Én av dem fant en feil i testen selv:**
+`core.vakt.finnes_ikke` gikk grønt fordi `core.vakt` også er modellen `Vakt`. Et modellnavn
+godtas nå bare alene eller med et felt etter.
+
 ## 2026-10-14 — CSP: `<style>` krever nonce (`style-src-elem`), attributtene tas gradvis  `#sikkerhet` `#csp`
 
 **Hvorfor:** Nr. 3 på lista André satte 14. okt. («Kjør nr 1 først G2 og så tar vi nr 3

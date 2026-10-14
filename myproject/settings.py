@@ -239,15 +239,15 @@ if _RUNNING_TESTS:
 
     # Backup-planleggeren ut av middleware-stacken under test.
     #
-    # `_should_run_now()` returnerer True når `last_run_at` er null, og i en
-    # fersk testdatabase er den alltid det. Første request i enhver test som
+    # `core.backup.klokke.forfalt()` svarer ja når planen aldri er sjekket
+    # (`sist_sjekket_at` er null), og i en fersk testdatabase er den alltid det. Første request i enhver test som
     # går gjennom stacken utløste derfor en ekte backup — som skriver filer og
     # rader, og på SQLite låser tabellen av og til. Resultatet var en
     # testsuite som feilet tilfeldig, med feilmeldinger som pekte på
     # backup_scheduler i tester som ikke har noe med backup å gjøre.
     #
     # En flaky suite er verre enn ingen suite: den lærer deg å kjøre om igjen
-    # i stedet for å lese. Planleggeren testes direkte i patients-testene, så
+    # i stedet for å lese. Klokka testes direkte i `core/tests_backup.py`, så
     # ingenting mistes ved å ta den ut her.
     # Intervallsendingen av vaktlista ut av samme grunn: en bakgrunnstråd som
     # sender e-post midt i en test som ikke handler om det. Den testes direkte
@@ -363,7 +363,7 @@ if REDIS_URL:
             # Merk: Django's innebygde RedisCache (django>=4.0) har INGEN innebygd
             # 'IGNORE_EXCEPTIONS'-option slik tredjepartspakken django-redis har.
             # Failsafe ved Redis-utfall er håndtert i koden:
-            #   - patients/stats_cache.py: try/except rundt cache.get/set/delete
+            #   - core/stats_cache.py: try/except rundt cache.get/set/delete
             #   - django-ratelimit: se core/ratelimit.py. Pakken faller IKKE
             #     åpen av seg selv — cache.add() mot en død Redis kaster
             #     ConnectionError, og RATELIMIT_FAIL_OPEN er False som default.

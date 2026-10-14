@@ -5,7 +5,7 @@ eller brukes som treningsdata. Den reelle beskyttelsen er innloggingskravet:
 alt utenom ``/healthz/`` og selve innloggingssiden redirecter til login, så en
 crawler kommer aldri til pasientdata uansett hva denne fila sier.
 
-Denne fila og ``X-Robots-Tag``-headeren (``patients/middleware.py``) løser to
+Denne fila og ``X-Robots-Tag``-headeren (``core/middleware.py``) løser to
 ulike problemer, og trengs begge:
 
 - **robots.txt** ber crawleren la være å hente sidene. Rent frivillig — den

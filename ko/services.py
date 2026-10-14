@@ -1100,7 +1100,7 @@ def hendelser_for(vakt):
     """Alle hendelsene i vakta med tellingene tavla trenger, nyeste først.
 
     Én spørring for tellingene, ikke én per hendelse: lista følger med hver
-    logg-poll, hvert 15. sekund fra hver operatør.
+    logg-henting, fra hver operatør — ved hver endring, og ellers hvert 30. s.
     """
     from oppdrag import choices
     qs = (Hendelse.objects.filter(vakt=vakt)

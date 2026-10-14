@@ -533,9 +533,9 @@ def enhetskort_liste(enheter, vakt=None, ledig_siden=None) -> list:
 def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
     """Alt et enhetskort viser — **den ene kilden, to lesere**.
 
-    Sentralbordet (`oppdrag.views.enheter_view`) og KOs ressursoversikt
-    (`ko.services.ressursbildet`) tegner samme kort, og skal derfor lese samme
-    felter. Lå serialiseringen i viewet, ville KO fått en kopi — og kopien
+    Sentralbordet (`oppdrag.views.enheter_view` — også i `/ko/`, som kjører
+    sentralbordets egen kode) og KO-utskriften (`ko.utskrift`, gjennom
+    `enhetskort_liste`) tegner samme kort, og skal derfor lese samme felter. Lå serialiseringen i viewet, ville KO fått en kopi — og kopien
     ville manglet neste felt noen la til her, uten at noe ble rødt. Feature
     parity som holder, er den som følger av konstruksjonen (André, 17. sep.
     2026: «Jeg vil ha det likt feature messig inn her i /ko»).

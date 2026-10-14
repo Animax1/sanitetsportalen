@@ -46,11 +46,12 @@ class Forstehjelper(models.Model):
 class Helsepersonell(models.Model):
     """Helsepersonell som kan knyttes til pasienter.
 
-    Samme mønster som Behandler – inaktive vises ikke i dropdown, men
-    beholdes som FK på historiske pasienter for referanseintegritet.
+    Samme mønster som ``Forstehjelper`` (het ``Behandler`` til migrasjon 0011) –
+    inaktive vises ikke i dropdown, men beholdes som FK på historiske pasienter
+    for referanseintegritet.
 
     Fase 5: ``user`` er en valgfri 1:1-kobling til CustomUser. Se
-    docstring på Behandler for detaljer.
+    docstringen på ``Forstehjelper`` for detaljer.
     """
 
     name = models.CharField(max_length=120, unique=True, verbose_name='Navn')

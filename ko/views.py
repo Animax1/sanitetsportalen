@@ -22,8 +22,8 @@ delt view.
 
 **Hendelsene (pulje 5) følger med logg-pollen**, ikke et eget endepunkt:
 `logg_view` svarer med `hendelser` hver gang. Lista er kort (tallet hendelser i
-en vakt), tavla trenger den hvert 15. sekund uansett, og en poller til mot
-samme side ville vært en poller til. Skrivingen har navngitte stier.
+en vakt), loggen hentes uansett når endringsnummeret går opp (2,5 s, med 30 s
+som sikkerhetsnett), og en poller til mot samme side ville vært en poller til. Skrivingen har navngitte stier.
 
 **Flatene er kolonner, ikke faner** (17. sep. 2026). Se `ko/CLAUDE.md`: tre av
 fire trengs for å fullføre én handling, og en skjult fane er en fane du ikke vet
@@ -317,10 +317,10 @@ def tilstede_view(request):
 def logg_view(request):
     """Loggen for aktiv vakt. `?siden=<id>` gir bare det som er nytt.
 
-    **Pollingen er den ene spørringen som går hele vakta**, fra hver operatør,
-    hvert 15. sekund. Derfor `?siden=` og ikke en full henting: en logg på
-    fire hundre linjer sendt fire ganger i minuttet til seks skjermer er en
-    kostnad uten en gevinst.
+    **Pollingen er den ene spørringen som går hele vakta**, fra hver operatør —
+    hver gang endringsnummeret går opp (spurt hvert 2,5 s), og ellers hvert
+    30. s. Derfor `?siden=` og ikke en full henting: en logg på fire hundre
+    linjer sendt for hver endring til seks skjermer er en kostnad uten en gevinst.
 
     **`fjernede` sendes hver gang, og det er ikke sløsing.** Sletteinngangen
     *endrer* en rad i stedet for å legge til en ny, så den har ingen ny `id`

@@ -380,7 +380,8 @@ Samme pulje:
   det tre steder. I tillegg gir to samtidige innsendinger i vaktlista 500, fordi
   `IntegrityError` ikke fanges og `kopier_oppsett` kjører utenfor transaksjonen.
 
-**F4. Rundt 40 utdaterte kommentarer.** Rettes i filen når noen likevel er der, ikke som en
+**F4. Rundt 40 utdaterte kommentarer.** *Levert 14. okt. 2026: 23 rettet, og
+`core/tests_kommentarraate.py` holder det, se CHANGELOG.* Rettes i filen når noen likevel er der, ikke som en
 egen runde. Eksempler:
 - «fase 3 gjenstår»
 - `patients/admin_status.py` i `settings.py`

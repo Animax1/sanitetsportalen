@@ -42,7 +42,7 @@ KILDE_VALG: tuple[tuple[str, str], ...] = (
 class LogglinjeManager(models.Manager):
     """Regelen «nyeste ikke-korrigerte rad i kjeden vinner», ett sted.
 
-    Bevisst samme form som `oppdrag.StatusmeldingManager.gjeldende()`, som
+    Bevisst samme form som `oppdrag.models.StatusmeldingManager.gjeldende()`, som
     §4.3 peker på som mønsteret. Den ligger i en manager og ikke i en `if` per
     view av samme grunn som der: glemmes den ett sted, viser den visningen det
     gamle tidspunktet, og da er loggen uenig med seg selv.

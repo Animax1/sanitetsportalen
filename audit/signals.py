@@ -5,7 +5,7 @@ Designvalg (Fase 3a):
   slik at logikken også gjelder ``AuditLog.objects.create(...)`` og bulk-create
   (sistnevnte kun hvis Django utvides senere — bulk_create kjører ikke
   pre_save i dag, men det er ingen bulk_create-bruk i kodebasen).
-- Logikken må holdes synkronisert med ``audit/migrations/0002_auditlog_app_label.py``
+- Logikken må holdes synkronisert med ``audit/migrations/0003_auditlog_app_label.py``
   (samme mapping). Endrer du denne, oppdater også migrasjonen for konsistens
   ved fremtidig restore fra backup.
 """

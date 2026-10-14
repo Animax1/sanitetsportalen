@@ -229,8 +229,6 @@ i den rekkefølgen de skal tas. A1 må tas før deploy 2 i oppdragsmodulen.*
       - **C4: `Vaktpost.avmeldt_at` — ett predikat for «på vakt», eller fjern feltet.**
         Feltet har ingen skrivevei, og fire lesere utelater avmeldte mens fire tar dem
         med. Avgjøres **før** noen bygger en avmeldingsknapp.
-- [ ] **Pulje F — dokumentasjon som motsier koden.** F1–F3 levert 26. sep. Igjen: ~40
-      utdaterte kommentarer, tas i forbifarten (F4).
 - [ ] **Pulje G — struktur, når man er i filene.** G4 og G5 levert 26. sep., og av G1 server-status,
       `AppSetting`-adminen, `appsetting` og `kollaps_arkiv`. Vaktas livssyklus er flyttet inn i
       punktet om arkiveringen under — den trenger et register, ikke en flytting.

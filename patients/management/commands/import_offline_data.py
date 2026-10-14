@@ -14,7 +14,8 @@ Forventet flyt:
      importerer dem likevel, for bevisst import av gamle data.
   4. For hver pasient: skap ny Patient i default-databasen. Pasientnummer re-tilordnes
      som max(eksisterende_nr globalt) + 1, 2, 3... for å unngå kollisjon.
-  5. Behandler/Helsepersonell-FK matches på NAVN i default-DB. Hvis ikke funnet,
+  5. Førstehjelper/Helsepersonell-FK matches på NAVN i default-DB (offline-basen
+     har den gamle tabellen ``patients_behandler``). Hvis ikke funnet,
      opprettes nye med samme navn og is_active=True.
   6. Alle operasjoner i én atomic-blokk. --dry-run ruller tilbake etterpå.
   7. Rapport: antall importert, antall behandlere/helsepersonell opprettet.

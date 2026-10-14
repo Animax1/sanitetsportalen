@@ -22,7 +22,7 @@ av seg selv, og det stod feil i ``settings.py`` fram til 23. aug. 2026:
 
 Begge er feil prioritering her. Dette er et system som brukes under
 sanitetsvakt: en pasient som ikke kan registreres fordi en cache er nede er
-verre enn en manglende bremse. Samme avveining som ``patients/stats_cache.py``
+verre enn en manglende bremse. Samme avveining som ``core/stats_cache.py``
 gjør for statistikken, og samme prinsipp som F3 formulerer for idempotens —
 bedre dobbel registrering enn ingen registrering.
 

@@ -2,7 +2,7 @@
 
 Dekker:
 - ?mine=1 filter på /pasienter/api/patients/
-- Signal: assigning Behandler.user / Helsepersonell.user gir varsel
+- Signal: assigning Forstehjelper.user / Helsepersonell.user gir varsel
 - Signal: transfer-flytting gir varsel til BÅDE ny og forrige eier
 - Signal: ingen varsel når bruker-koblingen ikke endrer seg
 - Signal: feiler aldri pasient-lagring selv om varsel-koden feiler

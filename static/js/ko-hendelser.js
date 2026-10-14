@@ -919,7 +919,7 @@ function koPrioKnapperHtml(h) {
 }
 
 // **Det som står i feltene overlever en omtegning.** Hendelsen tegnes på
-// nytt ved hver poll (hvert 15. sekund), og `innerHTML` kaster feltene —
+// nytt ved hver henting av loggen (ved hver endring), og `innerHTML` kaster feltene —
 // operatøren «datt ut av» skrivefeltet midt i en setning (André, 19. sep.
 // 2026). Verdien, markøren og fokuset tas vare på før og settes tilbake etter.
 function koBevarFelter(ider) {

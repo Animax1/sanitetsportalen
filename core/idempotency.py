@@ -29,7 +29,7 @@ reservasjonen, skal nøkkelen frigis med :func:`forkast`.
 **Cache-feil betyr opprett uansett.** Alle kall faller åpne. Under sanitetsvakt
 er en dobbeltregistrering et irritasjonsmoment; en pasient som ikke lar seg
 registrere fordi en cache er nede er det ikke. Samme avveining som
-``core/ratelimit.py`` og ``patients/stats_cache.py`` gjør.
+``core/ratelimit.py`` og ``core/stats_cache.py`` gjør.
 
 **Beskyttelsen er bare så delt som cachen er.** I dag kjører appen én
 gunicorn-worker med fire tråder mot LocMemCache, så alle forespørsler ser samme

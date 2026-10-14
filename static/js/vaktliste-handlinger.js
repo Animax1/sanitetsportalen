@@ -1177,7 +1177,7 @@ async function slettPause() {
 // på den som skriver det, ikke data noen andre skal se.
 
 //: Teller for klient-ID-er på linjer og vinduer. Se kommentaren over
-//: `_planleggerSkift()`: indekser flytter seg når man fjerner en rad, og
+//: `_planleggerVindutall()` i `vaktliste-oversikt.js`: indekser flytter seg når man fjerner en rad, og
 //: `data-id` skal peke på den samme raden før og etter.
 let planleggerNesteId = 1;
 
@@ -1188,7 +1188,7 @@ function _planleggerStandardvindu(fraTid, plasser) {
   // «Opprett vakt» i ressurstabellen.
   //
   // Har vakta ingen starttid, finnes det ikke noe bedre å falle tilbake på
-  // enn nå — men da sier panelet fra (`_planleggerUtenStart()`), i stedet for
+  // enn nå — men da sier panelet fra (`utenStart` i `mkPlanlegger()`), i stedet for
   // å la dagens dato stå der og se ut som et valg noen har tatt.
   const fra = _d(fraTid) || _d(aktivListe?.vaktliste?.startet) || new Date();
   const til = new Date(fra.getTime() + 8 * 3600000);
@@ -1387,7 +1387,7 @@ function _planleggerLinjeverdi(felt, verdi) {
 
 function planleggerSettLinje(id, felt, verdi) {
   // **Tre argumenter, fordi feltet bærer `data-felt`.** Se kommentaren over
-  // `_planleggerSkift()` i `vaktliste-oversikt.js`: delegeringen sender
+  // `_planleggerVindutall()` i `vaktliste-oversikt.js`: delegeringen sender
   // `(id, felt, verdi)` bare for elementer med `data-felt`, og ett argument
   // ellers. Første utgave tok `(arg, verdi)` og fikk aldri verdien.
   const linje = _planleggerFinnLinje(id);

@@ -3,8 +3,8 @@
 Inneholder modultilgangen og `admin_required`. Rollehierarkiet som lå her
 falt med deploy 2, da `role` krympet til admin/bruker.
 
-`accounts/decorators.py` re-eksporterer fortsatt `admin_required`, slik at
-gammel import ikke brekker. Nye apps SKAL importere herfra direkte.
+Importér alltid herfra. Re-eksporten i `accounts/decorators.py` er slettet
+(14. sep. 2026), og `core/tests.py` holder at ingen importerer den igjen.
 
 Tre kategorier (§3 i docs/BESLUTNING_ROLLEMODELLEN.md):
     global admin  – brukeradmin, backup, moduloppsett, audit, arkiv og alt

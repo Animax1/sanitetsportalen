@@ -139,10 +139,10 @@ class PabegyntTests(TestCase):
         self.assertFalse(result)
 
 
-# ── Behandler-modell ─────────────────────────────────────────────────────────
+# ── Førstehjelper-modell ─────────────────────────────────────────────────────
 
 class ForstehjelperTests(TestCase):
-    """Tester for Behandler-modell og FK-integritet."""
+    """Tester for Forstehjelper (het Behandler til migrasjon 0011) og FK-integritet."""
 
     def test_inactive_behandler_preserves_history(self):
         """Inaktivering av behandler skal ikke bryte pasient-referansen."""
@@ -155,7 +155,7 @@ class ForstehjelperTests(TestCase):
         self.assertEqual(p.forstehjelper, b)
 
     def test_cannot_delete_behandler_in_use(self):
-        """Behandler knyttet til pasient skal ikke kunne slettes (PROTECT)."""
+        """Førstehjelper knyttet til pasient skal ikke kunne slettes (PROTECT)."""
         from django.db.models.deletion import ProtectedError
         b = Forstehjelper.objects.create(name='Brukes')
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), forstehjelper=b)
