@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Ordboka i `/oppdrag/` og `/ko/` kartlagt: fem spørsmål til André  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
+
+**Ingenting er endret i grensesnittet** — dette er kartleggingen, skrevet som
+`docs/FORSLAG_ORDBOK_OPPDRAG_KO.md`, og svarene avgjør puljen.
+
+Talt med vaktlistevaktens egen leser (`synlig_tekst()`), som bare leser tekst brukeren ser:
+**16 treff i `/oppdrag/`, 89 i `/ko/`**. De fleste er bøyningsformer (`tavla`, `vakta`,
+`vaktlista`) og er mekaniske. Det som krever avgjørelse:
+
+- **Det konkrete heter «Ressurser»** over Karmøy 51 på sentralbordet og «Ressursoversikt» i
+  KO, mens vaktlista og «Nytt oppdrag» sier «enhet».
+- **«Trenger ressurs»** er et statusnavn folk sier på samband. Anbefalt beholdt som fagord,
+  med unntaket skrevet inn i vakten.
+- **«Tavla» betyr to ting:** plasseringene i `/ko/`, og oppdragslista i `/oppdrag/`
+  («står gult på tavla»). Sentralbordet står også inne i `/ko/`, så begge står på samme
+  skjerm.
+- **`oppdrag.Enhetstype` og `vaktliste.Ressursgruppe`** er to redigerbare lister for omtrent
+  det samme, og «ambulanse» finnes i begge. Anbefalt: ulike navn til det er avgjort om de
+  skal være én liste — det er et spørsmål om datamodellen, ikke om ordboka.
+
+TODO: punktet står øverst under «Krever Andre», skrevet om så det står på egne bein.
+
 ## 2026-10-14 — CSP: header, brukermeny, bjelle og personvernlenke uten `style=""` — målt før og etter  `#core/sikkerhet` `#core/grensesnitt`
 
 **Første pulje av de 334 attributtene, valgt etter hvor de vises:** det som står på
