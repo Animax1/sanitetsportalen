@@ -17,7 +17,7 @@ from accounts.models import ModulTilgang
 from core.models import AppSetting
 from oppdrag.models import Enhet
 
-from . import services
+from . import vaktdrift
 from .models import Mannskap, Vaktpost
 from .test_helpers import AMBULANSE, gruppe, lag_ressurs
 from .tests_tilgang import TilgangsBasis
@@ -46,7 +46,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         self._skift(self.res_hgsd, self.p_hgsd)
         self._skift(self.res_fri, self.p_karmoy)
         self._skift(self.bil, self.p_hgsd)
-        navn = [r['navn'] for r in services.ressurser_uten_enhet()]
+        navn = [r['navn'] for r in vaktdrift.ressurser_uten_enhet()]
         self.assertIn('Lag HGSD', navn)
         self.assertIn('KO', navn)
         self.assertNotIn('Ambulanse 1', navn, 'bilen står i /oppdrag/ alt')
@@ -55,13 +55,13 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         """Samme regel som besetningen i `/oppdrag/` (26. sep. 2026)."""
         for navn in ('Åse', 'Ærlig', 'Ola'):
             self._skift(self.res_hgsd, Mannskap.objects.create(navn=navn, korps=self.hgsd))
-        rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
+        rader = {r['navn']: r for r in vaktdrift.ressurser_uten_enhet()}
         self.assertEqual([m['navn'] for m in rader['Lag HGSD']['mannskap']], ['Ola', 'Ærlig', 'Åse'])
 
     def test_bemanningen_er_de_som_har_skift_naa(self):
         self._skift(self.res_hgsd, self.p_hgsd, mott_at=self.na)
         self._skift(self.res_hgsd, self.p_karmoy)            # ikke møtt
-        rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
+        rader = {r['navn']: r for r in vaktdrift.ressurser_uten_enhet()}
         hgsd = rader['Lag HGSD']
         self.assertEqual((hgsd['antall'], hgsd['tilstede']), (2, 1))
         self.assertEqual([m['navn'] for m in hgsd['mannskap']], ['Kari', 'Ola'],
@@ -73,19 +73,19 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         skift starter senere, gikk ut, eller som ikke har noe skift, vises
         ikke — heller ikke som ubemannet. Grensene selv er innenfor."""
         self._skift(self.res_karmoy, self.p_karmoy, fra=5, til=13)      # senere
-        self.assertEqual([r['navn'] for r in services.ressurser_uten_enhet()], [])
+        self.assertEqual([r['navn'] for r in vaktdrift.ressurser_uten_enhet()], [])
         self._skift(self.res_fri, self.p_hgsd, fra=-9, til=-1)           # gikk ut
-        self.assertEqual([r['navn'] for r in services.ressurser_uten_enhet()], [])
+        self.assertEqual([r['navn'] for r in vaktdrift.ressurser_uten_enhet()], [])
         self._skift(self.res_hgsd, self.p_hgsd, fra=0, til=0)            # akkurat nå
-        rader = services.ressurser_uten_enhet(naa=self.na)
+        rader = vaktdrift.ressurser_uten_enhet(naa=self.na)
         self.assertEqual([r['navn'] for r in rader], ['Lag HGSD'])
         # Regelen er én, og lagvelgeren i KO leser den samme.
-        self.assertEqual([r.pk for r in services.ressurser_paa_vakt_naa(self.vl, self.na)],
+        self.assertEqual([r.pk for r in vaktdrift.ressurser_paa_vakt_naa(self.vl, self.na)],
                          [self.res_hgsd.pk])
 
     def test_avmeldte_teller_ikke(self):
         self._skift(self.res_hgsd, self.p_hgsd, avmeldt_at=self.na)
-        rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
+        rader = {r['navn']: r for r in vaktdrift.ressurser_uten_enhet()}
         self.assertNotIn('Lag HGSD', rader, 'et avmeldt skift er ikke et skift')
 
     def test_svaret_baerer_telefon_og_issi(self):
@@ -96,14 +96,14 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         self.p_hgsd.issi = '2401234'
         self.p_hgsd.save()
         self._skift(self.res_hgsd, self.p_hgsd)
-        rad = next(r for r in services.ressurser_uten_enhet() if r['navn'] == 'Lag HGSD')
+        rad = next(r for r in vaktdrift.ressurser_uten_enhet() if r['navn'] == 'Lag HGSD')
         self.assertEqual(set(rad['mannskap'][0]), {'navn', 'rolle', 'tilstede', 'telefon', 'issi'})
         self.assertEqual((rad['mannskap'][0]['telefon'], rad['mannskap'][0]['issi']), ('99988777', '2401234'))
 
     def test_ingen_liste_gir_tom(self):
         AppSetting.set('aktiv_vakt_id', 999999)
         self.vl.delete()
-        self.assertEqual(services.ressurser_uten_enhet(), [])
+        self.assertEqual(vaktdrift.ressurser_uten_enhet(), [])
 
     def test_gaten_er_vaktlistas_og_krever_alle_korps(self):
         """`les` i vaktliste som bare ser sitt eget korps får ikke alle

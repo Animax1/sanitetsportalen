@@ -37,7 +37,7 @@ Planleggeren skal i stor grad *samle* ting som er bygget, ikke finne dem opp:
 | Timesum for et utvalg skift | `_sumTimer()` | `vaktliste-tegning.js` |
 | «Hvor mange er på vakt time for time» | `mkGruppekurve()` / `_bemanningPerTime()` | samme fil |
 | Vaktas spenn | `_vaktensSpenn()` | samme fil |
-| Belastning per person | `services.belastning_per_person()` | `vaktliste/services.py` |
+| Belastning per person | `belastning.belastning_per_person()` | `vaktliste/belastning.py` |
 | Å kopiere et oppsett til en ny vakt | `services.kopier_oppsett()` | samme |
 | En ledig plass | `Vaktpost` uten `mannskap` | `vaktliste/models.py` |
 

@@ -19,6 +19,7 @@ arkiveres med `arkivert_at` og slettes med vakta. Se `docs/BESLUTNING_VAKTLISTE.
 | Pausene | `vaktliste/pauser.py`, `vaktliste.Pause` |
 | Overnattingen og brannlista | `vaktliste/overnatting.py`, `Overnattingsrom`, `Overnatting`, `Vaktliste.brannrutine` |
 | Viewene, delt etter flate (G2) | Kartet i docstringen til `vaktliste/views.py` |
+| Planleggeren, belastningen, vaktlisten i drift (G2) | `planlegger.py`, `belastning.py`, `vaktdrift.py` — tilgangen står i `services.py` |
 
 **Flaten — fanene, ressurskortene, regnearket, tidsfeltene og JS-filene — står i
 `templates/vaktliste/CLAUDE.md`** (delt 23. sep. 2026).
@@ -282,7 +283,7 @@ ressursene **uten** enhet og **på vakt nå** fra `api/ressurser/uten-enhet/` �
   fungerer ikke»: vaktlista som kjørte lå på en annen vakt enn den aktive). Dekker
   ingen skift nå, sendes **neste skift** med (`neste`, `neste_fra`), så svaret er «ingen
   nå, Kari fra 16:00». 404-meldingen skiller «koblet i en annen vakt» fra «ikke koblet
-  noe sted» (`services.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
+  noe sted» (`vaktdrift.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
 - **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
   PostgreSQL (prod) plasserer NULL i hver sin ende.
 
@@ -350,7 +351,7 @@ begge veier og rører ingen stempler.
   `RessurstabellensBreddeTests` regner ut at tidskolonnene rommer feltet i begge
   former.
 - **Klokka setter lista i drift ved vaktas start; knappen er overstyringen** (30. sep.
-  2026). Reglene: `services.skal_settes_i_drift()` — én gang, bare lister planlagt i
+  2026). Reglene: `vaktdrift.skal_settes_i_drift()` — én gang, bare lister planlagt i
   forveien, aldri stenging. Går i `FilutsendingMiddleware` og i viewene; auditraden
   skrives `uten_request()`, og `drift_automatisk` sier at det var klokka.
 - **«Sett i drift» bor i «Innstillinger»** (12. sep. 2026), i bolken for én liste,
@@ -370,7 +371,7 @@ begge veier og rører ingen stempler.
 
 ## Planleggeren — grunnlaget for vaktlista
 
-**Planleggeren lager grunnlaget for vaktlista** (15. sep. 2026, `services.generer_grunnlag`,
+**Planleggeren lager grunnlaget for vaktlista** (15. sep. 2026, `planlegger.generer_grunnlag`,
 `POST api/vaktlister/<pk>/generer/`, `kan_lede`). Du sier «tre firemannslag 14–22, én
 ambulanse 15–03, én på åttetimers rotasjon», og etterpå finnes ressursene og de tomme
 plassene — klare til å fordeles og spisses i fanene som alt virker.
@@ -394,7 +395,7 @@ står under raden — «6 skift × 1 ressurs = 12 plasser, 96 t» — nettopp fo
 oversettelsen skal være synlig før man trykker. Plassene står ikke som et ledd der, fordi
 de kan være ulike fra vindu til vindu: hvert vindu viser sitt eget tall, raden summen.
 
-**Parsingen av `plasser` står i `services._linjens_skift()`, ikke i viewet.** Viewet gjorde
+**Parsingen av `plasser` står i `planlegger._linjens_skift()`, ikke i viewet.** Viewet gjorde
 `_int(...) or 1`, og da ble et eksplisitt `0` stille til 1 — en regel som later som den
 avviser noe.
 
@@ -413,8 +414,8 @@ rullet den rettelsen tilbake.
 |---|---|
 | Én rad per ressurs, vinduene gruppert på plassenes tider | `planleggerLesTilbake()` |
 | Står det ingenting i oppsettet, leses det tilbake — har du skrevet noe, røres det ikke | `planleggerSikreLinjer()`, kalt av `tegnPanel()` |
-| `ressurs_id` gjør raden til en **redigering**; gruppa og navnet følger ressursen | `services._planlegg` |
-| «Plasser» er vinduets hele bemanning, ikke et påslag — de som står telles fra | `services._nye_plasser()` |
+| `ressurs_id` gjør raden til en **redigering**; gruppa og navnet følger ressursen | `planlegger._planlegg` |
+| «Plasser» er vinduets hele bemanning, ikke et påslag — de som står telles fra | `planlegger._nye_plasser()` |
 | Beholdningen forbrukes **per vindu** | to like vinduer i samme rad ville ellers begge trukket fra de samme plassene |
 | Panelet viser oppsettet, bekreftelsen viser endringen | `_sammendrag` teller nye ressurser og nye plasser, og `fjernes` ved siden |
 

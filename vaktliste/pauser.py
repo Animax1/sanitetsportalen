@@ -129,7 +129,7 @@ def les_regel(linje) -> tuple[int, int, bool] | None:
     **Begge feltene tomme er «ingen regel»; ett av dem er en feil.** En
     lengde uten «etter» ville ellers stille blitt pause ved skiftstart.
     """
-    from .services import Planleggerfeil
+    from .planlegger import Planleggerfeil
 
     etter, lengde = linje.get('pause_etter_min'), linje.get('pause_min')
     if etter in (None, '') and lengde in (None, ''):
@@ -161,7 +161,7 @@ def regelpause(fra, til, *, etter_min, lengde_min, indeks=0):
     og ikke en stille utelatelse — et lag som mangler pausen sin er noe
     lederen må få vite.
     """
-    from .services import Planleggerfeil
+    from .planlegger import Planleggerfeil
 
     lengde = timedelta(minutes=lengde_min)
     etter = timedelta(minutes=etter_min)

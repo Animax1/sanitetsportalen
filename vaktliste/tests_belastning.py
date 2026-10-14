@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
-from . import services
+from . import belastning, services
 from .models import Belastningsgrenser, Vaktliste, Vaktpost
 from .tests_tilgang import TilgangsBasis, _bruker, _klient
 
@@ -46,7 +46,7 @@ class HviletidTests(SimpleTestCase):
             self.til_tid = self.fra_tid + timedelta(hours=timer)
 
     def _hvile(self, *spenn):
-        return services._hviletider([self.FalsktSkift(*s) for s in spenn])
+        return belastning._hviletider([self.FalsktSkift(*s) for s in spenn])
 
     def test_hullene_maales_kronologisk(self):
         self.assertEqual([4.0, 2.0], self._hvile((0, 8), (12, 4), (18, 4)))
@@ -83,7 +83,7 @@ class OverlappstimerTests(SimpleTestCase):
             self.til_tid = self.fra_tid + timedelta(hours=timer)
 
     def _overlapp(self, *spenn):
-        return services._overlappstimer([self.FalsktSkift(*s) for s in spenn])
+        return belastning._overlappstimer([self.FalsktSkift(*s) for s in spenn])
 
     def test_ingen_skift_gir_null(self):
         self.assertEqual(0.0, self._overlapp())
@@ -107,9 +107,9 @@ class OverlappstimerTests(SimpleTestCase):
     def test_summen_minus_overlappet_er_tilstedevaerelsen(self):
         """Invarianten regelen er skrevet for, målt i stedet for antatt."""
         skift = [self.FalsktSkift(12, 8), self.FalsktSkift(16, 6)]
-        sum_timer = sum(services._timer(vp.fra_tid, vp.til_tid) for vp in skift)
-        tilstede = services._timer(skift[0].fra_tid, skift[1].til_tid)
-        self.assertEqual(tilstede, sum_timer - services._overlappstimer(skift))
+        sum_timer = sum(belastning._timer(vp.fra_tid, vp.til_tid) for vp in skift)
+        tilstede = belastning._timer(skift[0].fra_tid, skift[1].til_tid)
+        self.assertEqual(tilstede, sum_timer - belastning._overlappstimer(skift))
 
     def test_helt_sammenfallende_skift_teller_hele_lengden(self):
         self.assertEqual(8.0, self._overlapp((0, 8), (0, 8)))
@@ -132,7 +132,7 @@ class OverlappstimerTests(SimpleTestCase):
     def test_skift_uten_gyldig_spenn_hoppes_over(self):
         tomt = self.FalsktSkift(0, 8)
         tomt.til_tid = None
-        self.assertEqual(0.0, services._overlappstimer(
+        self.assertEqual(0.0, belastning._overlappstimer(
             [tomt, self.FalsktSkift(0, 8)]))
 
     def test_rundes_en_gang_saa_et_varsel_ikke_fyrer_paa_avrunding(self):
@@ -154,13 +154,13 @@ class OverlappstimerTests(SimpleTestCase):
             return skift
 
         skift = [kl(2, 53, 4, 34), kl(7, 27, 7, 13), kl(16, 56, 4, 5)]
-        self.assertEqual(0.0, services._overlappstimer(skift))
+        self.assertEqual(0.0, belastning._overlappstimer(skift))
         # Og vis hva den naive formen ville gitt, så testen ikke bare er
         # «null er null»: summen av avrundede timetall minus den avrundede
         # unionen er ikke null.
-        naiv = round(sum(services._timer(s.fra_tid, s.til_tid) for s in skift)
-                     - (services._timer(skift[0].fra_tid, skift[1].til_tid)
-                        + services._timer(skift[2].fra_tid, skift[2].til_tid)), 2)
+        naiv = round(sum(belastning._timer(s.fra_tid, s.til_tid) for s in skift)
+                     - (belastning._timer(skift[0].fra_tid, skift[1].til_tid)
+                        + belastning._timer(skift[2].fra_tid, skift[2].til_tid)), 2)
         self.assertEqual(0.01, naiv, 'tilfellet skal faktisk utløse avrundingen')
 
 
@@ -179,7 +179,7 @@ class BelastningsberegningTests(TilgangsBasis):
             **felt)
 
     def _rader(self):
-        return services.belastning_per_person(self.vl)
+        return belastning.belastning_per_person(self.vl)
 
     def test_timer_og_skift_summeres_per_person(self):
         self._skift(self.p_hgsd, 0, 8)
@@ -303,7 +303,7 @@ class BelastningsberegningTests(TilgangsBasis):
             fra_tid=self.start, til_tid=self.start + timedelta(hours=8))
 
         rader = self._rader()
-        sam = services.belastning_sammendrag(self.vl, rader)
+        sam = belastning.belastning_sammendrag(self.vl, rader)
         self.assertEqual(2, sam['personer'])
         self.assertEqual(2, sam['skift'])
         self.assertEqual(18.0, sam['timer'])
@@ -345,7 +345,7 @@ class OverlappIRadenTests(TilgangsBasis):
     def test_uten_overlapp_er_feltet_null_og_flagget_av(self):
         self._skift(self.p_hgsd, 0, 8)
         self._skift(self.p_hgsd, 12, 4)
-        rad, = services.belastning_per_person(self.vl)
+        rad, = belastning.belastning_per_person(self.vl)
         self.assertEqual(0.0, rad['overlapp'])
         self.assertFalse(rad['har_overlapp'])
 
@@ -353,7 +353,7 @@ class OverlappIRadenTests(TilgangsBasis):
         """Det målte tilfellet fra TODO: 14 timer skift, 10 på stedet."""
         self._skift(self.p_hgsd, 12, 8, ressurs=self.res_hgsd)
         self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri)
-        rad, = services.belastning_per_person(self.vl)
+        rad, = belastning.belastning_per_person(self.vl)
         self.assertEqual(14.0, rad['timer'])
         self.assertEqual(4.0, rad['overlapp'])
         self.assertTrue(rad['har_overlapp'])
@@ -364,7 +364,7 @@ class OverlappIRadenTests(TilgangsBasis):
         `overlapp` finnes ved siden av, og ikke i stedet for."""
         self._skift(self.p_hgsd, 0, 8, ressurs=self.res_hgsd)
         self._skift(self.p_hgsd, 4, 8, ressurs=self.res_fri)
-        rad, = services.belastning_per_person(self.vl)
+        rad, = belastning.belastning_per_person(self.vl)
         self.assertEqual(0.0, rad['korteste_hvile'])
         self.assertTrue(rad['kort_hvile'])
         self.assertEqual(4.0, rad['overlapp'])
@@ -374,7 +374,7 @@ class OverlappIRadenTests(TilgangsBasis):
         Uten denne kunne `overlapp` vært et alias for `kort_hvile`."""
         self._skift(self.p_hgsd, 0, 8)
         self._skift(self.p_hgsd, 8, 4)
-        rad, = services.belastning_per_person(self.vl)
+        rad, = belastning.belastning_per_person(self.vl)
         self.assertEqual(0.0, rad['korteste_hvile'])
         self.assertTrue(rad['kort_hvile'])
         self.assertEqual(0.0, rad['overlapp'])
@@ -385,7 +385,7 @@ class OverlappIRadenTests(TilgangsBasis):
         person står to steder. Kroppen skiller ikke på lønn."""
         self._skift(self.p_hgsd, 12, 8, ressurs=self.res_hgsd)
         self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri, probono=True)
-        rad, = services.belastning_per_person(self.vl)
+        rad, = belastning.belastning_per_person(self.vl)
         self.assertEqual(8.0, rad['timer'], 'probono-timene teller ikke')
         self.assertEqual(4.0, rad['overlapp'], 'men overlappet gjør det')
 
@@ -394,15 +394,15 @@ class OverlappIRadenTests(TilgangsBasis):
         self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri)
         self._skift(self.p_karmoy, 0, 8, ressurs=self.res_fri)
         self._skift(self.p_karmoy, 4, 4, ressurs=self.res_hgsd)
-        rader = services.belastning_per_person(self.vl)
-        sammendrag = services.belastning_sammendrag(self.vl, rader)
+        rader = belastning.belastning_per_person(self.vl)
+        sammendrag = belastning.belastning_sammendrag(self.vl, rader)
         self.assertEqual(8.0, sammendrag['overlapp'], '4 timer på hver')
         self.assertEqual(2, sammendrag['overlappende_personer'])
 
     def test_sammendraget_er_null_naar_ingen_er_dobbeltbooket(self):
         self._skift(self.p_hgsd, 0, 8)
-        rader = services.belastning_per_person(self.vl)
-        sammendrag = services.belastning_sammendrag(self.vl, rader)
+        rader = belastning.belastning_per_person(self.vl)
+        sammendrag = belastning.belastning_sammendrag(self.vl, rader)
         self.assertEqual(0.0, sammendrag['overlapp'])
         self.assertEqual(0, sammendrag['overlappende_personer'])
 
@@ -484,20 +484,20 @@ class DagbolkerTests(SimpleTestCase):
 
     def test_usortert_inndata_gir_kronologiske_dager(self):
         """M-funn: regelen, ikke modellens ordering."""
-        bolker = services._dagbolker(
+        bolker = belastning._dagbolker(
             [self._kl(4, 8), self._kl(2, 8), self._kl(3, 8)])
         self.assertEqual(['2026-10-02', '2026-10-03', '2026-10-04'],
                          [b['nokkel'] for b in bolker])
 
     def test_timene_summeres_per_dag(self):
-        bolker = services._dagbolker(
+        bolker = belastning._dagbolker(
             [self._kl(2, 8, timer=8), self._kl(2, 20, timer=4),
              self._kl(3, 8, timer=6)])
         self.assertEqual([12.0, 6.0], [b['timer'] for b in bolker])
 
     def test_nattskift_hoerer_til_startdagen(self):
         """«fre. 20:00 – lør. 04:00» står under fredag. Beslutning 7."""
-        bolker = services._dagbolker([self._kl(2, 20, timer=8)])
+        bolker = belastning._dagbolker([self._kl(2, 20, timer=8)])
         self.assertEqual(1, len(bolker))
         self.assertEqual('2026-10-02', bolker[0]['nokkel'])
         self.assertEqual(8.0, bolker[0]['timer'])
@@ -511,16 +511,16 @@ class DagbolkerTests(SimpleTestCase):
         fleste — og viser seg bare på nattevakter. Mutanten som byttet
         `timezone.localtime(...)` mot tidspunktet selv overlevde til denne
         testen fantes."""
-        bolker = services._dagbolker([self._kl(2, 0, 30, timer=6)])
+        bolker = belastning._dagbolker([self._kl(2, 0, 30, timer=6)])
         self.assertEqual('2026-10-02', bolker[0]['nokkel'])
 
     def test_skift_uten_starttid_hoppes_over(self):
         tomt = self._kl(2, 8)
         tomt.fra_tid = None
-        self.assertEqual([], services._dagbolker([tomt]))
+        self.assertEqual([], belastning._dagbolker([tomt]))
 
     def test_tom_liste_gir_ingen_dager(self):
-        self.assertEqual([], services._dagbolker([]))
+        self.assertEqual([], belastning._dagbolker([]))
 
 
 class BudsjettallTests(TilgangsBasis):
@@ -543,7 +543,7 @@ class BudsjettallTests(TilgangsBasis):
             **felt)
 
     def _tall(self):
-        return services.planleggingstall(self.vl)
+        return belastning.planleggingstall(self.vl)
 
     def test_uten_tak_er_igjen_ingenting_og_ikke_null(self):
         """«0 timer igjen» er en beskjed om at budsjettet er brukt opp;
@@ -849,7 +849,7 @@ class ProbonoTests(TilgangsBasis):
             fra_tid=na + timedelta(hours=10), til_tid=na + timedelta(hours=24))
 
     def _rad(self):
-        return services.belastning_per_person(self.vl)[0]
+        return belastning.belastning_per_person(self.vl)[0]
 
     def test_timene_hopper_over_probono(self):
         self.assertEqual(8.0, self._rad()['timer'])
@@ -875,8 +875,8 @@ class ProbonoTests(TilgangsBasis):
         self.assertEqual(8.0, self._rad()['faktiske_timer'])
 
     def test_sammendraget_summerer_uten_probono(self):
-        rader = services.belastning_per_person(self.vl)
-        self.assertEqual(8.0, services.belastning_sammendrag(self.vl, rader)['timer'])
+        rader = belastning.belastning_per_person(self.vl)
+        self.assertEqual(8.0, belastning.belastning_sammendrag(self.vl, rader)['timer'])
 
     def test_flagget_settes_ved_opprettelse_og_endring(self):
         c = self.c_vl

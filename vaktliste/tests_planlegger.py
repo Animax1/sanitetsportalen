@@ -34,7 +34,7 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from . import services
+from . import planlegger, services
 from .models import Ressurs, Vaktpost
 from .test_helpers import gruppe
 from .tests_tilgang import TilgangsBasis
@@ -52,7 +52,7 @@ class SkiftvinduValideringTests(TilgangsBasis):
     """Vinduets egne krav. `SkiftvinduTests` målte rotasjonen, som er borte."""
 
     def _skift(self, fra, til, plasser=2):
-        return services._linjens_skift({'vinduer': [
+        return planlegger._linjens_skift({'vinduer': [
             {'fra': fra, 'til': til, 'plasser': plasser}]})
 
     def test_ett_vindu_er_ett_skift(self):
@@ -67,31 +67,31 @@ class SkiftvinduValideringTests(TilgangsBasis):
     def test_ulike_vinduer_kan_ha_ulikt_antall(self):
         """André: «noen ganger ønsker man å ha mindre og mer plasser på
         enkelte skift visse deler av døgnet.»"""
-        skift = services._linjens_skift({'vinduer': [
+        skift = planlegger._linjens_skift({'vinduer': [
             {'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 6},
             {'fra': kl(2, 22), 'til': kl(3, 6), 'plasser': 2},
         ]})
         self.assertEqual([6, 2], [pl for _, _, pl in skift])
 
     def test_bakvendt_vindu_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
+        with self.assertRaises(planlegger.Planleggerfeil):
             self._skift(kl(3, 3), kl(2, 15))
 
     def test_null_lengde_vindu_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
+        with self.assertRaises(planlegger.Planleggerfeil):
             self._skift(kl(2, 15), kl(2, 15))
 
     def test_vindu_uten_tid_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
+        with self.assertRaises(planlegger.Planleggerfeil):
             self._skift(None, kl(2, 22))
 
     def test_null_plasser_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
+        with self.assertRaises(planlegger.Planleggerfeil):
             self._skift(kl(2, 14), kl(2, 22), 0)
 
     def test_ressurs_uten_vindu_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
-            services._linjens_skift({'vinduer': []})
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger._linjens_skift({'vinduer': []})
 
 
 class GrunnlagTests(TilgangsBasis):
@@ -123,7 +123,7 @@ class GrunnlagTests(TilgangsBasis):
 
     def test_tre_firemannslag_fra_14_til_22(self):
         vl = self._ny_liste()
-        svar = services.generer_grunnlag(
+        svar = planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 3, 4, (kl(2, 14), kl(2, 22), None))])
         self.assertEqual(3, svar['ressurser'])
         self.assertEqual(12, svar['plasser'])
@@ -145,7 +145,7 @@ class GrunnlagTests(TilgangsBasis):
         vinduer = [(kl(2, 14) + timedelta(hours=8 * i),
                     kl(2, 14) + timedelta(hours=8 * (i + 1)), None)
                    for i in range(6)]
-        svar = services.generer_grunnlag(
+        svar = planlegger.generer_grunnlag(
             vl, [self._lag('Ambulanse', 1, 2, *vinduer)])
         self.assertEqual(1, svar['ressurser'])
         self.assertEqual(12, svar['plasser'], '6 skift × 2 plasser')
@@ -157,7 +157,7 @@ class GrunnlagTests(TilgangsBasis):
         """Bestillingen bak flyttingen (André, 15. sep. 2026). Seks 14–22 og
         to 22–06 er **én** samleplass med to vinduer."""
         vl = self._ny_liste()
-        svar = services.generer_grunnlag(vl, [self._ulike(
+        svar = planlegger.generer_grunnlag(vl, [self._ulike(
             'Samleplass',
             (kl(2, 14), kl(2, 22), None, 6),
             (kl(2, 22), kl(3, 6), None, 2))])
@@ -172,7 +172,7 @@ class GrunnlagTests(TilgangsBasis):
         """**To vinduer på én ressurs**, ikke to biler. Det er hele grunnen
         til at ressursen er subjektet i oppsettet."""
         vl = self._ny_liste()
-        svar = services.generer_grunnlag(vl, [self._lag(
+        svar = planlegger.generer_grunnlag(vl, [self._lag(
             'Ambulanse', 1, 2,
             (kl(2, 15), kl(3, 3), None),
             (kl(3, 15), kl(4, 3), None))])
@@ -184,7 +184,7 @@ class GrunnlagTests(TilgangsBasis):
     def test_hele_oppsettet_i_en_omgang(self):
         """Alle tre linjene sammen — det er slik fanen brukes."""
         vl = self._ny_liste()
-        svar = services.generer_grunnlag(vl, [
+        svar = planlegger.generer_grunnlag(vl, [
             self._lag('Lag', 3, 4, (kl(2, 14), kl(2, 22), None)),
             self._lag('Ambulanse', 1, 2,
                       *[(kl(2, 14) + timedelta(hours=8 * i),
@@ -206,7 +206,7 @@ class GrunnlagTests(TilgangsBasis):
         """Beslutning 10. Uten det ser et halvferdig oppsett ferdig ut for
         alle korps i det øyeblikket generatoren kjører."""
         vl = self._ny_liste()
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 1, 2, (kl(2, 14), kl(2, 22), None))])
         for vp in self._poster(vl).select_related('ressurs'):
             self.assertTrue(services.er_planlagt(vp))
@@ -215,7 +215,7 @@ class GrunnlagTests(TilgangsBasis):
     def test_forhaandsvisningen_skriver_ingenting(self):
         vl = self._ny_liste()
         linjer = [self._lag('Lag', 3, 4, (kl(2, 14), kl(2, 22), None))]
-        svar = services.forhaandsvis_grunnlag(vl, linjer)
+        svar = planlegger.forhaandsvis_grunnlag(vl, linjer)
         self.assertEqual(12, svar['plasser'])
         self.assertEqual(0, Ressurs.objects.filter(vaktliste=vl).count())
         self.assertEqual(0, self._poster(vl).count())
@@ -227,8 +227,8 @@ class GrunnlagTests(TilgangsBasis):
             self._lag('Lag', 2, 4, (kl(2, 14), kl(2, 22), None)),
             self._lag('Ambulanse', 1, 2, (kl(2, 14), kl(4, 14), 8)),
         ]
-        foer = services.forhaandsvis_grunnlag(vl, linjer)
-        etter = services.generer_grunnlag(vl, linjer)
+        foer = planlegger.forhaandsvis_grunnlag(vl, linjer)
+        etter = planlegger.generer_grunnlag(vl, linjer)
         for nokkel in ('ressurser', 'plasser', 'timer'):
             self.assertEqual(foer[nokkel], etter[nokkel], nokkel)
         self.assertEqual([r['navn'] for r in foer['linjer']],
@@ -237,9 +237,9 @@ class GrunnlagTests(TilgangsBasis):
 
     def test_navnene_teller_videre_fra_det_som_staar_der(self):
         vl = self._ny_liste()
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 2, 2, (kl(2, 14), kl(2, 22), None))])
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 1, 2, (kl(2, 14), kl(2, 22), None))])
         self.assertEqual(['Lag 1', 'Lag 2', 'Lag 3'],
                          sorted(Ressurs.objects.filter(vaktliste=vl)
@@ -253,7 +253,7 @@ class GrunnlagTests(TilgangsBasis):
                                gruppe=gruppe('Lag'))
         Ressurs.objects.create(vaktliste=vl, navn='Lag 3',
                                gruppe=gruppe('Lag'))
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 1, 1, (kl(2, 14), kl(2, 22), None))])
         self.assertTrue(
             Ressurs.objects.filter(vaktliste=vl, navn='Lag 2').exists())
@@ -261,7 +261,7 @@ class GrunnlagTests(TilgangsBasis):
     def test_gruppe_i_ett_eksemplar_faar_navnet_bart(self):
         """«Samleplass», ikke «Samleplass 1» — det finnes ingen nummer to."""
         vl = self._ny_liste()
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Samleplass', 1, 4, (kl(2, 14), kl(2, 22), None))])
         self.assertEqual(['Samleplass'],
                          list(Ressurs.objects.filter(vaktliste=vl)
@@ -272,24 +272,24 @@ class GrunnlagTests(TilgangsBasis):
         generator som lager «Samleplass 2» er akkurat den feilen
         `flere_enheter` finnes for."""
         vl = self._ny_liste()
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(
                 vl, [self._lag('Samleplass', 2, 4,
                                (kl(2, 14), kl(2, 22), None))])
 
     def test_gruppe_i_ett_eksemplar_som_alt_staar_der_avvises(self):
         vl = self._ny_liste()
         linje = self._lag('KO', 1, 2, (kl(2, 14), kl(2, 22), None))
-        services.generer_grunnlag(vl, [linje])
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(vl, [linje])
+        planlegger.generer_grunnlag(vl, [linje])
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(vl, [linje])
 
     def test_ingenting_skrives_naar_en_senere_linje_feiler(self):
         """`transaction.atomic` rundt hele genereringen. Et halvt grunnlag
         er verre enn ingenting: man ser ressurser stå der og tror det gikk."""
         vl = self._ny_liste()
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(vl, [
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(vl, [
                 self._lag('Lag', 2, 4, (kl(2, 14), kl(2, 22), None)),
                 self._lag('Samleplass', 3, 4, (kl(2, 14), kl(2, 22), None)),
             ])
@@ -297,20 +297,20 @@ class GrunnlagTests(TilgangsBasis):
         self.assertEqual(0, self._poster(vl).count())
 
     def test_tomt_oppsett_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(self._ny_liste(), [])
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(self._ny_liste(), [])
 
     def test_ressurs_uten_vindu_avvises(self):
         vl = self._ny_liste()
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(
                 vl, [{'gruppe_id': gruppe('Lag').pk, 'antall': 1,
                       'vinduer': []}])
 
     def test_ukjent_gruppe_avvises(self):
         vl = self._ny_liste()
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(
                 vl, [{'gruppe_id': 999999, 'antall': 1,
                       'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22),
                                    'skiftlengde': None, 'plasser': 1}]}])
@@ -319,14 +319,14 @@ class GrunnlagTests(TilgangsBasis):
         """Sperra er mot et uhell man må rydde opp i for hånd, ikke en regel
         om hvor stor en vakt kan være."""
         vl = self._ny_liste()
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(
                 vl, [self._lag('Lag', 50, 50, (kl(2, 0), kl(3, 0), None))])
         self.assertEqual(0, Ressurs.objects.filter(vaktliste=vl).count())
 
     def test_ressursene_faar_fanerekkefolge_i_den_rekkefolgen_de_kom(self):
         vl = self._ny_liste()
-        services.generer_grunnlag(vl, [
+        planlegger.generer_grunnlag(vl, [
             self._lag('Lag', 2, 2, (kl(2, 14), kl(2, 22), None)),
             self._lag('Ambulanse', 1, 2, (kl(2, 14), kl(2, 22), None)),
         ])
@@ -338,7 +338,7 @@ class GrunnlagTests(TilgangsBasis):
         """Beslutning: bare antall — roller settes etterpå, i raden der man
         uansett ser hvem som står der."""
         vl = self._ny_liste()
-        services.generer_grunnlag(
+        planlegger.generer_grunnlag(
             vl, [self._lag('Lag', 1, 4, (kl(2, 14), kl(2, 22), None))])
         for vp in self._poster(vl):
             self.assertIsNone(vp.rolle_id)
@@ -379,7 +379,7 @@ class RedigeringTests(TilgangsBasis):
         return linje
 
     def _generer(self, *linjer):
-        return services.generer_grunnlag(self.vl2, list(linjer) or [self._linje()])
+        return planlegger.generer_grunnlag(self.vl2, list(linjer) or [self._linje()])
 
     # ── Kladden er generatorens eget utkast ──────────────────────────────
 
@@ -458,15 +458,15 @@ class RedigeringTests(TilgangsBasis):
 
     def test_ressurs_paa_en_annen_vaktliste_avvises(self):
         """`ressurs_id` er ikke en nøkkel man får følge ut av lista."""
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(self.vl2, [{
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(self.vl2, [{
                 'ressurs_id': self.res_fri.pk,
                 'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
                              'plasser': 1}]}])
 
     def test_ukjent_ressurs_avvises(self):
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(self.vl2, [{
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(self.vl2, [{
                 'ressurs_id': 99999,
                 'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
                              'plasser': 1}]}])
@@ -474,7 +474,7 @@ class RedigeringTests(TilgangsBasis):
     def test_samme_ressurs_to_ganger_avvises(self):
         """Den andre linja ville ryddet bort kladden den første nettopp lagde,
         og resultatet avhengt av rekkefølgen."""
-        with self.assertRaises(services.Planleggerfeil):
+        with self.assertRaises(planlegger.Planleggerfeil):
             self._generer(self._linje(), self._linje())
 
     # ── «Plasser» er vinduets hele bemanning ─────────────────────────────
@@ -536,7 +536,7 @@ class RedigeringTests(TilgangsBasis):
         hvert vindu, trekker to like vinduer fra de samme plassene — og til
         sammen lages det for få."""
         self._plass(mannskap=self.p_hgsd)
-        svar = services.generer_grunnlag(self.vl2, [{
+        svar = planlegger.generer_grunnlag(self.vl2, [{
             'ressurs_id': self.res.pk,
             'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 2},
                         {'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 2}]}])
@@ -569,17 +569,17 @@ class RedigeringTests(TilgangsBasis):
         from unittest.mock import patch
         self._plass(mannskap=self.p_hgsd)
         self._plass(mannskap=self.p_karmoy)
-        with patch.object(services, 'MAKS_PLASSER_TOTALT', 1):
+        with patch.object(planlegger, 'MAKS_PLASSER_TOTALT', 1):
             svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=3))
         self.assertEqual(1, svar['plasser'], '2 sto fra før, 1 lages')
 
-        with patch.object(services, 'MAKS_PLASSER_TOTALT', 1):
-            with self.assertRaises(services.Planleggerfeil):
+        with patch.object(planlegger, 'MAKS_PLASSER_TOTALT', 1):
+            with self.assertRaises(planlegger.Planleggerfeil):
                 self._generer(self._linje(kl(3, 14), kl(3, 22), plasser=2))
 
     def test_ressurs_uten_vindu_avvises_ogsaa_med_ressurs_id(self):
-        with self.assertRaises(services.Planleggerfeil):
-            services.generer_grunnlag(
+        with self.assertRaises(planlegger.Planleggerfeil):
+            planlegger.generer_grunnlag(
                 self.vl2, [{'ressurs_id': self.res.pk, 'vinduer': []}])
 
     def test_slettet_kladd_kommer_tilbake_naar_skrivingen_feiler(self):
@@ -609,7 +609,7 @@ class RedigeringTests(TilgangsBasis):
                   self._linje(ressurs=False)]
         with patch.object(Ressurs.objects, 'create', side_effect=feiler):
             with self.assertRaises(RuntimeError):
-                services.generer_grunnlag(self.vl2, linjer)
+                planlegger.generer_grunnlag(self.vl2, linjer)
 
         self.assertTrue(Vaktpost.objects.filter(pk=kladd.pk).exists(),
                         'kladden skal stå der som før')

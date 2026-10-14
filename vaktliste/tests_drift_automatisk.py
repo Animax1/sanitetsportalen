@@ -7,7 +7,7 @@ møter tidlig bruker knappen.
 Tjenestelaget er det tunge laget her (`CLAUDE.md`, «Mutasjonstesting»): en feil
 i klokka legger seg i data og oppdages av ingen før innsjekken er stengt ved
 vaktstart — eller en gammel liste åpner seg selv. Hver regel i
-`services.skal_settes_i_drift()` har sin test, og kallstedene prøves gjennom de
+`vaktdrift.skal_settes_i_drift()` har sin test, og kallstedene prøves gjennom de
 ekte inngangene (viewene og middlewaren), ikke bare gjennom funksjonen.
 """
 from datetime import timedelta
@@ -21,7 +21,7 @@ from audit.models import AuditLog
 from audit.utils import clear_current_request, get_current_request, set_current_request
 from core.models import AppSetting
 
-from . import choices, fil, services
+from . import choices, fil, services, vaktdrift
 from .models import Utsending, Vaktliste, Vaktpost
 from .tests_tilgang import TilgangsBasis
 
@@ -51,7 +51,7 @@ class RegleneTests(TestCase):
         self.start = self.vl.vakt.startet
 
     def _sett(self, naa):
-        return services.sett_i_drift_ved_start(self.vl, naa)
+        return vaktdrift.sett_i_drift_ved_start(self.vl, naa)
 
     def test_settes_i_drift_ved_start(self):
         naa = self.start + timedelta(minutes=1)
@@ -74,15 +74,15 @@ class RegleneTests(TestCase):
     def test_uten_slutt_bare_det_forste_dognet(self):
         vl = _liste(1, None, navn='Uten slutt')
         start = vl.vakt.startet
-        self.assertFalse(services.skal_settes_i_drift(vl, start + services.AUTODRIFT_UTEN_SLUTT))
-        self.assertTrue(services.skal_settes_i_drift(
-            vl, start + services.AUTODRIFT_UTEN_SLUTT - timedelta(seconds=1)))
+        self.assertFalse(vaktdrift.skal_settes_i_drift(vl, start + vaktdrift.AUTODRIFT_UTEN_SLUTT))
+        self.assertTrue(vaktdrift.skal_settes_i_drift(
+            vl, start + vaktdrift.AUTODRIFT_UTEN_SLUTT - timedelta(seconds=1)))
 
     def test_start_passert_da_lista_ble_laget(self):
         """«Ny vaktliste» uten start gir start = nå. Uten regelen gikk lista i
         drift idet den ble laget — og gamle lister åpnet seg ved deploy."""
         vl = _liste(-1, 8, navn='Passert')
-        self.assertFalse(services.sett_i_drift_ved_start(vl, timezone.now()))
+        self.assertFalse(vaktdrift.sett_i_drift_ved_start(vl, timezone.now()))
         self.assertEqual(choices.PLANLEGGING, Vaktliste.objects.get(pk=vl.pk).status)
 
     def test_laget_akkurat_ved_start_er_ikke_foer(self):
@@ -118,15 +118,15 @@ class RegleneTests(TestCase):
     def test_forfalte_tar_bare_dem_som_skal(self):
         passert = _liste(-1, 8, navn='Passert ved laging')
         framtid = _liste(5, 9, navn='Senere')
-        satt = services.sett_forfalte_i_drift(self.start + timedelta(minutes=1))
+        satt = vaktdrift.sett_forfalte_i_drift(self.start + timedelta(minutes=1))
         self.assertEqual([self.vl.pk], [v.pk for v in satt])
         for vl in (passert, framtid):
             self.assertEqual(choices.PLANLEGGING, Vaktliste.objects.get(pk=vl.pk).status)
 
     def test_autodrift_tidspunkt(self):
         """Det knappen sier: «settes i drift av seg selv …» — bare når det stemmer."""
-        self.assertEqual(self.start, services.autodrift_tidspunkt(self.vl))
-        self.assertIsNone(services.autodrift_tidspunkt(_liste(-1, 8, navn='Ingen auto')))
+        self.assertEqual(self.start, vaktdrift.autodrift_tidspunkt(self.vl))
+        self.assertIsNone(vaktdrift.autodrift_tidspunkt(_liste(-1, 8, navn='Ingen auto')))
 
 
 class AuditOgKnappTests(TilgangsBasis):
@@ -144,14 +144,14 @@ class AuditOgKnappTests(TilgangsBasis):
         tilfeldigvis gjorde forespørselen."""
         forespoersel = SimpleNamespace(user=self.leser, META={'REMOTE_ADDR': '10.0.0.9'})
         set_current_request(forespoersel)
-        services.sett_i_drift_ved_start(self.auto, self.auto.vakt.startet)
+        vaktdrift.sett_i_drift_ved_start(self.auto, self.auto.vakt.startet)
         rader = AuditLog.objects.filter(record_id=self.auto.pk, field_name='status')
         self.assertTrue(rader.exists(), 'endringen skal fortsatt logges')
         self.assertFalse(rader.filter(user__isnull=False).exists())
         self.assertIs(forespoersel, get_current_request(), 'requesten settes tilbake')
 
     def test_knappen_er_en_person_ikke_klokka(self):
-        services.sett_i_drift_ved_start(self.auto, self.auto.vakt.startet)
+        vaktdrift.sett_i_drift_ved_start(self.auto, self.auto.vakt.startet)
         self.c_vl.post(f'/vaktliste/api/vaktlister/{self.auto.pk}/drift/stopp/')
         self.c_vl.post(f'/vaktliste/api/vaktlister/{self.auto.pk}/drift/start/')
         self.auto.refresh_from_db()
@@ -162,7 +162,7 @@ class AuditOgKnappTests(TilgangsBasis):
         """Åpnet og stengt før start: klokka skal ikke åpne igjen."""
         self.c_vl.post(f'/vaktliste/api/vaktlister/{self.auto.pk}/drift/start/')
         self.c_vl.post(f'/vaktliste/api/vaktlister/{self.auto.pk}/drift/stopp/')
-        self.assertEqual([], services.sett_forfalte_i_drift(
+        self.assertEqual([], vaktdrift.sett_forfalte_i_drift(
             self.auto.vakt.startet + timedelta(minutes=1)))
 
 
@@ -178,14 +178,14 @@ class FilaVedAutomatiskDriftTests(TestCase):
 
     def test_sendes_en_gang(self):
         start = self.vl.vakt.startet
-        services.sett_i_drift_ved_start(self.vl, start)
-        services.sett_i_drift_ved_start(self.vl, start + timedelta(minutes=1))
-        services.sett_forfalte_i_drift(start + timedelta(minutes=2))
+        vaktdrift.sett_i_drift_ved_start(self.vl, start)
+        vaktdrift.sett_i_drift_ved_start(self.vl, start + timedelta(minutes=1))
+        vaktdrift.sett_forfalte_i_drift(start + timedelta(minutes=2))
         self.assertEqual(1, self._driftfiler())
 
     def test_ikke_naar_admin_har_slaatt_det_av(self):
         AppSetting.set(fil.VED_DRIFT_NOKKEL, '0')
-        services.sett_i_drift_ved_start(self.vl, self.vl.vakt.startet)
+        vaktdrift.sett_i_drift_ved_start(self.vl, self.vl.vakt.startet)
         self.assertEqual(0, self._driftfiler())
 
 
@@ -246,7 +246,7 @@ class KallstedeneTests(TilgangsBasis):
 
     def test_middlewarens_klokke_overlever_en_feil_i_drift(self):
         """En feil i den ene skal ikke stoppe den andre."""
-        with patch.object(services, 'sett_forfalte_i_drift', side_effect=RuntimeError('boom')), \
+        with patch.object(vaktdrift, 'sett_forfalte_i_drift', side_effect=RuntimeError('boom')), \
                 patch.object(fil, 'send_planlagte', return_value=[]) as sp:
             _kjor_klokka()
         sp.assert_called_once()

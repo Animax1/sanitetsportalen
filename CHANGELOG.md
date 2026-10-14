@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — G2: `vaktliste/services.py` delt — `planlegger.py`, `belastning.py`, `vaktdrift.py`  `#vaktliste` `#ko` `#park` `#gjeld`
+
+**Hvorfor:** G2, steg to i vaktlista. `services.py` var 1 858 linjer, og to av seksjonene
+bar noe annet enn navnet: «Hvem får røre hva» inneholdt belastningen og
+planleggingstallene, og «Drift ved vaktas start» lesestiene KO og park bruker.
+
+**Etter domene, som `pauser.py`, `overnatting.py` og `fil.py` alt er:**
+
+| Fil | Linjer | Innhold |
+|---|---|---|
+| `services.py` | 769 | Tilgangen («hvem får røre hva»), kompetansestigen, planlagte vakter og kopiering |
+| `planlegger.py` | 441 | Grunnlaget for vaktlisten — `generer_grunnlag`, forhåndsvisningen, `Planleggerfeil` |
+| `belastning.py` | 283 | Timer, hvile, overlapp, `planleggingstall` |
+| `vaktdrift.py` | 410 | Drift ved start, og lesestiene: `besetning`, `ressurser_uten_enhet`, `ressurser_paa_vakt_naa`, `vaktliste_i_bruk` |
+
+**Retningen ble målt før snittet:** ingenting som ble igjen i `services.py` bruker de nye
+modulene, så `services` importerer ingen av dem — pilene går én vei, uten sirkel.
+Planleggeren bruker `belastning._timer`; lesestiene bruker `lister_i_drift` i samme fil.
+
+**Navnene ble prøvd mot hver identifikator i kodebasen.** `drift` er variabel i tre filer,
+`i_drift` en funksjon i `ko/program.py`, og `paa_vakt` en variabel i `ko/services.py` —
+alle tre ville skygget modulen der den skulle importeres. `vaktdrift` finnes ikke noe sted.
+
+**Ingen videresending i `services.py`.** Kallstedene ble skrevet om — 21 filer, også i
+`ko/` og `park/` — så hver funksjon har én adresse. En alias i `services` ville gitt to, og en
+`mock.patch` på den gamle hadde ikke truffet kall inne i den nye modulen.
+
+**Pyflakes ser ikke `services.navn_som_er_flyttet`** — et modulattributt prøves først når
+koden kjører. Derfor en egen kontroll: hver binding av de fire modulene i hele kodebasen,
+hvert `modul.attributt`, hver `from … import`, hver `patch.object` og hver
+`'vaktliste.services.X'`-streng slått opp mot den lastede modulen. **379 referanser.** Den
+fant tre `patch.object(services, …)` som ville gitt `AttributeError` — og før de ble pekt om,
+ble det kontrollert at kallene de skal treffe, slår opp gjennom modulen
+(`vaktdrift.sett_forfalte_i_drift()` i middlewaren, `MAKS_PLASSER_TOTALT` som global i
+`planlegger`), så patchene treffer det samme som før.
+
+**Bevisene:**
+
+| Hva | Resultat |
+|---|---|
+| AST for alle 71 definisjoner (62 funksjoner/klasser, 9 konstanter), uansett fil | **Identisk**; hver definert nøyaktig én gang |
+| De 21 omskrevne filene mot originalen, importene borte og `services.X`/`planlegger.X`/… normalisert til ett navn | **Identiske** — eneste forskjell er hvilken modul navnet slås opp i |
+| Referansekontrollen over | 379 av 379 finnes |
+| `pauser` og `intervaller`, som `services` ikke lenger importerer ved lasting | Ingen sideeffekter ved import |
+| Hele suiten mot PostgreSQL | 4 479 + 1 178, grønn |
+
+21 omtaler i dokumenter og kommentarer pekt om (`vaktliste.services.besetning` →
+`vaktliste.vaktdrift.besetning` osv.) — dokumentråte-testen sjekker symbolnavnet, ikke
+modulen, og ville ikke sagt fra.
+
+**G2 gjenstår:** `oppdrag/services.py`, etter G6b.
+
 ## 2026-10-14 — G2: `vaktliste/views.py` delt etter flate, sju filer  `#vaktliste` `#gjeld`
 
 **Hvorfor:** G2 i gjeldsplanen. `vaktliste/views.py` var 1 840 linjer — vokst fra 1 692 da

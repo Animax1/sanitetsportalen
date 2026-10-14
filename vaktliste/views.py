@@ -68,7 +68,7 @@ from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
-from . import choices, fil, overnatting, pauser, services
+from . import choices, fil, overnatting, pauser, services, vaktdrift
 from .models import Korps, Pause, Ressursgruppe, Ressursrolle, Vaktliste, Vaktpost
 
 
@@ -175,7 +175,7 @@ def _vaktliste_til_dict(vl, user):
     """`user` avgjør om feilteksten fra siste utsending sendes (B7). Påkrevd,
     ikke valgfri: et nytt endepunkt skal ikke kunne glemme den."""
     vis_feil = services.kan_skrive_alt(user)
-    autodrift = services.autodrift_tidspunkt(vl)
+    autodrift = vaktdrift.autodrift_tidspunkt(vl)
     return {
         'id': vl.pk,
         'vakt_navn': vl.vakt.navn,
@@ -340,8 +340,8 @@ def vaktlister_view(request):
 
     if request.method == 'GET':
         # Klokka først, så «— i drift» i velgeren stemmer fra første lasting
-        # etter start (30. sep. 2026, `services.sett_forfalte_i_drift`).
-        services.sett_forfalte_i_drift()
+        # etter start (30. sep. 2026, `vaktdrift.sett_forfalte_i_drift`).
+        vaktdrift.sett_forfalte_i_drift()
         # Arkiverte lister er ute av velgeren. `?arkiverte=1` gir dem, og
         # bare til global admin — det er hun som henter tilbake.
         if request.GET.get('arkiverte'):
@@ -455,7 +455,7 @@ def vaktliste_detalj_view(request, pk):
     # **Klokka går også her**, ikke bare i middlewaren (30. sep. 2026): den
     # sjekker høyst hvert minutt, og innsjekken skal være åpen i det første
     # trykket etter start.
-    if request.method == 'GET' and services.sett_i_drift_ved_start(vl):
+    if request.method == 'GET' and vaktdrift.sett_i_drift_ved_start(vl):
         vl.refresh_from_db()
 
     if request.method == 'DELETE':

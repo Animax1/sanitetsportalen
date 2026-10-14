@@ -682,7 +682,7 @@ def lag_som_kan_velges(vakt, hendelse=None):
     hendelsen skal ikke gjøre lista umulig å lagre — det tas av ved å utelates,
     ikke ved at alt annet nektes."""
     from vaktliste.models import Ressurs
-    from vaktliste.services import ressurser_paa_vakt_naa, vaktliste_i_bruk
+    from vaktliste.vaktdrift import ressurser_paa_vakt_naa, vaktliste_i_bruk
 
     liste = vaktliste_i_bruk()
     if liste is None:

@@ -181,7 +181,7 @@ Detaljene og de tre valgene bak `ressursApen` står i `CHANGELOG.md`.
 
 **Drift-automatikken (§3.3) er levert 30. sep. 2026:** klokka setter lista i drift ved
 vaktas start, én gang, og stenger den aldri; knappen står igjen som overstyring. Reglene i
-`vaktliste.services.skal_settes_i_drift()`, detaljene i `CHANGELOG.md`.
+`vaktliste.vaktdrift.skal_settes_i_drift()`, detaljene i `CHANGELOG.md`.
 
 ---
 

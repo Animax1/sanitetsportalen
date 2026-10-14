@@ -408,7 +408,7 @@ Ingen av disse gjør skade i dag. Hver av dem gjør neste endring dyrere.
 | Fil | Linjer | Merknad |
 |---|---|---|
 | `vaktliste/views.py` | 1 692 | *Levert 14. okt. 2026: sju filer, se CHANGELOG* |
-| `vaktliste/services.py` | 1 678 | |
+| `vaktliste/services.py` | 1 678 | *Levert 14. okt. 2026: `planlegger.py`, `belastning.py`, `vaktdrift.py` skilt ut, se CHANGELOG* |
 | `oppdrag/services.py` | 1 619 | |
 | `accounts/views.py` | 1 463 | `user_detail_view` er 216 linjer med åtte `action`-grener, og bør bli en dispatch-tabell. *Levert 13. okt. 2026, se CHANGELOG* |
 | `ko/views.py` | 1 394 | Deles etter flate, som `views_verdier` i oppdrag. *Levert 13. okt. 2026: seks filer, se CHANGELOG* |

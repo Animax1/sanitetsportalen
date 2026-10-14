@@ -135,7 +135,7 @@ def lagene():
     (`vaktliste_i_bruk`) — og bare grupper med rutingflagget (§3.4).
     """
     from vaktliste.models import Ressurs
-    from vaktliste.services import vaktliste_i_bruk
+    from vaktliste.vaktdrift import vaktliste_i_bruk
 
     liste = vaktliste_i_bruk()
     if liste is None:

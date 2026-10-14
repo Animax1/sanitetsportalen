@@ -29,7 +29,7 @@ setning på papiret, ikke som en 403 for hele utskriften.
 `_hendelse_til_dict` i `ko/views.py`, oppdragene av
 `oppdrag.views.sentralbord_liste`, tavla av `tavle.tavle_data`, programmet av
 `program.poster`, ressursene av `oppdrag.services.enhetskort_liste`,
-`vaktliste.services.besetning` og `ressurser_uten_enhet`. Det som legges til
+`vaktliste.vaktdrift.besetning` og `ressurser_uten_enhet`. Det som legges til
 her er bare utvalget (tidsvinduet, de åpne) og tidene som lokale tidspunkter —
 aldri en egen spørring som kan bli uenig med skjermen.
 
@@ -202,7 +202,7 @@ def ressurser_del(vakt, *, med_biler: bool, med_vaktliste: bool) -> dict:
 
     **Telefon og ISSI står på papiret** — det er det man trenger når
     sambandet eller portalen er borte. Samme felter som besetningen bak et
-    klikk på skjermen (`vaktliste.services.besetning`), ikke flere: notat og
+    klikk på skjermen (`vaktliste.vaktdrift.besetning`), ikke flere: notat og
     kompetanser står heller ikke der.
     """
     from oppdrag.models import Enhet
@@ -220,14 +220,14 @@ def ressurser_del(vakt, *, med_biler: bool, med_vaktliste: bool) -> dict:
             kort['besetning'] = None
             biler.append(kort)
         if med_vaktliste:
-            from vaktliste.services import besetning
+            from vaktliste.vaktdrift import besetning
             for kort in biler:
                 kort['besetning'] = besetning(kort['id'])
         # På vakt først, så av vakt — samme deling som sentralbordet.
         biler.sort(key=lambda k: not k['pa_vakt'])
     lag = []
     if med_vaktliste:
-        from vaktliste.services import ressurser_uten_enhet
+        from vaktliste.vaktdrift import ressurser_uten_enhet
         lag = ressurser_uten_enhet()
     return {'biler': biler, 'lag': lag, 'med_biler': med_biler, 'med_vaktliste': med_vaktliste}
 

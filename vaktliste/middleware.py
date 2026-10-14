@@ -6,7 +6,7 @@ maks én gang i minuttet per prosess, og selve sendingen i en bakgrunnstråd
 slik at ingen venter på AHASend. Under en vakt er det alltid trafikk; utenom
 vakt finnes ingen liste i drift, og da er det ingenting å sende.
 
-Reglene ligger i `fil.send_planlagte()` og `services.sett_forfalte_i_drift()`
+Reglene ligger i `fil.send_planlagte()` og `vaktdrift.sett_forfalte_i_drift()`
 — dette er bare klokka.
 """
 from __future__ import annotations
@@ -41,13 +41,13 @@ def maybe_send_planlagte() -> bool:
 
 def _kjor():
     global _kjorer
-    from . import fil, services
+    from . import fil, vaktdrift
     # **Drift ved vaktas start** (30. sep. 2026) går på samme klokke, og før
     # intervallsendingen: en liste som nettopp gikk i drift skal ikke få en
     # intervallfil i samme runde som driftfila. Hver for seg i try — en feil i
     # den ene skal ikke stoppe den andre.
     try:
-        services.sett_forfalte_i_drift()
+        vaktdrift.sett_forfalte_i_drift()
     except Exception:   # noqa: BLE001 — klokka skal aldri ta ned appen
         logger.exception('Automatisk drift av vaktlisten feilet')
     try:

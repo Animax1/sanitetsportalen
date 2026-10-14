@@ -2,7 +2,7 @@
 
 Løkka sto tre ganger i vaktlista: `statistikk.union` (bemannet tid per
 ressurs), `pauser._slaa_sammen` (lagets skiftspenn) og inne i
-`services._overlappstimer` (sum minus union). De to første var like; den
+`belastning._overlappstimer` (sum minus union). De to første var like; den
 tredje var skrevet om med `start`/`slutt` og egne kommentarer om hvilke
 mutanter som var ekvivalente. Tre kopier av samme regel er tre steder en
 retting kan glemmes.

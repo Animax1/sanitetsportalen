@@ -378,7 +378,7 @@ MAKS_DEKNINGSTIMER = 48
 def paa_vakt_per_time(start, vakt=None, antall=24) -> list[dict]:
     """Hvor mange av hver ressursgruppe vaktlista har på vakt, time for time
     i døgnet som begynner `start`. **Samme regel som resten av portalen**
-    (`vaktliste.services.ressurser_med_skift`) — planleggeren skal ikke ha sin
+    (`vaktliste.vaktdrift.ressurser_med_skift`) — planleggeren skal ikke ha sin
     egen mening om hvem som er på vakt.
 
     **Et lag i pause midt i timen er ikke på vakt den timen** (23. sep. 2026).
@@ -390,7 +390,7 @@ def paa_vakt_per_time(start, vakt=None, antall=24) -> list[dict]:
     Tjuefire spørringer, én per time: svaret hentes når planleggeren åpnes
     eller bytter døgn, ikke ved hver poll.
     """
-    from vaktliste.services import ressurser_med_skift, vaktliste_i_bruk
+    from vaktliste.vaktdrift import ressurser_med_skift, vaktliste_i_bruk
 
     from .tavle import effektive_pauser
 

@@ -62,7 +62,7 @@ skjerm i et kommandopunkt.
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | «Vis»-menyen over ressurslista | `oppdaterSynlighetsmeny()` i `static/js/oppdrag-kort.js`, `templates/oppdrag/_synlighetsmeny.html` |
-| Vaktlistas ressurser uten enhet | `vaktliste.services.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
+| Vaktlistas ressurser uten enhet | `vaktliste.vaktdrift.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
 
 ## Hendelsesloggen og loggstrømmen i nettleseren
 

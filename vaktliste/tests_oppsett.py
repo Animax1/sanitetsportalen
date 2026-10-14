@@ -26,7 +26,7 @@ from core.models import Vakt
 from oppdrag.models import Enhet
 from core.models import AppSetting
 
-from . import choices, services
+from . import choices, services, vaktdrift
 from .test_helpers import (KO, LAG, MANNSKAPSBIL, SAMLEPLASS, gruppe,
                            lag_ressurs, lag_rolle)
 from .models import (Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste,
@@ -1136,8 +1136,8 @@ class ArkiveringAvVaktlisteTests(ApiTests):
         Vakt.objects.filter(pk=levende.vakt_id).update(er_aktiv=True)
         AppSetting.set('aktiv_vakt_id', str(levende.vakt_id))
 
-        self.assertNotEqual(services.vaktliste_i_bruk(), arkivert)
-        besetning = services.besetning(enhet.pk)
+        self.assertNotEqual(vaktdrift.vaktliste_i_bruk(), arkivert)
+        besetning = vaktdrift.besetning(enhet.pk)
         self.assertEqual(besetning['ressurs_navn'] if besetning else None, 'Bil levende')
         AppSetting.set(fil.MOTTAKERE_NOKKEL, 'a@example.com')
         AppSetting.set(fil.INTERVALL_NOKKEL, '30')
@@ -1158,8 +1158,8 @@ class ArkiveringAvVaktlisteTests(ApiTests):
         enhet = Enhet.objects.create(navn='Sola 56')
         self._ressurs(gammel, 'A-bil', enhet=enhet)
         self._ressurs(ny, 'B-bil', enhet=enhet)
-        self.assertEqual(services.vaktliste_i_bruk().pk, ny.pk)
-        self.assertEqual(services.besetning(enhet.pk)['ressurs_navn'], 'B-bil')
+        self.assertEqual(vaktdrift.vaktliste_i_bruk().pk, ny.pk)
+        self.assertEqual(vaktdrift.besetning(enhet.pk)['ressurs_navn'], 'B-bil')
 
     def test_bare_global_admin(self):
         vl = self._liste('Testvakten')

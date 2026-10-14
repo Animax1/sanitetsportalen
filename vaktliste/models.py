@@ -602,7 +602,7 @@ class Vaktliste(BaseTimeStampedModel):
     # klokka — uten det ville en tom `satt_i_drift_av` ikke kunne skilles fra
     # en konto som er slettet. `db_default`: gammel kode lager rader uten
     # feltet i release-vinduet, som `core/0012`. Reglene står i
-    # `services.skal_settes_i_drift()`.
+    # `vaktdrift.skal_settes_i_drift()`.
     drift_automatisk = models.BooleanField(
         default=False, db_default=False,
         verbose_name='Satt i drift automatisk')

@@ -14,7 +14,7 @@ from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import modul_kreves
 from core.ratelimit import rate_limit
 
-from . import pauser, services
+from . import belastning, pauser, planlegger, services
 from .models import Belastningsgrenser, Korps, Pause, Ressurs, Vaktliste
 from .views import _nektet, _int, _tid
 
@@ -31,28 +31,28 @@ def _planleggerlinjer(data):
     """
     linjer = data.get('linjer')
     if not isinstance(linjer, list):
-        raise services.Planleggerfeil('Oppsettet mangler.')
+        raise planlegger.Planleggerfeil('Oppsettet mangler.')
     ut = []
     for raa in linjer:
         if not isinstance(raa, dict):
-            raise services.Planleggerfeil('Ugyldig linje i oppsettet.')
+            raise planlegger.Planleggerfeil('Ugyldig linje i oppsettet.')
         vinduer = raa.get('vinduer')
         if not isinstance(vinduer, list) or not vinduer:
-            raise services.Planleggerfeil(
+            raise planlegger.Planleggerfeil(
                 'Hver enhet må ha minst ett skiftvindu.')
         lest = []
         for vindu in vinduer:
             if not isinstance(vindu, dict):
-                raise services.Planleggerfeil('Ugyldig skiftvindu.')
+                raise planlegger.Planleggerfeil('Ugyldig skiftvindu.')
             fra, til = _tid(vindu.get('fra')), _tid(vindu.get('til'))
             if fra is None or til is None:
-                raise services.Planleggerfeil(
+                raise planlegger.Planleggerfeil(
                     'Skiftvinduet mangler fra- eller til-tidspunkt.')
             # **Ett vindu er ett skift**, og **plassene hører til vinduet**
             # (15. sep. 2026): samleplassen kan ha seks 14–22 og to 22–06, og
             # det er én ressurs med to vinduer — ikke to samleplasser. Feltet
             # `skiftlengde`, som delte vinduet i bolker, er fjernet.
-            # Rå verdi videre: `services._linjens_skift()` eier regelen, og
+            # Rå verdi videre: `planlegger._linjens_skift()` eier regelen, og
             # et `_int(...) or 1` her ville gjort et eksplisitt `0` til 1 før
             # den fikk se det.
             lest.append({'fra': fra, 'til': til,
@@ -61,7 +61,7 @@ def _planleggerlinjer(data):
             # **`ressurs_id` gjør linja til en redigering** (15. sep. 2026):
             # planleggeren leser oppsettet tilbake fra vaktlista, så et andre
             # trykk retter det som ble laget i stedet for å lage det på nytt.
-            # Gruppa og navnet følger da ressursen — se `services._planlegg`.
+            # Gruppa og navnet følger da ressursen — se `planlegger._planlegg`.
             'ressurs_id': _int(raa.get('ressurs_id')),
             'gruppe_id': _int(raa.get('gruppe_id')),
             'antall': _int(raa.get('antall')) or 1,
@@ -109,10 +109,10 @@ def generer_view(request, pk):
     try:
         linjer = _planleggerlinjer(data)
         if data.get('forhaandsvis'):
-            svar = services.forhaandsvis_grunnlag(vl, linjer)
+            svar = planlegger.forhaandsvis_grunnlag(vl, linjer)
         else:
-            svar = services.generer_grunnlag(vl, linjer)
-    except services.Planleggerfeil as feil:
+            svar = planlegger.generer_grunnlag(vl, linjer)
+    except planlegger.Planleggerfeil as feil:
         return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': svar})
 
@@ -193,7 +193,7 @@ def belastning_view(request, pk):
     # parameter som kunne flytte den avgrensningen ville vært en dør.
     korps_id = (_int(request.GET.get('korps'))
                 if services.ser_alle_korps(request.user) else None)
-    rader = services.belastning_per_person(
+    rader = belastning.belastning_per_person(
         vl, grenser, user=request.user, korps_id=korps_id)
     # **Budsjettallene følger med her, uten et eget kall.** Fanen henter
     # allerede dette svaret, og to runder til serveren for tall som tegnes
@@ -204,11 +204,11 @@ def belastning_view(request, pk):
     # vært et aggregat over skift hun ikke får se. Det er samme regel som
     # statistikkmodulen bruker: aggregater gir avledet innsyn, og skal gates
     # der dataene bor.
-    planlegging = (services.planleggingstall(vl)
+    planlegging = (belastning.planleggingstall(vl)
                    if services.ser_alle_korps(request.user) else None)
     return JsonResponse({'status': 'ok', 'data': {
         'personer': rader,
-        'sammendrag': services.belastning_sammendrag(
+        'sammendrag': belastning.belastning_sammendrag(
             vl, rader, user=request.user, korps_id=korps_id),
         'planlegging': planlegging,
         'kan_sette_tak': services.kan_lede(request.user),

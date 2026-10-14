@@ -7,7 +7,7 @@ kan skjule, og en regel i planleggeren nå.
 """
 from core.models import AppSetting
 
-from . import fil, pauser, services
+from . import belastning, fil, pauser, planlegger, services
 from .models import Pause, Vaktpost
 from .tests_planlegger import kl
 from .tests_tilgang import TilgangsBasis
@@ -72,9 +72,9 @@ class PausereglerTests(_Pauser):
 
     def test_pausen_teller_i_timene(self):
         """André: «ja» — ingen fratrekk. Belastningen er den samme før og etter."""
-        foer = services.planleggingstall(self.vl)
+        foer = belastning.planleggingstall(self.vl)
         pauser.lagre(self.r, kl(2, 18), kl(2, 19))
-        self.assertEqual(services.planleggingstall(self.vl), foer)
+        self.assertEqual(belastning.planleggingstall(self.vl), foer)
 
 
 class PauseportTests(_Pauser):
@@ -147,7 +147,7 @@ class RegelpauseTests(TilgangsBasis):
 
     def test_forskjoevet_ut_av_skiftet_er_en_feil_ikke_en_utelatelse(self):
         pauser.regelpause(kl(2, 14), kl(2, 22), etter_min=240, lengde_min=60, indeks=3)
-        with self.assertRaisesRegex(services.Planleggerfeil, 'får ikke plass'):
+        with self.assertRaisesRegex(planlegger.Planleggerfeil, 'får ikke plass'):
             pauser.regelpause(kl(2, 14), kl(2, 22), etter_min=240, lengde_min=60, indeks=4)
 
     def test_les_regel(self):
@@ -157,12 +157,12 @@ class RegelpauseTests(TilgangsBasis):
         self.assertEqual(pauser.les_regel({'pause_min': 30, 'pause_etter_min': 0, 'pause_forskyv': False}),
                          (0, 30, False))
         for halv in ({'pause_min': 30}, {'pause_etter_min': 240}, {'pause_min': 30, 'pause_etter_min': ''}):
-            with self.subTest(halv=halv), self.assertRaisesRegex(services.Planleggerfeil, 'både lengde'):
+            with self.subTest(halv=halv), self.assertRaisesRegex(planlegger.Planleggerfeil, 'både lengde'):
                 pauser.les_regel(halv)
         for feil in ({'pause_min': 30}, {'pause_etter_min': 240}, {'pause_min': 'x', 'pause_etter_min': 1},
                      {'pause_min': 4, 'pause_etter_min': 1}, {'pause_min': 241, 'pause_etter_min': 1},
                      {'pause_min': 30, 'pause_etter_min': -1}, {'pause_min': 30, 'pause_etter_min': 24 * 60 + 1}):
-            with self.subTest(feil=feil), self.assertRaises(services.Planleggerfeil):
+            with self.subTest(feil=feil), self.assertRaises(planlegger.Planleggerfeil):
                 pauser.les_regel(feil)
         self.assertEqual(pauser.les_regel({'pause_min': 5, 'pause_etter_min': 24 * 60})[:2], (24 * 60, 5))
         self.assertEqual(pauser.les_regel({'pause_min': 240, 'pause_etter_min': 0})[1], 240)
@@ -190,7 +190,7 @@ class PlanleggerensPauseregelTests(TilgangsBasis):
                 for r in self.vl2.ressurser.order_by('navn')}
 
     def test_tre_lag_tar_pause_etter_hverandre(self):
-        svar = services.generer_grunnlag(self.vl2, [self._linje()])
+        svar = planlegger.generer_grunnlag(self.vl2, [self._linje()])
         self.assertEqual(svar['pauser'], 3)
         self.assertEqual(self._pauser(), {
             'Lag 1': [(kl(2, 18), kl(2, 18, 30), True)],
@@ -201,13 +201,13 @@ class PlanleggerensPauseregelTests(TilgangsBasis):
         self.assertEqual((r.pause_etter_min, r.pause_min, r.pause_forskyv), (240, 30, True))
 
     def test_samtidig_naar_forskyvningen_er_av(self):
-        services.generer_grunnlag(self.vl2, [self._linje(pause_forskyv=False)])
+        planlegger.generer_grunnlag(self.vl2, [self._linje(pause_forskyv=False)])
         self.assertEqual({v[0][0] for v in self._pauser().values()}, {kl(2, 18)})
         self.assertEqual(set(self.vl2.ressurser.values_list('pause_forskyv', flat=True)), {False})
 
     def test_et_forskjoevet_lag_legger_seg_etter_dem_paa_samtidig(self):
         """To lag på «samtidig» tar 18:00; det forskjøvne tar neste ledige."""
-        services.generer_grunnlag(self.vl2, [self._linje(antall=2, pause_forskyv=False),
+        planlegger.generer_grunnlag(self.vl2, [self._linje(antall=2, pause_forskyv=False),
                                              self._linje(antall=1)])
         self.assertEqual(sorted(v[0][0] for v in self._pauser().values()),
                          [kl(2, 18), kl(2, 18), kl(2, 19)])
@@ -215,18 +215,18 @@ class PlanleggerensPauseregelTests(TilgangsBasis):
     def test_forskyvningen_telles_paa_tvers_av_linjene_saa_tilbakelesingen_holder(self):
         """Leses oppsettet tilbake, er hvert lag sin egen linje. Da skal lag to
         fortsatt ta pause etter lag én, ikke samtidig."""
-        services.generer_grunnlag(self.vl2, [self._linje()])
+        planlegger.generer_grunnlag(self.vl2, [self._linje()])
         linjer = [{'ressurs_id': r.pk, 'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 4}],
                    'pause_min': 30, 'pause_etter_min': 240}
                   for r in self.vl2.ressurser.order_by('rekkefolge')]
         foer = self._pauser()
-        services.generer_grunnlag(self.vl2, linjer)
+        planlegger.generer_grunnlag(self.vl2, linjer)
         self.assertEqual(self._pauser(), foer)
 
     def test_en_annen_gruppe_og_en_annen_skiftstart_forskyves_ikke_sammen(self):
         from .test_helpers import AMBULANSE
         from .test_helpers import gruppe
-        services.generer_grunnlag(self.vl2, [
+        planlegger.generer_grunnlag(self.vl2, [
             self._linje(antall=1),
             self._linje(antall=1, gruppe_id=gruppe(AMBULANSE).pk),
             self._linje(antall=1, vinduer=[{'fra': kl(2, 15), 'til': kl(2, 23), 'plasser': 2}]),
@@ -235,34 +235,34 @@ class PlanleggerensPauseregelTests(TilgangsBasis):
         self.assertEqual(starter, [kl(2, 18), kl(2, 18), kl(2, 19)])
 
     def test_regenerering_lager_regelpausene_paa_nytt_og_lar_lederens_staa(self):
-        services.generer_grunnlag(self.vl2, [self._linje(antall=1)])
+        planlegger.generer_grunnlag(self.vl2, [self._linje(antall=1)])
         r = self.vl2.ressurser.get()
         egen = pauser.lagre(r, kl(2, 20), kl(2, 20, 30))
         linje = {'ressurs_id': r.pk, 'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 4}],
                  'pause_min': 30, 'pause_etter_min': 300}
-        services.generer_grunnlag(self.vl2, [linje])
+        planlegger.generer_grunnlag(self.vl2, [linje])
         self.assertEqual(self._pauser()['Lag 1'],
                          [(kl(2, 19), kl(2, 19, 30), True), (kl(2, 20), kl(2, 20, 30), False)])
         self.assertTrue(Pause.objects.filter(pk=egen.pk).exists())
         # Regelen tatt bort: regelpausene går, lederens står.
-        services.generer_grunnlag(self.vl2, [dict(linje, pause_min='', pause_etter_min='')])
+        planlegger.generer_grunnlag(self.vl2, [dict(linje, pause_min='', pause_etter_min='')])
         self.assertEqual(self._pauser()['Lag 1'], [(kl(2, 20), kl(2, 20, 30), False)])
         r.refresh_from_db()
         self.assertIsNone(r.pause_min)
 
     def test_en_regelpause_oppaa_lederens_hoppes_over(self):
-        services.generer_grunnlag(self.vl2, [self._linje(antall=1)])
+        planlegger.generer_grunnlag(self.vl2, [self._linje(antall=1)])
         r = self.vl2.ressurser.get()
         Pause.objects.filter(ressurs=r).delete()
         pauser.lagre(r, kl(2, 18, 15), kl(2, 18, 45))
         linje = {'ressurs_id': r.pk, 'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 4}],
                  'pause_min': 30, 'pause_etter_min': 240}
-        self.assertEqual(services.forhaandsvis_grunnlag(self.vl2, [linje])['pauser'], 0)
-        services.generer_grunnlag(self.vl2, [linje])
+        self.assertEqual(planlegger.forhaandsvis_grunnlag(self.vl2, [linje])['pauser'], 0)
+        planlegger.generer_grunnlag(self.vl2, [linje])
         self.assertEqual(self._pauser()['Lag 1'], [(kl(2, 18, 15), kl(2, 18, 45), False)])
 
     def test_forhaandsvisningen_skriver_ingenting(self):
-        svar = services.forhaandsvis_grunnlag(self.vl2, [self._linje()])
+        svar = planlegger.forhaandsvis_grunnlag(self.vl2, [self._linje()])
         self.assertEqual((svar['pauser'], [ln['pauser'] for ln in svar['linjer']]), (3, [1, 1, 1]))
         self.assertFalse(Pause.objects.exists())
 
@@ -319,7 +319,7 @@ class PausenePaaEpostTests(_Pauser):
         self.assertNotEqual(fil.signatur(fil.rader_for(self.vl)), foer)
 
     def test_timeoversikten_er_uendret(self):
-        rader = services.belastning_per_person(self.vl)
+        rader = belastning.belastning_per_person(self.vl)
         pauser.lagre(self.r, kl(2, 18), kl(2, 19))
-        self.assertEqual(services.belastning_per_person(self.vl), rader)
+        self.assertEqual(belastning.belastning_per_person(self.vl), rader)
 

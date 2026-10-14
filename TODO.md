@@ -209,8 +209,7 @@ virkeligheten, og rekkefølgen under følger av det.*
       server-status i §9** (14. okt. 2026), før staging gjenopprettes.
 - [ ] **Etter vakta:** arkivering, «Broer i oppdrag» på server-status, deretter G6b — og G6c i
       en *senere* `main`-push (se under).
-- [ ] **G2 (store filer): `vaktliste/services.py` og `oppdrag/services.py` gjenstår — men
-      ikke `oppdrag/services.py` før G6b**, ellers
+- [ ] **G2 (store filer): `oppdrag/services.py` gjenstår — men ikke før G6b**, ellers
       skrives samme fil om to ganger med vakta imellom. Metoden fra `accounts/views.py` og
       `ko/views.py` (CHANGELOG 13. okt. 2026): AST per toppnivånavn og rutekart før og
       etter, og en differensialtest mot den gamle fila.
@@ -619,7 +618,7 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 - [ ] **Del 1: timeregnskap og betaling.** *Anbefales.* Timer per mannskap, korps og
       rolle, med kr/time og sum per korps. Mye finnes alt —
-      `vaktliste.services.belastning_per_person()` regner timene, og `Vaktpost.probono`
+      `vaktliste.belastning.belastning_per_person()` regner timene, og `Vaktpost.probono`
       bærer allerede skillet «går, men telles ikke i timene».
       **Krever en avgjørelse først:** plan eller faktisk som fakturagrunnlag (§2.2), og om
       rapporter skal **fryses** (§2.4). Uten frysing er ikke et fakturagrunnlag

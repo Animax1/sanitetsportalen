@@ -65,13 +65,13 @@ def ressurser_paa_tavla(naa=None, *, med_biler=True):
 
     Bilene er vaktlistas ressurser **med** oppdragsenhet, og de er på vakt når
     enheten er det (`Enhet.pa_vakt`): «bilene styres ikke herfra; de skrus av
-    og på av KO» (`vaktliste.services.ressurser_paa_vakt_naa`). En bil uten
+    og på av KO» (`vaktliste.vaktdrift.ressurser_paa_vakt_naa`). En bil uten
     ressurs i vaktlista har ingen gruppe å filtrere på, og står ikke på tavla.
     """
     from django.db.models import Q
 
     from vaktliste.models import Ressurs
-    from vaktliste.services import ressurser_paa_vakt_naa, vaktliste_i_bruk
+    from vaktliste.vaktdrift import ressurser_paa_vakt_naa, vaktliste_i_bruk
 
     liste = vaktliste_i_bruk()
     if liste is None:
@@ -388,7 +388,7 @@ def paa_vakt_ved(ressurs, tidspunkt, naa) -> bool:
     skift i vaktlista som dekker starten** — en plan for i morgen gjelder laget
     som går vakt i morgen, ikke det som står på tavla nå. Samme regel for
     skiftene som resten av portalen (`ressurser_med_skift`)."""
-    from vaktliste.services import ressurser_med_skift, vaktliste_i_bruk
+    from vaktliste.vaktdrift import ressurser_med_skift, vaktliste_i_bruk
 
     if ressurs.pk in {r.pk for r in ressurser_paa_tavla(naa)}:
         return True
@@ -485,7 +485,7 @@ def effektive_pauser(vakt, liste=None) -> list[dict]:
     stått dobbelt.
     """
     from vaktliste.models import Pause
-    from vaktliste.services import vaktliste_i_bruk
+    from vaktliste.vaktdrift import vaktliste_i_bruk
 
     ko = list(PlanlagtPause.objects.filter(vakt=vakt))
     overtatt = {q.fra_vaktliste_id for q in ko if q.fra_vaktliste_id}
@@ -786,7 +786,7 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
 
 def _planbare(med_biler) -> list[dict]:
     from vaktliste.models import Ressurs
-    from vaktliste.services import vaktliste_i_bruk
+    from vaktliste.vaktdrift import vaktliste_i_bruk
 
     liste = vaktliste_i_bruk()
     if liste is None:

@@ -436,7 +436,7 @@ class DekningTests(_Program):
         self.assertEqual(program.paa_vakt_per_time(self.start)[16]['grupper'], {})
 
     def test_samme_regel_som_vaktlista_og_lagene_er_fortsatt_uten_biler(self):
-        from vaktliste.services import ressurser_med_skift, ressurser_paa_vakt_naa
+        from vaktliste.vaktdrift import ressurser_med_skift, ressurser_paa_vakt_naa
         self._skift(self.lag1, 16, 18)
         self._skift(self.bil, 16, 18)
         t = self.start + timedelta(hours=17)

@@ -14,7 +14,7 @@ from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import har_tilgang, modul_kreves
 from core.ratelimit import rate_limit
 
-from . import services
+from . import services, vaktdrift
 from .models import Mannskap, Ressurs, Ressursgruppe, Vaktliste, Vaktpost
 from .views import _ukjent_peker, _nektet, _int, _tid, _ressurs_til_dict, _vaktpost_til_dict
 
@@ -105,7 +105,7 @@ def ressurser_uten_enhet_view(request):
     if not (services.ser_alle_korps(request.user)
             or har_tilgang(request.user, 'oppdrag', 'les')):
         return json_feil('Listen viser alle korps, og du ser bare ditt eget.', status=403)
-    return JsonResponse({'status': 'ok', 'data': services.ressurser_uten_enhet()})
+    return JsonResponse({'status': 'ok', 'data': vaktdrift.ressurser_uten_enhet()})
 
 
 # ── Koblingen til /oppdrag (fase 6) ──────────────────────────────────────────
@@ -138,7 +138,7 @@ def besetning_view(request, pk):
     if not (services.ser_alle_korps(request.user)
             or har_tilgang(request.user, 'oppdrag', 'les')):
         return json_feil('Besetningen viser alle korps, og du ser bare ditt eget.', status=403)
-    data = services.besetning(pk)
+    data = vaktdrift.besetning(pk)
     if data is not None:
         return JsonResponse({'status': 'ok', 'data': data})
 
@@ -147,7 +147,7 @@ def besetning_view(request, pk):
     # finner besetningen er at bilen er koblet i en vakt man har *planlagt*,
     # mens sentralbordet står i den aktive. Da er ikke oppsettet feil; det er
     # feil vakt som er aktiv, og det er noe helt annet å rette.
-    annen = services.koblet_i_annen_vakt(pk)
+    annen = vaktdrift.koblet_i_annen_vakt(pk)
     if annen:
         return json_feil(
             f'Enheten er koblet i vaktlisten for «{annen}», som verken er i '

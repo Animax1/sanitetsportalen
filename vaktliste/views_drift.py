@@ -17,7 +17,7 @@ from core.jsonkropp import json_body, json_feil
 from core.auth_decorators import modul_kreves
 from core.ratelimit import rate_limit
 
-from . import choices, fil, services
+from . import choices, fil, services, vaktdrift
 from .models import Utsending, Vaktliste, Vaktpost
 from .views import _nektet, _vaktliste_til_dict, _vaktpost_til_dict
 
@@ -178,7 +178,7 @@ def stempling_view(request, pk, handling):
 
     # Klokka før porten: første stempel etter start skal ikke få 409 fordi
     # middlewaren ennå ikke har sjekket (30. sep. 2026).
-    if services.sett_i_drift_ved_start(vp.ressurs.vaktliste):
+    if vaktdrift.sett_i_drift_ved_start(vp.ressurs.vaktliste):
         vp.ressurs.vaktliste.refresh_from_db()
     if not vp.ressurs.vaktliste.i_drift:
         return json_feil(

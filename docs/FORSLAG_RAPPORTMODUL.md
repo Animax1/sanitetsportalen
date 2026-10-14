@@ -35,7 +35,7 @@ kommer først når noen trykker **«Generer rapport»**.
 
 ### 2.1 Det meste finnes allerede
 
-Se `vaktliste/services.py`:
+Se `vaktliste/belastning.py` (skilt ut av `services.py` 14. okt. 2026):
 
 | Finnes i dag | Hva den gjør |
 |---|---|
@@ -46,7 +46,7 @@ Se `vaktliste/services.py`:
 | `Vaktpost.rolle` | Aksen «per rolle» |
 | **`Vaktpost.probono`** | **Skiftet går, men telles ikke i timene** |
 
-Kommentaren ved `probono` i `services.py` sier:
+Kommentaren ved `probono` i `belastning.py` sier:
 
 > «Probono telles ikke i timene, men i alt annet. **Summen er det organisasjonen betaler
 > for**; lengste skift og korteste hvile er hva kroppen tåler.»

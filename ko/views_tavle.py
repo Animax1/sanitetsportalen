@@ -227,7 +227,7 @@ def _tavle_pause(request, ref):
     ref = str(ref)
     if ref.startswith(tavle.VAKTLISTE_PREFIKS):
         from vaktliste.models import Pause
-        from vaktliste.services import vaktliste_i_bruk
+        from vaktliste.vaktdrift import vaktliste_i_bruk
 
         liste = vaktliste_i_bruk()
         pk = _heltall_eller_none(ref[len(tavle.VAKTLISTE_PREFIKS):])
