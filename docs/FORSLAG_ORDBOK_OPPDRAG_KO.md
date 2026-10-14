@@ -128,3 +128,45 @@ ordboka, og det hører hjemme i en egen runde. Ordboka gjør det synlig, den lø
    tavlen og «Nytt oppdrag».
 
 Anslag: A og B er rundt 100 etiketter og én pulje. C og D er et titalls til.
+
+## 4. Avgjørelsene (André, 14. okt. 2026)
+
+| | Svar |
+|---|---|
+| **A** | **Ja** — -en-form i hele portalen |
+| **B** | **Endret:** samlingen heter «ressurser», én konkret heter «enhet». Se under |
+| **C** | **2** — «Trenger ressurs» står som fagord, navngitt unntak i vakten |
+| **D** | **1** — «oppdragslisten» i `/oppdrag/`; «tavlen» bare i `/ko/` |
+| **E** | **1** — «Enhetstyper» og «Ressurstyper» står ulike; om de skal være én liste er en egen sak |
+
+**B ble ikke som foreslått, og det var forslaget som var for grovt.** «Ressursoversikt»
+viser alle enhetene gruppert etter type — ambulanse, mannskapsbil, lege — og *er* en oversikt
+over ressursene. André: «innenfor ressursen ambulanse så har du enheter hvor Ambulanse A er
+én enhet og Ambulanse B er en annen enhet.» Regelen er derfor:
+
+| Ord | Betyr | Eksempel |
+|---|---|---|
+| **ressurser** (flertall) | alt vi har å sette inn, på tvers av typene | «Ressursoversikt», «Ressurser» på sentralbordet |
+| **ressurs / ressurstype** | hva slags | ambulanse, mannskapsbil, lag |
+| **enhet** | én konkret | Ambulanse A, Karmøy 51, Lag 3 |
+
+Det henger sammen med vaktlistas «ressurs er typen, enhet er den konkrete», og «Trenger
+ressurs» (C) passer inn: det betyr «trenger noe å sende», ikke en bestemt bil.
+
+**Hva B da betyr i praksis:**
+
+| Står | Blir |
+|---|---|
+| KO: vinduet «Ressursoversikt» | **står** |
+| Sentralbordet: overskriften «Ressurser» | **står** |
+| KO-tavlen: kolonnen «Ressurs» (én rad er én enhet) | «Enhet» |
+| «Ukjent ressurs» | «Ukjent enhet» |
+| «Ressursen finnes ikke lenger i vaktlista» | «Enheten finnes ikke lenger i vaktlisten» |
+| «Vaktlistas ressurser uten oppdragsenhet — de som får oppdrag muntlig på samband» | «Vaktlistens enheter uten delt konto — de som får oppdrag muntlig på samband» |
+| «Lag» | **står** |
+
+**Vakten må kunne skille de to**, ellers «retter» neste gjennomgang «Ressursoversikt»:
+flertallet og sammensetningene for samlingen står i en tillatt-liste med denne begrunnelsen,
+og entall om én konkret ting er et gammelt ord.
+
+*Rettelse til §2 B: «Enheter» i KO-vinduet er en knapp som åpner enhetsadministrasjonen, ikke en fane.*

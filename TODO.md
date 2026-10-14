@@ -35,13 +35,6 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Svar på ordboka for `/oppdrag/` og `/ko/` — fem spørsmål, A–E i
-      `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md`** (kartlagt 14. okt. 2026). Vaktlista fikk
-      ordboka 30. sep.; de to andre modulene viser de samme bilene og lagene med andre ord
-      — «Ressurser» over Karmøy 51 på sentralbordet, «tavla» om to ulike ting. A og B er
-      mekaniske når du har sagt ja (rundt 100 etiketter); C («Trenger ressurs» som fagord?)
-      og D («tavla» i `/oppdrag/`) er dine ord å velge. Anbefalingene står ved hvert
-      spørsmål. Ingenting bygges før svarene er der.
 - [ ] **Feltprøv Wake Lock på bilskjermen** (på staging fra 9. okt. 2026 — kan ikke prøves i
       node). En iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring —
       én gang med strømsparing av, én gang på. Trykk på skjermen først (låsen hentes ved
@@ -315,6 +308,15 @@ skjermen), 4 («Del ut») og 5 (veiledningen) er levert — CHANGELOG 30. sep. o
         sluttsteget i planleggeren. Tilgangsmatrisen §16 har en ny rad.
       - **Pulje 5**: §1 «Veiledningen» — lenken i vaktlinjen, egen del pekt ut per rolle,
         og at den leses på telefon.
+
+- [ ] **Bygg ordboka i `/oppdrag/` og `/ko/` — avgjort 14. okt. 2026.** Svarene og
+      regelen står i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md` §4: **samlingen heter «ressurser»,
+      én konkret heter «enhet»** (André: «innenfor ressursen ambulanse så har du enheter hvor
+      Ambulanse A er én enhet»). «Ressursoversikt» og sentralbordets «Ressurser» står;
+      «Ukjent ressurs», tavlens kolonne «Ressurs» og liknende entall blir «enhet». -en-form i
+      hele portalen, «Trenger ressurs» står som fagord, «oppdragslisten» i `/oppdrag/`,
+      typelistene beholder hvert sitt navn. Leseren i `vaktliste/tests_ordboka.py` flyttes til
+      `core` og får en vakt per modul, med tillatt-lista for samlingen. Staging før `main`.
 
 ### Vaktlista: nedtrekket i «Rediger skift» — bevisst ufiltrert (14. sep. 2026)
 

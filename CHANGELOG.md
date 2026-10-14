@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Ordboka avgjort: «ressurser» er samlingen, «enhet» er den ene — «Ambulanse A er én enhet»  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
+
+André svarte på de fem spørsmålene i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md` (§4):
+**A** ja, -en-form i hele portalen; **C** «Trenger ressurs» står som fagord; **D**
+«oppdragslisten» i `/oppdrag/`, «tavlen» bare i KO; **E** «Enhetstyper» og «Ressurstyper»
+står ulike.
+
+**B ble ikke som foreslått.** Forslaget ville gjort «Ressursoversikt» til «Enhetsoversikt».
+André: «i ressursoversikt er det flere typer ressurser som ambulanse, mannskapsbil, lege» og
+«innenfor ressursen ambulanse så har du enheter hvor Ambulanse A er én enhet og Ambulanse B
+er en annen enhet». Regelen ble: **samlingen heter «ressurser», én konkret heter «enhet»**.
+«Ressursoversikt» og sentralbordets «Ressurser» står; entall om én ting — «Ukjent ressurs»,
+tavlens kolonne «Ressurs» — blir «enhet». Det henger sammen med vaktlistas «ressurs er
+typen», og «Trenger ressurs» passer inn.
+
+Ingenting er bygget ennå. TODO-punktet er flyttet ut av «Krever Andre» (det blokkerer ikke
+lenger) og skrevet om til byggepunktet, med regelen for vakten: en tillatt-liste for
+samlingen, så neste gjennomgang ikke «retter» «Ressursoversikt».
+
 ## 2026-10-14 — Ordboka i `/oppdrag/` og `/ko/` kartlagt: fem spørsmål til André  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
 
 **Ingenting er endret i grensesnittet** — dette er kartleggingen, skrevet som
