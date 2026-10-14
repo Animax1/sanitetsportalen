@@ -50,25 +50,31 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 - [ ] **Les `/personvern/` på staging, og få teksten godkjent for Kverneland Røde Kors før
       den går til `main`** (12. okt. 2026). Det er korpset som er behandlingsansvarlig, og
-      siden taler på korpsets vegne. Sjekk samtidig at **personvern@sanitet.net** finnes og
-      at noen leser den — siden lover svar innen en måned. Teksten står i
+      siden taler på korpsets vegne. Siden lover svar innen en måned på
+      **personvern@sanitet.net** (egen innboks hos Proton fra 14. okt.). Teksten står i
       `core/templates/core/personvern.html`; tallene hentes fra koden.
 
 - [ ] **Databehandleravtale mellom Kverneland Røde Kors og deg** (art. 28). Du eier og drifter
       portalen og kart.sanitet.net, korpset er behandlingsansvarlig — da er du databehandler,
       og forholdet skal stå i en skriftlig avtale: hva du behandler, at du bare gjør det etter
       korpsets instruks, taushetsplikt, sikkerhet, avvik, sletting når samarbeidet slutter, og
-      at korpset godkjenner leverandørene (Railway, Scaleway, Cloudflare, AhaSend) som
+      at korpset godkjenner leverandørene (Railway, Scaleway, AhaSend, Proton) som
       underdatabehandlere. **Utkast:** [`docs/DATABEHANDLERAVTALE_UTKAST.md`](./docs/DATABEHANDLERAVTALE_UTKAST.md)
       (13. okt. 2026), dekker begge appene; de åpne punktene står nederst i den. Før den inn i A.1/A.2 når den er signert.
       **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
 
-- [ ] **Cloudflare og AhaSend inn i behandlingsprotokollen** (A.2 og A.8). Begge behandler
-      personopplysninger og står navngitt på `/personvern/`, men ikke i protokollen.
-      **Cloudflare** står foran Railway og terminerer TLS, så all trafikk går gjennom den i
-      klartekst: finn avtalegrunnlaget (art. 28) for kontoen, og vurder A.8s «ingen overføring
-      utenfor EU/EØS» — Cloudflare er amerikansk med et globalt nett. **AhaSend:** før inn
-      avtalen som finnes (se punktet om e-postinnhold under). Merknaden står i A.2.
+- [ ] **E-posten på `sanitet.net`: fjern Cloudflare-MX-ene, og før inn avtalene** (14. okt.
+      2026). Proton er ført inn i protokollen A.2, men tre ting står igjen:
+      1. **MX-oppføringene** i Cloudflare peker fortsatt også på Email Routing —
+         `route3.mx.cloudflare.net` (prioritet 12), `route1` (87) og `route2` (94), ved siden
+         av Protons 10 og 20. Får en avsender ikke levert til Proton, prøver den Cloudflare,
+         og da kan en henvendelse til personvern@ havne et helt annet sted. Slett de tre, og
+         slå av Email Routing for domenet hvis den står på. Sjekk etterpå med
+         `nslookup -type=MX sanitet.net`: bare de to Proton-oppføringene skal stå.
+      2. **Avtalene:** referansen (URL eller dato) til databehandleravtalen hos **AhaSend** og
+         hos **Proton** for kontoene dine. Står som «[fylles inn]» i A.2.
+      3. **`ADMINS` i Railway** til `admin@sanitet.net`, hvis feilvarslene fortsatt går til
+         Gmail — ellers ligger de i en innboks protokollen ikke nevner.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
@@ -869,14 +875,6 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
 Besluttet 14. aug. 2026: invitasjon som registreringsvei, selvbetjent passord-reset for
 personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
-- [ ] **AHASend og e-postleverandøren til `sanitet.net` inn i `PERSONVERN_DOKUMENTASJON.md`
-      A.2.** AHASend-avtalen er på plass, og kontoen står på EØS-infrastruktur (André,
-      1. okt. 2026), men dataflyten er ikke dokumentert. Mottakeren flyttes fra privat Gmail
-      til `admin@sanitet.net` (se «Krever Andre»), og det er leverandøren av den innboksen
-      som skal stå her — ikke Google, med mindre domenet ligger hos Google Workspace. Tas i
-      dokumentgjennomgangen. Avkrysningen «Ingen andre databehandlere er for øyeblikket i
-      bruk» i C.3 kan ikke krysses av så lenge AHASend er i bruk.
-
 - [ ] **VURDER: skal innlogging normalisere passordet?** Funnet 29. aug. 2026.
       `set_password` kaller `make_password` rett på råstrengen, så Django normaliserer
       ikke passord. Et passord med `å` satt i én Unicode-normalform og skrevet i en
@@ -1090,14 +1088,10 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
         ikke mindre. Men dokumentet er art. 30-protokollen, og skal beskrive det som
         faktisk skjer. Funnet 23. aug. 2026 da tre testpasienter ble slettet.
         Docstringen i `views_patients.py` som påsto det samme er allerede rettet
-      - **E-postvarsling ved feil er ikke omtalt i dokumentet i det hele tatt.** Det er
-        en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og
-        leverandøren av `admin@sanitet.net` (mottakerens innboks) — og begge hører hjemme i A.2.
-        Varselet inneholder, etter slankingen 22. aug.: brukernavn og rolle på den som
-        opplevde feilen, klient-IP, forespurt URL og traceback. **Ingen kliniske
-        opplysninger** — skjemadata, cookies, settings og lokale variabler er utelatt,
-        og `core/tests_error_reporting.py` vokter det. Lagringstid styres av innboksen,
-        ikke av applikasjonen, på samme måte som Railway-backupen i A.2
+      - **Lagringstid for e-post i Proton-innboksene** (personvern@, admin@, support@ og
+        catch-all-en) er ikke fastsatt — A.9 sier det rett ut. Henvendelser etter A.14
+        trenger en frist som dekker saken og dokumentasjonen av svaret; feilvarsler og
+        vaktlista som fil har ingen verdi etter vakta. Føres også i DPA-utkastet punkt 7
       - Bump versjonsnummer og dato når noe endres
 
 ### Puljene fra Andrés gjennomgang 16. sep. 2026

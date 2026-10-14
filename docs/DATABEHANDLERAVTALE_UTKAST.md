@@ -1,6 +1,6 @@
 # Databehandleravtale – Sanitetsportalen og kart.sanitet.net
 
-**Utkast** · 12. oktober 2026 · André Eritsland
+**Utkast** · 12. oktober 2026, oppdatert 14. oktober · André Eritsland
 
 > **Hvor utkastet bor:** det skrives og kommenteres i Claude Docs
 > (<https://claude.ai/code/artifact/3edfaced-340f-4057-9ae2-cf311f3f57d8>), og denne fila er
@@ -34,7 +34,8 @@ registreres. Korpset er derfor behandlingsansvarlig, og André behandler opplysn
 vegne.
 
 Henvendelser fra de registrerte går til **personvern@sanitet.net**, som databehandler leser og
-videreformidler til korpset etter punkt 4.
+videreformidler til korpset etter punkt 4. Drift og feilvarsler går til **admin@sanitet.net**,
+og brukerstøtte til **support@sanitet.net**. Alle tre er egne innbokser hos Proton (punkt 6).
 
 ## 2. Formål, art og varighet
 
@@ -110,11 +111,16 @@ for at hver av dem er bundet av en avtale etter art. 28 med minst samme vern.
 | --- | --- | --- | --- |
 | Railway Corp. | Drift av appen og databasen | EU, Nederland (europe-west4) | Portalen, [kartet?] |
 | Scaleway SAS | Krypterte sikkerhetskopier | EU, Nederland (nl-ams) | Portalen |
-| Cloudflare, Inc. | Nettverket foran appen; all trafikk går gjennom | [vurderes — globalt nett, amerikansk selskap] | Portalen, [kartet?] |
-| AhaSend | E-post fra portalen | [fylles inn] | Portalen |
+| AhaSend | E-post fra portalen (`noreply@mail.sanitet.net`) | EØS | Portalen |
+| Proton AG | E-post til `@sanitet.net`: personvern@, admin@, support@ og en catch-all | Sveits (adekvansbeslutning, art. 45) | Begge |
 
 Overføring utenfor EU/EØS skjer bare med et gyldig grunnlag etter GDPR kapittel V, for eksempel
-EU–US Data Privacy Framework eller standard personvernbestemmelser.
+EU–US Data Privacy Framework eller standard personvernbestemmelser. Den eneste i dag er e-posten
+hos Proton i Sveits, som har adekvansbeslutning fra EU-kommisjonen.
+
+**Cloudflare er ikke underdatabehandler.** Den er bare DNS-leverandør for `sanitet.net`, med alle
+oppføringer som «DNS only»: trafikken går rett til Railway, og Cloudflare ser den ikke. Skal
+proxyen slås på, er det en ny underdatabehandler etter avsnittet over.
 
 ## 7. Avvik, revisjon og sletting
 
@@ -158,8 +164,12 @@ avtales skriftlig. Norsk rett gjelder.
 
 - [ ] **kart.sanitet.net:** hvor kjører det, hvilke leverandører bruker det, og hvilke
       kontoopplysninger lagrer det om kartgruppenes medlemmer? Fyll inn punkt 3 og 6.
-- [ ] **Cloudflare:** finn avtalegrunnlaget for kontoen, og vurder overføringen ut av EØS.
-- [ ] **AhaSend:** før inn avtalen som finnes, med behandlingssted.
+- [ ] **Cloudflare Email Routing:** fjern de tre MX-oppføringene til `route*.mx.cloudflare.net`.
+      Så lenge de står, kan e-post til `@sanitet.net` havne hos Cloudflare i stedet for Proton,
+      og da er Cloudflare likevel underdatabehandler.
+- [ ] **AhaSend og Proton:** før inn referansen til databehandleravtalen for hver av kontoene.
+- [ ] **Lagringstid for e-post:** hvor lenge skal henvendelser og feilvarsler ligge i
+      Proton-innboksene? Fristen føres i punkt 7 og protokollen A.9.
 - [ ] **Tallene i klammer:** varslingstid ved avvik (24 t), videresending av henvendelser
       (5 dager), varsel om ny leverandør (30 dager), sletting ved opphør (60 dager),
       oppsigelse (3 måneder).

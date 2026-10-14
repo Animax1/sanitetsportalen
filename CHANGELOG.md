@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Proton for e-post til `@sanitet.net`, Cloudflare ut som databehandler (personvern@, admin@, support@)  `#core/dokumentasjon` `#core/personvern`
+
+André: «jeg har satt opp proton mail for all mail sendt til *@sanitet.net og egne addresser
+for admin@sanitet.net, personvern@sanitet.net, support@sanitet.net … All dns på cloudflare er
+dns only ikke proxied.» Ført inn i behandlingsprotokollen (v1.23), på `/personvern/` og i
+DPA-utkastet.
+
+**Kontrollert mot DNS og HTTP samme dag, ikke bare skrevet av:** `portal.sanitet.net` og
+`kart.sanitet.net` er CNAME-er til `*.up.railway.app` og svarer `server: railway-hikari` med
+`x-railway-edge` — **ikke** `server: cloudflare`, som var funnet 11. okt. Proton står med MX
+(`mail.protonmail.ch` 10, `mailsec.protonmail.ch` 20), SPF, tre DKIM-CNAME-er og DMARC
+`p=quarantine`. Portalens egen utsending ligger på `mail.sanitet.net` mot AhaSend, så de to
+leverandørene deler ikke domene.
+
+**Funnet underveis: tre MX-er til Cloudflare Email Routing står fortsatt**
+(`route3.mx.cloudflare.net` prioritet 12, `route1` 87, `route2` 94). Når Proton ikke svarer,
+prøver avsenderen dem — så «Cloudflare er ute» er sant for trafikken, men ikke for e-posten før
+de er slettet. Lagt under «Krever Andre» i `TODO.md`.
+
+- **A.1:** admin@ og support@ som egne kontaktrader; personvern@ er egen Proton-innboks.
+- **A.2:** Cloudflare-merknaden skrevet om — bare DNS-leverandør, ikke databehandler, med
+  MX-resten og hva som gjelder hvis proxyen slås på igjen. **Nye tabeller for AhaSend og
+  Proton AG**, med innhold, region og avtalegrunnlag (referansene står som «[fylles inn]»).
+  Merknad om at catch-all-en fanger feilskrevne adresser, og hva det koster.
+- **A.7:** AhaSend og Proton som mottakere. **A.8:** «ingen overføring utenfor EU/EØS» var
+  ikke lenger sant — Proton er i Sveits. Skrevet om: én overføring, grunnlag art. 45
+  (adekvansbeslutning). **A.9:** ny rad for e-post i innboksene — frist **ikke fastsatt**, sagt
+  rett ut. **A.14:** en rettighetshenvendelse til support@ eller catch-all-en er like gyldig, og
+  fristen løper fra mottak. **C.3:** «Ingen andre databehandlere er i bruk» erstattet med
+  sjekkpunkter for Scaleway, AhaSend, Proton og Cloudflare-DNS.
+- **`/personvern/`:** raden «Cloudflare — trafikken går gjennom Cloudflare» er fjernet (den
+  var ikke lenger sann), og Proton er lagt til.
+- **DPA-utkastet:** de tre adressene i punkt 1; Cloudflare ut av underdatabehandlerne med en
+  setning om hvorfor; Proton inn, AhaSend fylt ut med EØS. Åpne punkter: MX-ene, avtalereferansene
+  og lagringstid for e-post.
+- **`TODO.md`:** «Cloudflare og AhaSend inn i behandlingsprotokollen», «AHASend og
+  e-postleverandøren til `sanitet.net` inn i A.2» og «E-postvarsling ved feil er ikke omtalt»
+  er slettet — de er gjort. Igjen står MX-ene, avtalereferansene og `ADMINS` (Krever Andre), og
+  lagringstiden for innboksene.
+
 ## 2026-10-14 — Ordboka bygget: «tavla» → «tavlen», «oppdragslisten» i `/oppdrag/`, «Ukjent ressurs» → «Ukjent enhet»  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
 
 André: «Nei vi gjør ferdig ordboka nå.» Svarene står i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md`

@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 13. oktober 2026  
-**Versjon:** 1.22  
+**Siste oppdatering:** 14. oktober 2026  
+**Versjon:** 1.23  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -20,7 +20,9 @@
 | Behandlingsansvarlig | Kverneland Røde Kors |
 | Systemansvarlig | André Eritsland |
 | Eier av systemene | **André Eritsland** — eier, drifter og utvikler både portalen og kart.sanitet.net. Korpset eier dem ikke (André, 12. okt. 2026) |
-| Kontakt for personvern | **personvern@sanitet.net** — adressen de registrerte får, på `/personvern/` (fra 12. okt. 2026) |
+| Kontakt for personvern | **personvern@sanitet.net** — adressen de registrerte får, på `/personvern/` (fra 12. okt. 2026). Egen innboks hos Proton (A.2) fra 14. okt. 2026 |
+| Kontakt, drift og feilvarsler | **admin@sanitet.net** — egen innboks hos Proton |
+| Kontakt, brukerstøtte | **support@sanitet.net** — egen innboks hos Proton |
 | Kontakt, systemansvarlig | andre.eritsland@gmail.com |
 | Geografisk plassering | Rogaland, Norge |
 
@@ -58,19 +60,24 @@ Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd me
 | Databehandlingsregion | europe-west4 (Nederland, EU) |
 | Kontakt / DPA-referanse | Railway Amsterdam Data Processing Addendum |
 
-> **Ikke ført inn her ennå (12. okt. 2026): Cloudflare og AhaSend.** Begge behandler
-> personopplysninger for portalen. **Cloudflare** står foran Railway (`server: cloudflare`,
-> funnet 11. okt. 2026, se CHANGELOG): TLS termineres der, så all trafikk — innlogging,
-> pasientdata, posisjoner — går gjennom Cloudflare i klartekst. **AhaSend** er
-> e-posttransporten i prod (`core/mail_backends.py`): invitasjoner, «Glemt passord»,
-> vaktlista som fil (navn, telefon, ISSI, overnatting) og feilvarsler. Begge står navngitt på
-> personvernsiden, fordi de registrerte har krav på å vite det. **AhaSend har en avtale** —
-> `TODO.md` siterer den i punktet om lagring av e-postinnhold — men den er ikke ført inn her.
-> **For Cloudflare er avtalegrunnlaget (art. 28) ikke kontrollert**, og A.8s «ingen
-> overføring utenfor EU/EØS» er ikke vurdert mot noen av dem — Cloudflare er et amerikansk
-> selskap med et globalt nett. Står i `TODO.md` under «Krever Andre».
+> **Cloudflare er ikke databehandler for trafikken** (14. okt. 2026). Fram til i dag sto det
+> her at Cloudflare sto foran Railway og terminerte TLS (`server: cloudflare`, funnet 11. okt.
+> 2026). **Alle DNS-oppføringene er nå «DNS only», ikke proxied** (André, 14. okt. 2026), og det
+> er kontrollert samme dag: `portal.sanitet.net` og `kart.sanitet.net` er CNAME-er rett til
+> `*.up.railway.app`, og svaret kommer fra `server: railway-hikari` med `x-railway-edge`. TLS
+> termineres hos Railway. Cloudflare er dermed bare **DNS-leverandør** for `sanitet.net`: den
+> svarer på oppslag fra resolvere, ser ikke trafikken mellom nettleseren og appene, og
+> behandler ingen personopplysninger på korpsets vegne. **Én rest står igjen:** MX-oppføringene
+> for `sanitet.net` peker fortsatt også på Cloudflare Email Routing
+> (`route1–3.mx.cloudflare.net`, prioritet 12, 87 og 94, ved siden av Protons 10 og 20). Får
+> en avsender ikke levert til Proton, prøver den Cloudflare — og da går e-posten dit, også
+> henvendelser til personvern@. Så lenge de står, er Cloudflare en mulig mottaker av e-post.
+> Står i `TODO.md` under «Krever Andre».
+>
+> **Hvis proxyen slås på igjen**, er Cloudflare databehandler for all trafikk i klartekst, og
+> må inn i tabellene under med avtalegrunnlag og overføringsgrunnlag (A.8) før det skjer.
 
-Databehandleravtale (DPA) er inngått i samsvar med GDPR artikkel 28. Data lagres utelukkende i EU-regionen europe-west4 (Nederland). Ingen behandling skjer utenfor EU/EØS.
+Databehandleravtale (DPA) er inngått i samsvar med GDPR artikkel 28. Railway lagrer data utelukkende i EU-regionen europe-west4 (Nederland). Det eneste stedet opplysninger behandles utenfor EU/EØS, er hos Proton i Sveits — se under og A.8.
 
 | Felt | Opplysning |
 |---|---|
@@ -131,6 +138,36 @@ Applikasjonen kjøres i to driftsmoduser (se TEKNISK_DOKUMENTASJON.md kapittel 8
 > *Merknad 14. sep. 2026:* denne teksten sa tidligere at applikasjonens egen backup «kun inneholder `patients`-data». Det er ikke lenger riktig på noen av punktene — portalen har seks modulfiler og i tillegg en hel databasebackup med samme innhold som Railways. Forskjellen er ikke lenger *hva* som sikkerhetskopieres, men *hvem som har nøkkelen*: portalens egne filer er kryptert med en nøkkel verken Railway eller Scaleway har.
 
 > **Underbehandlere:** Railway Corp. kan benytte egne underleverandører (bl.a. skyleverandører som Google Cloud eller AWS) for å levere infrastrukturtjenestene (inkludert Redis når denne er aktiv). Behandlingsansvarlig skal kontrollere at Railways DPA dekker slike underbehandlere i samsvar med GDPR art. 28(2)–(4). Se sjekkliste i avsnitt A.13.
+
+**E-post** (ført inn 14. okt. 2026). Portalen sender og mottar e-post gjennom to ulike
+leverandører, på to ulike domener, og det er med vilje: utsendingen fra portalen ligger på
+underdomenet `mail.sanitet.net` med egne SPF- og MX-oppføringer mot AhaSend, mens
+`sanitet.net` selv er Protons. Den ene leverandøren kan byttes uten at den andre merker det.
+
+| Felt | Opplysning |
+|---|---|
+| Navn | AhaSend |
+| Rolle | Databehandler (utsending av e-post fra portalen, avsender `noreply@mail.sanitet.net`) |
+| Avtalegrunnlag | AhaSends databehandleravtale, inngått for kontoen. [Referanse eller URL fylles inn] |
+| Databehandlingsregion | EØS — kontoen står på EØS-infrastruktur (André, 1. okt. 2026) |
+| Innhold | Invitasjoner og «Glemt passord» (brukernavn, e-post, engangslenke); **vaktlista som fil** (navn, korps, rolle, skift, telefon, ISSI og overnatting, se A.11); **feilvarsler** (brukernavn og rolle på den som traff feilen, klient-IP, URL og traceback — ingen kliniske opplysninger, `core/tests_error_reporting.py` vokter det) |
+| Lagring hos leverandøren | AhaSend kan lagre innholdet i sendte e-poster. Avtalen sier det kan slås av; det er ikke gjort ennå (`TODO.md`). Avtalen forbyr dessuten å sende «Sensitive Data», og det er en grunn til at feilvarselet holdes fritt for helseopplysninger |
+
+| Felt | Opplysning |
+|---|---|
+| Navn | Proton AG (Genève, Sveits) |
+| Rolle | Databehandler (mottak og lagring av all e-post til `@sanitet.net`, fra 14. okt. 2026) |
+| Avtalegrunnlag | Protons databehandleravtale (DPA). [Kontrolleres at den gjelder kontoen, se C.3] |
+| Databehandlingsregion | **Sveits — utenfor EØS**, men med adekvansbeslutning fra EU-kommisjonen etter art. 45 (se A.8) |
+| Adresser | Tre egne innbokser: **personvern@** (de registrertes henvendelser, A.14), **admin@** (drift og feilvarsler) og **support@** (brukerstøtte). Alt annet til `@sanitet.net` fanges av en catch-all |
+| Innhold | Det andre skriver til oss, og det kan ikke avgrenses: en henvendelse etter A.14 kan inneholde helseopplysninger den registrerte selv oppgir for å bli funnet igjen (tidspunkt, arrangement, hva som skjedde). Dessuten feilvarsler og vaktlista som fil når en av adressene står i `ADMINS` eller i vaktlistas mottakerliste |
+| Kryptering | TLS inn til Proton. Lagret e-post krypteres med kontoens egen nøkkel ved mottak (Protons «zero-access»-kryptering), så Proton kan ikke lese den i ettertid |
+| Domenet | Kontrollert 14. okt. 2026: MX til `mail.protonmail.ch` (10) og `mailsec.protonmail.ch` (20), SPF `include:_spf.protonmail.ch`, DKIM via tre CNAME-er til Proton, DMARC `p=quarantine`. **Avvik:** tre MX-er til Cloudflare Email Routing står fortsatt (se merknaden om Cloudflare over) |
+
+> **Catch-all-en er et bevisst valg, med en pris.** Den fanger en feilskrevet adresse — en
+> henvendelse til `personvernet@` går ikke tapt — men den betyr også at alt som sendes til
+> et hvilket som helst navn på domenet havner i en innboks, inkludert søppelpost og e-post
+> ingen ba om. Den som leser den, må vite at det kan ligge en rettighetshenvendelse der.
 
 ---
 
@@ -565,6 +602,8 @@ Key-prefiks `pasientregistrering:` brukes for å isolere applikasjonens nøkler 
 |---|---|---|
 | Interne appbrukere (helsepersonell/frivillige med konto) | Tjenestlig behov, rollebasert tilgangsstyring | Pasientdata i henhold til tildelt rolle |
 | Railway Corp. (databehandler) | Databehandleravtale (DPA), art. 28 | All data lagret i databasen (infrastrukturtilgang, ikke applikasjonsnivå) |
+| AhaSend (databehandler) | Databehandleravtale, art. 28 | E-post portalen sender: invitasjoner, «Glemt passord», vaktlista som fil, feilvarsler (A.2) |
+| Proton AG (databehandler) | Databehandleravtale, art. 28 | E-post til `@sanitet.net`: henvendelser fra de registrerte, brukerstøtte, og feilvarsler og vaktlista som fil når adressene står som mottakere (A.2) |
 | kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling og på «Send posisjon»; lagets navn og stedsnavn, og lagets posisjon på «Send posisjon til KO». Ingen helseopplysninger |
 
 Det foretas **ingen videreformidling** til tredjeparter, kommersielle aktører, offentlige myndigheter (med unntak av eventuelle lovpålagte utleveringer) eller andre organisasjoner.
@@ -573,7 +612,11 @@ Det foretas **ingen videreformidling** til tredjeparter, kommersielle aktører, 
 
 ## A.8 Overføring til tredjeland
 
-Det foretas **ingen overføring av personopplysninger til land utenfor EU/EØS.** All data lagres og behandles i Railway-region europe-west4 (Nederland), som er beliggende i EU. Railway Corp. er underlagt EU-regelverket gjennom DPA og sin Amsterdam Data Processing Addendum.
+Appenes data lagres og behandles i Railway-region europe-west4 (Nederland), som er beliggende i EU. Railway Corp. er underlagt EU-regelverket gjennom DPA og sin Amsterdam Data Processing Addendum. Sikkerhetskopiene ligger hos Scaleway i Nederland, og AhaSend sender fra EØS-infrastruktur.
+
+**Én overføring ut av EØS, med grunnlag (fra 14. okt. 2026):** e-post til `@sanitet.net` mottas og lagres av **Proton AG i Sveits** (A.2). Sveits har adekvansbeslutning fra EU-kommisjonen (2000/518/EF, bekreftet i kommisjonens gjennomgang i januar 2024), og overføringen skjer derfor etter art. 45 uten ytterligere garantier. Det som overføres, er e-post andre sender til oss — ikke innholdet i portalens database.
+
+**Cloudflare er ikke en overføring.** Cloudflare er bare DNS-leverandør, uten proxy (A.2), og ser ikke trafikken. Unntaket er MX-oppføringene til Cloudflare Email Routing som fortsatt står — de fjernes (`TODO.md`). Slås proxyen på igjen, må denne vurderingen gjøres på nytt før det skjer.
 
 ---
 
@@ -600,6 +643,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
+| **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Ikke fastsatt** (14. okt. 2026) | Manuelt — appene rører ikke innboksene | Henvendelser etter A.14 bør beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret; feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Fristen avgjøres, og står i `TODO.md` |
 | **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **Oppdragsnotat og «Annet sted» (`Oppdrag.fritekst`, `Statusmelding.sted_tekst`)** | **3 dager etter siste aktivitet** på oppdraget, justerbart 1–30 av global admin | Skjules i serverens svar straks fristen er ute; tømmes av `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Fritt tekstfelt der identifikatorer kan havne (A.6). Oppdraget står igjen til vakta avsluttes. Teksten ligger fortsatt i backupene (730 og 90 dager hos Scaleway) — fristen er ikke en sletterett |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
@@ -934,8 +978,15 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 > Det innebærer at brukernavnet til en frivillig består i arkivet også etter at kontoen er slettet. Opplysningen er nødvendig for at dokumentasjonen av vakten skal være etterrettelig, og de registrerte informeres om det på personvernsiden (`/personvern/`, «Har du brukerkonto»).
 
 **Alle henvendelser om rettigheter rettes til:**  
-personvern@sanitet.net (fra 12. okt. 2026 — adressen personvernsiden oppgir).
-Systemansvarlig, André Eritsland, behandler henvendelsene på vegne av Kverneland Røde Kors.
+personvern@sanitet.net (fra 12. okt. 2026 — adressen personvernsiden oppgir). Fra 14. okt.
+2026 er den en egen innboks hos Proton (A.2), atskilt fra admin@ og support@, så en
+henvendelse ikke drukner i driftsvarsler. Systemansvarlig, André Eritsland, behandler
+henvendelsene på vegne av Kverneland Røde Kors.
+
+**Henvendelser kan komme andre steder.** En rettighetshenvendelse er gyldig uansett hvilken
+adresse den sendes til, og fristen på én måned løper fra den mottas. Den som leser
+support@ og catch-all-en, må derfor flytte en slik henvendelse til personvern@ og ikke
+besvare den som brukerstøtte.
 
 ---
 
@@ -1005,7 +1056,8 @@ til de registrerte. Endres en behandling i del A, skal siden følge i samme comm
 ekomloven § 3-15) og den lokale lagringen (offline-køene, vaktlista i Cache Storage,
 visningsvalg, lagregistreringens nøkler); brukerkontoen; mannskapsregisteret med
 overnatting og vaktlista som fil; posisjon til kartet; lagregistreringen; pasientene;
-leverandørene (Railway, Scaleway, Cloudflare, AhaSend, kart.sanitet.net); lagringstid;
+leverandørene (Railway, Scaleway, AhaSend, Proton, kart.sanitet.net — Cloudflare gikk ut
+14. okt. 2026, da proxyen var av); lagringstid;
 sikkerhet; rettigheter og klage til Datatilsynet.
 
 **Pasientene ser ikke portalen.** Siden har et eget avsnitt for dem, men den når dem bare
@@ -1074,10 +1126,21 @@ Denne sjekklisten skal gjennomgås ved etablering av ny databehandleravtale og v
 - [ ] Verifisert at Railways DPA dekker disse underbehandlerne i samsvar med GDPR art. 28(2)–(4)
 - [ ] Bekreftet at underbehandlerne ikke behandler data utenfor EU/EØS, eventuelt at overføringsgrunnlag foreligger (f.eks. standardkontraktsklausuler)
 
-**Eventuelle andre tredjepartstjenester:**
+**Scaleway SAS, AhaSend og Proton AG** (A.2):
 
-- [ ] Ingen andre databehandlere er for øyeblikket i bruk
-- [ ] Ved fremtidig integrasjon av ny tjeneste: inngå DPA før data overføres
+- [ ] Scaleway: DPA gjelder kontoen, bucketen står fortsatt i nl-ams
+- [ ] AhaSend: DPA gjelder kontoen, kontoen står fortsatt på EØS-infrastruktur, lagring av innhold vurdert
+- [ ] Proton: DPA gjelder kontoen, og Sveits har fortsatt adekvansbeslutning (A.8)
+- [ ] Proton: innboksene er ryddet etter fristen i A.9
+
+**Cloudflare (bare DNS):**
+
+- [ ] Alle oppføringer er fortsatt «DNS only» — `curl -sI https://portal.sanitet.net/healthz/` svarer `server: railway-…`, ikke `server: cloudflare`
+- [ ] MX-oppføringene peker bare på Proton, ikke på `route*.mx.cloudflare.net`
+
+**Ny tjeneste:**
+
+- [ ] Inngå DPA før data overføres, og før den inn i A.2, A.7 og A.8 og på `/personvern/`
 
 ---
 
@@ -1159,10 +1222,18 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.22 – sist oppdatert 13. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.23 – sist oppdatert 14. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.23 (14.10.2026):** **E-post og Cloudflare inn i protokollen** (A.1, A.2, A.7, A.8, A.9,
+  A.14, B, C.3). **Proton AG** mottar og lagrer all e-post til `@sanitet.net`, med egne
+  innbokser for personvern@, admin@ og support@ og en catch-all; Sveits har
+  adekvansbeslutning, og A.8s «ingen overføring utenfor EU/EØS» er skrevet om til å si det.
+  **AhaSend** er ført inn med innhold og region. **Cloudflare er ikke lenger databehandler for
+  trafikken:** alle oppføringer er «DNS only», kontrollert samme dag (`server: railway-hikari`).
+  Rest: tre MX-er til Cloudflare Email Routing står fortsatt. E-post i innboksene har ingen
+  fastsatt lagringstid ennå (A.9).
 - **v1.22 (13.10.2026):** **A.11: KO-utskriften uten nett.** KO-PC-en holder siste utskrift av
   KO i nettleseren (helseopplysninger i loggen og notatene), bare for personlige kontoer, høyst
   24 timer, slettes ved «Logg ut». Personvernsiden sier det samme.
