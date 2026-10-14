@@ -31,6 +31,7 @@ from audit.models import AuditLog
 from core import vaktsletting
 from core.models import AppSetting, Backup, Vakt, VaktStatistikk
 from patients.test_helpers import sett_aktiv_vakt
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class DekningenTests(TestCase):
@@ -63,7 +64,7 @@ class _Data:
         from ko.models import Hendelse, Logglinje
         from oppdrag import services as oppdrag_services
         from oppdrag.arkiv import arkiver_vakt
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from oppdrag.models import Enhet, Lokasjon
         from park.models import Parklenke, Registrering
         from patients.models import Patient
         from patients.services import arkiver_aktiv_vakt, next_patient_nr
@@ -75,7 +76,7 @@ class _Data:
         enhet = Enhet.objects.get_or_create(navn='Bil 1', defaults={'pa_vakt': True})[0]
         Patient.objects.create(vakt=vakt, pasientnummer=next_patient_nr(vakt))
         arkiver_aktiv_vakt(vakt.navn, '', admin, vakt=vakt)
-        o = Oppdrag.objects.create(vakt=vakt, oppdragsnummer=oppdrag_services.neste_oppdragsnummer(vakt),
+        o = lag_oppdrag(vakt=vakt, oppdragsnummer=oppdrag_services.neste_oppdragsnummer(vakt),
                                    problemstilling='Pustevansker', hastegrad='Akutt',
                                    lokasjon=lokasjon, enhet=enhet)
         arkiver_vakt(vakt, '', admin, tomm=False)

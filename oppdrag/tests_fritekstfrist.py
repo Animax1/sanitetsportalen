@@ -33,6 +33,7 @@ from oppdrag.models import (
 from patients.js_test_utils import (
     OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node,
 )
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2026
 NOTAT = 'Pasienten heter Kari, bor i Storgata 5'
@@ -69,7 +70,7 @@ class FristBasis(TestCase):
         self.klient.force_login(self.operator)
 
     def _oppdrag(self, *, fritekst=NOTAT, sted_tekst=STED, historikk=False):
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=self.vakt, enhet=self.bil, problemstilling='Udefinert',
             hastegrad='Haster', lokasjon=self.lokasjon, fritekst=fritekst,
             oppdragsnummer=services.neste_oppdragsnummer(self.vakt))

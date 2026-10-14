@@ -21,10 +21,10 @@ from ko import services, systemlinjer
 from ko.models import KILDE_SYSTEM, Logglinje
 from oppdrag import choices
 from oppdrag import services as oservices
-from oppdrag.models import Oppdrag
 from patients.js_test_utils import KO_JS, build_harness, node_available, run_node
 
 from .tests_tavle import _Grunnlag
+from oppdrag.test_helpers import lag_oppdrag
 
 KOBLET = {'KART_URL': 'https://kart.example.no', 'KART_HMAC_NOKKEL': 'k' * 64}
 
@@ -85,7 +85,7 @@ class DeltPosisjonILoggenTests(_Grunnlag):
 
     def test_bil_paa_et_oppdrag_i_en_hendelse_faar_linja_i_hendelsen(self):
         h = services.opprett_hendelse(self.vakt, 'Fall', bruker=self.operator, lokasjon=self.park)
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, lokasjon=self.park, problemstilling='Fall',
             hastegrad=choices.HASTEGRAD[0])

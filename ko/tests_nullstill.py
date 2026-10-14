@@ -20,6 +20,7 @@ from ko.models import Ansvarsmerke, Ansvarsomraade, Hendelse, Logglinje
 from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, Statusmelding
+from oppdrag.test_helpers import lag_oppdrag
 
 
 def _bruker(navn, **kwargs):
@@ -44,7 +45,7 @@ class _Grunnlag(TestCase):
 
     def _oppdrag(self, vakt=None, status=None):
         vakt = vakt or self.vakt
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=vakt, oppdragsnummer=oservices.neste_oppdragsnummer(vakt),
             enhet=self.enhet, lokasjon=self.lokasjon, problemstilling='Fall',
             hastegrad=choices.HASTEGRAD[0])
@@ -165,7 +166,7 @@ class PorteneTests(TestCase):
 
     def test_nullstill_er_global_admin_med_confirm_og_auditrad(self):
         services.opprett_hendelse(self.vakt, 'H', bruker=self.leder)
-        Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=self.enhet,
+        lag_oppdrag(vakt=self.vakt, oppdragsnummer=1, enhet=self.enhet,
                                lokasjon=self.lokasjon, problemstilling='Fall',
                                hastegrad=choices.HASTEGRAD[0])
         for hva in ('oppdrag', 'hendelser', 'logg'):

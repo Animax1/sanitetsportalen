@@ -232,6 +232,11 @@ _RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
 if _RUNNING_TESTS:
     PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
+    # Broene fra deploy 1 av flere enheter kaster under test (14. okt. 2026):
+    # en test som går gjennom en, prøver en vei drift ikke går. I drift
+    # telles de i stedet — se `oppdrag/bro.py`.
+    OPPDRAG_BRO_KASTER = True
+
     # Backup-planleggeren ut av middleware-stacken under test.
     #
     # `_should_run_now()` returnerer True når `last_run_at` er null, og i en

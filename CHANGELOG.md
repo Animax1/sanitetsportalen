@@ -4,6 +4,61 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — G6b-forarbeid: broene telles i drift, kaster under test, og ingen test går gjennom dem  `#oppdrag` `#gjeld`
+
+**Hvorfor:** G6b fjerner broene fra deploy 1 av flere enheter etter neste vakt. André
+14. okt. 2026, om advarselen som skulle bevise at de ikke brukes: «Hvordan ser vi
+advarselen?» Svaret var: ikke i det hele tatt — en `warning` går bare til Railways logg.
+Og testene gikk gjennom broene **615 ganger**, en vei drift ikke har gått siden A1
+(26. sep. 2026). Slettingen skal stå på bevis, og suiten skal prøve den veien drift går.
+
+**Broene telles** (`oppdrag/bro.py`): `Oppdrag.save()` (første koblingsrad fra
+`Oppdrag.enhet`) og begge grenene i `Statusmelding.save()`. Hver bruk skriver
+`AppSetting['oppdrag.bro.<navn>']` — antall, første, siste, oppdraget — og en `warning`.
+**Server-status** har fått raden «Broer i oppdrag (G6b)»: «Aldri brukt» (grønn) eller
+«Brukt 3 g. (oppdrag), sist 14.10. 21:40» (gul — et funn, ikke en feil). Telleren er unntatt
+audit (`NOKLER_UTEN_AUDIT`, det er maskinen som teller), skrives i et eget savepoint og
+**kaster aldri**: en stempling i en bil skal ikke feile fordi telleren gjorde det.
+
+**Under `manage.py test` kaster broene** (`settings.OPPDRAG_BRO_KASTER`, `BroBrukt`). En test
+som går gjennom en bro, blir rød med det samme — det er vakten, og det samme signalet som
+teller i drift. `BroenTests` slår det av, og er det ene stedet broene prøves.
+
+**Kartlagt, ikke gjettet:** broene ble gjort til unntak og hele suiten kjørt — 615 tester i
+44 moduler sto på broen i `Oppdrag.save()` (en `grep` fant 36 kall i 26 filer; resten arvet
+dem gjennom basisklasser som `OppdragBasis`). Deretter 16 på `Statusmelding`-broen.
+
+**Omskrivingen:** `oppdrag/test_helpers.lag_oppdrag(**felter)` gjør det broen gjorde, i
+klartekst og i samme rekkefølge — oppdraget, koblingsraden med oppdragets status,
+opphavsperson, `rekkefolge=0` og frosset modus, så den gamle kolonnen med `update()` (i broen
+sto den i selve `INSERT`-en; en `save()` ville gitt en auditrad ingen test har sett). Ingen
+mottaker av `post_save` leser `enhet` ved opprettelse — sjekket i `oppdrag/signals.py` og
+`ko/signals.py`. `Oppdrag.objects.create(` → `lag_oppdrag(` maskinelt i 26 testfiler; ti
+ubrukte `Oppdrag`-importer fjernet etter pyflakes. De 13 meldingene fikk
+`oppdragsenhet=<oppdrag>.primaer` — det broen gjorde — lagt inn via AST.
+
+**Fanget underveis: to tester prøvde hjelperen i stedet for broen.**
+`BroenTests.test_oppdrag_med_enhet_faar_en_koblingsrad` og modus-stempelet på første rad
+(mutanten fra 16. sep.) gikk gjennom `_oppdrag`, som nå er `lag_oppdrag` — grønne av feil
+grunn. Felle 3 i mutasjonsreglene. `BroenTests` går nå gjennom `Oppdrag.objects.create`, og
+har fått **`test_hjelperen_lager_samme_rad_som_broen`**: bro og hjelper side om side i tre
+statuser med en passiv enhet, felt for felt. Det er beviset for at de 615 testene prøver det
+samme som før.
+
+**Mutasjonstesting: 18 mutanter, 18 drept** — bryteren av, savepointet fjernet, try/except
+fjernet, telleren teller ikke, «første» overskrives, `warning` fjernet, hvert av de tre
+kallstedene fjernet, audit-unntaket fjernet, server-status uten broene, bryteren av i
+settings, og i hjelperen: fast status, modusen glemt, kolonnen glemt, `varslet_av` glemt,
+`rekkefolge=1`; og `broTekst()` invertert. Hele suiten grønn mot PostgreSQL:
+4 479 + 1 178.
+
+**Og Railway-fella fra 13. okt.** står nå i `docs/DEPLOY_GUIDE.md` §9 og push-regelen i
+`CLAUDE.md`: feiler CI, blir commit-en **SKIPPED** i Railway, og en grønn re-run deployer
+den ikke — **⋮ → Redeploy**.
+
+**Etter vakta:** «Broer i oppdrag» på server-status. «Aldri brukt» → G6b. Et tall → et funn
+først (TODO).
+
 ## 2026-10-13 — G2: `ko/views.py` delt etter flate, `user_detail_view` som dispatch-tabell  `#ko` `#accounts` `#gjeld`
 
 **Hvorfor:** Gjeldsplanen 25. sep. 2026, G2. `ko/views.py` var 1 354 linjer med seks flater

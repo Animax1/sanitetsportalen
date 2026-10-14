@@ -70,6 +70,7 @@ NOKLER_UTEN_AUDIT = (
     'next_oppdrag_nr_vakt_',    # teller, én skriving per oppdrag
     'next_hendelse_nr_vakt_',   # teller, én skriving per KO-hendelse
     'cron.',                    # jobbstatus; vises bedre på server-status
+    'oppdrag.bro.',             # teller for G6b-broene; vises på server-status
 )
 
 

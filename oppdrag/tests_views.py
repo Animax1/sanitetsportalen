@@ -17,6 +17,7 @@ from core.models import AppSetting
 
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag, Statusmelding
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2098
 
@@ -52,7 +53,7 @@ class OppdragBasis(TestCase):
             vakt = vakt_for_year(vakt)
         vakt = vakt or self.vakt
         kwargs.setdefault('oppdragsnummer', neste_oppdragsnummer(vakt))
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=vakt, enhet=enhet or self.enhet,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=self.lokasjon, **kwargs)
@@ -172,7 +173,7 @@ class RadnivaaTests(OppdragBasis):
         oppdrag = self._oppdrag(self.enhet, fritekst='sensitivt notat',
                                 status=choices.LEDIG)
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.LEDIG, tidspunkt=timezone.now())
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.LEDIG, tidspunkt=timezone.now())
 
         raa = _klient(self.bruker).get('/oppdrag/api/oppdrag/').content.decode()
         self.assertNotIn('sensitivt notat', raa)
@@ -189,7 +190,7 @@ class RadnivaaTests(OppdragBasis):
         oppdrag = self._oppdrag(self.enhet, fritekst='sensitivt notat',
                                 status=choices.LEDIG)
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.LEDIG, tidspunkt=timezone.now())
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.LEDIG, tidspunkt=timezone.now())
         raa = _klient(_bruker('sentral6', 'les')).get(
             '/oppdrag/api/oppdrag/').content.decode()
         self.assertIn('sensitivt notat', raa)
@@ -197,7 +198,7 @@ class RadnivaaTests(OppdragBasis):
     def test_oppdrag_skjules_30_min_etter_ledig(self):
         oppdrag = self._oppdrag(self.enhet, status=choices.LEDIG)
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.LEDIG,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.LEDIG,
             tidspunkt=timezone.now() - timedelta(minutes=45))
         data = _klient(self.bruker).get('/oppdrag/api/oppdrag/').json()['data']
         self.assertEqual(data, [])
@@ -995,7 +996,7 @@ class OppdragsnummerTests(OppdragBasis):
         o = self._oppdrag()
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                Oppdrag.objects.create(
+                lag_oppdrag(
                     vakt=self.vakt, oppdragsnummer=o.oppdragsnummer,
                     enhet=self.enhet, problemstilling='Transport',
                     hastegrad='Vanlig', lokasjon=self.lokasjon)
@@ -1482,7 +1483,7 @@ class KorreksjonTests(StemplingBasis):
     def test_melding_utenfor_aktiv_vakt_gir_404(self):
         gammelt = self._oppdrag(vakt=AAR - 1, status=choices.FREMME)
         melding = Statusmelding.objects.create(
-            oppdrag=gammelt, status=choices.FREMME, tidspunkt=timezone.now())
+            oppdrag=gammelt, oppdragsenhet=gammelt.primaer, status=choices.FREMME, tidspunkt=timezone.now())
         resp = self._korriger(melding, timezone.now() - timedelta(minutes=1))
         self.assertEqual(resp.status_code, 404)
 
@@ -1686,7 +1687,7 @@ class EnhetskortetsOppdragsfelterTests(OppdragBasis):
         # En korreksjon: ny rad som peker på den gamle, ett minutt tidligere.
         gammel = Statusmelding.objects.gjeldende_for_status(oppdrag, choices.RYKKER_UT)
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.RYKKER_UT,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.RYKKER_UT,
             tidspunkt=gammel.tidspunkt - timedelta(minutes=1), korrigerer=gammel)
         self.assertEqual(
             c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag).status_code, 200)
@@ -1716,7 +1717,7 @@ class OppdragslistaStatustidspunktTests(OppdragBasis):
         gammel = services.sett_status(oppdrag, choices.RYKKER_UT)
         ny_tid = gammel.tidspunkt - timedelta(minutes=5)
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.RYKKER_UT,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.RYKKER_UT,
             tidspunkt=ny_tid, korrigerer=gammel)
         rad = next(r for r in self._liste() if r['id'] == oppdrag.pk)
         self.assertEqual(rad['status_tidspunkt'], ny_tid.isoformat())

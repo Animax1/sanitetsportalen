@@ -26,6 +26,7 @@ from ko.models import (HENDELSE_APEN, HENDELSE_LUKKET, KILDE_SYSTEM, Hendelse,
 from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
+from oppdrag.test_helpers import lag_oppdrag
 
 
 def _bruker(navn, **kwargs):
@@ -50,7 +51,7 @@ class _Grunnlag(TestCase):
     def _oppdrag(self, **felt):
         felt.setdefault('problemstilling', 'Fall')
         felt.setdefault('hastegrad', choices.HASTEGRAD[0])
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, lokasjon=self.lokasjon, **felt)
 

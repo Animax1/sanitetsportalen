@@ -292,6 +292,19 @@ function renderDisk(disk) {
   document.getElementById('disk-path').textContent = disk.sti || '';
 }
 
+function broTekst(broer) {
+  // G6b (14. okt. 2026): «Aldri brukt» er beviset for at broene kan fjernes
+  // etter vakta. Gul, ikke rød — en brukt bro er et funn, ikke en feil.
+  // Egen funksjon fordi den avgjør hva dashbordet påstår (testes i node).
+  if (!broer) return { tekst: '–', klasse: '' };
+  const brukt = Object.keys(broer).filter(n => broer[n]).sort();
+  if (!brukt.length) return { tekst: 'Aldri brukt', klasse: 'status-ok' };
+  const antall = brukt.reduce((s, n) => s + (broer[n].antall || 0), 0);
+  const siste = brukt.map(n => broer[n].siste || '').sort().pop();
+  return { tekst: 'Brukt ' + antall + ' g. (' + brukt.join(', ') + ')' + (siste ? ', sist ' + datoKlokke(siste) : ''),
+           klasse: 'status-warn' };
+}
+
 function renderVaktbilde(v) {
   const vakt = v.aktiv_vakt;
   setVal('vakt-navn', vakt ? vakt.navn : '–');
@@ -304,8 +317,10 @@ function renderVaktbilde(v) {
       o.ventende ? 'status-warn' : '');
     setVal('vakt-venter', o.trenger_ressurs + (o.eldste_ventende_minutter !== null ? ' · eldste ventende ' + o.eldste_ventende_minutter + ' min' : ''),
       o.trenger_ressurs ? 'status-crit' : '');
+    const broer = broTekst(o.broer);
+    setVal('vakt-broer', broer.tekst, broer.klasse);
   } else {
-    setVal('vakt-oppdrag', '–'); setVal('vakt-venter', '–');
+    setVal('vakt-oppdrag', '–'); setVal('vakt-venter', '–'); setVal('vakt-broer', '–');
   }
   const u = v.siste_utsending;
   if (u) {

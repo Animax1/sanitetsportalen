@@ -32,8 +32,9 @@ from accounts.models import CustomUser, ModulTilgang
 
 from . import choices, services
 from .statistikk import passiv_timer_for
-from .models import (Enhet, Enhetshendelse, Enhetstype, Lokasjon, Oppdrag,
+from .models import (Enhet, Enhetshendelse, Enhetstype, Lokasjon, 
                      Vaktmodusperiode)
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2026
 
@@ -66,7 +67,7 @@ class PassivBasis(TestCase):
         self.klient.force_login(self.operator)
 
     def _oppdrag(self, enhet=None):
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, enhet=enhet or self.lege,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=self.lokasjon,

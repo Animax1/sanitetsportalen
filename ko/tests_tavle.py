@@ -23,6 +23,7 @@ from vaktliste.models import Vaktliste
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
 
 from .tests_hendelseslogg import _bruker, _gi, skift
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class _Grunnlag(TestCase):
@@ -195,7 +196,7 @@ class HendelseneHarForrangTests(_Grunnlag):
 class BilenPaaOppdragTests(_Grunnlag):
 
     def _oppdrag(self, lokasjon=None):
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=lokasjon or self.park)

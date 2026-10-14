@@ -18,6 +18,7 @@ from core.modules import get_module, get_nav_modules, get_visible_modules, reset
 from oppdrag import choices, services
 from oppdrag.choices import validate_oppdrag_choice_fields
 from oppdrag.models import Enhet, Enhetsbytte, Lokasjon, Oppdrag, Statusmelding
+from oppdrag.test_helpers import lag_oppdrag
 
 
 AAR = 2098
@@ -42,7 +43,7 @@ def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst='', vakt=N
     from core.vakt import hent_aktiv_vakt
     if vakt is None:
         vakt = hent_aktiv_vakt()
-    return Oppdrag.objects.create(
+    return lag_oppdrag(
         vakt=vakt,
         oppdragsnummer=neste_oppdragsnummer(vakt),
         enhet=enhet,
@@ -352,7 +353,7 @@ class SynlighetForEnhetTests(TestCase):
 
     def _avslutt(self, oppdrag, minutter_siden):
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.LEDIG,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.LEDIG,
             tidspunkt=timezone.now() - timedelta(minutes=minutter_siden))
         # Statusen bor på koblingsraden (11. sep. 2026); oppdragets er
         # utledet av den. Hjelperen går utenom `sett_status` med vilje, og

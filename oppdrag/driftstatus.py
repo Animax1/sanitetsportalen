@@ -21,7 +21,7 @@ class OppdragDriftstatus(BaseDriftstatusHandler):
         `vakt_id=None` gir null rader. Det er riktig svar: det er ingenting
         på tavla når det ikke finnes en tavle.
         """
-        from oppdrag import choices
+        from oppdrag import bro, choices
         from oppdrag.models import Oppdrag
 
         tavla = Oppdrag.objects.filter(
@@ -36,6 +36,9 @@ class OppdragDriftstatus(BaseDriftstatusHandler):
                 'eldste_ventende_minutter': (
                     int((timezone.now() - eldste.created_at).total_seconds() / 60)
                     if eldste else None),
+                # G6b (14. okt. 2026): har broene fra deploy 1 blitt brukt i
+                # drift? `None` per bro er «aldri». Se `oppdrag/bro.py`.
+                'broer': bro.status(),
             },
         }
 

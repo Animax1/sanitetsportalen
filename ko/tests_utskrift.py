@@ -33,6 +33,7 @@ from patients.js_test_utils import JS_DIR, build_harness, extract_function, node
 
 from .tests_hendelseslogg import _gi, skift
 from .tests_program import _Program
+from oppdrag.test_helpers import lag_oppdrag
 
 URL = '/ko/utskrift/'
 SW_JS = JS_DIR / 'ko-sw.js'
@@ -214,7 +215,7 @@ class LoggenTests(_Utskrift):
 class OppdrageneTests(_Utskrift):
 
     def _oppdrag(self, problemstilling):
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, problemstilling=problemstilling, hastegrad='Akutt',
             lokasjon=self.park)
@@ -250,7 +251,7 @@ class TavlaTests(_Utskrift):
 
     def test_opptatt_har_forrang_og_bilen_krever_oppdragstilgang(self):
         tavle.plasser(self.vakt, self.bil, bruker=self.operator, lokasjon=self.club)
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, problemstilling='Pustevansker', hastegrad='Akutt', lokasjon=self.park)
         oservices.sett_status(o, choices.RYKKER_UT, enhet=self.enhet)

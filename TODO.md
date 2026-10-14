@@ -83,6 +83,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   står). Betingelsen var «la prod gå noen vakter med broene først», og det
                   har ikke vært en vakt siden flere enheter kom — neste vakt er den
                   første. Kolonnen er nødutgangen til modellen har vært i ekte bruk.
+                  **Forarbeidet er levert 14. okt.:** ingen test går gjennom broene, og
+                  i drift telles de (`oppdrag/bro.py`). **Før G6b:** se på
+                  `/portal-admin/server-status/` at «Broer i oppdrag (G6b)» står
+                  «Aldri brukt» etter vakta. Står det et tall, er det et funn — G6b venter.
                   **G6c, i en senere `main`-push enn G6b:** `DROP COLUMN`, og
                   `Statusmelding.oppdragsenhet` NOT NULL (med `SET CONSTRAINTS ALL
                   IMMEDIATE` om et dataskritt går foran). Backup før.
@@ -202,7 +206,8 @@ virkeligheten, og rekkefølgen under følger av det.*
       Funn går i `/backlog/`. **Og lastmålingen i §8** (4. okt. 2026): det reelle antallet
       faner i en time, og tallene inn i `docs/RUNBOOK_VAKT.md` der det står «Mål på
       staging» — se «Skalering mot 2027» under Ideer.
-- [ ] **Etter vakta:** arkivering, deretter G6b, og G6c i en *senere* `main`-push (se under).
+- [ ] **Etter vakta:** arkivering, «Broer i oppdrag» på server-status, deretter G6b — og G6c i
+      en *senere* `main`-push (se under).
 - [ ] **G2 (store filer): `vaktliste/views.py`, `vaktliste/services.py` og
       `oppdrag/services.py` gjenstår — men ikke `oppdrag/services.py` før G6b**, ellers
       skrives samme fil om to ganger med vakta imellom. Metoden fra `accounts/views.py` og

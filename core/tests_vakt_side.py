@@ -29,6 +29,7 @@ from core.vakt import hent_aktiv_vakt, vakt_for_year
 from oppdrag.models import OppdragArkiv
 from patients.models import Patient, VaktArkiv
 from patients.test_helpers import sett_aktiv_vakt
+from oppdrag.test_helpers import lag_oppdrag
 
 SIDE = '/portal-admin/vakt/'
 AVSLUTT = '/portal-admin/vakt/avslutt/'
@@ -195,9 +196,9 @@ class SidenTests(VaktsideBasis):
 
     def test_oversikten_og_sperrene_vises(self):
         from oppdrag import services
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from oppdrag.models import Enhet, Lokasjon
         Patient.objects.create(pasientnummer=1, vakt=self.vakt)
-        Oppdrag.objects.create(
+        lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=services.neste_oppdragsnummer(self.vakt),
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=Lokasjon.objects.create(navn='Scene'),

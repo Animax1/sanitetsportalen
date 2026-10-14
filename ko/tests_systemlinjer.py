@@ -21,6 +21,7 @@ from ko import signals, systemlinjer
 from ko.models import KILDE_SYSTEM, Logglinje
 from oppdrag import choices, services as oservices
 from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class ListaErEnKontraktTests(TestCase):
@@ -99,7 +100,7 @@ class LoftetSkjerTests(TestCase):
         self.lokasjon = Lokasjon.objects.create(navn='Scene sør')
 
     def _opprett(self):
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=self.vakt,
             oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet,
@@ -333,7 +334,7 @@ class MottakerneKasterIkkeTests(TestCase):
         enhet = Enhet.objects.create(navn='HGSD 56')
         lokasjon = Lokasjon.objects.create(navn='Scene sør')
         with patch('ko.signals.systemlinje', side_effect=RuntimeError('nei')):
-            oppdrag = Oppdrag.objects.create(
+            oppdrag = lag_oppdrag(
                 vakt=vakt, oppdragsnummer=1, enhet=enhet,
                 problemstilling='Brystsmerter', lokasjon=lokasjon,
                 hastegrad=choices.HASTEGRAD[0])
@@ -368,7 +369,7 @@ class MottakerneKasterIkkeTests(TestCase):
             username='bil_a3', password='x', role='bruker', must_change_password=False)
         ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
         enhet = Enhet.objects.create(navn='HGSD 56', user=bil)
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=vakt, oppdragsnummer=1, enhet=enhet,
             problemstilling='Brystsmerter', lokasjon=Lokasjon.objects.create(navn='Scene sør'),
             hastegrad=choices.HASTEGRAD[0])

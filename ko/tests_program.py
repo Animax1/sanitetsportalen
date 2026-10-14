@@ -20,6 +20,7 @@ from vaktliste.test_helpers import AMBULANSE, LAG, gruppe
 
 from .tests_hendelseslogg import _bruker, _gi
 from .tests_tavle import _Grunnlag
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class _Program(_Grunnlag):
@@ -605,12 +606,11 @@ class PlanMotFaktiskTests(_Program):
         self.assertEqual(rad['endringer'], 2)
 
     def test_oppdrag_paa_stedet_mens_konserten_paagikk(self):
-        from oppdrag.models import Oppdrag
         from oppdrag.services import neste_oppdragsnummer
         self.fra, self.til = self.naa - timedelta(minutes=5), self.naa + timedelta(hours=1)
         self._lagre()
         for sted in (self.park, self.park, self.club):
-            Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
+            lag_oppdrag(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
                                    problemstilling='Fall', hastegrad='Akutt', lokasjon=sted)
         self.assertEqual(self._rad()['oppdrag'], 2)
 
@@ -625,7 +625,7 @@ class PlanMotFaktiskTests(_Program):
         self.fra, self.til = self.naa - timedelta(minutes=5), self.naa + timedelta(hours=1)
         self._lagre()
         for _ in range(2):
-            o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
+            o = lag_oppdrag(vakt=self.vakt, oppdragsnummer=neste_oppdragsnummer(self.vakt),
                                        problemstilling='Fall', hastegrad='Akutt', lokasjon=self.park)
         Oppdrag.objects.filter(pk=o.pk).update(created_at=self.fra - timedelta(minutes=1))
         self.assertEqual(self._rad()['oppdrag'], 1)

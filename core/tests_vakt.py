@@ -18,6 +18,7 @@ from patients.models import Patient, VaktArkiv
 from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2098
 
@@ -176,16 +177,16 @@ class VerifiserVaktTests(TestCase):
         """
         from django.db import IntegrityError, transaction
 
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from oppdrag.models import Enhet, Lokasjon
         enhet = Enhet.objects.create(navn='H56')
         lokasjon = Lokasjon.objects.create(navn='Scene')
         vakt = hent_aktiv_vakt()
-        Oppdrag.objects.create(
+        lag_oppdrag(
             vakt=vakt, oppdragsnummer=1, enhet=enhet,
             problemstilling='Transport', hastegrad='Vanlig', lokasjon=lokasjon)
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                Oppdrag.objects.create(
+                lag_oppdrag(
                     vakt=vakt, oppdragsnummer=1, enhet=enhet,
                     problemstilling='Transport', hastegrad='Vanlig',
                     lokasjon=lokasjon)

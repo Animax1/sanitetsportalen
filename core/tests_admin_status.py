@@ -8,6 +8,7 @@ from accounts.models import CustomUser
 
 from .middleware import metrics_store, _MetricsStore
 from accounts.test_helpers import gi_standardtilgang
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class MetricsStoreTests(TestCase):
@@ -717,7 +718,7 @@ class UtvidetStatusTests(TestCase):
     def test_vaktbilde(self):
         from django.utils import timezone
         from oppdrag import choices
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from oppdrag.models import Enhet, Lokasjon
         from core.vakt import hent_aktiv_vakt
         from vaktliste.models import Vaktliste
         from vaktliste import choices as vl
@@ -728,7 +729,7 @@ class UtvidetStatusTests(TestCase):
         lok = Lokasjon.objects.create(navn='Scene')
 
         def lag(nr, **kw):
-            return Oppdrag.objects.create(vakt=vakt, oppdragsnummer=nr, enhet=enhet, lokasjon=lok,
+            return lag_oppdrag(vakt=vakt, oppdragsnummer=nr, enhet=enhet, lokasjon=lok,
                                           problemstilling='Udefinert', hastegrad='Akutt', **kw)
         lag(1, status=choices.VENTER)
         lag(2, status=choices.VENTER, trenger_ressurs=True)

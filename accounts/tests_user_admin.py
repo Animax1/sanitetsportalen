@@ -15,6 +15,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from accounts.test_helpers import gi_standardtilgang
+from oppdrag.test_helpers import lag_oppdrag
 
 
 def _create_session_for_user(user):
@@ -511,10 +512,10 @@ class EnhetFolgerKontoenTests(TestCase):
             {'confirm_username': bruker.username})
 
     def _gi_oppdrag(self):
-        from oppdrag.models import Lokasjon, Oppdrag
+        from oppdrag.models import Lokasjon
         from oppdrag.services import neste_oppdragsnummer
         vakt = vakt_for_year(2098)
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=vakt, oppdragsnummer=neste_oppdragsnummer(vakt),
             enhet=self.enhet, problemstilling='Pustevansker',
             hastegrad='Akutt',
@@ -541,11 +542,11 @@ class EnhetFolgerKontoenTests(TestCase):
     def test_bil_nummer_to_pensjoneres_ikke_500(self):
         """Bilen står på et oppdrag bare som koblingsrad — ikke i
         `Oppdrag.enhet`. Sjekken så bare det feltet, og `delete()` smalt."""
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag, Oppdragsenhet
+        from oppdrag.models import Enhet, Lokasjon, Oppdragsenhet
         from oppdrag.services import neste_oppdragsnummer
         annen = Enhet.objects.create(navn='Karmøy 12')
         vakt = vakt_for_year(2098)
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=vakt, oppdragsnummer=neste_oppdragsnummer(vakt), enhet=annen,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=Lokasjon.objects.create(navn='Hovedscene'))

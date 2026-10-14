@@ -30,7 +30,8 @@ derfra til `staging` (het `rollemodell` til 25. sep. 2026), og til `main` **bare
 André har sagt fra**. Byggnummeret i footeren skal stemme med commit-en som ble pushet.
 
 **En push er ikke ferdig før CI er grønn på den SHA-en** (André, 30. sep. 2026: «vent på
-ci svar før du er ferdig»). `e81709d` var grønn på SQLite og rød i CI, som er PostgreSQL.
+ci svar før du er ferdig»). `e81709d` var grønn på SQLite og rød i CI, som er PostgreSQL. **Og ikke før bygget er ute:** feiler
+CI, står commit-en SKIPPED i Railway, og en grønn re-run deployer den ikke (`fa17627`, 13. okt.).
 Kjør suiten mot en lokal PostgreSQL før push — er bare `.md`-filer endret, dokumenttestene (se Commands).
 
 **Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Regelen sto her fra
@@ -316,6 +317,9 @@ ikke hadde noe flagg kunne ikke gates i det hele tatt.
 Profilen oppgis eksplisitt — `leser`, `skriver`, `leder_les`, `leder`, `admin` — fordi
 rollen ikke lenger sier noe om tilgang. En bruker uten rader er stengt ute av modulen, så
 en test som glemmer kallet tester 403-stien uten å vite det.
+
+**Oppdrag lages med `oppdrag.test_helpers.lag_oppdrag`** (14. okt. 2026): broene fra deploy 1
+kaster under test, og telles i drift — `oppdrag/bro.py`.
 
 ### Klient-IP og data inn i `<script>` (core/klientip.py, core/jsdata.py)
 

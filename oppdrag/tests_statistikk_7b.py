@@ -22,6 +22,7 @@ from .arkiv import OppdragArkivHandler, arkiver_vakt
 from .models import ArkivertOppdrag, Enhet, Enhetshendelse, Enhetstype, Lokasjon, Oppdrag
 from .statistikk import (_i_hastegradrekkefolge, _p90, _sd, _timebolker,
                          arkiv_stats, oppdrag_stats)
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2096
 
@@ -46,7 +47,7 @@ class Basis(TestCase):
     def _oppdrag(self, *, enhet='a1', hastegrad='Akutt', problemstilling='Pustevansker',
                  opprettet=0, varslet=None, **felter):
         enhet = getattr(self, enhet) if isinstance(enhet, str) else enhet
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=services.neste_oppdragsnummer(self.vakt),
             enhet=enhet, problemstilling=problemstilling, hastegrad=hastegrad,
             lokasjon=self.lokasjon, **felter)

@@ -20,6 +20,7 @@ from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
 from vaktliste.intervaller import slaa_sammen
 from vaktliste.statistikk import bemanning_stats, lengste_hull
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class IntervallTests(TestCase):
@@ -87,7 +88,7 @@ class Basis(TestCase):
             avmeldt_at=self._t(fra) if avmeldt else None)
 
     def _oppdrag(self, enhet, opprettet, ledig=None):
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=enhet, lokasjon=self.lokasjon, problemstilling='Fall', hastegrad='Haster')
         Oppdrag.objects.filter(pk=o.pk).update(created_at=self._t(opprettet))

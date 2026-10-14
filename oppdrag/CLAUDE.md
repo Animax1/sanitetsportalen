@@ -23,6 +23,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | **Uten pasient: Drift og Plassering** — driftens problemstillinger, aldri grovsortering, intet grovmerke | `choices.UTEN_PASIENT`; JS har lista inne i `_kanGrovsortere`/`grovKrevesFor`/`_grovMerke` fordi harnessene henter funksjoner alene |
 | Grovsorteringen har **«Ikke aktuelt»** (grått) — teller som satt | `choices.GROVSORTERING`, `.grov-ikke_aktuelt` |
 | «Trenger ny ressurs» spør **to** ting: er noen på vei, *og* var noen framme | `services.trenger_ny_ressurs()` |
+| **Broene fra deploy 1 telles** (14. okt.): kaster under test, telles i drift, vises på server-status. G6b fjerner dem når det står «Aldri brukt» | `bro.py`, `test_helpers.lag_oppdrag` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
 | Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut og Fremme, Behandlet på sted i Fremme — **«Utført»** på Drift og Plassering | `services.BILEN_KAN_LEDIG_FRA`, `AVBRYT_FRA`, `ALTERNATIV`, `alternativ_for()`, `choices.status_navn_for` |
 | «Avreist → Annet sted» har et **fritekstfelt** (`Statusmelding.sted_tekst`, 19. sep.): bilen og føringen sender det i kroppen, bare ved `annet`; arves av korreksjon; aldri verdilogget | `_sted_tekst`, `STEMPLING_TILLATTE_NOKLER`, `choices.sted_navn_for`, `stempleAnnetSted` i bilen |
@@ -176,7 +177,7 @@ ble regnet ut, ville et oppdrag hun kjørte i passiv vakt hoppet over til «akti
 gikk aktiv neste morgen — og hele poenget med å dokumentere passiv tid ville vært borte.
 **Broen i `Oppdrag.save()` stempler den også** — den lager den *første* koblingsraden, og
 uten stempelet talte `oppdrag_i_passiv` bare enheter lagt til etterpå (funnet av en mutant).
-**Siden 26. sep. 2026 (A1) når bare testene broen:** POST oppretter med `enhet=None` og
+**Siden 26. sep. 2026 (A1) når bare testene broen, og fra 14. okt. bare `BroenTests`:** POST oppretter med `enhet=None` og
 varsler *alle* enhetene gjennom `varsle_enhet` — broen gikk utenom bjella, så den første
 bilen fikk ingen rad. Første steg mot deploy 2.
 

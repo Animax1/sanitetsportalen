@@ -61,6 +61,7 @@ from patients.models import Forstehjelper, Helsepersonell, Patient
 from core.models import AppSetting, Backup
 from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
+from oppdrag.test_helpers import lag_oppdrag
 
 
 # Felles testmappe for backup-filer.
@@ -1873,7 +1874,7 @@ class AlleFileneGjenopprettesTests(TestCase):
     def _seed(self):
         from datetime import timedelta
 
-        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from oppdrag.models import Enhet, Lokasjon
         from patients.models import Forstehjelper, Patient
         from vaktliste.models import (
             Korps, Mannskap, Ressurs, Ressursgruppe, Vaktliste, Vaktpost,
@@ -1886,7 +1887,7 @@ class AlleFileneGjenopprettesTests(TestCase):
                                    problemstilling='Test', forstehjelper=fh)
         lok = Lokasjon.objects.create(navn='Scene')
         enhet = Enhet.objects.create(navn='Bil 1')
-        Oppdrag.objects.create(vakt=vakt, oppdragsnummer=1, enhet=enhet,
+        lag_oppdrag(vakt=vakt, oppdragsnummer=1, enhet=enhet,
                                problemstilling='Udefinert', hastegrad='Gul',
                                lokasjon=lok)
         korps = Korps.objects.create(navn='Testkorps')

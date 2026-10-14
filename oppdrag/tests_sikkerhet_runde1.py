@@ -26,7 +26,7 @@ class Basis(TestCase):
 
     def _ledig_for(self, oppdrag, minutter):
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.LEDIG,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.LEDIG,
             tidspunkt=timezone.now() - timedelta(minutes=minutter))
         oppdrag.enheter.update(status=choices.LEDIG)
         Oppdrag.objects.filter(pk=oppdrag.pk).update(status=choices.LEDIG)

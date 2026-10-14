@@ -22,6 +22,7 @@ from core.backup import KIND_MANUAL, create_backup, restore_backup
 
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, Oppdragsenhet, Statusmelding
+from oppdrag.test_helpers import lag_oppdrag
 
 
 AAR = 2098
@@ -54,7 +55,7 @@ class FlereEnheterBasis(TestCase):
 
     def _oppdrag(self, enhet=None, **kwargs):
         kwargs.setdefault('oppdragsnummer', services.neste_oppdragsnummer(self.vakt))
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, enhet=enhet or self.a,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=self.lokasjon, **kwargs)
@@ -65,16 +66,65 @@ class FlereEnheterBasis(TestCase):
         return o
 
 
+@override_settings(OPPDRAG_BRO_KASTER=False)
 class BroenTests(FlereEnheterBasis):
-    """`Oppdrag.enhet` lever til deploy 2, og all eldre kode går gjennom den."""
+    """`Oppdrag.enhet` lever til deploy 2, og broene med den — **testet her og
+    bare her**. Resten av suiten oppretter uten bro (`lag_oppdrag`, 14. okt.
+    2026), og broen kaster under test; denne klassen slår det av, og går
+    gjennom `Oppdrag.objects.create` med vilje. G6b sletter klassen."""
+
+    def _via_broen(self, enhet, **kwargs):
+        return Oppdrag.objects.create(
+            vakt=self.vakt, enhet=enhet, oppdragsnummer=services.neste_oppdragsnummer(self.vakt),
+            problemstilling='Pustevansker', hastegrad='Akutt', lokasjon=self.lokasjon, **kwargs)
 
     def test_oppdrag_med_enhet_faar_en_koblingsrad(self):
-        o = self._oppdrag(self.a, status=choices.FREMME)
+        o = self._via_broen(self.a, status=choices.FREMME)
         rader = list(o.enheter.all())
         self.assertEqual(len(rader), 1)
         self.assertEqual(rader[0].enhet, self.a)
         self.assertEqual(rader[0].status, choices.FREMME)
         self.assertEqual(o.primaer, rader[0])
+
+    def test_broen_stempler_modusen_paa_den_forste_raden(self):
+        """Mutanten fra 16. sep. 2026: uten stempelet talte `oppdrag_i_passiv`
+        bare enhetene som ble lagt til etterpå. Prøvde gjennom `_oppdrag` til
+        14. okt. — som nå er `lag_oppdrag`, så her går den gjennom broen."""
+        from oppdrag.models import Enhetstype
+        self.a.enhetstype = Enhetstype.objects.create(navn='Lege', kan_passiv_vakt=True)
+        self.a.passiv_vakt = True
+        self.a.save(update_fields=['enhetstype', 'passiv_vakt'])
+        o = self._via_broen(self.a)
+        self.assertEqual(o.primaer.varslet_modus, 'passiv')
+
+    def test_hjelperen_lager_samme_rad_som_broen(self):
+        """**Beviset for omskrivingen 14. okt. 2026**: 615 tester gikk fra
+        broen til `lag_oppdrag`, og prøver bare det samme som før hvis de to
+        gir samme oppdrag og samme koblingsrad — felt for felt."""
+        from django.contrib.auth import get_user_model
+        from oppdrag.models import Enhetstype
+        self.a.enhetstype = Enhetstype.objects.create(navn='Lege', kan_passiv_vakt=True)
+        self.a.passiv_vakt = True
+        self.a.save(update_fields=['enhetstype', 'passiv_vakt'])
+        av = get_user_model().objects.create_user(username='g6b_av', password='x')
+        felt = ('enhet_id', 'status', 'varslet_av_id', 'rekkefolge', 'varslet_modus')
+
+        def bilde(o):
+            o.refresh_from_db()
+            rader = [tuple(getattr(r, f) for f in felt) for r in o.enheter.all()]
+            return o.enhet_id, o.status, rader
+
+        for status in (choices.VENTER, choices.FREMME, choices.LEDIG):
+            with self.subTest(status=status):
+                bro = self._via_broen(self.a, status=status, opprettet_av=av)
+                hjelper = self._oppdrag(self.a, status=status, opprettet_av=av)
+                self.assertEqual(bilde(bro), bilde(hjelper))
+                self.assertEqual(len(bilde(hjelper)[2]), 1)
+        # Uten enhet: ingen rad fra noen av dem.
+        self.assertEqual(lag_oppdrag(
+            vakt=self.vakt, oppdragsnummer=services.neste_oppdragsnummer(self.vakt),
+            problemstilling='Pustevansker', hastegrad='Akutt',
+            lokasjon=self.lokasjon).enheter.count(), 0)
 
     def test_melding_uten_koblingsrad_havner_paa_den_primaere(self):
         o = self._to_enheter()
@@ -1796,7 +1846,7 @@ class LedigSidenTests(FlereEnheterBasis):
             navn='I fjor', year=AAR - 1,
             startet=timezone.now() - timedelta(days=365), er_aktiv=False)
         naa = timezone.now() - timedelta(days=365)
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=gammel_vakt, enhet=self.a, problemstilling='Pustevansker',
             hastegrad='Akutt', lokasjon=self.lokasjon,
             oppdragsnummer=services.neste_oppdragsnummer(gammel_vakt))

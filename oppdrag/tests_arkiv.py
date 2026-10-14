@@ -24,6 +24,7 @@ from oppdrag.models import (
     ArkivertOppdrag, Enhet, Lokasjon, Oppdrag, OppdragArkiv,
 )
 from oppdrag.statistikk import arkiv_stats, oppdrag_stats
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2098
 
@@ -47,7 +48,7 @@ class ArkivBasis(TestCase):
         }
         felter.update(kwargs)
         vakt = felter.pop('vakt', self.vakt)
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=vakt, oppdragsnummer=services.neste_oppdragsnummer(vakt),
             **felter)
         opprettet = self.naa - timedelta(minutes=minutter_siden)

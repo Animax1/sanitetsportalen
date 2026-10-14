@@ -325,6 +325,12 @@ git push origin HEAD:main            # prod
 Railway auto-deployer fra begge. Følg prosessen under **Deployments**, og sammenlign
 **byggnummeret i footeren** med commit-en du pushet – de skal stemme.
 
+**Railway venter på CI.** Feiler kjøringen, står commit-en som **SKIPPED** («CI check
+suite failed») — og blir stående slik selv om en ny kjøring av samme commit blir grønn.
+Da må den deployes for hånd: **⋮ → Redeploy** på kortet. Ikke en tom commit for å tvinge
+den ut: da peker byggnummeret i footeren på en commit uten innhold. (`fa17627`,
+13. okt. 2026: CI døde på nedlasting av PostgreSQL-imaget før en test hadde kjørt.)
+
 ### Migrasjoner og release-vinduet
 
 `release` kjører før containerbyttet, så mellom `migrate` og byttet står **gammel kode og

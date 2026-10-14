@@ -31,6 +31,7 @@ from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+from oppdrag.test_helpers import lag_oppdrag
 
 
 def skift(ressurs, fra=-1, til=7):
@@ -77,7 +78,7 @@ class _Grunnlag(TestCase):
         return services.opprett_hendelse(self.vakt, tittel, bruker=self.operator, **kw)
 
     def _oppdrag(self):
-        return Oppdrag.objects.create(
+        return lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, lokasjon=self.lokasjon, problemstilling='Fall',
             hastegrad=choices.HASTEGRAD[0])
@@ -726,7 +727,7 @@ class PorteneTests(TestCase):
         _gi(self.skriver, 'oppdrag', 'skriv_full')
         enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
         lok = Lokasjon.objects.create(navn='Scene')
-        o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
+        o = lag_oppdrag(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
                                    problemstilling='Fall', hastegrad=choices.HASTEGRAD[0])
         services.knytt_oppdrag(o, h, bruker=self.skriver)
         return o

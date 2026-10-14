@@ -21,6 +21,7 @@ from patients.test_helpers import sett_aktiv_vakt
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, Statusmelding
 from oppdrag.statistikk import oppdrag_stats
+from oppdrag.test_helpers import lag_oppdrag
 
 AAR = 2098
 
@@ -37,7 +38,7 @@ class OppdragStatsBasis(TestCase):
     def _oppdrag(self, *, vakt=None, hastegrad='Akutt',
                  problemstilling='Pustevansker', enhet=None, minutter_siden=60):
         vakt = vakt or self.vakt
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=vakt,
             oppdragsnummer=services.neste_oppdragsnummer(vakt),
             enhet=enhet or self.enhet,
@@ -178,10 +179,10 @@ class NegativVarighetTests(OppdragStatsBasis):
         """
         oppdrag = self._oppdrag()
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.RYKKER_UT,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.RYKKER_UT,
             tidspunkt=oppdrag.created_at + timedelta(minutes=20))
         Statusmelding.objects.create(
-            oppdrag=oppdrag, status=choices.FREMME,
+            oppdrag=oppdrag, oppdragsenhet=oppdrag.primaer, status=choices.FREMME,
             tidspunkt=oppdrag.created_at + timedelta(minutes=5))
 
         data = oppdrag_stats(self.vakt)

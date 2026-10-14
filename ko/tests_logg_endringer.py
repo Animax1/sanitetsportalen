@@ -25,6 +25,7 @@ from ko.models import Logglinje
 from oppdrag.endringer import OPPDRAG
 
 from .tests_tavle import PorteneTests, _Grunnlag
+from oppdrag.test_helpers import lag_oppdrag
 
 
 class _Teller(_Grunnlag):
@@ -86,8 +87,7 @@ class OppdragslistaFraKoTests(_Teller):
     def test_deling_med_ett_oppdrag_alene(self):
         """«Del med <enhet>» lager bare en `Linjedeling` — linja røres ikke."""
         from oppdrag import services as oppdrag_services
-        from oppdrag.models import Oppdrag
-        o = Oppdrag.objects.create(vakt=self.vakt, enhet=self.enhet, hendelse=self.h, lokasjon=self.park,
+        o = lag_oppdrag(vakt=self.vakt, enhet=self.enhet, hendelse=self.h, lokasjon=self.park,
                                    problemstilling='Pustevansker', hastegrad='Akutt',
                                    oppdragsnummer=oppdrag_services.neste_oppdragsnummer(self.vakt))
         linje = services.skriv_linje(self.vakt, 'Pasient våken', bruker=self.operator, hendelse=self.h)

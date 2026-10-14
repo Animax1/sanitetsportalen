@@ -23,6 +23,7 @@ from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+from oppdrag.test_helpers import lag_oppdrag
 
 
 def _bruker(navn, **kw):
@@ -69,7 +70,7 @@ class Basis(TestCase):
         return services.lukk_hendelse(h, bruker=self.op, confirm=True, naa=self._t(minutter))
 
     def _oppdrag(self, h=None, *, opprettet=0, enhet=None):
-        o = Oppdrag.objects.create(
+        o = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=enhet or self.enhet, lokasjon=self.lokasjon, problemstilling='Fall',
             hastegrad='Haster')

@@ -457,6 +457,9 @@ class Oppdrag(BaseTimeStampedModel):
         ny = self._state.adding
         super().save(*args, **kwargs)
         if ny and self.enhet_id and not self.enheter.exists():
+            # Telt (14. okt. 2026): G6b fjerner broen på bevis — `oppdrag/bro.py`.
+            from .bro import bro_brukt
+            bro_brukt('oppdrag', self.pk)
             # **Modusen stemples her også** (16. sep. 2026). Den *første*
             # enheten på et oppdrag får koblingsraden sin herfra, ikke fra
             # `varsle_enhet` — så uten dette ville «oppdrag i passiv tid» bare
@@ -785,9 +788,14 @@ class Statusmelding(BaseTimeStampedModel):
         # Broen (§2.3): en melding laget med bare `oppdrag` hører til
         # oppdragets primære enhet. Alle nye veier inn oppgir koblingsraden
         # eksplisitt; dette er for koden og testene som ennå ikke gjør det.
+        # Begge grenene telles (14. okt. 2026) — `oppdrag/bro.py`.
         if self.oppdragsenhet_id is None and self.oppdrag_id is not None:
+            from .bro import bro_brukt
+            bro_brukt('statusmelding', self.oppdrag_id)
             self.oppdragsenhet = self.oppdrag.primaer
         elif self.oppdrag_id is None and self.oppdragsenhet_id is not None:
+            from .bro import bro_brukt
+            bro_brukt('statusmelding_oppdrag', self.oppdragsenhet.oppdrag_id)
             self.oppdrag_id = self.oppdragsenhet.oppdrag_id
         super().save(*args, **kwargs)
 

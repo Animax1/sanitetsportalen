@@ -28,6 +28,7 @@ from oppdrag import services as oppdrag_services
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, OppdragArkiv
 from patients.models import ArkivertPasient, Patient, VaktArkiv
 from patients.test_helpers import sett_aktiv_vakt
+from oppdrag.test_helpers import lag_oppdrag
 
 URL = '/portal-admin/vakt/avslutt/'
 
@@ -58,7 +59,7 @@ class AvsluttVaktTests(TestCase):
             Patient.objects.create(pasientnummer=nr, vakt=self.vakt, problemstilling='Svimmelhet')
 
     def _oppdrag(self, *, paa_tavla=False):
-        oppdrag = Oppdrag.objects.create(
+        oppdrag = lag_oppdrag(
             vakt=self.vakt, oppdragsnummer=oppdrag_services.neste_oppdragsnummer(self.vakt),
             problemstilling='Pustevansker', hastegrad='Akutt', lokasjon=self.lokasjon,
             enhet=self.enhet)
