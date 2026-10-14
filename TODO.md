@@ -205,7 +205,8 @@ virkeligheten, og rekkefølgen under følger av det.*
       på flere biler per oppdrag. Testsjekklistene for KO og vaktlista kjøres i forkant.
       Funn går i `/backlog/`. **Og lastmålingen i §8** (4. okt. 2026): det reelle antallet
       faner i en time, og tallene inn i `docs/RUNBOOK_VAKT.md` der det står «Mål på
-      staging» — se «Skalering mot 2027» under Ideer.
+      staging» — se «Skalering mot 2027» under Ideer. **Og «Broer i oppdrag» på
+      server-status i §9** (14. okt. 2026), før staging gjenopprettes.
 - [ ] **Etter vakta:** arkivering, «Broer i oppdrag» på server-status, deretter G6b — og G6c i
       en *senere* `main`-push (se under).
 - [ ] **G2 (store filer): `vaktliste/views.py`, `vaktliste/services.py` og

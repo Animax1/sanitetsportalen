@@ -193,6 +193,11 @@ sekundet i 48 timer. Se «Skalering mot 2027» i `TODO.md`.
       responstiden er per bil.
 - [ ] **Avslutt vakta i pasientregistreringen** («Avslutt vakt»). Den tar backup først.
 - [ ] `/portal-admin/backup/`: backupene er skrevet, og **offsite står grønt**.
+- [ ] **Server-status → «Broer i oppdrag (G6b)» står fortsatt «Aldri brukt»** (14. okt.
+      2026, `oppdrag/bro.py`). Prøven kjører de samme veiene som vakta, så et tall her er
+      et funn: noter tidspunktet som står, og hva som ble prøvd da — det sier hvilken vei
+      som fortsatt går gjennom en bro. **Les av før gjenopprettingen under**, som kan
+      nullstille telleren.
 - [ ] Til slutt, om staging skal tilbake til utgangspunktet: gjenopprett fra backupene i
       §0 på `/portal-admin/backup/`.
 
@@ -212,4 +217,5 @@ begge.
 |---|---|
 | Ingen funn, eller bare småting | Bygget kan gå til `main`. G6b/G6c tas etter vakta som planlagt |
 | Funn i flyten med flere biler | Rettes før vakta. Nødutgangen (den gamle kolonnen) blir stående |
+| «Broer i oppdrag» viser et tall | En vei går fortsatt gjennom en bro. Finn den før vakta; G6b venter til den er borte og telleren har stått på «Aldri brukt» gjennom vakta |
 | Funn som krever endringer etter fastfrysingen | Rett bare det som må rettes, og kjør de berørte delene av prøven på nytt |

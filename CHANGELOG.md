@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Generalprøven leser av broene  `#oppdrag` `#generalprove`
+
+André 14. okt. 2026, etter at staging viste «Aldri brukt»: «Jeg antar at det og er verdifullt
+når vi tester appen og ikke minst general prøven?» Ja — prøven kjører de samme veiene som
+vakta, tre–fire uker før, og et tall der gir tid til å rette før frysingen.
+`docs/GENERALPROVE.md` §9 har fått avlesningen, **før** gjenopprettingen fra backup som kan
+nullstille telleren, og «Etterpå»-tabellen en rad for utfallet. Staging kan ikke bevise alt:
+gamle statusmeldinger uten koblingsrad finnes bare i prod, så telleren må fortsatt til `main`
+før vakta.
+
 ## 2026-10-14 — G6b-forarbeid: broene telles i drift, kaster under test, og ingen test går gjennom dem  `#oppdrag` `#gjeld`
 
 **Hvorfor:** G6b fjerner broene fra deploy 1 av flere enheter etter neste vakt. André
