@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-14 — Ordboka bygget: «tavla» → «tavlen», «oppdragslisten» i `/oppdrag/`, «Ukjent ressurs» → «Ukjent enhet»  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
+
+André: «Nei vi gjør ferdig ordboka nå.» Svarene står i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md`
+§4; dette er byggingen. **47 filer, bare tekst brukeren ser** — modellene, URL-ene,
+`trenger_ressurs`, `paa_tavla` og CSS-klassene heter det samme.
+
+**A — -en-form i hele portalen,** ikke bare `/vaktliste/`: rundt 130 steder i sju moduler.
+«Vakta avsluttes», «Kunne ikke hente lista», «Tavla viser vaktlistas ressurser», «Fila er
+ikke en kryptert backup» heter nå «Vakten», «listen», «Tavlen … vaktlistens», «Filen».
+Byttet ble gjort *inne i tekstsegmentene leseren gir ut*, aldri i kode eller kommentarer,
+og 13 f-strenger tatt for hånd. «KO-tavla» → «KO-tavlen» også som valgetikett i park
+(`park/0004_ko_tavlen`, bare `choices`, ingen SQL).
+
+**D — «tavla» i `/oppdrag/` er oppdragslisten:** «står gult i oppdragslisten», «Hent
+tilbake til oppdragslisten», «Enheter rydder ikke oppdragslisten», «N oppdrag står fortsatt
+i oppdragslisten» (sperren i «Avslutt vakt»), og i KO der det gjelder oppdragene: «Ingen
+oppdrag i oppdragslisten», «Oppdragene blir stående i oppdragslisten». Server-status:
+«Oppdrag i oppdragslisten».
+
+**B — samlingen er «ressurser», én er «enhet»:** «Ressursoversikt» og «Ressurser» står.
+«Ukjent ressurs» → «Ukjent enhet» (×3), «Ressursen finnes ikke lenger» → «Enheten …»,
+kolonnen «Ressurs» → «Enhet» i utskriften og besøkstabellen, «hvor ressursen er» → «hvor
+enheten er», systemlinja om «en ressurs man tror man har» → «enhet», og «Vaktlistas
+ressurser uten oppdragsenhet» → «Vaktlistens enheter uten delt konto». «ressursgruppe» →
+«ressurstype» i KOs program.
+
+**C — «Trenger ressurs» står**, og frasene som hører til («Oppdrag uten ressurs»,
+«Avbrutt — trenger ny ressurs», «Ingen ressurs», «Tildelt ressurs») er en navngitt
+tillatt-liste i vakten.
+
+**Leseren flyttet til `core/ordboka.py`, og tre blindsoner ble funnet da den ble brukt
+utenfor vaktlista:**
+- **f-strenger var usynlige.** Fra Python 3.12 er en f-streng `FSTRING_START/MIDDLE/END`,
+  ikke `STRING` — «står fortsatt på tavla» i `oppdrag/vaktslutt.py` og «er ikke den aktive
+  vakta» i `core/vaktslutt.py` sto utenfor. Vaktlistevakten har vært grønn uten å lese dem
+  (den er fortsatt grønn med dem).
+- **`/"/g` velte leseren** (`notifications.js`, `IndexError`): en `"` i en regex ble lest
+  som starten på en streng. En streng i `'`/`"` kan ikke gå over linjeskift — finnes ingen
+  slutt før det, var tegnet noe annet.
+- **«KO-tavla» slapp forbi grensen** (bindestrek i lookbehind), men å fjerne den slapp inn
+  `data-tavle-ressurs="` fra mal-strenger delt av `${...}`. Grensen står; sammensetningen er
+  eget mønster.
+- **Sammensatte ord sto igjen:** «Nullstill oppdragslista», «Nattevakta», «Artistlista»,
+  «modulfila» — grensen krever at ordet står alene. Endelsen avgjør nå (`_SAMMEN`), og de
+  fire er byttet; «oppdragslista» er oppdragslisten, svar D.
+
+**Vaktene:** `core/tests_ordboka.py` (-en-formen i alle moduler og de felles filene, og
+leserens blindsoner), `oppdrag/tests_ordboka.py` (D, B, C) og `ko/tests_ordboka.py` (B, C).
+**6 mutanter** — «tavlen» tilbake i `/oppdrag/`, «Ukjent ressurs» tilbake, C-unntaket fjernet,
+f-strengstøtten fjernet, bindestreken ut av grensen, sammensetningene ut — 6 drept. Den nye
+vakten fant selv én «KO-tavla» som byttet hadde gått forbi.
+
+**16 eksisterende tester sjekket den gamle teksten ordrett** («står fortsatt på tavla»,
+«Fra KO-tavla», «fra vaktlista», «Ukjent ressurs» …) og er oppdatert til de nye ordene —
+ingen av dem pekte på endret oppførsel. Hele suiten mot PostgreSQL er grønn.
+
+TODO: «Se over ordboka på staging før `main`» under «Krever Andre».
+
 ## 2026-10-14 — Ordboka avgjort: «ressurser» er samlingen, «enhet» er den ene — «Ambulanse A er én enhet»  `#core/dokumentasjon` `#ko/skallet` `#oppdrag/sentralbord`
 
 André svarte på de fem spørsmålene i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md` (§4):

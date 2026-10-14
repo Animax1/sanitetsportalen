@@ -600,7 +600,7 @@ function koVippFilter(valg) {
 function koOppdragTomMelding() {
   if (koOppdragFilterValg === 'uten_ressurs') return 'Ingen oppdrag uten ressurs.';
   if (koOppdragFilterValg === 'tildelt') return 'Ingen tildelte oppdrag som venter.';
-  return 'Ingen oppdrag på tavla.';
+  return 'Ingen oppdrag i oppdragslisten.';
 }
 
 // ── Hendelsen åpnet inne i vinduet ──────────────────────────────────────────
@@ -1177,7 +1177,7 @@ function koFyllLagvalg(h) {
       + escapeHtml(r.navn) + ' ' + hint + '</label>';
   }).join('');
   boks.innerHTML = rader
-    || '<span class="form-text">Ingen lag i vaktlista som er i bruk — eller du mangler vaktlistetilgang.</span>';
+    || '<span class="form-text">Ingen lag i vaktlisten som er i bruk — eller du mangler vaktlistetilgang.</span>';
 }
 
 function koNyHendelse() {
@@ -1314,7 +1314,7 @@ async function koLukkHendelse(id) {
     const antall = data.apne_oppdrag || 0;
     if (!window.confirm(
         (data.message || 'Hendelsen har åpne oppdrag.')
-        + '\n\nLukke likevel? Oppdragene blir stående på tavla, og at du lukket med '
+        + '\n\nLukke likevel? Oppdragene blir stående i oppdragslisten, og at du lukket med '
         + antall + ' åpne står i loggen.')) {
       return;
     }
@@ -1566,7 +1566,7 @@ async function koEtterOpprettet(oppdragId) {
 // skriver en auditrad. Ren markup uten data — ingenting å escape.
 
 const KO_NULLSTILL = [
-  ['oppdrag', 'Nullstill oppdragslista', 'Alle oppdrag i aktiv vakt, tavla og historikken, med statusmeldingene. O-serien starter på 1 igjen. Enheter, lokasjoner og valglister røres ikke.'],
+  ['oppdrag', 'Nullstill oppdragslisten', 'Alle oppdrag i aktiv vakt, i oppdragslisten og historikken, med statusmeldingene. O-serien starter på 1 igjen. Enheter, lokasjoner og valglister røres ikke.'],
   ['hendelser', 'Nullstill hendelsesloggen', 'Alle hendelser i aktiv vakt. Loggen og oppdragene blir stående, men mister H-merkene. H-serien starter på 1 igjen.'],
   ['logg', 'Nullstill loggstrømmen', 'Alle logglinjer i aktiv vakt, systemlinjer og festede inkludert. Hendelsene blir stående uten linjer.'],
 ];

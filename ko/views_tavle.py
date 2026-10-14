@@ -32,7 +32,7 @@ from .views import _heltall_eller_none, _kan_lede_ko
 
 def _tavle_gate(request):
     if not har_tilgang(request.user, 'vaktliste', 'les'):
-        return json_feil('Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.', 403)
+        return json_feil('Tavlen viser vaktlistens ressurser, og krever lesetilgang i vaktlisten.', 403)
     return None
 
 
@@ -81,7 +81,7 @@ def tavle_plasser_view(request):
     data = json_body(request)
     ressurs = _tavle_ressurs(request, data)
     if ressurs is None:
-        return json_feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent enhet.', 404)
     lokasjon = None
     if not data.get('pause'):
         try:
@@ -108,7 +108,7 @@ def tavle_uten_plass_view(request):
         return stengt
     ressurs = _tavle_ressurs(request, json_body(request))
     if ressurs is None:
-        return json_feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent enhet.', 404)
     try:
         tavle.avslutt(hent_aktiv_vakt(), ressurs, bruker=request.user)
     except services.Ugyldig as e:
@@ -197,7 +197,7 @@ def tavle_pauser_view(request):
     data = json_body(request)
     ressurs = _tavle_ressurs(request, data)
     if ressurs is None:
-        return json_feil('Ukjent ressurs.', 404)
+        return json_feil('Ukjent enhet.', 404)
     # **Hvilken som helst rad** (23. sep. 2026): `lokasjon_id` er et sted,
     # uten er det Pause-raden.
     lokasjon = None
@@ -307,7 +307,7 @@ def tavle_oppsett_view(request):
 
     if request.method == 'PUT':
         if not _kan_lede_ko(request):
-            return json_feil('Å sette opp tavla er skriv_leder i KO.', 403)
+            return json_feil('Å sette opp tavlen er skriv_leder i KO.', 403)
         data = json_body(request)
         try:
             with transaction.atomic():

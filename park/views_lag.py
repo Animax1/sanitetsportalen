@@ -158,7 +158,7 @@ def sted_view(request):
     except (TypeError, ValueError):
         return json_feil('Ugyldig lag.')
     if not services.lagene().filter(pk=lag_id).exists():
-        return json_feil('Laget finnes ikke på vaktlista.', status=404)
+        return json_feil('Laget finnes ikke på vaktlisten.', status=404)
     valg = services.forhandsvalg(services.aapen_vakt(), lag_id)
     return JsonResponse({
         'sted': valg['lokasjon_id'],
@@ -223,7 +223,7 @@ def posisjon_view(request):
         return json_feil('Velg laget dere er.')
     lag = services.lagene().filter(pk=lag_id).first()
     if lag is None:
-        return json_feil('Laget finnes ikke på vaktlista.', status=404)
+        return json_feil('Laget finnes ikke på vaktlisten.', status=404)
     try:
         lat, lon, tid = kartkobling.les_posisjon(data['posisjon'])
     except ValueError:

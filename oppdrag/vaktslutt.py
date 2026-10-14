@@ -29,8 +29,8 @@ class OppdragVaktslutt(BaseVaktsluttHandler):
         paa_tavla = Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True).count()
         if not paa_tavla:
             return ''
-        return (f'{paa_tavla} oppdrag står fortsatt på tavla. Legg dem i historikken '
-                'eller slett dem før vakta avsluttes.')
+        return (f'{paa_tavla} oppdrag står fortsatt i oppdragslisten. Legg dem i historikken '
+                'eller slett dem før vakten avsluttes.')
 
     def avslutt(self, vakt, bruker, request=None) -> int:
         from core.arkiv import logg_arkivhendelse

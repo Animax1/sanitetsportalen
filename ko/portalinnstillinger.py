@@ -63,16 +63,16 @@ class KoInnstillinger(BasePortalinnstillingHandler):
             try:
                 timer = int(str(raa_timer).strip())
             except (TypeError, ValueError):
-                raise ValidationError('Tavlas tidsvindu må være et helt tall timer.') from None
+                raise ValidationError('Tavlens tidsvindu må være et helt tall timer.') from None
             if not tavle.TIMER_MIN <= timer <= tavle.TIMER_MAKS:
-                raise ValidationError(f'Tavlas tidsvindu må være mellom {tavle.TIMER_MIN} '
+                raise ValidationError(f'Tavlens tidsvindu må være mellom {tavle.TIMER_MIN} '
                                       f'og {tavle.TIMER_MAKS} timer.')
             ut['tavle_timer'] = timer
         raa_start = post.get('ko_tavle_dognstart')
         if raa_start is not None:
             start = tavle.gyldig_klokke(raa_start)
             if start is None:
-                raise ValidationError('Døgnstarten for tavla må være et klokkeslett, TT:MM.')
+                raise ValidationError('Døgnstarten for tavlen må være et klokkeslett, TT:MM.')
             ut['tavle_dognstart'] = start
         raa = post.get('ko_logg_dager')
         if raa is None:

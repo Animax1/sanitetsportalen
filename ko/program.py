@@ -97,10 +97,10 @@ def _behov(raa) -> list[tuple]:
         if antall > MAKS_ANTALL:
             raise Ugyldig(f'Mer enn {MAKS_ANTALL} av én gruppe er ikke en plan.')
         if gruppe_id in sett:
-            raise Ugyldig('Samme ressursgruppe står to ganger i behovet.')
+            raise Ugyldig('Samme ressurstype står to ganger i behovet.')
         gruppe = Ressursgruppe.objects.filter(pk=gruppe_id, er_aktiv=True).first()
         if gruppe is None:
-            raise Ugyldig('Ukjent eller inaktiv ressursgruppe i behovet.')
+            raise Ugyldig('Ukjent eller inaktiv ressurstype i behovet.')
         sett.add(gruppe_id)
         ut.append((gruppe, antall))
     return ut
@@ -114,7 +114,7 @@ def _kjennetegn(raa) -> list:
     ider = set(raa)
     rader = list(Kjennetegn.objects.filter(pk__in=ider))
     if len(rader) != len(ider):
-        raise Ugyldig('Ukjent kjennetegn — hent lista på nytt.')
+        raise Ugyldig('Ukjent kjennetegn — hent listen på nytt.')
     return rader
 
 
@@ -552,7 +552,7 @@ def kopier_program(fra_vakt, til_vakt, *, forste_dogn, bruker, naa=None) -> dict
     kilde = list(Programpost.objects.filter(vakt=fra_vakt).prefetch_related('behov', 'kjennetegn')
                  .order_by('fra', 'id'))
     if not kilde:
-        raise Ugyldig('Vakta har ikke noe program å kopiere.')
+        raise Ugyldig('Vakten har ikke noe program å kopiere.')
     skift = timedelta(days=(forste_dogn - _dogn_dato(kilde[0].fra)).days)
     kopiert, hoppet_over = 0, []
     for post in kilde:
@@ -566,7 +566,7 @@ def kopier_program(fra_vakt, til_vakt, *, forste_dogn, bruker, naa=None) -> dict
             gruppe = (Ressursgruppe.objects.filter(pk=b.gruppe_id, er_aktiv=True).first()
                       or Ressursgruppe.objects.filter(navn=b.gruppe_navn, er_aktiv=True).first())
             if gruppe is None:
-                hoppet_over.append(f'{post.navn} — behovet for «{b.gruppe_navn}» er ikke med, gruppa finnes ikke')
+                hoppet_over.append(f'{post.navn} — behovet for «{b.gruppe_navn}» er ikke med, ressurstypen finnes ikke')
             else:
                 behov.append({'gruppe_id': gruppe.pk, 'antall': b.antall})
         data = {'lokasjon_id': lokasjon.pk, 'navn': post.navn,

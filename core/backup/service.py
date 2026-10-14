@@ -120,7 +120,7 @@ def oversett_modellnavn(raw: bytes) -> bytes:
         if not isinstance(objekter, list):
             return raw
     except Exception as feil:   # noqa: BLE001 — se docstring
-        logger.warning('core.backup: kunne ikke lese fila for navnebytte: %s', feil)
+        logger.warning('core.backup: kunne ikke lese filen for navnebytte: %s', feil)
         return raw
 
     byttet = 0
@@ -189,7 +189,7 @@ def fjern_utgaatte(raw: bytes) -> bytes:
         if not isinstance(objekter, list):
             return raw
     except Exception as feil:   # noqa: BLE001 — se docstring
-        logger.warning('core.backup: kunne ikke lese fila for utgåtte felt: %s', feil)
+        logger.warning('core.backup: kunne ikke lese filen for utgåtte felt: %s', feil)
         return raw
 
     beholdt, modeller_ut, felt_ut = [], 0, 0
@@ -253,7 +253,7 @@ def nullstill_manglende_brukere(raw: bytes, *, slug: str) -> bytes:
         if not isinstance(objekter, list):
             return raw
     except Exception as feil:   # noqa: BLE001 — se docstring
-        logger.warning('core.backup: kunne ikke lese fila for brukerpekere: %s', feil)
+        logger.warning('core.backup: kunne ikke lese filen for brukerpekere: %s', feil)
         return raw
 
     # (rad, feltnavn, nøkkel) for hver nullbar brukerpeker med en verdi.

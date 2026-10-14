@@ -89,8 +89,8 @@ class PorteneTests(_Utskrift):
         ModulTilgang.objects.filter(bruker=self.operator).exclude(modul_slug='ko').delete()
         html = self._hent()
         self.assertIn('Oppdragene krever lesetilgang i oppdragsmodulen.', html)
-        self.assertIn('Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.', html)
-        self.assertIn('Ressursoversikten krever lesetilgang i oppdragsmodulen eller vaktlista.', html)
+        self.assertIn('Tavlen viser vaktlistens ressurser, og krever lesetilgang i vaktlisten.', html)
+        self.assertIn('Ressursoversikten krever lesetilgang i oppdragsmodulen eller vaktlisten.', html)
         self.assertIn('Ingen åpne hendelser.', html, 'KOs egne deler står')
 
     def test_med_tilgang_ingen_setning(self):
@@ -100,7 +100,7 @@ class PorteneTests(_Utskrift):
     def test_alle_vinduene_alltid_i_vinduenes_rekkefolge(self):
         html = self._hent()
         overskrifter = ['<h2>Åpne hendelser</h2>', '<h2>Ressursoversikten</h2>', '<h2>Aktive oppdrag</h2>',
-                        '<h2>Tavla</h2>', '<h2>Konsertplanleggeren', '<h2>Loggen']
+                        '<h2>Tavlen</h2>', '<h2>Konsertplanleggeren', '<h2>Loggen']
         plass = [html.index(o) for o in overskrifter]
         self.assertEqual(plass, sorted(plass))
         self.assertNotIn('name="vis"', html, 'ingen valg av deler')
@@ -240,7 +240,7 @@ class TavlaTests(_Utskrift):
     def test_stedet_pausen_og_uten_plass(self):
         tavle.plasser(self.vakt, self.lag1, bruker=self.operator, lokasjon=self.park)
         tavle.plasser(self.vakt, self.lag2, bruker=self.operator, pause=True)
-        html = _del(self._hent(), 'Tavla')
+        html = _del(self._hent(), 'Tavlen')
         self.assertIn('<td><b>Parkscene</b></td> <td>Lag 1', html)
         self.assertIn('<h3>Pause</h3> <div>Lag 2', html)
         uten_plass = html.split('<h3>Uten plass</h3>')[1].split('<h3>')[0]
@@ -255,11 +255,11 @@ class TavlaTests(_Utskrift):
             vakt=self.vakt, oppdragsnummer=oservices.neste_oppdragsnummer(self.vakt),
             enhet=self.enhet, problemstilling='Pustevansker', hastegrad='Akutt', lokasjon=self.park)
         oservices.sett_status(o, choices.RYKKER_UT, enhet=self.enhet)
-        html = _del(self._hent(), 'Tavla')
+        html = _del(self._hent(), 'Tavlen')
         self.assertIn(f'<h3>Opptatt</h3> <div>Ambulanse 1 — O{o.oppdragsnummer}', html)
         self.assertNotIn('<td><b>Club Venue</b></td>', html)
         ModulTilgang.objects.filter(bruker=self.operator, modul_slug='oppdrag').delete()
-        html = _del(self._hent(), 'Tavla')
+        html = _del(self._hent(), 'Tavlen')
         self.assertNotIn('Ambulanse 1', html)
         self.assertIn('Bilene står ikke med', html)
 
@@ -271,7 +271,7 @@ class TavlaTests(_Utskrift):
         etter = naa + timedelta(hours=tavle.timer() + 1)
         tavle.planlegg_pause(self.vakt, self.lag2, fra=etter, til=etter + timedelta(hours=1),
                              bruker=self.operator)
-        html = _del(self._hent(), 'Tavla')
+        html = _del(self._hent(), 'Tavlen')
         self.assertNotIn('<td>Lag 2</td>', html, 'pausen etter vinduet står ikke')
         fra = timezone.localtime(naa + timedelta(hours=1)).strftime('%H:%M')
         self.assertIn(f'<td class="tid">{fra}–', html)
@@ -319,7 +319,7 @@ class RessursoversiktenTests(_Utskrift):
         html = self._hent()
         self.assertNotIn('99887766', html)
         self.assertIn('Lagene står ikke med', html)
-        self.assertIn('Krever lesetilgang i vaktlista', html)
+        self.assertIn('Krever lesetilgang i vaktlisten', html)
         self.assertIn('<td><b>HGSD 56</b>', html, 'bilen står, uten besetning')
 
     def test_dataene_hentes_ikke_uten_tilgang(self):

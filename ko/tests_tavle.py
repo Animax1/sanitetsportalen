@@ -430,7 +430,7 @@ class RettTests(_Grunnlag):
         tavle.fjern(self.b, bruker=self.operator)
         self.assertFalse(Tavleplassering.objects.filter(pk=self.b.pk).exists())
         linje = Logglinje.objects.filter(systemkode=systemlinjer.TAVLE_RETTET).get()
-        self.assertIn('fjernet fra tavla', systemlinjer.tegn(linje.systemkode, linje.systemdata))
+        self.assertIn('fjernet fra tavlen', systemlinjer.tegn(linje.systemkode, linje.systemdata))
         tavle.fjern(self.c, bruker=self.operator)
         self.assertIsNone(tavle.aapen(self.lag1), 'den åpne fjernet: laget står uten plass')
 

@@ -723,7 +723,7 @@ class KopierProgrammetTests(_Program):
         svar = program.kopier_program(self.i_fjor, self.vakt, forste_dogn=self.maal, bruker=self.leder)
         self.assertEqual(svar['kopiert'], 2)
         self.assertEqual([h for h in svar['hoppet_over'] if AMBULANSE in h],
-                         [f'{n} — behovet for «{AMBULANSE}» er ikke med, gruppa finnes ikke'
+                         [f'{n} — behovet for «{AMBULANSE}» er ikke med, ressurstypen finnes ikke'
                           for n in ('Headliner fredag', 'Natt')])
         post = Programpost.objects.get(vakt=self.vakt, navn='Headliner fredag')
         self.assertEqual(list(post.behov.values_list('gruppe_navn', flat=True)), [LAG])

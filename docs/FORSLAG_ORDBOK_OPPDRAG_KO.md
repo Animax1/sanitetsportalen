@@ -1,6 +1,10 @@
 # Forslag: ordboka i `/oppdrag/` og `/ko/`
 
-*14. okt. 2026. Kartlagt mot koden samme dag; ingenting er endret ennå. Vaktlista fikk sin
+*14. okt. 2026. **Bygget samme kveld** — svarene i §4, reglene i `core/ordboka.py`,
+vaktene i `core/`, `oppdrag/` og `ko/` (`tests_ordboka.py`). Resten av dokumentet er
+kartleggingen slik den sto før svarene.*
+
+*Kartlagt mot koden samme dag. Vaktlista fikk sin
 ordbok 30. sep. 2026 (CHANGELOG, «Vaktlista, pulje 3»), og `vaktliste/tests_ordboka.py`
 holder den. Dette er neste steg: de samme ordene i de to andre modulene som viser de samme
 tingene.*

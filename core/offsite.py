@@ -196,13 +196,13 @@ def dekrypter(blob: bytes, hemmelighet: str, *, objekt: str) -> bytes:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     magi = next((m for m in (MAGI, MAGI_V1) if blob.startswith(m)), None)
     if magi is None or len(blob) < len(magi) + 12 + 16:
-        raise ValueError('Fila er ikke en kryptert backup fra portalen.')
+        raise ValueError('Filen er ikke en kryptert backup fra portalen.')
     tillegg = _tillegg(magi, objekt)
     nonce = blob[len(magi):len(magi) + 12]
     try:
         return AESGCM(_avledet_nokkel(hemmelighet)).decrypt(nonce, blob[len(magi) + 12:], tillegg)
     except Exception as exc:   # InvalidTag — feil nøkkel, tuklet fil, eller flyttet fil
-        raise ValueError('Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY, eller fila er '
+        raise ValueError('Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY, eller filen er '
                          'endret eller flyttet til et annet navn.') from exc
 
 
@@ -331,7 +331,7 @@ def hent(objekt: str):
     if sti.exists():
         if sti.read_bytes() != raa:
             raise ValueError(f'{filnavn} finnes allerede på volumet med et annet innhold, '
-                             f'og skrives ikke over. Flytt eller slett den lokale fila først.')
+                             f'og skrives ikke over. Flytt eller slett den lokale filen først.')
     else:
         with open(sti, 'wb') as f:
             f.write(raa)

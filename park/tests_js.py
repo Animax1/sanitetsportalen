@@ -94,7 +94,7 @@ class ParkReglerTests(SimpleTestCase):
 
     def test_kildelinja(self):
         tid = "'2026-10-01T20:00:00+00:00'"
-        self.assertEqual(self._j(f"parkKildeTekst('ko', {tid})"), 'Fra KO-tavla 22:00')
+        self.assertEqual(self._j(f"parkKildeTekst('ko', {tid})"), 'Fra KO-tavlen 22:00')
         self.assertEqual(self._j(f"parkKildeTekst('registrering', {tid})"), 'Sist registrert 22:00')
         self.assertEqual(self._j("parkKildeTekst('telefon', null)"), 'Sist valgt på denne telefonen')
         self.assertEqual(self._j("parkKildeTekst('ingen', null)"), '')

@@ -814,6 +814,10 @@ fordelt på de tre.
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke
 skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 
+**Ordene på skjermen håndheves** (`core/ordboka.py`, 14. okt. 2026): samlingen heter
+«ressurser», én konkret «enhet», -en-form overalt, og «Trenger ressurs» er fagord. Hver
+modul har sin `tests_ordboka.py`; leseren tar bare tekst brukeren ser.
+
 **Tall i dokumentene håndheves av `core/tallfasit.py`** (14. sep. 2026). Antall ruter,
 backup-handlere, moduler og JS-filer regnes ut fra koden, og
 `TallpaastanderTests` krever at dokumentene stemmer. Kjør `python manage.py tallfasit` for

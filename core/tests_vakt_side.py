@@ -205,7 +205,7 @@ class SidenTests(VaktsideBasis):
             enhet=Enhet.objects.create(navn='Bil 1', pa_vakt=True))
         svar = self.c.get(SIDE)
         self.assertContains(svar, '1 pasient arkiveres og tømmes.')
-        self.assertContains(svar, 'står fortsatt på tavla')
+        self.assertContains(svar, 'står fortsatt i oppdragslisten')
         # Knappen er av så lenge noe sperrer; serveren sjekker uansett.
         self.assertContains(svar, 'disabled>\n            Avslutt vakt og start ny')
 

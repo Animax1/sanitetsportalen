@@ -70,7 +70,7 @@
       <li><a href="#ansvarlig">Hvem er ansvarlig</a></li>
       <li><a href="#cookies">Informasjonskapsler og lokal lagring</a></li>
       <li><a href="#konto">Har du brukerkonto</a></li>
-      <li><a href="#mannskap">Står du i vaktlista</a></li>
+      <li><a href="#mannskap">Står du i vaktlisten</a></li>
       <li><a href="#posisjon">Posisjon til kartet</a></li>
       <li><a href="#lag">Lagregistreringen</a></li>
       <li><a href="#pasient">Er du pasient</a></li>
@@ -130,10 +130,10 @@
     <code>Cache Storage</code>), fordi de skal virke også når nettet faller ut under en vakt:
   </p>
   <ul>
-    <li><strong>Stemplinger som ikke er sendt ennå</strong> — fra bilens skjerm og vaktlista — til nettet er tilbake.</li>
-    <li><strong>Siste utgave av vaktlista</strong>, med navn og telefonnummer på mannskapet, så den kan leses uten nett.</li>
+    <li><strong>Stemplinger som ikke er sendt ennå</strong> — fra bilens skjerm og vaktlisten — til nettet er tilbake.</li>
+    <li><strong>Siste utgave av vaktlisten</strong>, med navn og telefonnummer på mannskapet, så den kan leses uten nett.</li>
     <li><strong>KO-utskriften</strong> på KO-PC-en: hendelsene, ressursene med telefon og ISSI, oppdragene med notat,
-      tavla, konsertplanleggeren og de siste timene av loggen — så den kan skrives ut uten nett. Kan inneholde
+      tavlen, konsertplanleggeren og de siste timene av loggen — så den kan skrives ut uten nett. Kan inneholde
       helseopplysninger, lagres bare for personlige kontoer, og brukes ikke etter et døgn.</li>
     <li><strong>Valgene dine</strong> — filtre, kolonner, lyd av eller på, «Del posisjon» og sist valgte liste.</li>
   </ul>
@@ -185,7 +185,7 @@
     ikke fullt ut av retten til sletting; alt annet om deg kan slettes.
   </p>
 
-  <h2 id="mannskap">4. Står du i vaktlista</h2>
+  <h2 id="mannskap">4. Står du i vaktlisten</h2>
   <p>
     Korpset fører et register over mannskapet det bemanner vaktene med. Du kan stå der uten å
     ha brukerkonto.
@@ -194,13 +194,13 @@
     <li><strong>Om deg:</strong> navn, korps, kompetanser, telefonnummer (valgfritt), kobling til
       brukerkonto hvis du har en, og et notatfelt for praktiske opplysninger. Helseopplysninger,
       som matallergi, skal <em>ikke</em> føres der og samles inn utenfor portalen.</li>
-    <li><strong>Om vakta:</strong> hvilken plass og ressurs du er satt på, tidene dine, når du møtte
+    <li><strong>Om vakten:</strong> hvilken plass og ressurs du er satt på, tidene dine, når du møtte
       og gikk av, og radio-ID (ISSI) for sambandet.</li>
     <li><strong>Overnatting:</strong> hvilket rom du sover i, for brannsikkerheten. Slettes
-      {% if frister.vaktliste %}{{ frister.vaktliste }} dager{% else %}en fast tid{% endif %} etter natta.</li>
-    <li><strong>Vaktlista som fil:</strong> under vakt sendes lista — navn, korps, rolle, skift,
+      {% if frister.vaktliste %}{{ frister.vaktliste }} dager{% else %}en fast tid{% endif %} etter natten.</li>
+    <li><strong>Vaktlisten som fil:</strong> under vakt sendes listen — navn, korps, rolle, skift,
       telefon, ISSI og overnatting — på e-post til en fast mottakerliste satt av administrator,
-      slik at den finnes også om portalen er nede. Fila ber selv om å bli slettet etter vakta.</li>
+      slik at den finnes også om portalen er nede. Filen ber selv om å bli slettet etter vakten.</li>
   </ul>
   <p>
     Grunnlaget er korpsets berettigede interesse: å vite hvem det kan bemanne med, og å nå
@@ -257,7 +257,7 @@
     <li><strong>Grunnlag:</strong> å verne liv og helse (art. 6 nr. 1 bokstav d), og administrasjon av
       helsehjelpen under arrangementet (art. 9 nr. 2 bokstav h). Alle med tilgang har
       taushetsplikt — helsepersonell etter loven, de andre gjennom signert taushetserklæring.</li>
-    <li>Etter vakta arkiveres opplysningene{% if pasientarkiv_mnd %} i {{ pasientarkiv_mnd }} måneder{% endif %}.
+    <li>Etter vakten arkiveres opplysningene{% if pasientarkiv_mnd %} i {{ pasientarkiv_mnd }} måneder{% endif %}.
       Deretter slettes de, og bare anonym statistikk står igjen.</li>
   </ul>
   <p>
@@ -267,7 +267,7 @@
 
   <h2 id="hvem">8. Hvem behandler opplysningene</h2>
   <p>
-    Bare de som trenger det for vakta får tilgang, og bare til de modulene de har fått. I tillegg
+    Bare de som trenger det for vakten får tilgang, og bare til de modulene de har fått. I tillegg
     bruker driften av portalen disse leverandørene:
   </p>
   <div class="pv-tabell">
@@ -277,7 +277,7 @@
         <tr><td>Railway</td><td>Driften av portalen og databasen, i EU (Nederland).</td></tr>
         <tr><td>Scaleway</td><td>Sikkerhetskopier, i EU (Nederland). Krypteres før de forlater portalen, med en nøkkel Scaleway ikke har.</td></tr>
         <tr><td>Cloudflare</td><td>Nettverket foran portalen: trafikken mellom nettleseren din og portalen går gjennom Cloudflare.</td></tr>
-        <tr><td>AhaSend</td><td>E-post fra portalen: invitasjoner, «Glemt passord», vaktlista som fil og driftsvarsler.</td></tr>
+        <tr><td>AhaSend</td><td>E-post fra portalen: invitasjoner, «Glemt passord», vaktlisten som fil og driftsvarsler.</td></tr>
         <tr><td>kart.sanitet.net</td><td>Korpsets eget kart, se punkt 5.</td></tr>
       </tbody>
     </table>

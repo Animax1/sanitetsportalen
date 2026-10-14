@@ -147,7 +147,7 @@ def slett_vakt(vakt, *, bruker, request=None) -> list[tuple[str, int]]:
     Kaster `KanIkkeSlettes` for den aktive vakta — før noe er rørt.
     """
     if vakt.pk == _aktiv_pk() or vakt.er_aktiv:
-        raise KanIkkeSlettes(f'«{vakt.navn}» er den aktive vakta og kan ikke slettes. '
+        raise KanIkkeSlettes(f'«{vakt.navn}» er den aktive vakten og kan ikke slettes. '
                              f'Avslutt den først.')
     with _pagar(f'vakt:{vakt.pk}'):
         return _slett_vakt(vakt, bruker=bruker, request=request)
@@ -170,7 +170,7 @@ def _slett_vakt(vakt, *, bruker, request):
         raise KanIkkeSlettes(f'«{vakt.navn}» er allerede slettet.')
 
     slettet = oversikt(vakt)
-    _backup_foer('full', bruker, f'Før sletting av vakta «{vakt.navn}»')
+    _backup_foer('full', bruker, f'Før sletting av vakten «{vakt.navn}»')
 
     with transaction.atomic():
         # **Spør igjen, under låsen** (andre gjennomgang 29. sep. 2026). Backupen
@@ -187,7 +187,7 @@ def _slett_vakt(vakt, *, bruker, request):
             pk, tittel = arkiv.pk, arkiv.tittel
             arkiv.delete()   # CASCADE tar de arkiverte radene
             logg_arkivhendelse(type(arkiv), 'arkiv_slettet',
-                               f'arkiv_id={pk}, tittel={tittel}, med vakta',
+                               f'arkiv_id={pk}, tittel={tittel}, med vakten',
                                request=request, record_id=pk)
         VaktStatistikk.objects.filter(vakt=vakt).delete()
         pk, navn = vakt.pk, vakt.navn

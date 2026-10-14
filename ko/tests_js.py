@@ -1148,7 +1148,7 @@ class DelingOgLagTests(SimpleTestCase):
         self.assertEqual(ut[:6], [
             '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":1}',
             '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":6}',
-            '4 Ingen oppdrag på tavla.',
+            '4 Ingen oppdrag i oppdragslisten.',
             'uten_ressurs 1 [1] Ingen oppdrag uten ressurs.',
             'tildelt [4] Ingen tildelte oppdrag som venter.',
             'null 4'])

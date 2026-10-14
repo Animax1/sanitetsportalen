@@ -46,7 +46,7 @@ KoModule = Module(
     name='KO',
     description=(
         'Situasjonsbildet: ressursoversikt, oppdragsliste, logg og hendelser. '
-        'Eier ingen ressurser selv — tavla settes sammen av vaktlista og '
+        'Eier ingen ressurser selv — tavlen settes sammen av vaktlisten og '
         'oppdragsmodulen.'
     ),
     url='/ko/',

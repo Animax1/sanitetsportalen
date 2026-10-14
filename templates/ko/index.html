@@ -72,7 +72,7 @@
           av sier når den sist ble lagret.
         {% endcomment %}
         <a class="btn btn-outline-secondary btn-sm" href="{% url 'ko_utskrift' %}" target="_blank" rel="noopener"
-           title="Skriv ut alt i KO — hendelser, ressurser, oppdrag, tavla, konsertplanleggeren og loggen">
+           title="Skriv ut alt i KO — hendelser, ressurser, oppdrag, tavlen, konsertplanleggeren og loggen">
           <i class="bi bi-printer me-1"></i>Skriv ut
         </a>
         <span class="small text-muted align-self-center d-none" id="ko-kopi-status"
@@ -328,7 +328,7 @@
           {% if kan_se_vaktliste %}
           {# Tavla deler plass med ressursoversikten (22. sep. 2026). #}
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
-                  data-action="koByttPar" data-arg="ressurser" title="Bytt til tavla">
+                  data-action="koByttPar" data-arg="ressurser" title="Bytt til tavlen">
             <i class="bi bi-arrow-left-right me-1"></i>Tavle
           </button>
           {% endif %}
@@ -406,12 +406,12 @@
           </span>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
                   data-action="koApneEgetVindu" data-arg="oppdrag"
-                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne oppdragslista i eget vindu">
+                  title="Åpne i eget vindu — for skjerm to" aria-label="Åpne oppdragslisten i eget vindu">
             <i class="bi bi-box-arrow-up-right"></i>
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
                   data-action="koSkjulVindu" data-arg="oppdrag"
-                  title="Skjul vinduet" aria-label="Skjul oppdragslista">
+                  title="Skjul vinduet" aria-label="Skjul oppdragslisten">
             <i class="bi bi-eye-slash"></i>
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1"
@@ -468,12 +468,12 @@
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="koApneEgetVindu" data-arg="tavle"
-                    title="Åpne i eget vindu — for skjerm to" aria-label="Åpne tavla i eget vindu">
+                    title="Åpne i eget vindu — for skjerm to" aria-label="Åpne tavlen i eget vindu">
               <i class="bi bi-box-arrow-up-right"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm ko-skjul-knapp"
                     data-action="koSkjulVindu" data-arg="tavle"
-                    title="Skjul vinduet" aria-label="Skjul tavla">
+                    title="Skjul vinduet" aria-label="Skjul tavlen">
               <i class="bi bi-eye-slash"></i>
             </button>
           </span>
@@ -485,7 +485,7 @@
           {% if kan_se_vaktliste %}
           <div class="ko-tavle" id="ko-tavle"><div class="tom-melding">Laster…</div></div>
           {% else %}
-          <p class="text-muted small mb-0">Tavla viser vaktlistas ressurser, og krever tilgang til vaktlista.</p>
+          <p class="text-muted small mb-0">Tavlen viser vaktlistens ressurser, og krever tilgang til vaktlisten.</p>
           {% endif %}
         </div>
       </section>
@@ -503,7 +503,7 @@
           <span class="ko-vindu-tall" id="ko-plan-antall"></span>
           <div class="btn-group btn-group-sm ms-1" role="group" aria-label="Visning">
             <button type="button" class="btn btn-outline-secondary active" data-action="koPlanVelgVisning"
-                    data-arg="tidslinje" title="Tidslinja — samme tid som tavla — med dekningen under">
+                    data-arg="tidslinje" title="Tidslinja — samme tid som tavlen — med dekningen under">
               <i class="bi bi-bar-chart-steps"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary" data-action="koPlanVelgVisning"
@@ -522,7 +522,7 @@
             </button>
             {% endif %}
             <button type="button" class="btn btn-outline-secondary btn-sm"
-                    data-action="koByttPar" data-arg="plan" title="Bytt til oppdragslista">
+                    data-action="koByttPar" data-arg="plan" title="Bytt til oppdragslisten">
               <i class="bi bi-arrow-left-right me-1"></i>Oppdragsliste
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm"
@@ -616,7 +616,7 @@
           <div class="mb-2">
             <div class="form-label">Lag på hendelsen</div>
             <div class="ko-lag-valg" id="ko-h-lag"></div>
-            <div class="form-text">Vaktlistas ressurser uten oppdragsenhet — de som får oppdrag muntlig på samband. Kan legges til og tas av i hendelsen etterpå.</div>
+            <div class="form-text">Vaktlistens enheter uten delt konto — de som får oppdrag muntlig på samband. Kan legges til og tas av i hendelsen etterpå.</div>
           </div>
           <div class="ko-hint" id="ko-h-opprettes-av"></div>
           <div id="ko-h-feil" class="text-danger small d-none mt-2" role="alert"></div>

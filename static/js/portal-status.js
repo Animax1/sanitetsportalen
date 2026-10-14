@@ -330,7 +330,7 @@ function renderVaktbilde(v) {
     setVal('vakt-utsending', 'Aldri');
   }
   document.getElementById('vakt-hint').textContent = v.error ? v.error :
-    (vakt ? 'Vakta startet ' + datoKlokke(vakt.startet) + '. Tallene er den aktive vaktas.' : '');
+    (vakt ? 'Vakten startet ' + datoKlokke(vakt.startet) + '. Tallene er den aktive vaktens.' : '');
 }
 
 function renderTregeste(rader) {

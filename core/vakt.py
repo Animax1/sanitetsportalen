@@ -40,7 +40,7 @@ def opprett_vakt(navn, *, year, startet, er_aktiv=True):
     """
     navn = (navn or '').strip()
     if not navn:
-        raise ValueError('Vakta må ha et navn.')
+        raise ValueError('Vakten må ha et navn.')
     try:
         with transaction.atomic():
             return Vakt.objects.create(navn=navn, year=year, startet=startet,

@@ -50,7 +50,7 @@ function parkVelgSted(server, husketNavn, steder) {
  * lest; en linje som sier hvor valget kom fra, blir det oftere (§5.1). */
 function parkKildeTekst(kilde, tid) {
   const kl = tid ? parkKlokke(tid) : '';
-  if (kilde === 'ko') return kl ? `Fra KO-tavla ${kl}` : 'Fra KO-tavla';
+  if (kilde === 'ko') return kl ? `Fra KO-tavlen ${kl}` : 'Fra KO-tavlen';
   if (kilde === 'registrering') return kl ? `Sist registrert ${kl}` : 'Sist registrert';
   if (kilde === 'telefon') return 'Sist valgt på denne telefonen';
   return '';
@@ -450,7 +450,7 @@ async function parkStart() {
   parkFyllValg(parkEl('park-sted'), o.steder, 'Velg sted');
   parkFyllValg(parkEl('park-problemstilling'), o.problemstillinger, 'Velg problemstilling');
   parkFyllValg(parkEl('park-utfall'), o.utfall, 'Velg utfall');
-  if (!o.lag.length) parkMelding('Ingen lag er satt opp for registrering på denne vakta. Si fra til KO.');
+  if (!o.lag.length) parkMelding('Ingen lag er satt opp for registrering på denne vakten. Si fra til KO.');
 
   const lag = parkVelgLag(o.lag, parkLes(PARK_LAGRING.lag));
   if (lag != null) parkEl('park-lag').value = String(lag);

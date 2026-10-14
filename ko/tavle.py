@@ -280,7 +280,7 @@ def rett(plassering, *, fra, til=None, bruker, naa=None) -> Tavleplassering:
     """
     naa = naa or timezone.now()
     if plassering.hendelse_nummer:
-        raise Ugyldig('Tida på en hendelse følger hendelsen, og rettes ikke på tavla.')
+        raise Ugyldig('Tida på en hendelse følger hendelsen, og rettes ikke på tavlen.')
     rader = _laas_ressursens(plassering)
     plassering = next(r for r in rader if r.pk == plassering.pk)
     aapen_rad = plassering.til is None
@@ -289,7 +289,7 @@ def rett(plassering, *, fra, til=None, bruker, naa=None) -> Tavleplassering:
     elif til is None:
         raise Ugyldig('Oppgi når plasseringen sluttet.')
     if fra > naa or (til is not None and til > naa):
-        raise Ugyldig('Tavla fører det som har skjedd — tida kan ikke være fram i tid.')
+        raise Ugyldig('Tavlen fører det som har skjedd — tida kan ikke være fram i tid.')
     if til is not None and til <= fra:
         raise Ugyldig('«Til» må være etter «fra».')
     i = rader.index(plassering)
@@ -331,7 +331,7 @@ def fjern(plassering, *, bruker, naa=None) -> None:
     plass. Tida på en hendelse fjernes ikke herfra."""
     naa = naa or timezone.now()
     if plassering.hendelse_nummer:
-        raise Ugyldig('Tida på en hendelse følger hendelsen, og fjernes ikke fra tavla.')
+        raise Ugyldig('Tida på en hendelse følger hendelsen, og fjernes ikke fra tavlen.')
     data = {'ressurs': plassering.ressurs_navn, 'sted': _stedsnavn(plassering),
             'fra_foer': _klokke(plassering.fra), 'til_foer': _klokke(plassering.til),
             'fjernet': True}
@@ -409,11 +409,11 @@ def planlegg_pause(vakt, ressurs, *, fra, til, bruker, naa=None, pause=None,
     """
     naa = naa or timezone.now()
     if pause is not None and pause.startet_id:
-        raise Ugyldig('Planen er startet. Rett plasseringen på tavla i stedet.')
+        raise Ugyldig('Planen er startet. Rett plasseringen på tavlen i stedet.')
     if pause is None and lokasjon is not None and not lokasjon.er_aktiv:
         raise Ugyldig('Lokasjonen er ikke aktiv.')
     if pause is None and not paa_vakt_ved(ressurs, fra, naa):
-        raise Ugyldig(f'{ressurs.navn} har ikke skift i vaktlista kl. {_klokke(fra)}.')
+        raise Ugyldig(f'{ressurs.navn} har ikke skift i vaktlisten kl. {_klokke(fra)}.')
     if til <= fra:
         raise Ugyldig('«Til» må være etter «fra».')
     er_pause = pause.pause if pause is not None else lokasjon is None
@@ -549,7 +549,7 @@ def start_pause(pause, *, bruker, naa=None) -> Tavleplassering:
     if pause.startet_id:
         raise Ugyldig('Planen er alt startet.')
     if pause.ressurs is None:
-        raise Ugyldig('Ressursen finnes ikke lenger i vaktlista.')
+        raise Ugyldig('Enheten finnes ikke lenger i vaktlisten.')
     if not pause.pause and pause.lokasjon is None:
         raise Ugyldig(f'Stedet «{pause.lokasjon_navn}» finnes ikke lenger.')
     naavaerende = aapen(pause.ressurs)
@@ -697,7 +697,7 @@ def lagre_oppsett(*, skjulte_ider, fulgte_ider) -> None:
             raise Ugyldig('Send lokasjonene som lister med tall.')
         ider |= set(liste)
     if Lokasjon.objects.filter(pk__in=ider).count() != len(ider):
-        raise Ugyldig('Lista inneholder ukjente lokasjoner — hent den på nytt.')
+        raise Ugyldig('Listen inneholder ukjente lokasjoner — hent den på nytt.')
     AppSetting.set(SKJULTE_NOKKEL, json.dumps(sorted(set(skjulte_ider))))
     AppSetting.set(FULGTE_NOKKEL, json.dumps(sorted(set(fulgte_ider))))
 

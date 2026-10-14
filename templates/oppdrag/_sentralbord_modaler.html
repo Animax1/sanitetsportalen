@@ -21,7 +21,7 @@
         <div class="mb-3">
           <label class="form-label" for="nytt-lokasjon">Hvor</label>
           <select id="nytt-lokasjon" class="form-select"><option value="">Velg…</option></select>
-          <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
+          <div class="form-text">Listen vedlikeholdes under «Valglister».</div>
         </div>
         <div class="mb-3">
           <div class="form-label">Hastegrad</div>
@@ -56,8 +56,8 @@
           <div id="nytt-enheter" class="nytt-enheter" data-action="oppdaterOpprettKnapp" data-hendelse="change"></div>
           {# Ingen enhet er lov (19. sep. 2026): varselet sier hva som skjer, og knappen skifter tekst. #}
           <div class="uten-enhet-varsel d-none mb-1" id="nytt-uten-enhet"><i class="bi bi-exclamation-triangle-fill"></i>
-            <div><b>Ingen enhet valgt.</b> Oppdraget opprettes som <b>Trenger ressurs</b> og står gult på tavla til du varsler en enhet fra oppdraget. Varselet trappes opp etter 5 og 15 minutter.</div></div>
-          <div class="form-text">Kryss av én eller flere, eller ingen. Den første i lista blir primær.</div>
+            <div><b>Ingen enhet valgt.</b> Oppdraget opprettes som <b>Trenger ressurs</b> og står gult i oppdragslisten til du varsler en enhet fra oppdraget. Varselet trappes opp etter 5 og 15 minutter.</div></div>
+          <div class="form-text">Kryss av én eller flere, eller ingen. Den første i listen blir primær.</div>
         </div>
         <div class="mb-3">
           {# Etiketten og hinten har id-er: på /ko/ bytter KO dem til «Bare dette #}
@@ -189,7 +189,7 @@
         <p class="form-text mb-0 mt-3">
           Oppdrag havner her av seg selv når de blir ledige. Ingenting er
           slettet eller fryst — åpne et oppdrag for å hente det tilbake til
-          tavla. Arkivering av hele vakter er noe annet, og gjøres et annet
+          oppdragslisten. Arkivering av hele vakter er noe annet, og gjøres et annet
           sted.
         </p>
       </div>
@@ -207,7 +207,7 @@
       </div>
       <div class="modal-body">
         <p class="form-text mt-0">
-          Oppdragene arkiveres når vakta avsluttes, sammen med resten —
+          Oppdragene arkiveres når vakten avsluttes, sammen med resten —
           under Administrasjon → Vakt.
         </p>
         <div id="arkivliste"><div class="tom-melding">Laster…</div></div>

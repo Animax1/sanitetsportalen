@@ -125,13 +125,13 @@ def vakt_navn_view(request):
     vakt = hent_aktiv_vakt()
     navn = (request.POST.get('navn') or '').strip()
     if not navn:
-        messages.error(request, 'Vakta må ha et navn.')
+        messages.error(request, 'Vakten må ha et navn.')
     elif Vakt.objects.filter(navn=navn).exclude(pk=vakt.pk).exists():
         messages.error(request, vaktnavn_opptatt_melding(navn))
     else:
         vakt.navn = navn
         vakt.save(update_fields=['navn'])
-        messages.success(request, f'Vakta heter nå «{navn}».')
+        messages.success(request, f'Vakten heter nå «{navn}».')
     return redirect('portaladmin:vakt')
 
 
@@ -149,7 +149,7 @@ def vakt_avslutt_view(request):
         return redirect('portaladmin:vakt')
     nytt_navn = (request.POST.get('ny_vakt_navn') or '').strip()
     if not nytt_navn:
-        messages.error(request, 'Den nye vakta må ha et navn — det settes ved vaktstart.')
+        messages.error(request, 'Den nye vakten må ha et navn — det settes ved vaktstart.')
         return redirect('portaladmin:vakt')
     # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
     # `opprett_vakt` i orkestratoren — denne sjekken er et kappløp.
@@ -195,7 +195,7 @@ def vakt_gjenaapne_view(request, pk):
     vakt = get_object_or_404(Vakt, pk=pk)
     if vakt.pk in _kollapsede_vakter():
         messages.error(request, f'Et arkiv for «{vakt.navn}» er kollapset — radnivået finnes '
-                                f'ikke lenger, og vakta kan ikke gjenåpnes.')
+                                f'ikke lenger, og vakten kan ikke gjenåpnes.')
         return redirect('portaladmin:vakt')
 
     with transaction.atomic():
@@ -214,7 +214,7 @@ def vakt_gjenaapne_view(request, pk):
         vakt.avsluttet = None
         vakt.save(update_fields=['er_aktiv', 'avsluttet'])
         AppSetting.set('aktiv_vakt_id', vakt.pk)
-    messages.success(request, f'Vakta «{vakt.navn}» er aktiv igjen.')
+    messages.success(request, f'Vakten «{vakt.navn}» er aktiv igjen.')
     return redirect('portaladmin:vakt')
 
 
@@ -239,7 +239,7 @@ def vakt_slett_view(request, pk):
     vakt = get_object_or_404(Vakt, pk=pk)
     if request.method == 'POST':
         if (request.POST.get('navn') or '').strip() != vakt.navn:
-            messages.error(request, 'Skriv vaktas navn nøyaktig for å slette den.')
+            messages.error(request, 'Skriv vaktens navn nøyaktig for å slette den.')
             return redirect('portaladmin:vakt_slett', pk=vakt.pk)
         try:
             slettet = vaktsletting.slett_vakt(vakt, bruker=request.user, request=request)

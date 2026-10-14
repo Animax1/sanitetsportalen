@@ -104,8 +104,8 @@ KODER: dict[str, str] = {
         'Ressursbruk per hendelse. «Vi sendte to biler» står ikke lesbart noe '
         'annet sted.',
     ENHET_TATT_AV:
-        'En ressurs som forsvinner fra oppdraget uten at noe sier fra, er en '
-        'ressurs man tror man har.',
+        'En enhet som forsvinner fra oppdraget uten at noe sier fra, er en '
+        'enhet man tror man har.',
     ENHET_RYKKET_VIDERE:
         'Bilen dro til noe annet mens dette sto uferdig. Forklarer hullet.',
     ENHET_AVBROT:
@@ -130,7 +130,7 @@ KODER: dict[str, str] = {
         '18. sep. 2026). Egen linje, aldri en stille statusendring.',
     OPPDRAG_KNYTTET:
         'Hvilke oppdrag som hørte til hvilken hendelse, med flyttinger. '
-        'Grupperingen på tavla forsvinner når vakta arkiveres; loggen står.',
+        'Grupperingen på tavlen forsvinner når vakten arkiveres; loggen står.',
     HENDELSE_PRIORITET:
         '«H14 satt til Viktig av Kari» er en avgjørelse, ikke en feltendring '
         '(18. sep. 2026): det er den man leter etter når man spør hvorfor to '
@@ -146,7 +146,7 @@ KODER: dict[str, str] = {
     # med hvem — per **ressurs**, ikke per person: det er lagene som flyttes,
     # og en linje per mannskap ville druknet loggen ved hvert vaktskifte.
     TAVLE_FLYTTET:
-        '«Lag 3 → Parkscene» er det tavla på veggen aldri kunne si: når, og '
+        '«Lag 3 → Parkscene» er det tavlen på veggen aldri kunne si: når, og '
         'hvem som flyttet. Forklarer hullene i «hvem har vært på Parkscene».',
     TAVLE_RETTET:
         'En retting skriver om historikken «Besøk» teller. Uten en linje ville '
@@ -158,7 +158,7 @@ KODER: dict[str, str] = {
     # linjer ingen trenger. Historikken står uansett i `Programendring`.
     PROGRAM_ENDRET:
         '«Headliner forsinket til 22:30, beredskap satt til rød» forklarer hvorfor '
-        '«2 / 4» plutselig ble «2 / 5» på tavla, og hvem som bestemte det.',
+        '«2 / 4» plutselig ble «2 / 5» på tavlen, og hvem som bestemte det.',
     # «Send posisjon» fra bil og lag (André, 8. okt. 2026). Ikke løftet av et
     # databasesignal — portalen lagrer ingenting — men av
     # `core.kartkobling.posisjon_delt`, sendt når kartet tok imot.
@@ -298,7 +298,7 @@ def tegn(kode: str, data: dict) -> str:
         sted = data.get('sted') or ''
         periode = '–'.join(t for t in (data.get('fra_foer') or '', data.get('til_foer') or '') if t)
         if data.get('fjernet'):
-            return f'{hvem} {sted} {periode} fjernet fra tavla'.replace('  ', ' ')
+            return f'{hvem} {sted} {periode} fjernet fra tavlen'.replace('  ', ' ')
         deler = []
         for felt, navn in (('fra', 'fra'), ('til', 'til')):
             foer, etter = data.get(f'{felt}_foer') or '', data.get(felt) or ''

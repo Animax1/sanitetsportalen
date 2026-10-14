@@ -203,7 +203,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
             return json_feil('Send `ider` som en liste med tall.')
         rader = {r.pk: r for r in liste.model.objects.filter(pk__in=ider)}
         if len(rader) != len(set(ider)):
-            return json_feil('Lista inneholder ukjente rader — hent den på nytt.')
+            return json_feil('Listen inneholder ukjente rader — hent den på nytt.')
         felter = ['rekkefolge'] + (
             ['updated_at'] if any(f.name == 'updated_at' for f in liste.model._meta.fields) else [])
         for plass, rad_pk in enumerate(ider):

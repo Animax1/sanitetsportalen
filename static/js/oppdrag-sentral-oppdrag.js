@@ -466,7 +466,7 @@ async function visOppdrag(id) {
     ? (o.historikk_fra
       ? `<button class="btn btn-outline-secondary btn-sm" type="button"
                  data-action="hentTilbakeOppdrag" data-id="${escHtmlValue(o.id)}">
-           Hent tilbake til tavla</button>`
+           Hent tilbake til oppdragslisten</button>`
       : `<button class="btn btn-outline-secondary btn-sm" type="button"
                  data-action="flyttTilHistorikk" data-id="${escHtmlValue(o.id)}">
            <i class="bi bi-clock-history me-1"></i>Legg i historikk</button>`)

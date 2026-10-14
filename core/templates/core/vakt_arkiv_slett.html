@@ -23,7 +23,7 @@
       <li>Rader: {{ antall|default_if_none:"–" }}{% if kollapset %} (kollapset — bare aggregatet står){% endif %}</li>
     </ul>
     <p class="small text-muted">
-      Arkivet kan være det eneste som står igjen av vakta: etter «Avslutt vakt» er radene
+      Arkivet kan være det eneste som står igjen av vakten: etter «Avslutt vakt» er radene
       borte. Det tas en backup av arkivet først, og den er eneste vei tilbake.
     </p>
     <form method="post" action="{% url 'portaladmin:vakt_arkiv_slett' slug arkiv.pk %}">

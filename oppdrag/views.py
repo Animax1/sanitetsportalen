@@ -1405,7 +1405,7 @@ def historikk_view(request, pk):
     """
     if er_enhetskonto(request.user):
         return JsonResponse(
-            {'status': 'error', 'message': 'Enheter rydder ikke tavla.'},
+            {'status': 'error', 'message': 'Enheter rydder ikke oppdragslisten.'},
             status=403)
 
     try:

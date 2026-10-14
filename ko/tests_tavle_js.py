@@ -512,11 +512,11 @@ class VaktlistasPauserJsTests(Steg2Tests):
             const stolper = koTavleRader(d, koTavleVindu(NAA2, 12, 25, NAA2 - 8 * 3600000), 'alle')[0].stolper;
             console.log(JSON.stringify(stolper.map((s) => [s.pause_id, s.pause_kilde])));
             const html = stolper.map(koTavleStolpeHtml);
-            console.log(html[0].includes('data-tavle-pause="v12"'), html[0].includes('fra vaktlista'),
+            console.log(html[0].includes('data-tavle-pause="v12"'), html[0].includes('fra vaktlisten'),
                         html[0].includes('ko-tavle-pause-endret'));
             console.log(html[1].includes('ko-tavle-pause-endret'), html[1].includes('endret i drift'));
-            console.log(koTavleSkjemaData({type: 'pause', id: 'v12'}, d, NAA2).hint.startsWith('Fra vaktlista.'));
-            console.log(koTavleSkjemaData({type: 'pause', id: 51}, d, NAA2).hint.startsWith('Fra vaktlista, endret'));
+            console.log(koTavleSkjemaData({type: 'pause', id: 'v12'}, d, NAA2).hint.startsWith('Fra vaktlisten.'));
+            console.log(koTavleSkjemaData({type: 'pause', id: 51}, d, NAA2).hint.startsWith('Fra vaktlisten, endret'));
             console.log(JSON.stringify([koTavlePauseKildetekst('ko'), koTavlePauseKildetekst(undefined)]));
         """)
         self.assertEqual(json.loads(ut[0]), [['v12', 'vaktliste'], [51, 'endret']])

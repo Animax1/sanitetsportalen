@@ -299,7 +299,7 @@ function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil, timene) {
   if (feil) return '<div class="ko-plan-dekning"><div class="ko-plan-dempet small">' + escapeHtml(feil) + '</div></div>';
   if (!grupper.length) {
     return '<div class="ko-plan-dekning"><div class="ko-plan-dempet small">Ingen behov satt i dette tidsrommet — '
-      + 'stripa sammenligner behovet med vaktlista når det finnes.</div></div>';
+      + 'stripa sammenligner behovet med vaktlisten når det finnes.</div></div>';
   }
   const start = (i) => (timene && timene[i] !== undefined ? timene[i] : vindu.fra + i * KO_PLAN_TIME);
   const plass = (i) => {
@@ -326,7 +326,7 @@ function koPlanDekningHtml(stripe, grupper, valgt, vindu, feil, timene) {
     + '</span>').join('');
   return '<div class="ko-plan-dekning"><div class="d-flex flex-wrap align-items-center gap-2 mb-1">'
     + '<span class="small fw-semibold">Dekning</span><div class="btn-group btn-group-sm flex-wrap">' + faner + '</div>'
-    + '<span class="small ko-plan-dempet">trengs / på vakt i vaktlista, utenom pause</span></div>'
+    + '<span class="small ko-plan-dempet">trengs / på vakt i vaktlisten, utenom pause</span></div>'
     + '<div class="ko-plan-soyler">' + soyler + '</div><div class="ko-plan-timer">' + timer + '</div></div>';
 }
 
@@ -387,8 +387,8 @@ function koPlanEtterpaaHtml(data, kanLede, aktivId) {
       ? '<div class="table-responsive"><table class="table table-sm ko-plan-etterpaa"><thead><tr><th>Konsert</th>'
         + '<th>Beredskap</th><th>Behov</th><th>Faktisk på stedet</th><th class="text-end">Oppdrag</th>'
         + '<th class="text-end">Endret</th></tr></thead><tbody>' + rader + '</tbody></table></div>'
-      : '<div class="tom-melding">Ingen konserter i denne vakta.</div>')
-    + '<div class="small ko-plan-dempet mb-1">«Faktisk» er tavlas plasseringer på stedet, også tida på en hendelse '
+      : '<div class="tom-melding">Ingen konserter i denne vakten.</div>')
+    + '<div class="small ko-plan-dempet mb-1">«Faktisk» er tavlens plasseringer på stedet, også tida på en hendelse '
     + 'der — ikke bilenes tid på oppdrag. Oppdrag er antall på stedet mens konserten pågikk.</div>'
     + (historikk ? '<div class="fw-semibold small mt-2">Endringer</div><ul class="ko-plan-historikk">' + historikk + '</ul>' : '');
 }
@@ -456,7 +456,7 @@ function koPlanSkjemaHtml(d, data, steder, dognene) {
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koPlanLukk">Avbryt</button>'
     + (d.id ? '<button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-action="koPlanSlett">Slett konserten</button>' : '')
     + '</div><div class="small ko-plan-dempet mt-1">Artisten setter ingen ressurser — behovet skrives inn for hånd. '
-    + 'Artistlista er KO-lederens, under KO-innstillinger. Et klokkeslett før døgnstarten hører til natta etter.</div>';
+    + 'Artistlisten er KO-lederens, under KO-innstillinger. Et klokkeslett før døgnstarten hører til natten etter.</div>';
 }
 
 // ── Tegning og handlinger ────────────────────────────────────────────────────
@@ -568,7 +568,7 @@ async function koPlanKopier(bekreftet) {
   const res = await apiFetch('/ko/api/program/kopier/', { method: 'POST', body: JSON.stringify(kropp) });
   const d = await res.json().catch(() => ({}));
   if (res.status === 409 && bekreftet !== true) {
-    if (window.confirm(d.message || 'Vakta har alt et program. Legge til likevel?')) await koPlanKopier(true);
+    if (window.confirm(d.message || 'Vakten har alt et program. Legge til likevel?')) await koPlanKopier(true);
     return;
   }
   if (!res.ok) { koPlanVisFeil(d.message || 'Kunne ikke kopiere.'); return; }
@@ -605,7 +605,7 @@ async function koHentDekning(timene) {
       + '&timer=' + timene.length);
     const d = await res.json().catch(() => ({}));
     koPlanDekning = res.ok ? { nokkel, timer: (d.data || {}).timer || [] }
-      : { nokkel, feil: res.status === 403 ? 'Dekningen er vaktlistas tall, og krever lesetilgang i vaktlista.'
+      : { nokkel, feil: res.status === 403 ? 'Dekningen er vaktlistens tall, og krever lesetilgang i vaktlisten.'
         : (d.message || 'Kunne ikke hente dekningen.') };
   } catch (e) {
     // Ikke `null`: da ville tegningen hentet på nytt med en gang, i løkke.

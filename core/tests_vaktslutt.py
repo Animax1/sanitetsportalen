@@ -139,7 +139,7 @@ class AvsluttVaktTests(TestCase):
         self._pasienter(2)
         self._oppdrag(paa_tavla=True)
         svar = self._avslutt()
-        self.assertIn('står fortsatt på tavla', self._meldinger(svar))
+        self.assertIn('står fortsatt i oppdragslisten', self._meldinger(svar))
         self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 2)
         self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 1)
         self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
@@ -157,7 +157,7 @@ class AvsluttVaktTests(TestCase):
                 self._oppdrag(paa_tavla=True)
             return ekte(**kw)
         with mock.patch('core.backup.create_backup', side_effect=backup_og_nytt_oppdrag):
-            self.assertIn('står fortsatt på tavla', self._meldinger(self._avslutt()))
+            self.assertIn('står fortsatt i oppdragslisten', self._meldinger(self._avslutt()))
         self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 1)
         self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
         self.assertFalse(VaktStatistikk.objects.exists())

@@ -652,7 +652,7 @@ function koTavleRadHtml(rad) {
   return '<div class="ko-tavle-rad' + (rad.pause ? ' ko-tavle-pause' : '') + '" tabindex="0" data-tavle-mal="'
     + escapeHtml(rad.id) + '">'
     + '<div class="ko-tavle-radnavn"><span>' + escapeHtml(rad.navn) + '</span>'
-    + (rad.fulgt ? '<span class="ko-tavle-stjerne" title="Fulgt sted — «ikke vært» står under tavla">★</span>' : '')
+    + (rad.fulgt ? '<span class="ko-tavle-stjerne" title="Fulgt sted — «ikke vært» står under tavlen">★</span>' : '')
     + (koTavleKanSkrive()
       ? '<button type="button" class="btn btn-sm btn-outline-secondary ko-tavle-planlegg"'
         + ' data-action="koTavlePlanlegg" data-arg="' + escapeHtml(rad.id) + '" title="'
@@ -686,7 +686,7 @@ function koTavleUtenPlassHtml(u) {
     + koTavlePlanlagtHtml(r.planlagt)
     + '</div>').join('') || '<div class="ko-tavle-tom">Alle ledige har en plass.</div>';
   const travle = u.opptatt.map((r) => '<div class="ko-tavle-kort ko-tavle-opptatt"'
-    + ' title="Hendelsen eller oppdraget styrer hvor ressursen er">' + escapeHtml(r.navn)
+    + ' title="Hendelsen eller oppdraget styrer hvor enheten er">' + escapeHtml(r.navn)
     + '<div class="ko-tavle-kort-under">' + escapeHtml(r.tekst) + '</div></div>').join('');
   return '<div class="ko-tavle-overskrift">Uten plass</div>' + kort
     + (travle ? '<div class="ko-tavle-overskrift mt-2">Opptatt</div>' + travle : '');
@@ -695,7 +695,7 @@ function koTavleUtenPlassHtml(u) {
 // Hvor pausen kommer fra, som et tillegg i `title`: «fra vaktlista» eller
 // «endret i drift». KOs egne sier ingenting — det er standarden på tavla.
 function koTavlePauseKildetekst(kilde) {
-  if (kilde === 'vaktliste') return ' · fra vaktlista';
+  if (kilde === 'vaktliste') return ' · fra vaktlisten';
   if (kilde === 'endret') return ' · endret i drift';
   return '';
 }
@@ -855,15 +855,15 @@ function koTavleBesokHtml(data, b, valg, lokasjonId) {
     + '<div class="btn-group btn-group-sm">' + maalKnapp('antall', 'Antall ganger') + maalKnapp('tid', 'Tid') + '</div>'
     + '<span class="small ko-tavle-dempet">Døgnet regnes fra ' + escapeHtml(data.dognstart || '06:00') + '</span></div>'
     + (steder.length
-      ? '<table class="table table-sm ko-tavle-besok-tabell"><thead><tr><th>Ressurs</th>' + hode
-        + '<th>Hele vakta</th><th>Tid totalt</th><th>Sist der</th></tr></thead><tbody>' + rader + '</tbody></table>'
-      : '<div class="ko-tavle-tom">Ingen lokasjoner på tavla.</div>')
+      ? '<table class="table table-sm ko-tavle-besok-tabell"><thead><tr><th>Enhet</th>' + hode
+        + '<th>Hele vakten</th><th>Tid totalt</th><th>Sist der</th></tr></thead><tbody>' + rader + '</tbody></table>'
+      : '<div class="ko-tavle-tom">Ingen lokasjoner på tavlen.</div>')
     + '</div>';
 }
 
 function koTavleIkkeVaertHtml(liste) {
   return liste.map((l) => '<div class="ko-tavle-ikke-vaert"><span class="ko-tavle-stjerne">★</span> Ikke vært på '
-    + escapeHtml(l.navn) + ' denne vakta: '
+    + escapeHtml(l.navn) + ' denne vakten: '
     + (l.ressurser.length ? l.ressurser.map((n) => '<span class="ko-tavle-navnelapp">' + escapeHtml(n) + '</span>').join(' ')
       : '<span class="ko-tavle-dempet">alle har vært der</span>')
     + '</div>').join('');
@@ -931,10 +931,10 @@ function koTavleSkjemaData(skjema, data, naaMs) {
     ref: q ? Date.parse(q.fra) : forslag,
     tilLaast: false,
     hint: (q && q.kilde === 'vaktliste'
-      ? 'Fra vaktlista. Endrer eller fjerner du den, gjelder KOs versjon resten av vakta. '
-      : (q && q.kilde === 'endret' ? 'Fra vaktlista, endret i drift — KOs versjon gjelder. ' : ''))
+      ? 'Fra vaktlisten. Endrer eller fjerner du den, gjelder KOs versjon resten av vakten. '
+      : (q && q.kilde === 'endret' ? 'Fra vaktlisten, endret i drift — KOs versjon gjelder. ' : ''))
       + 'Planen flytter ingen: når tiden er inne, får laget ' + flytt + ', og KO trykker. '
-      + (pause ? '' : 'Laget må ha skift i vaktlista når planen begynner.'),
+      + (pause ? '' : 'Laget må ha skift i vaktlisten når planen begynner.'),
     kanFjerne: Boolean(q),
   };
 }
@@ -1185,7 +1185,7 @@ async function koTavleFjernISkjema() {
   const s = koTavleSkjema;
   if (!s) return;
   const sporsmaal = s.type === 'rett'
-    ? 'Fjerne plasseringen? Den forsvinner fra tavla og fra «Besøk», og loggen får en linje om det.'
+    ? 'Fjerne plasseringen? Den forsvinner fra tavlen og fra «Besøk», og loggen får en linje om det.'
     : 'Fjerne planen?';
   if (!window.confirm(sporsmaal)) return;
   const url = s.type === 'rett' ? '/ko/api/tavle/plasseringer/' + s.id + '/' : '/ko/api/tavle/pauser/' + s.id + '/';
@@ -1233,22 +1233,22 @@ function koTavleOppsettHtml(data) {
     + '<label class="small">◀ ▶ flytter (minutter) <input type="number" min="15" max="720" step="15"'
     + ' class="form-control form-control-sm" id="ko-tavle-steg" value="' + escapeHtml(String((data && data.steg_min) || 120))
     + '"></label>'
-    + '<div class="form-text m-0">Gjelder tavla og konsertplanleggeren. Tidsvinduet (timer) settes i portalinnstillingene.</div>'
+    + '<div class="form-text m-0">Gjelder tavlen og konsertplanleggeren. Tidsvinduet (timer) settes i portalinnstillingene.</div>'
     + '</div>';
   if (!rader.length) return rulling + '<div class="tom-melding">Ingen aktive lokasjoner i oppdragsmodulen.</div>'
     + '<button type="button" class="btn btn-sm btn-primary" data-action="koLagreTavleOppsett">Lagre</button>';
   return rulling + '<table class="table table-sm align-middle mb-2"><thead><tr><th>Lokasjon (fra oppdragsmodulen)</th>'
-    + '<th class="text-center">På tavla</th><th class="text-center">Følg besøk ★</th></tr></thead><tbody>'
+    + '<th class="text-center">På tavlen</th><th class="text-center">Følg besøk ★</th></tr></thead><tbody>'
     + rader.map((l) => '<tr><td>' + escapeHtml(l.navn) + '</td>'
       + '<td class="text-center"><input type="checkbox" class="form-check-input" data-tavle-oppsett="paa" value="'
-      + escapeHtml(l.id) + '"' + (l.paa_tavla ? ' checked' : '') + ' aria-label="' + escapeHtml(l.navn) + ' på tavla"></td>'
+      + escapeHtml(l.id) + '"' + (l.paa_tavla ? ' checked' : '') + ' aria-label="' + escapeHtml(l.navn) + ' på tavlen"></td>'
       + '<td class="text-center"><input type="checkbox" class="form-check-input" data-tavle-oppsett="fulgt" value="'
       + escapeHtml(l.id) + '"' + (l.fulgt ? ' checked' : '') + ' aria-label="Følg ' + escapeHtml(l.navn) + '"></td></tr>').join('')
     + '</tbody></table>'
     + '<button type="button" class="btn btn-sm btn-primary" data-action="koLagreTavleOppsett">Lagre</button>'
     + '<div class="form-text">Rekkefølgen er lokasjonenes egen. KO eier bare de to avkryssingene — ikke lokasjonene. '
     + 'Pause er en fast rad øverst, ikke en lokasjon. «Følg» gir stjerne på raden, nuller øverst i «Besøk», '
-    + 'og «Ikke vært på» under tavla.</div>';
+    + 'og «Ikke vært på» under tavlen.</div>';
 }
 
 function koTegnTavleOppsett() {

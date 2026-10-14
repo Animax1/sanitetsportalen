@@ -87,7 +87,7 @@ TEMAER: dict[str, dict[str, str]] = {
     'ko': {
         'skallet': 'modulen, tilgangen, flatene, sidebaren',
         'loggen': 'logglinjer, retting, sletteinngangen, systemhendelsene som løftes inn',
-        'ressursbildet': 'tavla: projeksjonen av vaktliste + oppdrag + KO-ført status',
+        'ressursbildet': 'tavlen: projeksjonen av vaktliste + oppdrag + KO-ført status',
         'sentralbordet': 'sentralbordet flyttet inn i /ko/, delingen og gatene',
         'hendelseslogg': 'hendelsesloggen som egen flate: prioritet, bli med, festing, lagene på hendelsen, loggen i hendelsen med deling, melder',
         'oppsett': '2×2-rutenettet: bytte plass, skillelinjer, oppsettet i localStorage',
@@ -95,7 +95,7 @@ TEMAER: dict[str, dict[str, str]] = {
     },
     'oppdrag': {
         'enhetsskjerm': 'bilens side, offline-køen, lydvarselet',
-        'sentralbord': 'operatørens side, oppdragslista, tidslinja',
+        'sentralbord': 'operatørens side, oppdragslisten, tidslinja',
         'statusmaskin': 'overganger, stemplinger, passiv vakt, avvente',
     },
     'park': {

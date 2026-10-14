@@ -117,7 +117,7 @@
         <td><b>{{ b.navn }}</b>{% if b.type_navn %}<br><span class="dempet">{{ b.type_navn }}</span>{% endif %}</td>
         <td>{% if not b.pa_vakt %}<span class="dempet">Ikke på vakt</span>{% else %}{{ b.status_navn }}{% if b.status_tid %} <span class="tid dempet">{{ b.status_tid|date:"H:i" }}</span>{% elif b.ledig_tid %} <span class="tid dempet">siden {{ b.ledig_tid|date:"H:i" }}</span>{% endif %}{% if b.passiv_vakt %}<br><span class="dempet">Passiv vakt</span>{% endif %}{% endif %}</td>
         <td>{% if b.oppdragsnummer %}O{{ b.oppdragsnummer }} · {{ b.problemstilling }}{% if b.lokasjon_navn %} · {{ b.lokasjon_navn }}{% endif %}{% if b.sted_navn %}<br><span class="dempet">{{ b.sted_navn }}</span>{% endif %}{% else %}–{% endif %}</td>
-        <td>{% if b.besetning %}{% for m in b.besetning.mannskap %}<div>{{ m.navn }}{% if m.rolle %} ({{ m.rolle }}){% endif %} — {{ m.telefon|default:"–" }} · {{ m.issi|default:"–" }}{% if m.tilstede %} <span class="merke">møtt</span>{% endif %}</div>{% empty %}<span class="dempet">Ingen på skift nå</span>{% endfor %}{% elif ressurser.med_vaktliste %}<span class="dempet">Ikke koblet til vaktlista</span>{% else %}<span class="dempet">Krever lesetilgang i vaktlista</span>{% endif %}</td>
+        <td>{% if b.besetning %}{% for m in b.besetning.mannskap %}<div>{{ m.navn }}{% if m.rolle %} ({{ m.rolle }}){% endif %} — {{ m.telefon|default:"–" }} · {{ m.issi|default:"–" }}{% if m.tilstede %} <span class="merke">møtt</span>{% endif %}</div>{% empty %}<span class="dempet">Ingen på skift nå</span>{% endfor %}{% elif ressurser.med_vaktliste %}<span class="dempet">Ikke koblet til vaktlisten</span>{% else %}<span class="dempet">Krever lesetilgang i vaktlisten</span>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -129,7 +129,7 @@
   <h3>Lag og andre ressurser på vakt nå</h3>
   {% if ressurser.lag %}
   <table>
-    <thead><tr><th style="width:11rem">Ressurs</th><th style="width:6rem">Møtt</th><th>Mannskap — telefon · ISSI</th></tr></thead>
+    <thead><tr><th style="width:11rem">Enhet</th><th style="width:6rem">Møtt</th><th>Mannskap — telefon · ISSI</th></tr></thead>
     <tbody>
     {% for r in ressurser.lag %}
       {% ifchanged r.gruppe_navn %}<tr class="dag"><td colspan="3">{{ r.gruppe_navn }}</td></tr>{% endifchanged %}
@@ -142,7 +142,7 @@
     </tbody>
   </table>
   {% else %}<p class="tom">Ingen lag på vakt nå.</p>{% endif %}
-  {% else %}<p class="dempet">Lagene står ikke med — de krever lesetilgang i vaktlista.</p>{% endif %}
+  {% else %}<p class="dempet">Lagene står ikke med — de krever lesetilgang i vaktlisten.</p>{% endif %}
   {% endif %}
 
   <h2>Aktive oppdrag</h2>
@@ -172,7 +172,7 @@
   </table>
   {% else %}<p class="tom">Ingen aktive oppdrag.</p>{% endif %}
 
-  <h2>Tavla</h2>
+  <h2>Tavlen</h2>
   {% if stengt.tavle %}<p class="tom">{{ stengt.tavle }}</p>
   {% else %}
   {% if not tavle.med_biler %}<p class="dempet">Bilene står ikke med — de krever lesetilgang i oppdragsmodulen.</p>{% endif %}
@@ -204,7 +204,7 @@
   <h3>Planlagt fram til {{ tavle.til|date:"j.n. H:i" }}</h3>
   {% if tavle.planlagt %}
   <table>
-    <thead><tr><th>Tid</th><th>Ressurs</th><th>Til</th></tr></thead>
+    <thead><tr><th>Tid</th><th>Enhet</th><th>Til</th></tr></thead>
     <tbody>
     {% for q in tavle.planlagt %}
       <tr><td class="tid">{{ q.fra|date:"H:i" }}–{{ q.til|date:"H:i" }}</td><td>{{ q.navn }}</td><td>{{ q.hvor }}</td></tr>

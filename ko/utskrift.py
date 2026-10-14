@@ -267,7 +267,7 @@ def bygg(request, vakt, naa=None) -> dict:
           'logg_fra': lokal(naa - timedelta(hours=LOGG_TIMER))}
     if not kan_oppdrag and not kan_vaktliste:
         ut['stengt']['ressurser'] = ('Ressursoversikten krever lesetilgang i oppdragsmodulen '
-                                     'eller vaktlista.')
+                                     'eller vaktlisten.')
     if kan_oppdrag:
         ut['oppdrag'] = oppdrag_del(vakt)
     else:
@@ -275,5 +275,5 @@ def bygg(request, vakt, naa=None) -> dict:
     if kan_vaktliste:
         ut['tavle'] = tavle_del(vakt, naa, med_biler=kan_oppdrag)
     else:
-        ut['stengt']['tavle'] = 'Tavla viser vaktlistas ressurser, og krever lesetilgang i vaktlista.'
+        ut['stengt']['tavle'] = 'Tavlen viser vaktlistens ressurser, og krever lesetilgang i vaktlisten.'
     return ut

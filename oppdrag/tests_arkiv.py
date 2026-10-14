@@ -540,7 +540,7 @@ class ArkivEndepunktTests(ArkivBasis):
         slutt. Sperren sier hva som må gjøres først (`oppdrag/vaktslutt.py`)."""
         from oppdrag.vaktslutt import OppdragVaktslutt
         a, b, c_ = self._full_vakt()   # b er halvferdig
-        self.assertIn('1 oppdrag står fortsatt på tavla', OppdragVaktslutt().sperre(self.vakt))
+        self.assertIn('1 oppdrag står fortsatt i oppdragslisten', OppdragVaktslutt().sperre(self.vakt))
         self._stempel(b, choices.LEDIG, 30)
         Oppdrag.objects.filter(vakt=self.vakt).update(historikk_fra=timezone.now())
         self.assertEqual(OppdragVaktslutt().sperre(self.vakt), '')

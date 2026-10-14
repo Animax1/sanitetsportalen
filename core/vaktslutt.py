@@ -131,14 +131,14 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
     if hent_aktiv_vakt().pk != vakt.pk:
         # Tidlig, så en avsluttet vakt ikke koster backuper. Vernet er låsen i
         # transaksjonen under — denne sjekken er et kappløp.
-        grunner.insert(0, f'«{vakt.navn}» er ikke den aktive vakta.')
+        grunner.insert(0, f'«{vakt.navn}» er ikke den aktive vakten.')
     if grunner:
         raise Sperret(grunner)
 
     for h in handlere:
         if h.backup_slug:
             create_backup(slug=h.backup_slug, kind='pre_reset', user=bruker,
-                          note=f'Før avslutning av vakta «{vakt.navn}»')
+                          note=f'Før avslutning av vakten «{vakt.navn}»')
 
     with transaction.atomic():
         # Låst, og sjekket at vakta fortsatt er den aktive (28. sep. 2026). To
@@ -146,7 +146,7 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
         # to ganger; den andre gangen var radene tømt, og det nyeste settet —
         # det som vises — var nuller.
         if laas_aktiv_vakt().pk != vakt.pk:
-            raise Sperret([f'«{vakt.navn}» er ikke lenger den aktive vakta — '
+            raise Sperret([f'«{vakt.navn}» er ikke lenger den aktive vakten — '
                            'den er avsluttet i mellomtiden.'])
         # En gang til: backupene tar tid, og et oppdrag lagt på tavla imens
         # ville ellers blitt arkivert og slettet halvveis.

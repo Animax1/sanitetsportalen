@@ -130,7 +130,7 @@ function visManglendeOppsett() {
 
 //: Plassholderen mens første henting mangler. Sida poller hvert 30. sekund,
 //: så meldingen sier hva som skjer videre i stedet for å stå på «Laster…».
-const LASTEFEIL = 'Kunne ikke hente lista — prøver igjen om 30 sekunder.';
+const LASTEFEIL = 'Kunne ikke hente listen — prøver igjen om 30 sekunder.';
 
 
 async function _trygt(laster) {

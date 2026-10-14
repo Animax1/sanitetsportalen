@@ -281,7 +281,7 @@ function parkTegnRegistreringer() {
   const tabell = parkTabell(['Tid', 'Lag', 'Sted', 'Problemstilling', 'Antall', 'Utfall', ''], rader);
   // Overskriften står fast når lista rulles i sin egen boks.
   tabell.querySelector('thead').setAttribute('style', 'position: sticky; top: 0; z-index: 1;');
-  const tom = parkRegistreringene.length ? 'Ingen treff.' : 'Ingen registreringer på denne vakta.';
+  const tom = parkRegistreringene.length ? 'Ingen treff.' : 'Ingen registreringer på denne vakten.';
   document.getElementById('park-registreringer').replaceChildren(rader.length
     ? tabell : parkNode('p', {class: 'small text-muted', tekst: tom}));
 }
@@ -327,7 +327,7 @@ async function parkRydd(e) {
 
 async function parkHentVerdier(slug, boksId, kanRedigere) {
   const {ok, d} = await parkApi(`/lag/api/${slug}/`);
-  if (!ok) { parkFeil(d.message || 'Kunne ikke hente lista.'); return; }
+  if (!ok) { parkFeil(d.message || 'Kunne ikke hente listen.'); return; }
   const rader = d.data;
   const knapp = (tekst, fn, klasse = 'btn-outline-secondary') => parkNode('button', {
     class: `btn btn-sm ${klasse}`, type: 'button', tekst, klikk: fn});

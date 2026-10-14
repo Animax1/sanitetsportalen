@@ -272,7 +272,7 @@ def registrer(lenke, vakt, data: dict) -> tuple[Registrering, bool]:
 
     ressurs = lagene().filter(pk=_heltall(data.get('lag'), 'lag')).first()
     if ressurs is None:
-        raise Ugyldig('Laget finnes ikke på vaktlista. Last siden på nytt.')
+        raise Ugyldig('Laget finnes ikke på vaktlisten. Last siden på nytt.')
     sted = steder().filter(pk=_heltall(data.get('sted'), 'sted')).first()
     if sted is None:
         raise Ugyldig('Stedet finnes ikke lenger. Velg et annet.')

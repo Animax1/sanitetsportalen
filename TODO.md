@@ -35,6 +35,11 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Se over ordboka på staging før `main`** (bygget 14. okt. 2026). Sentralbordet
+      («Ressurser» står, «Hent tilbake til oppdragslisten»), KO (vinduet «Ressursoversikt»
+      står, «Vaktlistens enheter uten delt konto» i innstillingene, kolonnen «Enhet» i
+      utskriften), og -en-formen der du ser den — «Tavlen», «vakten». Er et ord feil i
+      sammenhengen, si hvilket; reglene står i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md` §4.
 - [ ] **Feltprøv Wake Lock på bilskjermen** (på staging fra 9. okt. 2026 — kan ikke prøves i
       node). En iPhone og en Android i en bil, bilkonto innlogget, 20 minutter uten berøring —
       én gang med strømsparing av, én gang på. Trykk på skjermen først (låsen hentes ved
@@ -308,15 +313,6 @@ skjermen), 4 («Del ut») og 5 (veiledningen) er levert — CHANGELOG 30. sep. o
         sluttsteget i planleggeren. Tilgangsmatrisen §16 har en ny rad.
       - **Pulje 5**: §1 «Veiledningen» — lenken i vaktlinjen, egen del pekt ut per rolle,
         og at den leses på telefon.
-
-- [ ] **Bygg ordboka i `/oppdrag/` og `/ko/` — avgjort 14. okt. 2026.** Svarene og
-      regelen står i `docs/FORSLAG_ORDBOK_OPPDRAG_KO.md` §4: **samlingen heter «ressurser»,
-      én konkret heter «enhet»** (André: «innenfor ressursen ambulanse så har du enheter hvor
-      Ambulanse A er én enhet»). «Ressursoversikt» og sentralbordets «Ressurser» står;
-      «Ukjent ressurs», tavlens kolonne «Ressurs» og liknende entall blir «enhet». -en-form i
-      hele portalen, «Trenger ressurs» står som fagord, «oppdragslisten» i `/oppdrag/`,
-      typelistene beholder hvert sitt navn. Leseren i `vaktliste/tests_ordboka.py` flyttes til
-      `core` og får en vakt per modul, med tillatt-lista for samlingen. Staging før `main`.
 
 ### Vaktlista: nedtrekket i «Rediger skift» — bevisst ufiltrert (14. sep. 2026)
 

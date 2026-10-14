@@ -117,7 +117,7 @@ class Registrering(models.Model):
     FORHANDSVALG_TELEFON = 'telefon'
     FORHANDSVALG_INGEN = 'ingen'
     FORHANDSVALG = (
-        (FORHANDSVALG_KO, 'KO-tavla'),
+        (FORHANDSVALG_KO, 'KO-tavlen'),
         (FORHANDSVALG_REGISTRERING, 'Lagets siste registrering'),
         (FORHANDSVALG_TELEFON, 'Telefonens siste valg'),
         (FORHANDSVALG_INGEN, 'Ingen'),

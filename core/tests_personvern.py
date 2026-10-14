@@ -97,7 +97,7 @@ class SidenTests(TestCase):
         from vaktliste.overnatting import OPPBEVARING_DAGER as OVERNATTING
 
         html = ' '.join(Client().get('/personvern/').content.decode().split())
-        self.assertIn(f'Slettes {OVERNATTING} dager etter natta', html)
+        self.assertIn(f'Slettes {OVERNATTING} dager etter natten', html)
         self.assertIn(f'Registreringene slettes {PARK} dager etter', html)
         mnd = round(PasientArkivHandler.retention_dager / 365 * 12)
         self.assertIn(f'arkiveres opplysningene i {mnd} måneder', html)
