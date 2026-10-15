@@ -24,23 +24,37 @@ gjelder portalen der ikke annet står.
    du vet hva som kjører hvis noe ser rart ut. Må du likevel deploye: §8c
 8. **Kartet åpent i egen fane** (`https://kart.sanitet.net`), innlogget, med bilene og lagene
    synlige. Kortet «Kart.sanitet.net» på server-status skal vise siste sending med ✓ (§1d steg 4)
-9. **Serverless er av på begge prod-tjenestene** (§1c steg 0). Better Stack sier ingenting om
-   prod — den overvåker staging (§1e)
+9. **Serverless er av på begge prod-tjenestene** (§1c steg 0), **backup-klokka er på** (§1c
+   steg 0b — punkt 5 over sier fra hvis den ikke er det), og **Better Stack er startet igjen**
+   (§1c steg 0c). Better Stack sier ingenting om prod — den overvåker staging (§1e)
 
 ### 1b. Driftsmodus — lavkostnad mellom vakter, vakt-modus før vakt
 
 Appen kjøres i to ulike modus styrt av én env-variabel: `REDIS_URL`. Standardtilstand mellom vakter er **lavkostnad-modus** (1 worker, Redis frakoblet, LocMemCache). Før hver vakt veksles til **vakt-modus** (Railway Pro, 2 workers × 4 tråder, Redis aktivt). Etter vakt veksles tilbake.
 
-| Modus | `REDIS_URL` | `WEB_WORKERS` × `WEB_THREADS` | Cache | Plan | Serverless (prod) | Når |
-|---|---|---|---|---|---|---|
-| **Lavkostnad** (default) | tom / fjernet | 1 × 4 | LocMemCache | Hobby | **på** | Mellom vakter |
-| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | **2 × 4** | RedisCache | **Pro** | **av** | Før og under vakt |
+| Modus | `REDIS_URL` | `WEB_WORKERS` × `WEB_THREADS` | Cache | Plan | Serverless (prod) | `BACKUP_KLOKKE` (prod) | Better Stack | Når |
+|---|---|---|---|---|---|---|---|---|
+| **Lavkostnad** (default) | tom / fjernet | 1 × 4 | LocMemCache | Hobby | **på** | **`av`** | **pauset** | Mellom vakter |
+| **Vakt-modus** | satt til Redis-tjenestens variabel-referanse | **2 × 4** | RedisCache | **Pro** | **av** | slettet (= på) | **på** | Før og under vakt |
 
 **Serverless** er Railways innstilling som lar en tjeneste sove når den ikke har trafikk, og
 vekker den ved neste forespørsel. Prod står slik mellom vakter, for både portalen og kartet:
 ingen bruker dem da, og en sovende tjeneste koster nesten ingenting. Prisen er **kald start**
 — den første forespørselen etter dvalen venter mens containeren starter. Det er greit for én
 person som tester en tirsdag, og galt under vakt (§1c steg 0). Kartets modus står i §1d.
+
+**Serverless alene får ikke prod til å sove** (15. okt. 2026). Railway lar en tjeneste sove
+først etter 5–10 minutter **uten utgående trafikk**, og spørringer mot Postgres teller.
+Backup-klokka spør databasen hvert minutt (`TIKK_SEKUNDER` i `core/backup/klokke.py`), og
+Better Stack spurte staging oftere enn hvert femte. Derfor står klokka av og Better Stack
+pauset mellom vakter. Mellom vakter endres nesten ingen data, så en backup ville tatt en kopi
+av det samme. Det er også grunnen til at begge **må på igjen før vakta**: uten klokka kjører
+vakta uten automatisk backup, og det merkes først når man trenger den.
+
+**Staging står slik hele tiden** (15. okt. 2026): serverless på og `BACKUP_KLOKKE=av` for
+portalen, serverless på for kartet. Staging-dataene er testdata, og en staging som sover koster
+nesten ingenting. **Tester du endringer i backupen på staging**, slett `BACKUP_KLOKKE` der
+mens du tester, og sett den tilbake til `av` etterpå.
 
 **Vakt-modus er grunnlinja tiltakene i §2 regnes fra** (24. sep. 2026). Til da regnet
 tabellen fra 1 worker, og «oransje: oppgrader til 2 workers» var et tiltak som alt var
@@ -63,6 +77,23 @@ står. Et sovende kart er verre enn det ser ut: portalen venter **3 sekunder** p
 portalen tar **60 sekunders pause** fra kartet, og posisjonen fra den stemplingen — og fra
 alle andre i pausen — er tapt. Ingen ny sending skjer før bilen stempler igjen. Stemplingen
 selv går gjennom; det er bare kartet som står uten bilen.
+
+#### Steg 0b: Slå på backup-klokka
+
+Railway → prod-miljøet → **web**-tjenesten → **Variables** → slett `BACKUP_KLOKKE` (eller
+sett den til noe annet enn `av` — bare `av` slår den av, uansett store og små bokstaver).
+Endringen redeployer tjenesten.
+
+**Kontroll:** `/portal-admin/backup/` skal ikke lenger si at klokka er slått av, og innen
+planens intervall skal «Siste backup» være fersk (§1 punkt 5). **Ikke hopp over steget:**
+står klokka av, er det ingen automatisk backup under vakta. `pre_reset`-backupen ved «Avslutt
+vakt» tas uansett (`core/vaktslutt.py`), men alt som skjer fram dit, er bare dekket av backupen
+fra før klokka ble slått av.
+
+#### Steg 0c: Start Better Stack igjen
+
+Better Stack → monitorene for staging → **Resume**. De er pauset mellom vakter (§1e). Vil du
+ha prod-monitorer under vakta, legg dem til nå — se §1e for adressene.
 
 #### Steg 1: Slå på Redis-tjenesten på Railway
 
@@ -198,6 +229,11 @@ portalen sender til testkart.sanitet.net og skal aldri kunne tegne i prod-kartet
 serverless: en monitor som spør prod hvert par minutter er trafikk, og trafikk holder
 tjenesten våken. Prod ville aldri sovnet, og poenget med lavkostnad-modus forsvinner. Og
 sovnet den likevel, ville hver kalde start sett ut som et utfall.
+
+**Mellom vakter er Better Stack pauset helt** (15. okt. 2026), staging-monitorene også. En
+monitor som spør oftere enn hvert femte minutt holder staging våken døgnet rundt, og da
+betaler man for to miljøer som ingen bruker. Monitorene startes i §1c steg 0c og pauses i
+§10b steg 6.
 
 Det betyr:
 
@@ -1088,13 +1124,20 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 2. Etter deployen: Logs viser **én** `Booting worker with pid`, og `/healthz` svarer `ok`.
 3. Kodefrysen i kartets repo oppheves.
 
-#### Steg 6: Prod-monitorene av, serverless på — i den rekkefølgen
+#### Steg 6: Monitorene av, backup-klokka av, serverless på — i den rekkefølgen
 
-1. Lagt til prod-monitorer i Better Stack (§1e)? **Pause dem først.** Står de på, holder de
-   prod våken, og serverless sparer ingenting.
-2. Railway → **web**-tjenesten (portalen) → **Settings** → **Serverless** → på.
-3. Samme på kart-tjenesten.
-4. Staging-monitorene i Better Stack blir stående som de er.
+1. **Pause alle monitorene i Better Stack**, staging-monitorene også (§1e). Står de på,
+   holder de tjenestene våkne, og serverless sparer ingenting.
+2. **Sjekk at det finnes en backup tatt etter at vakta ble avsluttet** — `/portal-admin/backup/`.
+   Den er det som dekker tiden fram til neste vakt.
+3. Railway → prod → **web**-tjenesten (portalen) → **Variables** → `BACKUP_KLOKKE` = `av`.
+   Klokka spør databasen hvert minutt og holder ellers portalen våken (§1b).
+4. Railway → **web**-tjenesten → **Settings** → **Serverless** → på.
+5. Samme på kart-tjenesten. Kartet har ingen backup-klokke, så serverless er nok der.
+
+**Kontroll et døgn etter:** Railway → Metrics for begge prod-tjenestene, siste 24 timer. Står
+minnet på 0 store deler av tiden, sover de. Ligger det flatt, holder noe dem våkne — en åpen
+fane, en monitor eller en variabel som ikke ble satt.
 
 ### 10c. Andre opprydding
 

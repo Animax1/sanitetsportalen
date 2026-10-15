@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — Runbook: backup-klokka av og Better Stack pauset mellom vakter, så prod får sove («overskrider 5 dollar planen»)  `#core/dokumentasjon` `#core/backup`
+
+André: «i denne perioden overskrider jeg 5 dollar planen til railway». Per tjeneste var minnet
+lite (web 88–119 MB, Postgres 75–131 MB); det som kostet var at alt var våkent døgnet rundt.
+**Serverless virket ikke:** Railway lar en tjeneste sove først etter 5–10 min uten
+*utgående* trafikk, og backup-klokka spør databasen hvert 60. sekund. Better Stack holdt
+staging våken på samme måte. André satte `BACKUP_KLOKKE=av` i prod og pauset Better Stack;
+etterpå sov både portalen og kartet i prod.
+
+Ført inn i `docs/RUNBOOK_VAKT.md` så det ikke glemmes før neste vakt:
+- **§1b:** tabellen har kolonnene `BACKUP_KLOKKE` (prod) og Better Stack; avsnitt om hvorfor
+  serverless alene ikke får prod til å sove, og at **staging står med serverless på og
+  `BACKUP_KLOKKE=av` hele tiden** (slettes midlertidig når backupen testes der).
+- **§1c steg 0b** «Slå på backup-klokka» og **steg 0c** «Start Better Stack igjen» — 0b/0c og
+  ikke ny nummerering, fordi «§1c steg 6» er referert fra `TODO.md`. **§1 punkt 9** krever begge.
+- **§1e:** Better Stack er pauset helt mellom vakter, staging også.
+- **§10b steg 6:** pause alle monitorene, sjekk at det finnes en backup etter «Avslutt vakt»,
+  `BACKUP_KLOKKE=av`, serverless på — og en kontroll et døgn etter i Railway Metrics.
+
 ## 2026-10-15 — Cloudflare Email Routing av, MX-ene til `route1–3.mx.cloudflare.net` slettet  `#core/dokumentasjon` `#core/personvern`
 
 André slo av Email Routing for `sanitet.net` («bare anestesi.net som har routing»). Det
