@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — Proton-filteret er en tillatelsesliste: avsender + admin@ + kjent emne; personvern@ får aldri frist  `#core/dokumentasjon` `#core/personvern`
+
+André: «Jeg tenker å ha flere epost kontoer for ulike ting. Så vi må nok endre på ting slik
+at alt ikke slettes», og «de som kontakter for å få evt innsyn sender til
+personvern@sanitet.net». Første forslag (A.9, v1.24) la `expire` på **alt** fra
+`noreply@mail.sanitet.net`, uansett mottaker og emne. Nå:
+- **Regel 1, først:** alt til personvern@ sorteres i «Personvern/Henvendelser», **uten
+  `expire`**, og `stop` — så ingen senere regel kan nå en innsynsbegjæring, heller ikke en
+  sendt til personvern@ og admin@ samtidig.
+- **Regel 2:** frist bare når avsenderen, mottakeren `admin@sanitet.net` og emnet stemmer:
+  `Vaktliste:` (30 dager), `[Django] ERROR` / `[Django] CRITICAL` (90 dager). Alt annet får
+  ingen frist.
+
+Emnelista bygger på de fire stedene portalen sender e-post fra (`AdminEmailHandler`,
+`vaktliste/fil.py`, `accounts/invitasjon.py` og `passord_reset.py`, `verifiser_feilvarsel`);
+`[test] `-prefikset utenfor drift treffes av `:contains`. Protokollen v1.26.
+
 ## 2026-10-15 — Runbook: backup-klokka av og Better Stack pauset mellom vakter, så prod får sove («overskrider 5 dollar planen»)  `#core/dokumentasjon` `#core/backup`
 
 André: «i denne perioden overskrider jeg 5 dollar planen til railway». Per tjeneste var minnet

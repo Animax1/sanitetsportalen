@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 15. oktober 2026  
-**Versjon:** 1.25  
+**Versjon:** 1.26  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -649,31 +649,70 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
 | Brukerkontoer | Slettes manuelt når tilgang ikke lenger er nødvendig | Manuell | Lagringsbegrensning, art. 5(1)(e) |
 
-> **Forslag til frist for systemposten, håndhevet av Proton** (15. okt. 2026). All e-post
-> portalen sender, kommer fra `noreply@mail.sanitet.net` (`DEFAULT_FROM_EMAIL` og
-> `SERVER_EMAIL`), og Proton kan merke og slette den selv med et Sieve-filter
-> (Innstillinger → Filtre → «Legg til Sieve-filter»). `expire` sletter meldingen etter fristen,
-> og Protons tak er 730 dager. Mappene må finnes før filteret lagres.
+> **Forslag til frist for systemposten, håndhevet av Proton** (15. okt. 2026). Proton kan
+> merke og slette e-post selv med et Sieve-filter (Innstillinger → Filtre → «Legg til
+> Sieve-filter»). `expire` sletter meldingen etter fristen, og Protons tak er 730 dager.
+> Mappene må finnes før filteret lagres.
+>
+> **Filteret er en tillatelsesliste, ikke en avsenderregel** (André, 15. okt. 2026: «Jeg tenker
+> å ha flere epost kontoer for ulike ting. Så vi må nok endre på ting slik at alt ikke
+> slettes»). All e-post portalen sender, kommer fra `noreply@mail.sanitet.net`
+> (`DEFAULT_FROM_EMAIL` og `SERVER_EMAIL`), så avsenderen alene skiller ikke en feilmelding fra
+> noe som skal tas vare på. En frist krever derfor **tre ting samtidig**: avsenderen,
+> mottakeren `admin@sanitet.net` og et emne vi vet hva er. Alt annet får ingen frist. Portalen
+> sender fire slags e-post (kontrollert i koden 15. okt. 2026):
+>
+> | Emne | Fra | Til | Frist |
+> |---|---|---|---|
+> | `[Django] ERROR …` / `CRITICAL …` (feilvarsler) | `AdminEmailHandler`, `settings.LOGGING` | `ADMINS` = admin@ | **90 dager** |
+> | `Vaktliste: <vakt>` (vaktlista som fil) | `vaktliste/fil.py` | mottakerlista i portalen | **30 dager** — bare kopien til admin@ |
+> | `Sett passordet ditt i Sanitetsportalen`, `Nytt passord i Sanitetsportalen` | `accounts/` | brukeren selv | Ingen — går ikke til innboksene våre |
+> | `Verifisering av e-postoppsettet` | `verifiser_feilvarsel` | `ADMINS` | Ingen — sjelden, slettes for hånd |
+>
+> Utenfor drift får emnet `[test] ` foran (`core/mail_backends.py`); `:contains` treffer begge.
+>
+> **personvern@ får aldri en frist** (André, 15. okt. 2026: «de som kontakter for å få evt
+> innsyn sender til personvern@sanitet.net»). Henvendelsene etter A.14 er den e-posten som
+> *dokumenterer* at korpset svarte innen fristen, og de slettes for hånd når saken er
+> avsluttet. Filteret sorterer dem i en egen mappe, uten `expire`, og stopper der — så ingen
+> regel lenger ned kan nå dem, heller ikke om noen skriver til personvern@ og admin@ i samme
+> e-post.
 >
 > ```
 > require ["fileinto", "vnd.proton.expire"];
-> if address :is "from" "noreply@mail.sanitet.net" {
+>
+> # 1. Henvendelser til personvern@: egen mappe, ALDRI expire. Står først,
+> #    og stop gjør at reglene under ikke kan nå dem.
+> if address :is ["to", "cc"] "personvern@sanitet.net" {
+>   fileinto "Personvern/Henvendelser";
+>   stop;
+> }
+>
+> # 2. Systemposten fra portalen til admin@, med et emne vi kjenner.
+> #    Alt annet — andre kontoer, ukjente emner — røres ikke.
+> if allof (address :is "from" "noreply@mail.sanitet.net",
+>           address :is ["to", "cc"] "admin@sanitet.net") {
 >   if header :contains "subject" "Vaktliste:" {
 >     fileinto "System/Vaktliste";
 >     expire "day" "30";
->   } else {
->     fileinto "System";
->     expire "day" "90";
+>     stop;
 >   }
->   stop;
+>   if header :contains "subject" ["[Django] ERROR", "[Django] CRITICAL"] {
+>     fileinto "System/Feilvarsler";
+>     expire "day" "90";
+>     stop;
+>   }
 > }
 > ```
 >
-> **Bare systemposten, med vilje.** En henvendelse etter A.14 skal ikke forsvinne av seg selv
-> midt i en sak; den slettes for hånd når saken er avsluttet og fristen er ute, og det
-> kontrolleres i den årlige gjennomgangen (C.4). Filteret virker bare på e-post som kommer
-> *etter* at det er lagret. Fristene over er forslag; når de er bestemt, skrives de inn i
-> tabellen.
+> **Står adressene på hver sin Proton-konto**, legges regel 1 på kontoen som eier personvern@
+> og regel 2 på kontoen som eier admin@; andre kontoer får ikke noe filter og beholder alt.
+> **Står flere adresser på samme konto**, er det mottakerkravet som holder reglene fra hverandre.
+> Kommer det en ny slags systempost — et nytt emne — får den ingen frist før den legges inn her,
+> med vilje: en e-post som ble liggende for lenge er en ryddejobb, en som ble slettet for tidlig
+> er tapt. **Svar på en henvendelse sendes fra personvern@**, så svaret ligger i Sendt på samme
+> konto som henvendelsen. Filteret virker bare på e-post som kommer *etter* at det er lagret.
+> Fristene over er forslag; når de er bestemt, skrives de inn i tabellen.
 
 > **Merk om KO-loggen (17. september 2026, KO pulje 2):** Loggen er i all hovedsak
 > fritekst. Opplæringen er at direkte identifiserende opplysninger – navn, adresse,
@@ -1246,10 +1285,15 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.25 – sist oppdatert 15. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.26 – sist oppdatert 15. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.26 (15.10.2026):** **A.9:** Sieve-forslaget er skrevet om fra en avsenderregel til en
+  tillatelsesliste — avsender **og** mottaker admin@ **og** kjent emne — fordi det skal komme
+  flere e-postkontoer, og den første versjonen ville gitt frist til alt fra
+  `noreply@mail.sanitet.net`. **personvern@ får aldri frist:** egen regel først, som bare
+  sorterer henvendelsene i en mappe og stopper. Tabell over de fire slagene e-post portalen sender.
 - **v1.25 (15.10.2026):** **A.2, A.8:** Cloudflare Email Routing er slått av og de tre
   MX-ene til `route1–3.mx.cloudflare.net` slettet. Kontrollert: bare Protons to MX-er står.
   Cloudflare er dermed bare DNS, for trafikken og for e-posten.
