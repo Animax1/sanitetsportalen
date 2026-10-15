@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — Personvern: vaktlista som fil på e-post inn i A.6, e-postfristene fastsatt; kartmodulen ut av TODO  `#core/dokumentasjon` `#core/personvern`
+
+André: «Det fungerte» — Sieve-filteret i Proton, etter at mappene var opprettet (uten dem
+ble e-posten liggende i innboksen, uten feilmelding). Protokollen v1.27:
+- **A.6:** «Vaktlista som fil på e-post» som egen behandling — opplysninger (med
+  brannlista), formål (reserve), hjemmel 6(1)(f), mottakere, vei (AhaSend, ukryptert),
+  sporing i `vaktliste.Utsending` (ikke innholdet) og lagringstid (raden følger vaktlista;
+  admin@-kopien 30 dager; andres innbokser utenfor portalens kontroll). Sto bare i A.2/A.11.
+- **A.7:** mottakerlista som mottaker.
+- **A.9:** e-postfristene **fastsatt og i drift**: vaktlista 30 dager, feilvarsler 90,
+  henvendelser til personvern@ til saken er avsluttet. Filteret er prøvd.
+- **DPA-utkastet punkt 7:** raden for e-post; det åpne punktet om lagringstid er ute.
+- **`TODO.md`:** «Lagringstid for e-post», «vaktlista på e-post inn i A.2/A.6» og hele
+  **«Kartmodul med værlag»** er slettet — André: «Kartmodul med værlag har vi dekket med
+  kart.sanitet.» `docs/FORSLAG_KARTMODUL.md` står som historikk.
+
 ## 2026-10-15 — Proton-filteret er en tillatelsesliste: avsender + admin@ + kjent emne; personvern@ får aldri frist  `#core/dokumentasjon` `#core/personvern`
 
 André: «Jeg tenker å ha flere epost kontoer for ulike ting. Så vi må nok endre på ting slik

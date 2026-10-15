@@ -564,10 +564,6 @@ direkte identifikatorer».
 - [ ] **Sjekk mot primærkilde:** Datatilsynets liste over behandlinger som alltid krever
       DPIA, og WP248-kriteriene i gjeldende form. Notatet gjetter ikke på dem
 
-- [ ] **Personverndokumentasjonen: vaktlista på e-post inn i A.2/A.6.** Utsendingen av
-      vaktlista som fil (`vaktliste/fil.py`, 12. sep. 2026) er en dataflyt ut av
-      systemet som ikke er beskrevet. Formål: «reserve ved bortfall av portalen».
-
 ### Forbedringsbacklog
 
 Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, F1–F9).
@@ -655,28 +651,6 @@ Overnattingen og brannlista er levert (se CHANGELOG 25. sep. 2026 og
       år betyr at rommene skrives inn på nytt. `services.kopier_oppsett()` kopierer alt
       ressursene; rommene kan følge samme vei — **aldri** plasseringene, av samme grunn
       som den aldri tar personene.
-
-### Kartmodul med værlag — se [`docs/FORSLAG_KARTMODUL.md`](./docs/FORSLAG_KARTMODUL.md)
-
-**Forslag, ikke besluttet — og ikke i år** (23. sep. 2026). Kilder og arkitektur er
-utredet, så arbeidet ikke gjøres på nytt. André har valgt **MET, Kartverket og
-NVE/Varsom** — 0 kr i data. Nødfall uten nett er utenfor første versjon.
-
-- [ ] **Modulen `kart/`** med Leaflet vendret under `static/vendor/`, topografisk og
-      gråtone bakgrunnskart fra Kartverket, og kildehenvisning som vannmerke nede til
-      høyre. Krever ett smalt tillegg i CSP-ens `img-src` (`cache.kartverket.no`) —
-      uten det er kartet grått uten feilmelding (§4.1).
-- [ ] **Værdata hentes av serveren, med cache** — MET krever identifiserende
-      `User-Agent`, som JavaScript ikke kan sette. Vindpil per lokasjon (husk at
-      `wind_from_direction` er *fra*-retningen, pila roteres 180°), nedbørsmengde fra
-      Locationforecast og neste 90 minutter fra Nowcast (§3.1, §4.3).
-- [ ] **Farevarsler som polygoner** fra MetAlerts (maks én henting per 10 min) og
-      Varsom (flom, jordskred, snøskred).
-- [ ] **Flyfoto: finn en kilde.** Norge i bilder er ikke lenger åpent — det krever tilgang
-      gjennom en Norge digitalt-part. Sjekk om korpset har det via en samarbeidspartner;
-      ellers Sentinel-2 (10 m, sjekk lisensen) (§6.1).
-- [ ] **Koordinater på `oppdrag.Lokasjon`**, meldt inn til kartet gjennom et register i
-      `core` framfor at kartet importerer oppdrag — én sannhet om hvor stedene er (§6.2).
 
 ### Backlog-modulen (`/backlog/`)
 
@@ -1079,12 +1053,6 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
         ikke mindre. Men dokumentet er art. 30-protokollen, og skal beskrive det som
         faktisk skjer. Funnet 23. aug. 2026 da tre testpasienter ble slettet.
         Docstringen i `views_patients.py` som påsto det samme er allerede rettet
-      - **Lagringstid for e-post i Proton-innboksene** (personvern@, admin@, support@ og
-        catch-all-en) er ikke fastsatt — A.9 sier det rett ut. Henvendelser etter A.14
-        trenger en frist som dekker saken og dokumentasjonen av svaret; feilvarsler og
-        vaktlista som fil har ingen verdi etter vakta. Føres også i DPA-utkastet punkt 7.
-        **Proton kan håndheve den selv** for systemposten: et Sieve-filter med
-        `vnd.proton.expire` (forslaget står i A.9). Henvendelsene slettes for hånd.
       - Bump versjonsnummer og dato når noe endres
 
 ### Puljene fra Andrés gjennomgang 16. sep. 2026

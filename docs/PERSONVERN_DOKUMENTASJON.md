@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 15. oktober 2026  
-**Versjon:** 1.26  
+**Versjon:** 1.27  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -445,6 +445,24 @@ en person (hvem gjorde det, og hvem det gjaldt), med revisjonsloggens frist på 
 stemte. Og modulbackupen følger backupfristene. **Selve ryddingen skriver ingenting i
 revisjonsloggen** — ellers ville den bevart i to år det som skulle bort etter 30 dager.
 
+#### Vaktlista som fil på e-post (`vaktliste/fil.py`) — 12. september 2026
+
+Vaktlista sendes som én HTML-fil på e-post, som **reserve ved bortfall av portalen**. Det er
+en dataflyt *ut* av systemet: når fila er sendt, ligger kopien i mottakernes innbokser og
+ikke lenger under portalens kontroll. Ført inn her 15. okt. 2026; vurderingen av risikoen
+står i A.11.
+
+| Aspekt | Beskrivelse |
+|---|---|
+| Opplysninger | Navn, korps, rolle, skift, telefon og ISSI. Fra 25. sep. 2026 også brannlista: hvem som sover i hvilket rom per natt. **Ikke** e-post, notat eller merknad |
+| Formål | Reserve: vakta skal kunne bemannes og nås selv om portalen er nede |
+| Hjemmel | GDPR art. 6(1)(f), som mannskapsregisteret over |
+| Mottakere | En fast liste satt av global admin (`AppSetting['vaktliste_fil_mottakere']`, A.7) |
+| Når | Ved «Sett i drift», på knapp, og på intervall mens lista er i drift — bare når innholdet er endret siden forrige sending (`innhold_sha256`) |
+| Vei | Ukryptert e-post gjennom AhaSend (A.2) til mottakernes innbokser |
+| Sporet | `vaktliste.Utsending`: hvem, når, utløser, adressene slik de var da, antall skift og eventuell feil. **Innholdet lagres ikke** — det står i basen fra før |
+| Lagringstid | `Utsending`-raden følger vaktlista og slettes med den (`CASCADE`). Kopien til admin@ slettes av Proton etter **30 dager** (A.9). Kopier i andres innbokser styres av mottakerne; fila sier selv «slett etter vakta» |
+
 ### KO-loggen (`ko.Logglinje`)
 
 Hendelsesloggen i KO-modulen (KO pulje 2, 17. september 2026). Den dekker **det som skjer
@@ -600,6 +618,7 @@ Key-prefiks `pasientregistrering:` brukes for å isolere applikasjonens nøkler 
 |---|---|---|
 | Interne appbrukere (helsepersonell/frivillige med konto) | Tjenestlig behov, rollebasert tilgangsstyring | Pasientdata i henhold til tildelt rolle |
 | Railway Corp. (databehandler) | Databehandleravtale (DPA), art. 28 | All data lagret i databasen (infrastrukturtilgang, ikke applikasjonsnivå) |
+| Mottakerlista for vaktlista som fil (satt av global admin) | Tjenestlig behov, reserve ved bortfall (A.6, A.11) | Navn, korps, rolle, skift, telefon, ISSI og overnatting |
 | AhaSend (databehandler) | Databehandleravtale, art. 28 | E-post portalen sender: invitasjoner, «Glemt passord», vaktlista som fil, feilvarsler (A.2) |
 | Proton AG (databehandler) | Databehandleravtale, art. 28 | E-post til `@sanitet.net`: henvendelser fra de registrerte, brukerstøtte, og feilvarsler og vaktlista som fil når adressene står som mottakere (A.2) |
 | kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling og på «Send posisjon»; lagets navn og stedsnavn, og lagets posisjon på «Send posisjon til KO». Ingen helseopplysninger |
@@ -641,7 +660,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
-| **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Ikke fastsatt** (14. okt. 2026) | Systemposten kan håndheves av Proton selv, se merknaden under; henvendelsene manuelt | Henvendelser etter A.14 bør beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret; feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Fristen avgjøres, og står i `TODO.md` |
+| **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Vaktlista som fil til admin@: 30 dager. Feilvarsler til admin@: 90 dager. Henvendelser til personvern@: til saken er avsluttet** (fastsatt 15. okt. 2026) | Systemposten: Proton, med Sieve-filteret i merknaden under. Henvendelsene og alt annet: manuelt, kontrollert i C.4 | Feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Henvendelser etter A.14 beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret |
 | **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **Oppdragsnotat og «Annet sted» (`Oppdrag.fritekst`, `Statusmelding.sted_tekst`)** | **3 dager etter siste aktivitet** på oppdraget, justerbart 1–30 av global admin | Skjules i serverens svar straks fristen er ute; tømmes av `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Fritt tekstfelt der identifikatorer kan havne (A.6). Oppdraget står igjen til vakta avsluttes. Teksten ligger fortsatt i backupene (730 og 90 dager hos Scaleway) — fristen er ikke en sletterett |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
@@ -649,7 +668,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
 | Brukerkontoer | Slettes manuelt når tilgang ikke lenger er nødvendig | Manuell | Lagringsbegrensning, art. 5(1)(e) |
 
-> **Forslag til frist for systemposten, håndhevet av Proton** (15. okt. 2026). Proton kan
+> **Fristen for systemposten håndheves av Proton** (i drift fra 15. okt. 2026). Proton kan
 > merke og slette e-post selv med et Sieve-filter (Innstillinger → Filtre → «Legg til
 > Sieve-filter»). `expire` sletter meldingen etter fristen, og Protons tak er 730 dager.
 > Mappene må finnes før filteret lagres.
@@ -712,7 +731,9 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > med vilje: en e-post som ble liggende for lenge er en ryddejobb, en som ble slettet for tidlig
 > er tapt. **Svar på en henvendelse sendes fra personvern@**, så svaret ligger i Sendt på samme
 > konto som henvendelsen. Filteret virker bare på e-post som kommer *etter* at det er lagret.
-> Fristene over er forslag; når de er bestemt, skrives de inn i tabellen.
+> **Lagt inn og prøvd 15. okt. 2026:** en test-e-post til personvern@, sendt fra en annen
+> konto, havnet i «Personvern/Henvendelser» uten utløp. Mappene måtte opprettes først —
+> uten dem ble e-posten liggende i innboksen, uten feilmelding.
 
 > **Merk om KO-loggen (17. september 2026, KO pulje 2):** Loggen er i all hovedsak
 > fritekst. Opplæringen er at direkte identifiserende opplysninger – navn, adresse,
@@ -1285,10 +1306,15 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.26 – sist oppdatert 15. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.27 – sist oppdatert 15. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.27 (15.10.2026):** **A.6:** ny underseksjon «Vaktlista som fil på e-post» —
+  opplysninger, formål, hjemmel, mottakere, vei, sporing (`Utsending`) og lagringstid. Den
+  sto bare i A.2 og A.11 og var ikke beskrevet som behandling. **A.7:** mottakerlista som
+  mottaker. **A.9:** fristene for e-post i Proton-innboksene er fastsatt og i drift
+  (vaktlista 30 dager, feilvarsler 90, henvendelser til saken er avsluttet); filteret er prøvd.
 - **v1.26 (15.10.2026):** **A.9:** Sieve-forslaget er skrevet om fra en avsenderregel til en
   tillatelsesliste — avsender **og** mottaker admin@ **og** kjent emne — fordi det skal komme
   flere e-postkontoer, og den første versjonen ville gitt frist til alt fra

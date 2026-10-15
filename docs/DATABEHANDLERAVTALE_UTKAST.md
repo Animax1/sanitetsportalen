@@ -141,6 +141,7 @@ følges, og går gjennom den årlige sjekklisten (protokollen C.4) sammen med ko
 | Sikkerhetskopier hos Scaleway | 730 dager (modulfiler), 90 dager (hele databasen) |
 | Overnatting | 30 dager etter natta |
 | Posisjoner i kartet | Siste posisjon slettes 24 timer etter siste melding; delt posisjon når visningstiden er ute |
+| E-post i innboksene hos Proton | Vaktlista som fil 30 dager og feilvarsler 90 dager (slettes av Proton); henvendelser til personvern@ når saken er avsluttet |
 
 **Ved opphør.** Når avtalen slutter, skal databehandler etter korpsets valg levere opplysningene
 tilbake i et lesbart format (JSON eller CSV) eller slette dem, i begge appene, innen [60] dager.
@@ -165,8 +166,6 @@ avtales skriftlig. Norsk rett gjelder.
 - [ ] **kart.sanitet.net:** hvor kjører det, hvilke leverandører bruker det, og hvilke
       kontoopplysninger lagrer det om kartgruppenes medlemmer? Fyll inn punkt 3 og 6.
 - [ ] **AhaSend og Proton:** før inn referansen til databehandleravtalen for hver av kontoene.
-- [ ] **Lagringstid for e-post:** hvor lenge skal henvendelser og feilvarsler ligge i
-      Proton-innboksene? Fristen føres i punkt 7 og protokollen A.9.
 - [ ] **Tallene i klammer:** varslingstid ved avvik (24 t), videresending av henvendelser
       (5 dager), varsel om ny leverandør (30 dager), sletting ved opphør (60 dager),
       oppsigelse (3 måneder).
