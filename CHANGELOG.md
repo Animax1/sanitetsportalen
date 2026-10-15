@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — DPA-utkastet: kart.sanitet.net fylt inn (punkt 3, 6 og 7)  `#core/dokumentasjon` `#core/personvern`
+
+Det åpne punktet «kart.sanitet.net: hvor kjører det, hvilke leverandører bruker det, og
+hvilke kontoopplysninger lagrer det» er besvart fra kartets kode og personvernside, ikke fra
+hukommelsen: **punkt 3** kartets brukere (konto med tofaktor-nøkkel, kartobjekter med
+endringslogg, innloggingslogg, feilede forsøk); **punkt 6** Railway for begge appene (kartet
+i Railways EU-region, `docs/PLAN.md` §1 i kartets repo), og hvorfor Kartverket, MapTiler
+(Sveits), EOX (Østerrike), MET, NVE og Kartverkets stedssøk *ikke* er underdatabehandlere;
+**punkt 7** kartets frister (`konto/rydding.py`: logg 30 dager, ubrukte kontoer 12 mnd;
+`AXES_COOLOFF_TIME` 15 min; `PAPIRKURV_DAGER` 30). Claude Docs-kopien er oppdatert likt, og
+kommentaren «Kjører kartet også på Railway og bak Cloudflare?» er besvart der.
+
 ## 2026-10-15 — Personvern: vaktlista som fil på e-post inn i A.6, e-postfristene fastsatt; kartmodulen ut av TODO  `#core/dokumentasjon` `#core/personvern`
 
 André: «Det fungerte» — Sieve-filteret i Proton, etter at mappene var opprettet (uten dem

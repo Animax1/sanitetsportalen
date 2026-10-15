@@ -1,6 +1,6 @@
 # Databehandleravtale – Sanitetsportalen og kart.sanitet.net
 
-**Utkast** · 12. oktober 2026, oppdatert 14. oktober · André Eritsland
+**Utkast** · 12. oktober 2026, oppdatert 15. oktober · André Eritsland
 
 > **Hvor utkastet bor:** det skrives og kommenteres i Claude Docs
 > (<https://claude.ai/code/artifact/3edfaced-340f-4057-9ae2-cf311f3f57d8>), og denne fila er
@@ -15,8 +15,8 @@ Kverneland Røde Kors som behandlingsansvarlig og André Eritsland som databehan
 **begge appene**: Sanitetsportalen og kart.sanitet.net.
 
 Innholdet bygger på behandlingsprotokollen (`docs/PERSONVERN_DOKUMENTASJON.md`, v1.21) og på det
-koden faktisk gjør per 12. oktober 2026. Det som ikke er kjent fra portalens kode — særlig
-hvordan kart.sanitet.net driftes — står som åpne punkter til slutt.
+koden faktisk gjør per 12. oktober 2026. Kartets del er fylt inn fra kartets egen kode og
+personvernside 15. oktober 2026. Det som gjenstår, står som åpne punkter til slutt.
 
 Utkastet er ikke juridisk kvalitetssikret. Les det sammen med korpset, og vurder å la noen med
 personvernkompetanse i Røde Kors-systemet se over før signering.
@@ -63,7 +63,7 @@ sletting etter fristene i punkt 7.
 | Mannskap (vaktlista) | Navn, korps, kompetanser, telefon, ISSI, vakter og tider, overnattingsrom, notat | Portalen |
 | Lag | Lagregistreringer uten identifikator; lagets posisjon når laget selv deler den | Portalen og kartet |
 | Mannskap i biler | Bilens posisjon ved stempling og på «Send posisjon», og om deling er slått av | Portalen og kartet |
-| Kartets brukere | [Fylles inn: hvilke kontoopplysninger kart.sanitet.net lagrer om medlemmene i kartgruppene] | Kartet |
+| Kartets brukere | Navn, e-post, rolle, grupper, passord (hashet) og tofaktor-nøkkel; kartobjektene de lager (veipunkter, ruter, teiger, notater) med hvem som laget og endret dem, og en endringslogg; innloggingslogg (e-post, IP-adresse, nettleser, tid) og feilede innloggingsforsøk (e-post, IP-adresse) | Kartet |
 
 Detaljene, med feltnavn og hjemmel, står i behandlingsprotokollen del A.6. Endres protokollen,
 endres dette vedlegget med den.
@@ -109,7 +109,7 @@ for at hver av dem er bundet av en avtale etter art. 28 med minst samme vern.
 
 | Leverandør | Hva | Hvor | App |
 | --- | --- | --- | --- |
-| Railway Corp. | Drift av appen og databasen | EU, Nederland (europe-west4) | Portalen, [kartet?] |
+| Railway Corp. | Drift av appene og databasene | EU, Nederland (europe-west4) for portalen; Railways EU-region for kartet | Begge |
 | Scaleway SAS | Krypterte sikkerhetskopier | EU, Nederland (nl-ams) | Portalen |
 | AhaSend | E-post fra portalen (`noreply@mail.sanitet.net`) | EØS | Portalen |
 | Proton AG | E-post til `@sanitet.net`: personvern@, admin@, support@ og en catch-all | Sveits (adekvansbeslutning, art. 45) | Begge |
@@ -117,6 +117,13 @@ for at hver av dem er bundet av en avtale etter art. 28 med minst samme vern.
 Overføring utenfor EU/EØS skjer bare med et gyldig grunnlag etter GDPR kapittel V, for eksempel
 EU–US Data Privacy Framework eller standard personvernbestemmelser. Den eneste i dag er e-posten
 hos Proton i Sveits, som har adekvansbeslutning fra EU-kommisjonen.
+
+**Kartleverandørene og datakildene er ikke underdatabehandlere.** Kartverket, MapTiler (Sveits)
+og EOX (Østerrike) leverer kartbildene direkte til brukerens nettleser. De ser IP-adressen og
+hvilket område som vises, men ikke hvem brukeren er, og de behandler ikke opplysninger på
+korpsets vegne — de leverer en tjeneste til den som ber om den. MET, NVE og Kartverkets
+stedssøk hentes av kartets server, så de ser bare serveren. Alle er navngitt på kartets
+personvernside.
 
 **Cloudflare er ikke underdatabehandler.** Den er bare DNS-leverandør for `sanitet.net`, med alle
 oppføringer som «DNS only»: trafikken går rett til Railway, og Cloudflare ser den ikke. Skal
@@ -141,6 +148,7 @@ følges, og går gjennom den årlige sjekklisten (protokollen C.4) sammen med ko
 | Sikkerhetskopier hos Scaleway | 730 dager (modulfiler), 90 dager (hele databasen) |
 | Overnatting | 30 dager etter natta |
 | Posisjoner i kartet | Siste posisjon slettes 24 timer etter siste melding; delt posisjon når visningstiden er ute |
+| Kartet: innloggingslogg, feilede innloggingsforsøk, papirkurv | 30 dager, 15 minutter, 30 dager. Kontoer som ikke er brukt på 12 måneder gås gjennom og deaktiveres eller slettes |
 | E-post i innboksene hos Proton | Vaktlista som fil 30 dager og feilvarsler 90 dager (slettes av Proton); henvendelser til personvern@ når saken er avsluttet |
 
 **Ved opphør.** Når avtalen slutter, skal databehandler etter korpsets valg levere opplysningene
@@ -163,8 +171,6 @@ avtales skriftlig. Norsk rett gjelder.
 
 ## Åpne punkter før signering
 
-- [ ] **kart.sanitet.net:** hvor kjører det, hvilke leverandører bruker det, og hvilke
-      kontoopplysninger lagrer det om kartgruppenes medlemmer? Fyll inn punkt 3 og 6.
 - [ ] **AhaSend og Proton:** før inn referansen til databehandleravtalen for hver av kontoene.
 - [ ] **Tallene i klammer:** varslingstid ved avvik (24 t), videresending av henvendelser
       (5 dager), varsel om ny leverandør (30 dager), sletting ved opphør (60 dager),
