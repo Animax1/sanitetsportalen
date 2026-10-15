@@ -63,6 +63,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       (13. okt. 2026), dekker begge appene; de åpne punktene står nederst i den. Før den inn i A.1/A.2 når den er signert.
       **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
 
+- [ ] **Bestem med korpset: DPIA eller dokumentert begrunnelse** (15. okt. 2026). Kontrollert
+      mot Datatilsynet er **to av de ni kriteriene oppfylt** — helseopplysninger og sårbare
+      registrerte (pasienter er nevnt uttrykkelig) — og da er utgangspunktet at DPIA *skal*
+      gjøres. Vurderingen i protokollen sa «ikke påkrevd», men drøftet bare art. 35(3).
+      **Anbefaling: gjennomfør den.** Det meste finnes alt i protokollen, og risikoen for de
+      registrerte er skrevet (A.12, v1.28). Sjekk om korpset eller Røde Kors har et
+      personvernombud — da skal det spørres (art. 35(2)).
+
 - [ ] **Før inn databehandleravtalene for AhaSend og Proton** (14. okt. 2026): referansen
       (URL eller dato) for kontoene dine. Står som «[fylles inn]» i protokollen A.2.
 
@@ -557,12 +565,6 @@ direkte identifikatorer».
 - [ ] **Skriv om A.6-argumentet** hvis adressen kommer inn. «Oppdraget har ingenting, og
       re-identifisering krever kunnskap utenfra» holder ikke når kunnskapen utenfra ligger
       i raden
-- [ ] **Skriv art. 35(7)(c) — risiko for de registrertes rettigheter.** A.12 er en
-      *sikkerhets*risikovurdering: den måler sannsynlighet og konsekvens av brudd, altså
-      risiko sett fra systemets side. Hva som skjer med pasienten hvis det går galt, er
-      ikke spurt om noe sted. Nyttig i seg selv, og halve jobben hvis en DPIA senere kreves
-- [ ] **Sjekk mot primærkilde:** Datatilsynets liste over behandlinger som alltid krever
-      DPIA, og WP248-kriteriene i gjeldende form. Notatet gjetter ikke på dem
 
 ### Forbedringsbacklog
 

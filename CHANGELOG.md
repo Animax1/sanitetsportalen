@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — DPIA kontrollert mot Datatilsynet: to av ni kriterier oppfylt, utgangspunktet er at DPIA skal gjøres; risiko for de registrerte (art. 35(7)(c)) skrevet  `#core/dokumentasjon` `#core/personvern`
+
+To TODO-punkter fra GDPR-gjennomgangen («Sjekk mot primærkilde», «Skriv art. 35(7)(c)»).
+**Primærkildene** (datatilsynet.no, begge sidene oppdatert 27.07.2023): listen over
+behandlinger som *alltid* krever DPIA har 14 punkter, og ingen av dem er utløst — nærmest er
+punkt 7, lokasjonsdata, men posisjonene er hendelsesstyrt, uten historikk og slettet etter
+24 t. **Men to av de ni kriteriene er oppfylt:** særlige kategorier (`Rus`, `Psykiatri`,
+`Vold`, `Mistanke overgrep`) og sårbare registrerte — Datatilsynet nevner pasienter
+uttrykkelig. Datatilsynet: «I de fleste situasjoner kan en behandlingsansvarlig anta at det
+skal gjøres en vurdering av personvernkonsekvenser» når to er oppfylt. Protokollen sa «DPIA
+vurdert som ikke påkrevd» fra v1.5, med en begrunnelse som bare drøftet art. 35(3).
+
+- **A.12 (v1.28):** DPIA-avsnittet skrevet om med kildene, tabellen over alle ni kriteriene og
+  anbefalingen «gjennomfør DPIA»; avgjørelsen er korpsets. Ny underseksjon **risiko for de
+  registrertes rettigheter og friheter**, per gruppe: pasienter, mannskap, brukere, henvendere.
+  Funnet som ikke sto noe sted: **den alvorligste risikoen for pasienten er at helsehjelpen
+  svikter fordi systemet er nede**, ikke lekkasje — reservene i A.11 er personverntiltak.
+  Og pasientene får ikke vite om registreringen (siden når dem ikke).
+- **`docs/NOTAT_DPIA_OG_FRITEKST.md` §3:** «Må sjekkes mot primærkilde» erstattet med det
+  som ble funnet; tabellen hadde seks av ni kriterier.
+- **`TODO.md`:** de to punktene er ute; nytt under «Krever Andre»: *Bestem med korpset: DPIA
+  eller dokumentert begrunnelse*.
+
 ## 2026-10-15 — DPA-utkastet: kart.sanitet.net fylt inn (punkt 3, 6 og 7)  `#core/dokumentasjon` `#core/personvern`
 
 Det åpne punktet «kart.sanitet.net: hvor kjører det, hvilke leverandører bruker det, og

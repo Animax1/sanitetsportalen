@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 15. oktober 2026  
-**Versjon:** 1.27  
+**Versjon:** 1.28  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -1020,9 +1020,79 @@ Tiltaket vurderes på nytt dersom systemet får oppslag på enkeltpasienter, der
 
 Alle med tilgang til pasientregistreringen har tjenstlig behov for hele oversikten for å utøve rollen sin: triagering, ressursfordeling og overlevering forutsetter at man ser alle pasienter på posten, ikke bare egne. Filteret «Mine pasienter» beholdes derfor som et visningsvalg, ikke som en tilgangsgrense. Tilgang styres i stedet gjennom hvem som får konto, rollenivået deres, og taushetsplikten i A.4.
 
-#### DPIA (art. 35) – vurdert som ikke påkrevd
+#### DPIA (art. 35) — kontrollert mot Datatilsynet 15. okt. 2026: to av ni kriterier er oppfylt
 
-Behandlingen omfatter særlige kategorier personopplysninger, men i begrenset omfang, uten direkte identifikatorer, uten profilering eller automatiserte avgjørelser, og uten systematisk overvåking av offentlig område. Vilkåret om behandling «i stor skala» anses ikke oppfylt. En full DPIA er derfor ikke gjennomført. Vurderingen tas opp igjen ved den årlige revisjonen og ved vesentlige endringer i behandlingens art, omfang eller formål — særlig dersom nye moduler tar inn direkte identifikatorer.
+**Vurderingen fram til 15. okt. 2026** (v1.5) var at DPIA ikke var påkrevd: særlige kategorier,
+men i begrenset omfang, uten direkte identifikatorer, uten profilering eller automatiserte
+avgjørelser, uten systematisk overvåking av offentlig område, og ikke «i stor skala». Den
+drøftet bare de tre tilfellene i art. 35(3). **Den drøftet ikke art. 35(1) med de ni
+kriteriene**, og det er der terskelen ligger for denne behandlingen.
+
+**Kontrollert mot primærkilden** (`docs/NOTAT_DPIA_OG_FRITEKST.md` §3 hadde gjettet på begge):
+
+1. **Datatilsynets liste over behandlinger som alltid krever DPIA** (art. 35(4), oppdatert
+   27.07.2023, godkjent av EDPB) har 14 punkter. Sanitetstjeneste, akutthjelp og pasienter er
+   ikke nevnt. Nærmest er **punkt 7, «Behandling av lokasjonsdata i følge med minst ett annet
+   kriterium»**, med eksempelet systematisk sammenstilling av lokasjons- og trafikkdata fra
+   teleoperatører. Bilenes og lagenes posisjon er personopplysninger om mannskapet, men de
+   sendes bare ved stempling og «Send posisjon», overskrives uten historikk og slettes etter
+   24 timer i kartet (A.6). Det er ikke systematisk monitorering, og punktet regnes som **ikke
+   utløst** — men det er den nærmeste grensen, og løpende posisjonsdeling eller historikk
+   ville krysset den.
+2. **De ni kriteriene** (Datatilsynet, «Når er det høy risiko?», oppdatert 27.07.2023):
+
+| Kriterium | Her |
+|---|---|
+| Evaluering eller poengsetting | Nei. Triage er en klinisk vurdering for å gi hjelp, ikke profilering |
+| Automatiske beslutninger med rettslig eller tilsvarende betydelig virkning | Nei |
+| Systematisk monitorering | Nei. Posisjonene er hendelsesstyrt og uten historikk (over) |
+| **Særlige kategorier eller opplysninger av svært personlig karakter** | **Ja.** Helseopplysninger, også `Rus`, `Psykiatri`, `Vold` og `Mistanke overgrep` i verdimengdene |
+| Stor skala | Nei. Ett arrangement i året, et begrenset antall pasienter, ett geografisk område |
+| Matching eller sammenstilling av datasett | Nei. Kartkoblingen har samme behandlingsansvarlige og samme formål |
+| **Sårbare registrerte** | **Ja.** Datatilsynet nevner **pasienter** uttrykkelig. De er skadde eller syke, velger ikke å bli registrert og kan ikke protestere i situasjonen |
+| Innovativ bruk av ny teknologi | Nei |
+| Behandlingen hindrer de registrerte i å utøve en rettighet eller bruke en tjeneste | Nei. Registreringen avgjør ikke om pasienten får hjelp |
+
+**Datatilsynets regel:** «I de fleste situasjoner kan en behandlingsansvarlig anta at det skal
+gjøres en vurdering av personvernkonsekvenser» dersom to kriterier er oppfylt. Den
+behandlingsansvarlige *kan* likevel konkludere med at DPIA ikke trengs, men må begrunne og
+dokumentere det. **Med to kriterier er utgangspunktet altså at DPIA skal gjøres**, ikke at den
+kan unnlates. Begrunnelsen fra v1.5 svarer ikke på det.
+
+**Anbefaling:** gjennomfør DPIA. Det meste av art. 35(7) finnes allerede i denne protokollen —
+(a) beskrivelsen i A.3 og A.6, (b) nødvendighet og forholdsmessighet i A.4 og A.9, (d)
+tiltakene i A.10 — og (c), risikoen for de registrerte, står under. Det som mangler, er å
+samle dem, vurdere restrisikoen samlet, og la korpset ta stilling. Har korpset eller Røde
+Kors et personvernombud, skal ombudets råd innhentes (art. 35(2)) — det er ikke kontrollert.
+**Avgjørelsen er korpsets** og står i `TODO.md` under «Krever Andre».
+
+#### Risiko for de registrertes rettigheter og friheter (art. 35(7)(c)) — 15. okt. 2026
+
+Tabellen øverst i A.12 måler risiko sett fra systemet: hvor sannsynlig et brudd er, og hva
+det koster. **Her er spørsmålet hva som skjer med den registrerte** hvis noe går galt. Skalaen
+er den samme (lav, moderat, høy), og «restrisiko» er det som står igjen etter tiltakene som
+allerede er i drift.
+
+| Registrerte | Hva kan skje med personen | Sannsynlighet | Alvor | Tiltak i drift | Restrisiko |
+|---|---|---|---|---|---|
+| **Pasienter** | **Helsehjelpen svikter fordi systemet er nede** — en pasient følges ikke opp, eller en bil sendes ikke | Lav | **Høy** (liv og helse) | Papirskjema som reserve, vaktlista som fil, KO-utskriften uten nett (A.11), vakt-modus og backup-klokka på før vakt (runbook §1c) | **Moderat.** Den alvorligste risikoen i hele behandlingen, og den eneste der feilen rammer kroppen og ikke bare personvernet |
+| **Pasienter** | **Noen får vite om helseforholdet** — rus, psykiatri, vold eller mistanke om overgrep — og pasienten blir stigmatisert eller utsatt i lokalmiljøet | Lav | **Høy** | Ingen navn eller fødselsnummer; verdimengder i stedet for fritekst; tilgang per modul og nivå; MFA; kryptert offsite-backup; taushetsplikt (A.4) | **Moderat.** Den som var på stedet kan koble løpenummer, tid og plass til en person. Fritekst i oppdrag og KO-logg kan bære identifikatorer (frist 3 dager i oppdrag, 730 i KO-loggen) |
+| **Pasienter** | **Pasienten vet ikke om registreringen** og kan ikke bruke rettighetene sine (innsyn, retting) | **Høy** | Lav | `/personvern/` finnes, men pasientene ser ikke portalen; innsyn mulig med tid og arrangement (A.14) | **Moderat.** Informasjonen på stedet er korpsets sak og ikke beskrevet noe sted (B) |
+| **Pasienter** | **Opplysningene ligger lenger enn formålet krever** | Lav | Moderat | Arkiv kollapses til statistikk etter 24 mnd; slettefrister i A.9 | **Lav.** Backupene hos Scaleway ligger 730 dager og kan ikke slettes med portalens nøkkel |
+| **Mannskap** | **Overnattingsstedet og telefonnummeret kommer på avveie** — hvor en navngitt person sover, natt for natt | Moderat | Moderat | Overnatting slettes 30 dager etter natta; fila sier «slett etter vakta»; kopien til admin@ slettes etter 30 dager | **Moderat.** Vaktlista som fil sendes **ukryptert** til innbokser utenfor portalens kontroll (A.6) |
+| **Mannskap** | **Posisjonen eller loggene brukes til å vurdere den frivillige** — hvem var hvor, hvem gjorde hva | Lav | Moderat | Posisjon bare ved stempling og «Send posisjon», uten historikk, slettet etter 24 t; audit-loggen er for revisjon, ikke vurdering | **Lav.** Formålsbegrensningen står ikke skrevet for mannskapet noe sted |
+| **Brukere** | **Kontoen tas over**, og noen ser eller endrer i den registrertes navn | Lav | Moderat | MFA, rate-limiting, kontosperre, innloggingslogg | Lav |
+| **Henvendere** (personvern@) | **Henvendelsen leses av uvedkommende** — den kan inneholde helseopplysninger den registrerte selv oppgir | Lav | Moderat | Egen innboks hos Proton, kryptert lagring, ingen automatisk sletting av en sak som pågår | Lav |
+
+**Det tabellen sier som A.12 ellers ikke sier:**
+- **Den alvorligste risikoen er tilgjengelighet, ikke konfidensialitet.** At helsehjelp
+  svikter fordi portalen er nede, veier tyngre for pasienten enn at en registrering lekker.
+  Reservene i A.11 og vakt-modusen er derfor personverntiltak, ikke bare drift.
+- **Pasientenes informasjon er det svakeste leddet i rettighetene.** Siden finnes, men den
+  når ikke dem den gjelder. En plakat eller et kort på stedet med lenke og e-postadresse ville
+  lukket det meste.
+- **Vaktlista som fil er det svakeste leddet i konfidensialiteten** for mannskapet. Det er en
+  bevisst avveining (A.11), men den hører hjemme i en samlet DPIA.
 
 ---
 
@@ -1306,10 +1376,18 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.27 – sist oppdatert 15. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.28 – sist oppdatert 15. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.28 (15.10.2026):** **A.12: DPIA-vurderingen kontrollert mot Datatilsynet.** Listen over
+  behandlinger som alltid krever DPIA (14 punkter, 27.07.2023) utløses ikke; nærmest er punkt 7,
+  lokasjonsdata. Men **to av de ni kriteriene er oppfylt** — særlige kategorier og sårbare
+  registrerte (Datatilsynet nevner pasienter uttrykkelig) — og da er utgangspunktet at DPIA
+  skal gjøres. Vurderingen fra v1.5 drøftet bare art. 35(3). Anbefaling: gjennomfør DPIA;
+  avgjørelsen er korpsets. **Ny underseksjon: risiko for de registrertes rettigheter og
+  friheter (art. 35(7)(c))**, per gruppe registrerte. Den alvorligste risikoen er at
+  helsehjelpen svikter fordi systemet er nede, ikke at noe lekker.
 - **v1.27 (15.10.2026):** **A.6:** ny underseksjon «Vaktlista som fil på e-post» —
   opplysninger, formål, hjemmel, mottakere, vei, sporing (`Utsending`) og lagringstid. Den
   sto bare i A.2 og A.11 og var ikke beskrevet som behandling. **A.7:** mottakerlista som

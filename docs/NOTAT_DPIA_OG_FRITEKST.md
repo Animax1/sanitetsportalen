@@ -73,13 +73,18 @@ behandlingsansvarlige kan dokumentere hvorfor risikoen likevel ikke er høy, og 
 nettopp det A.12 gjør. Men det er en nærmere avgjørelse enn ordlyden «vurdert som ikke
 påkrevd» antyder, og den bør ikke leses som avsluttet.
 
-### Må sjekkes mot primærkilde før noe bygges på det
+### Kontrollert mot primærkilde 15. okt. 2026
 
-- [ ] **Datatilsynets liste** over behandlinger som alltid krever DPIA — om sanitetstjeneste,
-      akutthjelp eller helseopplysninger om sårbare grupper er nevnt der. Ikke gjettet på
-      her med vilje.
-- [ ] **WP248-kriteriene** i gjeldende form. Tabellen over er skrevet etter hukommelsen om
-      dem og skal verifiseres før den siteres videre.
+- **Datatilsynets liste** over behandlinger som alltid krever DPIA (14 punkter, oppdatert
+  27.07.2023): sanitetstjeneste, akutthjelp og pasienter er ikke nevnt. Nærmest er punkt 7,
+  lokasjonsdata sammen med et annet kriterium — ikke utløst, se protokollen A.12.
+- **De ni kriteriene** står hos Datatilsynet («Når er det høy risiko?»). Tabellen over hadde
+  seks av dem; de tre som manglet (automatiske beslutninger, innovativ teknologi, og at
+  behandlingen hindrer en rettighet eller tjeneste) er ikke oppfylt. **«Sårbare registrerte»
+  er bekreftet:** Datatilsynet nevner pasienter uttrykkelig. Og regelen er strammere enn
+  «to kriterier gjør ikke DPIA påbudt» over antyder: med to kriterier *kan den
+  behandlingsansvarlige anta at det skal gjøres* en DPIA, og må begrunne det om ikke.
+  Den samlede vurderingen står i protokollen A.12 (v1.28).
 
 ## 4. Det som faktisk mangler er mindre enn man skulle tro
 
