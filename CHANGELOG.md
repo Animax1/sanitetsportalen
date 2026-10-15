@@ -4,6 +4,15 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — Cloudflare Email Routing av, MX-ene til `route1–3.mx.cloudflare.net` slettet  `#core/dokumentasjon` `#core/personvern`
+
+André slo av Email Routing for `sanitet.net` («bare anestesi.net som har routing»). Det
+fjernet ikke MX-ene: `route3` (12), `route1` (87) og `route2` (94) sto igjen som vanlige
+DNS-oppføringer, med full TTL fra både 1.1.1.1 og 8.8.8.8 — altså ferskt fra Cloudflares
+navnetjenere. André slettet dem; **kontrollert: bare `mail.protonmail.ch` (10) og
+`mailsec.protonmail.ch` (20) står.** Protokollen v1.25 (A.2, A.8), DPA-utkastets åpne punkt
+og «Krever Andre» i `TODO.md` er rettet; igjen står avtalereferansene for AhaSend og Proton.
+
 ## 2026-10-15 — Cloudflare-proxyen er av: «Cloudflare foran Railway» rettet i kode, tester og runbook; Proton-filter som frist for systemposten  `#core/dokumentasjon` `#core/personvern`
 
 André: «De andre dokumentene er viktig vi korrigerer, det kan skape forvirring på sikt.»

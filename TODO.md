@@ -63,16 +63,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       (13. okt. 2026), dekker begge appene; de åpne punktene står nederst i den. Før den inn i A.1/A.2 når den er signert.
       **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
 
-- [ ] **E-posten på `sanitet.net`: fjern Cloudflare-MX-ene, og før inn avtalene** (14. okt.
-      2026). Proton er ført inn i protokollen A.2, men to ting står igjen:
-      1. **MX-oppføringene** i Cloudflare peker fortsatt også på Email Routing —
-         `route3.mx.cloudflare.net` (prioritet 12), `route1` (87) og `route2` (94), ved siden
-         av Protons 10 og 20. Får en avsender ikke levert til Proton, prøver den Cloudflare,
-         og da kan en henvendelse til personvern@ havne et helt annet sted. Slett de tre, og
-         slå av Email Routing for domenet hvis den står på. Sjekk etterpå med
-         `nslookup -type=MX sanitet.net`: bare de to Proton-oppføringene skal stå.
-      2. **Avtalene:** referansen (URL eller dato) til databehandleravtalen hos **AhaSend** og
-         hos **Proton** for kontoene dine. Står som «[fylles inn]» i A.2.
+- [ ] **Før inn databehandleravtalene for AhaSend og Proton** (14. okt. 2026): referansen
+      (URL eller dato) for kontoene dine. Står som «[fylles inn]» i protokollen A.2.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):

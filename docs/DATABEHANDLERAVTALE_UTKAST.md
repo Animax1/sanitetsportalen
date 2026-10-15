@@ -164,9 +164,6 @@ avtales skriftlig. Norsk rett gjelder.
 
 - [ ] **kart.sanitet.net:** hvor kjører det, hvilke leverandører bruker det, og hvilke
       kontoopplysninger lagrer det om kartgruppenes medlemmer? Fyll inn punkt 3 og 6.
-- [ ] **Cloudflare Email Routing:** fjern de tre MX-oppføringene til `route*.mx.cloudflare.net`.
-      Så lenge de står, kan e-post til `@sanitet.net` havne hos Cloudflare i stedet for Proton,
-      og da er Cloudflare likevel underdatabehandler.
 - [ ] **AhaSend og Proton:** før inn referansen til databehandleravtalen for hver av kontoene.
 - [ ] **Lagringstid for e-post:** hvor lenge skal henvendelser og feilvarsler ligge i
       Proton-innboksene? Fristen føres i punkt 7 og protokollen A.9.

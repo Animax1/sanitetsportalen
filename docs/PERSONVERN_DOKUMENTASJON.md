@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 15. oktober 2026  
-**Versjon:** 1.24  
+**Versjon:** 1.25  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -67,12 +67,10 @@ Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd me
 > `*.up.railway.app`, og svaret kommer fra `server: railway-hikari` med `x-railway-edge`. TLS
 > termineres hos Railway. Cloudflare er dermed bare **DNS-leverandør** for `sanitet.net`: den
 > svarer på oppslag fra resolvere, ser ikke trafikken mellom nettleseren og appene, og
-> behandler ingen personopplysninger på korpsets vegne. **Én rest står igjen:** MX-oppføringene
-> for `sanitet.net` peker fortsatt også på Cloudflare Email Routing
-> (`route1–3.mx.cloudflare.net`, prioritet 12, 87 og 94, ved siden av Protons 10 og 20). Får
-> en avsender ikke levert til Proton, prøver den Cloudflare — og da går e-posten dit, også
-> henvendelser til personvern@. Så lenge de står, er Cloudflare en mulig mottaker av e-post.
-> Står i `TODO.md` under «Krever Andre».
+> behandler ingen personopplysninger på korpsets vegne. **Email Routing er også borte**
+> (15. okt. 2026): de tre MX-ene til `route1–3.mx.cloudflare.net` som sto igjen ved siden av
+> Protons, er slettet og Email Routing slått av for domenet. Kontrollert samme dag: bare
+> `mail.protonmail.ch` (10) og `mailsec.protonmail.ch` (20) står.
 >
 > **Hvis proxyen slås på igjen**, er Cloudflare databehandler for all trafikk i klartekst, og
 > må inn i tabellene under med avtalegrunnlag og overføringsgrunnlag (A.8) før det skjer.
@@ -162,7 +160,7 @@ underdomenet `mail.sanitet.net` med egne SPF- og MX-oppføringer mot AhaSend, me
 | Adresser | Tre egne innbokser: **personvern@** (de registrertes henvendelser, A.14), **admin@** (drift og feilvarsler) og **support@** (brukerstøtte). Alt annet til `@sanitet.net` fanges av en catch-all |
 | Innhold | Det andre skriver til oss, og det kan ikke avgrenses: en henvendelse etter A.14 kan inneholde helseopplysninger den registrerte selv oppgir for å bli funnet igjen (tidspunkt, arrangement, hva som skjedde). Dessuten **feilvarslene** — `ADMINS` er `admin@sanitet.net` (kontrollert av André 15. okt. 2026) — og vaktlista som fil når en av adressene står i vaktlistas mottakerliste |
 | Kryptering | TLS inn til Proton. Lagret e-post krypteres med kontoens egen nøkkel ved mottak (Protons «zero-access»-kryptering), så Proton kan ikke lese den i ettertid |
-| Domenet | Kontrollert 14. okt. 2026: MX til `mail.protonmail.ch` (10) og `mailsec.protonmail.ch` (20), SPF `include:_spf.protonmail.ch`, DKIM via tre CNAME-er til Proton, DMARC `p=quarantine`. **Avvik:** tre MX-er til Cloudflare Email Routing står fortsatt (se merknaden om Cloudflare over) |
+| Domenet | Kontrollert 14. okt. 2026: MX til `mail.protonmail.ch` (10) og `mailsec.protonmail.ch` (20), SPF `include:_spf.protonmail.ch`, DKIM via tre CNAME-er til Proton, DMARC `p=quarantine`. Tre MX-er til Cloudflare Email Routing sto ved siden av; slettet 15. okt. 2026 |
 
 > **Catch-all-en er et bevisst valg, med en pris.** Den fanger en feilskrevet adresse — en
 > henvendelse til `personvernet@` går ikke tapt — men den betyr også at alt som sendes til
@@ -616,7 +614,7 @@ Appenes data lagres og behandles i Railway-region europe-west4 (Nederland), som 
 
 **Én overføring ut av EØS, med grunnlag (fra 14. okt. 2026):** e-post til `@sanitet.net` mottas og lagres av **Proton AG i Sveits** (A.2). Sveits har adekvansbeslutning fra EU-kommisjonen (2000/518/EF, bekreftet i kommisjonens gjennomgang i januar 2024), og overføringen skjer derfor etter art. 45 uten ytterligere garantier. Det som overføres, er e-post andre sender til oss — ikke innholdet i portalens database.
 
-**Cloudflare er ikke en overføring.** Cloudflare er bare DNS-leverandør, uten proxy (A.2), og ser ikke trafikken. Unntaket er MX-oppføringene til Cloudflare Email Routing som fortsatt står — de fjernes (`TODO.md`). Slås proxyen på igjen, må denne vurderingen gjøres på nytt før det skjer.
+**Cloudflare er ikke en overføring.** Cloudflare er bare DNS-leverandør, uten proxy (A.2), og ser ikke trafikken. E-posten går heller ikke dit: Email Routing er av og MX-ene slettet (15. okt. 2026). Slås proxyen på igjen, må denne vurderingen gjøres på nytt før det skjer.
 
 ---
 
@@ -1248,10 +1246,13 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.24 – sist oppdatert 15. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.25 – sist oppdatert 15. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.25 (15.10.2026):** **A.2, A.8:** Cloudflare Email Routing er slått av og de tre
+  MX-ene til `route1–3.mx.cloudflare.net` slettet. Kontrollert: bare Protons to MX-er står.
+  Cloudflare er dermed bare DNS, for trafikken og for e-posten.
 - **v1.24 (15.10.2026):** **A.2:** `ADMINS` er `admin@sanitet.net`, kontrollert av André —
   feilvarslene ligger i Proton, ikke i Gmail. **A.9:** forslag til frist for systemposten,
   håndhevet av Proton med et Sieve-filter (`vnd.proton.expire`): vaktlista som fil 30 dager,
