@@ -94,7 +94,7 @@ def cached_stats_response(cache_key: str, ttl: int):
                     pass
 
             # 3) Sjekk If-None-Match for 304
-            # Svak sammenligning — Cloudflare gjør ETag-en svak (`core/etag.py`).
+            # Svak sammenligning, som RFC 9110 krever (`core/etag.py`).
             if etag_treffer(request, etag):
                 response = HttpResponseNotModified()
                 response['ETag'] = etag

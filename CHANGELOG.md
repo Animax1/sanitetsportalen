@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-15 — Cloudflare-proxyen er av: «Cloudflare foran Railway» rettet i kode, tester og runbook; Proton-filter som frist for systemposten  `#core/dokumentasjon` `#core/personvern`
+
+André: «De andre dokumentene er viktig vi korrigerer, det kan skape forvirring på sikt.»
+Åtte steder sa fortsatt at Cloudflare sto foran Railway. **Kontrollert 15. okt.:** en statisk
+fil med `Accept-Encoding: gzip, br` får `content-encoding: gzip` og **sterk** ETag
+(`"6acf93bc-60fd"`) fra `server: railway-hikari` — svekkingen var Cloudflares, og den er borte.
+
+**`etag_treffer()` står, og grunnen er skrevet om:** RFC 9110 §13.1.2 krever svak
+sammenligning for `If-None-Match`, så regelen er riktig uten Cloudflare og tåler at en proxy
+kommer tilbake. `CLAUDE.md`, `core/etag.py`, `core/tests_etag.py`, `core/stats_cache.py`,
+`oppdrag/tests_etag.py` (testen heter nå `…_med_svak_etag`), `core/kartkobling.py`,
+`core/tests_kartkobling.py`, `scripts/sikkerhetssjekk.py`, `docs/RUNBOOK_VAKT.md` §1d og §1e,
+`TODO.md` (lasttesten). **Statuskortet for kartkoblingen** sa «403: stoppet foran kartet
+(Cloudflare e.l.)» — nå «(Railway, en proxy e.l.)».
+
+`CLAUDE.md`-avsnittet ble først for langt og tok `test_rota_har_ikke_vokst_tilbake` (64 618 mot
+grensa 64 500); det ble strammet inn, ikke grensa hevet.
+
+**Protokollen v1.24:** `ADMINS` er `admin@sanitet.net`, kontrollert av André — punktet er ute av
+«Krever Andre». **A.9:** forslag til frist for systemposten, håndhevet av Proton selv med et
+Sieve-filter (`vnd.proton.expire`, tak 730 dager): alt fra `noreply@mail.sanitet.net` merkes
+«System», vaktlista som fil slettes etter 30 dager, resten etter 90. Henvendelser etter A.14
+slettes for hånd, med vilje — en sak skal ikke forsvinne midt i.
+
 ## 2026-10-14 — Proton for e-post til `@sanitet.net`, Cloudflare ut som databehandler (personvern@, admin@, support@)  `#core/dokumentasjon` `#core/personvern`
 
 André: «jeg har satt opp proton mail for all mail sendt til *@sanitet.net og egne addresser

@@ -54,9 +54,10 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT_S = 3
 #: Egen User-Agent, ikke urllibs «Python-urllib/3.x». Cloudflare foran kartet
-#: avviser den med 403 og «error code: 1010» før appen ser forespørselen
-#: (funnet på staging 30. sep. 2026). Kartet ser da aldri noe, og feilen er
-#: ikke nøkkelen — derfor forklarer statuskortet 403 for seg.
+#: avviste den med 403 og «error code: 1010» før appen så forespørselen
+#: (funnet på staging 30. sep. 2026). Proxyen er av fra 14. okt. 2026, men en
+#: navngitt klient er riktig uansett, og statuskortet forklarer fortsatt 403 for
+#: seg: kartet svarer aldri 403, så den kommer fra noe foran det.
 USER_AGENT = 'sanitetsportalen-kartkobling/1.0'
 PAUSE_S = 60
 PAUSE_NOKKEL = 'kartkobling:pause'

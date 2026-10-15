@@ -4,15 +4,18 @@
 er samme versjon. Fram til i dag sammenlignet hvert endepunkt headeren tegn for
 tegn med `==`, og det var riktig så lenge ingen sto mellom bilen og serveren.
 
-**Cloudflare står der.** Railway sender trafikken gjennom den (`server: cloudflare`),
-og den komprimerer dynamiske svar selv — og **gjør en sterk ETag svak** når den
-gjør det. Bilen fikk `W/"v2:…"`, sendte den tilbake, og `==` mot `"v2:…"` bommet:
+**Cloudflare sto der** fram til 14. okt. 2026 (`server: cloudflare`), og den
+komprimerte dynamiske svar selv — og **gjorde en sterk ETag svak** når den
+gjorde det. Bilen fikk `W/"v2:…"`, sendte den tilbake, og `==` mot `"v2:…"` bommet:
 **hver polling ble en full kropp**, for hver bil hvert 15. sekund, for sentralbordet
 hvert 2,5. Funnet 11. okt. 2026 (TODO: «Treffer ETag-en på bilens poll?»): samme
 statiske fil fikk `"…"` når Cloudflare sendte den slik den lå, og `W/"…"` når den
 pakket den om.
 
 Svaret er det samme med eller uten Cloudflare; derfor ett sted, brukt av alle.
+Fra 14. okt. 2026 er proxyen av (alle DNS-oppføringer «DNS only», svaret kommer fra
+`server: railway-hikari`), og ETag-en kommer sterk fram — men sammenligningen står:
+den er det standarden sier, og den tåler at en proxy kommer tilbake.
 """
 from __future__ import annotations
 

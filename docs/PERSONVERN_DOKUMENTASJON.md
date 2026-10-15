@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 14. oktober 2026  
-**Versjon:** 1.23  
+**Siste oppdatering:** 15. oktober 2026  
+**Versjon:** 1.24  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -160,7 +160,7 @@ underdomenet `mail.sanitet.net` med egne SPF- og MX-oppføringer mot AhaSend, me
 | Avtalegrunnlag | Protons databehandleravtale (DPA). [Kontrolleres at den gjelder kontoen, se C.3] |
 | Databehandlingsregion | **Sveits — utenfor EØS**, men med adekvansbeslutning fra EU-kommisjonen etter art. 45 (se A.8) |
 | Adresser | Tre egne innbokser: **personvern@** (de registrertes henvendelser, A.14), **admin@** (drift og feilvarsler) og **support@** (brukerstøtte). Alt annet til `@sanitet.net` fanges av en catch-all |
-| Innhold | Det andre skriver til oss, og det kan ikke avgrenses: en henvendelse etter A.14 kan inneholde helseopplysninger den registrerte selv oppgir for å bli funnet igjen (tidspunkt, arrangement, hva som skjedde). Dessuten feilvarsler og vaktlista som fil når en av adressene står i `ADMINS` eller i vaktlistas mottakerliste |
+| Innhold | Det andre skriver til oss, og det kan ikke avgrenses: en henvendelse etter A.14 kan inneholde helseopplysninger den registrerte selv oppgir for å bli funnet igjen (tidspunkt, arrangement, hva som skjedde). Dessuten **feilvarslene** — `ADMINS` er `admin@sanitet.net` (kontrollert av André 15. okt. 2026) — og vaktlista som fil når en av adressene står i vaktlistas mottakerliste |
 | Kryptering | TLS inn til Proton. Lagret e-post krypteres med kontoens egen nøkkel ved mottak (Protons «zero-access»-kryptering), så Proton kan ikke lese den i ettertid |
 | Domenet | Kontrollert 14. okt. 2026: MX til `mail.protonmail.ch` (10) og `mailsec.protonmail.ch` (20), SPF `include:_spf.protonmail.ch`, DKIM via tre CNAME-er til Proton, DMARC `p=quarantine`. **Avvik:** tre MX-er til Cloudflare Email Routing står fortsatt (se merknaden om Cloudflare over) |
 
@@ -643,13 +643,39 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Overnattingsplasseringer (`vaktliste.Overnatting`)** | **30 dager etter natta** | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Brannsikkerhet mens folk sover på stedet; formålet er uttømt etter vakta. Tretti dager gir rom til å se hva som skjedde om en natt ble en hendelse. Rommene står. Revisjonsloggens rader om hvem som endret en plassering følger revisjonsloggens frist (A.6) |
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
-| **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Ikke fastsatt** (14. okt. 2026) | Manuelt — appene rører ikke innboksene | Henvendelser etter A.14 bør beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret; feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Fristen avgjøres, og står i `TODO.md` |
+| **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Ikke fastsatt** (14. okt. 2026) | Systemposten kan håndheves av Proton selv, se merknaden under; henvendelsene manuelt | Henvendelser etter A.14 bør beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret; feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Fristen avgjøres, og står i `TODO.md` |
 | **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **Oppdragsnotat og «Annet sted» (`Oppdrag.fritekst`, `Statusmelding.sted_tekst`)** | **3 dager etter siste aktivitet** på oppdraget, justerbart 1–30 av global admin | Skjules i serverens svar straks fristen er ute; tømmes av `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Fritt tekstfelt der identifikatorer kan havne (A.6). Oppdraget står igjen til vakta avsluttes. Teksten ligger fortsatt i backupene (730 og 90 dager hos Scaleway) — fristen er ikke en sletterett |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
 | Brukerkontoer | Slettes manuelt når tilgang ikke lenger er nødvendig | Manuell | Lagringsbegrensning, art. 5(1)(e) |
+
+> **Forslag til frist for systemposten, håndhevet av Proton** (15. okt. 2026). All e-post
+> portalen sender, kommer fra `noreply@mail.sanitet.net` (`DEFAULT_FROM_EMAIL` og
+> `SERVER_EMAIL`), og Proton kan merke og slette den selv med et Sieve-filter
+> (Innstillinger → Filtre → «Legg til Sieve-filter»). `expire` sletter meldingen etter fristen,
+> og Protons tak er 730 dager. Mappene må finnes før filteret lagres.
+>
+> ```
+> require ["fileinto", "vnd.proton.expire"];
+> if address :is "from" "noreply@mail.sanitet.net" {
+>   if header :contains "subject" "Vaktliste:" {
+>     fileinto "System/Vaktliste";
+>     expire "day" "30";
+>   } else {
+>     fileinto "System";
+>     expire "day" "90";
+>   }
+>   stop;
+> }
+> ```
+>
+> **Bare systemposten, med vilje.** En henvendelse etter A.14 skal ikke forsvinne av seg selv
+> midt i en sak; den slettes for hånd når saken er avsluttet og fristen er ute, og det
+> kontrolleres i den årlige gjennomgangen (C.4). Filteret virker bare på e-post som kommer
+> *etter* at det er lagret. Fristene over er forslag; når de er bestemt, skrives de inn i
+> tabellen.
 
 > **Merk om KO-loggen (17. september 2026, KO pulje 2):** Loggen er i all hovedsak
 > fritekst. Opplæringen er at direkte identifiserende opplysninger – navn, adresse,
@@ -1222,10 +1248,14 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.23 – sist oppdatert 14. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.24 – sist oppdatert 15. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.24 (15.10.2026):** **A.2:** `ADMINS` er `admin@sanitet.net`, kontrollert av André —
+  feilvarslene ligger i Proton, ikke i Gmail. **A.9:** forslag til frist for systemposten,
+  håndhevet av Proton med et Sieve-filter (`vnd.proton.expire`): vaktlista som fil 30 dager,
+  feilvarsler og annen systempost 90. Henvendelsene slettes fortsatt for hånd.
 - **v1.23 (14.10.2026):** **E-post og Cloudflare inn i protokollen** (A.1, A.2, A.7, A.8, A.9,
   A.14, B, C.3). **Proton AG** mottar og lagrer all e-post til `@sanitet.net`, med egne
   innbokser for personvern@, admin@ og support@ og en catch-all; Sveits har

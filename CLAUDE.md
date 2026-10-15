@@ -344,8 +344,8 @@ bilens og vaktlistas offline-kø. `ui-actions.js` teller dem på skjemaer med `d
 prefiksene må følge `koNokkel()` i begge — `core/tests_utlogging.py` krever det.
 
 **`If-None-Match` sammenlignes med `etag_treffer()`, aldri `==`** (`core/etag.py`, 11. okt.
-2026): Cloudflare foran Railway gjør ETag-en svak når den komprimerer, og `==` ga aldri 304 i
-prod. `core/tests_etag.py` håndhever.
+2026): RFC 9110 krever svak sammenligning. Med Cloudflare-proxyen (av fra 14. okt.) ga `==`
+aldri 304 i prod. `core/tests_etag.py` håndhever.
 
 **Data inn i et `<script>`-element går gjennom `js_json()`**, aldri `json.dumps` + `|safe`:
 `json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet.

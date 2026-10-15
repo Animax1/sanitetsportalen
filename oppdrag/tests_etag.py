@@ -65,9 +65,9 @@ class EtagErHeleSvaretTests(FlereEnheterBasis):
                 res = getattr(self, klient).get(url, HTTP_IF_NONE_MATCH=etag)
                 self.assertEqual(res.status_code, 304)
 
-    def test_bilens_ekte_poll_gir_304_ogsaa_etter_cloudflare(self):
-        """Som bilen poller i prod (11. okt. 2026): med `X-Posisjonsdeling`, og med
-        ETag-en Cloudflare har gjort svak. Uten svak sammenligning ble hver
+    def test_bilens_ekte_poll_gir_304_ogsaa_med_svak_etag(self):
+        """Som bilen pollet i prod 11. okt. 2026: med `X-Posisjonsdeling`, og med
+        ETag-en Cloudflare hadde gjort svak. Uten svak sammenligning ble hver
         polling en full kropp (`core/etag.py`)."""
         url = '/oppdrag/api/oppdrag/'
         hode = {'HTTP_X_POSISJONSDELING': 'deler', 'HTTP_X_PORTAL_INAKTIV': '3'}

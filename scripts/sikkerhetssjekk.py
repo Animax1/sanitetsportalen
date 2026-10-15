@@ -113,7 +113,7 @@ class Klient:
             h['Referer'] = self.base + '/'
         h.update(hoder or {})
         req = urllib.request.Request(url, data=kropp, method=metode, headers=h)
-        # Hodenavnene normaliseres til små bokstaver: Cloudflare og HTTP/2 sender
+        # Hodenavnene normaliseres til små bokstaver: HTTP/2 sender
         # `location`, gunicorn direkte sender `Location` — første kjøring mot
         # staging meldte 64 falske FEIL på det.
         try:

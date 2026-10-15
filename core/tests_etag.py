@@ -1,9 +1,9 @@
 """`If-None-Match` sammenlignes svakt (11. okt. 2026, `core/etag.py`).
 
-Cloudflare foran Railway gjør en sterk ETag svak når den komprimerer svaret, og
-`==` mot vår sterke bommet: **ingen av listene som polles fikk 304 i prod**. Testene
-sender den svake formen gjennom hvert endepunkt som bruker ETag, slik nettleseren
-sender den tilbake etter Cloudflare.
+En proxy som komprimerer gjør en sterk ETag svak. Da Cloudflare sto foran Railway
+(til 14. okt. 2026), bommet `==` mot vår sterke: **ingen av listene som polles fikk
+304 i prod**. Testene sender den svake formen gjennom hvert endepunkt som bruker
+ETag, slik nettleseren sender den tilbake etter en slik proxy.
 """
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -54,7 +54,7 @@ class HvertEndepunktTests(TestCase):
                 forste = self.client.get(url)
                 self.assertEqual(forste.status_code, 200, forste.content[:200])
                 etag = forste['ETag']
-                # Statistikken sender svak selv; resten sterk, som Cloudflare svekker.
+                # Statistikken sender svak selv; resten sterk, som en proxy svekker.
                 svak = etag if etag.startswith('W/') else 'W/' + etag
                 self.assertEqual(self.client.get(url, HTTP_IF_NONE_MATCH=svak).status_code, 304)
 
@@ -76,4 +76,4 @@ class IngenEgenSammenligningTests(SimpleTestCase):
                 continue
             if 'HTTP_IF_NONE_MATCH' in sti.read_text(encoding='utf-8'):
                 funn.append(rel)
-        self.assertEqual(funn, [], 'Bruk core.etag.etag_treffer() — Cloudflare gjør ETag-en svak')
+        self.assertEqual(funn, [], 'Bruk core.etag.etag_treffer() — If-None-Match sammenlignes svakt (RFC 9110)')

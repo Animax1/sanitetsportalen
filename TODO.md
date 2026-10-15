@@ -64,7 +64,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       **Den viktigste av de tre:** uten den er det uklart hva korpset faktisk har ansvar for.
 
 - [ ] **E-posten på `sanitet.net`: fjern Cloudflare-MX-ene, og før inn avtalene** (14. okt.
-      2026). Proton er ført inn i protokollen A.2, men tre ting står igjen:
+      2026). Proton er ført inn i protokollen A.2, men to ting står igjen:
       1. **MX-oppføringene** i Cloudflare peker fortsatt også på Email Routing —
          `route3.mx.cloudflare.net` (prioritet 12), `route1` (87) og `route2` (94), ved siden
          av Protons 10 og 20. Får en avsender ikke levert til Proton, prøver den Cloudflare,
@@ -73,8 +73,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
          `nslookup -type=MX sanitet.net`: bare de to Proton-oppføringene skal stå.
       2. **Avtalene:** referansen (URL eller dato) til databehandleravtalen hos **AhaSend** og
          hos **Proton** for kontoene dine. Står som «[fylles inn]» i A.2.
-      3. **`ADMINS` i Railway** til `admin@sanitet.net`, hvis feilvarslene fortsatt går til
-         Gmail — ellers ligger de i en innboks protokollen ikke nevner.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
@@ -592,8 +590,9 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
       **Ta MFA-rate-limit med i testplanen** — den delte bøtta (N4) var nettopp den
       feiltypen en lasttest fanger, og som ellers først merkes ved en reell vaktstart.
       **Kjør gjennom `testportal.sanitet.net`, ikke Railway direkte**, med klienter som sender
-      `Accept-Encoding: gzip, br` og `If-None-Match` som en nettleser: Cloudflare komprimerer og
-      gjør ETag-en svak (`core/etag.py`, 11. okt. 2026), og andelen 304 er halve lasten.
+      `Accept-Encoding: gzip, br` og `If-None-Match` som en nettleser: andelen 304 er halve
+      lasten (`core/etag.py`). Cloudflare-proxyen er av fra 14. okt. 2026, så DNS-navnet og
+      Railway direkte gir nå samme vei — men kjør gjennom navnet likevel, det er det brukerne gjør.
       *Akseptanse:* rapport som viser at konfigurasjonen tåler 25 samtidige uten degradering.
 
 - [ ] **Statistikk-utvidelse (tidligere F6).** ~25–35 t, faseinndelt. Flyttet ut som eget
@@ -1091,7 +1090,9 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       - **Lagringstid for e-post i Proton-innboksene** (personvern@, admin@, support@ og
         catch-all-en) er ikke fastsatt — A.9 sier det rett ut. Henvendelser etter A.14
         trenger en frist som dekker saken og dokumentasjonen av svaret; feilvarsler og
-        vaktlista som fil har ingen verdi etter vakta. Føres også i DPA-utkastet punkt 7
+        vaktlista som fil har ingen verdi etter vakta. Føres også i DPA-utkastet punkt 7.
+        **Proton kan håndheve den selv** for systemposten: et Sieve-filter med
+        `vnd.proton.expire` (forslaget står i A.9). Henvendelsene slettes for hånd.
       - Bump versjonsnummer og dato når noe endres
 
 ### Puljene fra Andrés gjennomgang 16. sep. 2026

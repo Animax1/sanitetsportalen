@@ -188,7 +188,7 @@ portalen sender til testkart.sanitet.net og skal aldri kunne tegne i prod-kartet
 1. Stemple én gang fra en bilkonto i portalen (prod) med posisjon slått på.
 2. Server-status → kortet **«Kart.sanitet.net»**: «Siste sending» skal ha ✓ og klokkeslettet
    for stemplingen. ✗ med 401 er nøkkelen (ikke samme verdi i begge apper, eller satt i feil
-   miljø); ✗ med 403 er Cloudflare foran kartet, ikke kartet selv. ✗ uten kode er tidsavbrudd
+   miljø); ✗ med 403 er noe foran kartet (Railways kant eller en proxy), ikke kartet selv — kartet svarer aldri 403. ✗ uten kode er tidsavbrudd
    eller nettverk — sover kartet (§1c steg 0)? Kortet forklarer koden i linja under.
 3. Bilen skal stå i kartet, i en gruppe med flagget «Viser enheter og lag fra portalen».
 
@@ -205,7 +205,7 @@ Det betyr:
   starter og svarer. Under vakt er det portalens server-status (§13), kartets `/healthz` og
   Railway-loggen som forteller om prod.
 - **En rød staging-monitor under vakt er ikke et prod-utfall** — men sjekk prod med en gang,
-  fordi det kan være noe begge deler, som Railway selv, Cloudflare eller DNS.
+  fordi det kan være noe begge deler, som Railway selv eller DNS (Cloudflare, bare DNS fra 14. okt. 2026).
 - **Valgfritt under vakt:** når serverless er av, koster en prod-monitor ingenting ekstra.
   Legg til (eller slå på igjen) monitorer for `https://<portal-domenet>/healthz/` og
   `https://kart.sanitet.net/healthz` i Better Stack fra §1c, og **pause dem i §10b** før

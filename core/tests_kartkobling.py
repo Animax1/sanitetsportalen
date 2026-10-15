@@ -66,7 +66,7 @@ class KartkoblingTests(SimpleTestCase):
 
     def test_egen_user_agent_ikke_urllibs(self):
         """Cloudflare foran testkart.sanitet.net ga 403 («error code: 1010») på
-        «Python-urllib/3.13» (30. sep. 2026)."""
+        «Python-urllib/3.13» (30. sep. 2026; proxyen er av fra 14. okt.)."""
         kartkobling.send_enhet('Bil', 59.4, 5.2, TID)
         ua = self._foresporsel().get_header('User-agent')
         self.assertEqual(ua, kartkobling.USER_AGENT)
