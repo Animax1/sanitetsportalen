@@ -14,7 +14,7 @@ from audit.models import AuditLog
 from core.modules import get_module, get_visible_modules
 
 from .models import Kompetanse, Korps, Mannskap, Ressursrolle
-from .test_helpers import LAG, gruppe
+from .test_helpers import LAG, gruppe, lag_korps
 from .signals import SKJULT, TABELLNAVN
 from accounts.test_helpers import gi_modultilgang
 
@@ -23,10 +23,10 @@ User = get_user_model()
 
 class RegisterTests(TestCase):
     def test_korpsnavn_er_unikt(self):
-        Korps.objects.create(navn='Haugesund')
+        lag_korps(navn='Haugesund')
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                Korps.objects.create(navn='Haugesund')
+                lag_korps(navn='Haugesund')
 
     def test_verdimengdene_sorteres_alfabetisk(self):
         """Ingen `rekkefolge` å vedlikeholde (fjernet 30. aug. 2026).
@@ -107,10 +107,10 @@ class RegisterTests(TestCase):
 
 class MannskapTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
 
     def test_navn_er_unikt_per_korps_ikke_globalt(self):
-        annet = Korps.objects.create(navn='Karmøy')
+        annet = lag_korps(navn='Karmøy')
         Mannskap.objects.create(navn='Ola Hansen', korps=self.korps)
         # To korps kan ha hver sin Ola Hansen …
         Mannskap.objects.create(navn='Ola Hansen', korps=annet)
@@ -145,7 +145,7 @@ class AuditTests(TestCase):
     """Unntaket for `notat` — bygget inn fra første lagring, som i oppdrag."""
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund')
+        self.korps = lag_korps(navn='Haugesund')
         self.person = Mannskap.objects.create(
             navn='Kari', korps=self.korps, telefon='90000000')
         AuditLog.objects.all().delete()

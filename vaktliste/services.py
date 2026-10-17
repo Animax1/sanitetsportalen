@@ -206,6 +206,22 @@ def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
 # er ikke å skrive: stigen over gjelder skriving. Her sto «`les` gjelder hele
 # lista med vilje» (§4.4) til 26. sep. 2026 — regelen som ble snudd 11. sep.
 
+def korps_i_portal(portal=None):
+    """Korpsene vaktlista viser og godtar: `type='korps'`, med i portalen.
+
+    `docs/BESLUTNING_PORTALER.md` §4.3 (17. okt. 2026). Katalogen er felles
+    (`core.Tilhorighet`), og admin velger hvilke som er med i hver portal — en
+    lokal portal har ett korps, en tverrfaglig flere. «Annet» (som «Leger») er
+    aldri et korps i vaktlista. **Det ene stedet** dette avgjøres: lista,
+    registeret og hvert oppslag på `korps_id` går gjennom her, så et korps fra en
+    annen portal ikke kan settes på noen ved å sende ID-en for hånd.
+    """
+    from core.portal import gjeldende_portal
+
+    from .models import Korps
+    return Korps.objects.filter(type=Korps.KORPS, portaler=portal or gjeldende_portal())
+
+
 def kan_skrive_alt(user) -> bool:
     """`skriv_full` eller høyere — står utenfor badge og reservasjon.
 

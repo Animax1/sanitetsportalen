@@ -22,6 +22,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
+from vaktliste.test_helpers import lag_korps
 from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler
 from core.vakt import vakt_for_year
 
@@ -118,14 +119,14 @@ class VerifiserBackupTests(TestCase):
         from vaktliste.models import Korps
 
         Patient.objects.create(pasientnummer=1, vakt=vakt, problemstilling='X')
-        Korps.objects.create(navn='Testkorps')
+        lag_korps(navn='Testkorps')
         for slug in ('portal', 'patients', 'vaktliste'):
             self._lag_fil(slug)
 
         ut = self._kall()
         self.assertIn('core.vakt', ut)
         self.assertIn('patients.patient', ut)
-        self.assertIn('vaktliste.korps', ut)
+        self.assertIn('core.tilhorighet', ut)   # korpset, i portalfila siden 17. okt. 2026
         self.assertIn('samme antall rader', ut)
 
     def test_hel_fil_alene(self) -> None:

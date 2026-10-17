@@ -456,12 +456,12 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 
 | Slug | Fil | Innhold |
 |------|-----|---------|
-| `portal` | `core/backup/portal.py` | `core.Vakt` + `ModuleSettings`. **Først i gjenopprettingsrekkefølgen** — uten den feiler alle modulfilene i en tom base, fordi de peker på vakta med et heltall |
+| `portal` | `core/backup/portal.py` | Portaler, korps, `core.Vakt`, `ModuleSettings`. **Først i gjenopprettingsrekkefølgen** — uten den feiler alle modulfilene i en tom base, fordi de peker på vakta med et heltall |
 | `patients` | `patients/backup.py` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
 | `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient`. Heter «Pasientregistreringsarkiv» |
 | `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner og verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
-| `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `vaktliste` | `vaktliste/backup.py` | Mannskap, kompetanser, ressurser, vaktposter, vaktlister |
 | `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv** — ingen SHA-signatur, se `ko/CLAUDE.md` |
 | `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
 | `park` | `park/backup.py` | Lagenes registreringer og lenkene — hashen, ikke tokenet |

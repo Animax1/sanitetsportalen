@@ -21,6 +21,7 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
+from vaktliste.test_helpers import lag_korps
 from patients.test_helpers import aktiver_vakt
 
 from accounts.models import CustomUser, ModulTilgang
@@ -140,7 +141,7 @@ class PlanlagtVaktTests(TestCase):
 
 class KopierOppsettTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.enhet = Enhet.objects.create(navn='Haugesund 56')
         self.fra = services.opprett_planlagt_vakt('Fjorårets vakt')
         self.til = services.opprett_planlagt_vakt('Årets vakt')
@@ -247,7 +248,7 @@ class FanerekkefolgeTests(TestCase):
 
 class ModellReglerTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund')
+        self.korps = lag_korps(navn='Haugesund')
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(
             vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
@@ -328,8 +329,8 @@ class TilgangsregelTests(TestCase):
     """
 
     def setUp(self):
-        self.hgsd = Korps.objects.create(navn='Haugesund')
-        self.karmoy = Korps.objects.create(navn='Karmøy')
+        self.hgsd = lag_korps(navn='Haugesund')
+        self.karmoy = lag_korps(navn='Karmøy')
         self.vl = services.opprett_planlagt_vakt('Vakta')
 
         self.res_hgsd = lag_ressurs(
@@ -417,7 +418,7 @@ class ApiTests(TestCase):
     def setUp(self):
         from patients.test_helpers import sett_aktiv_vakt
         self.aktiv = sett_aktiv_vakt(2098)
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.rolle = lag_rolle('Lagleder')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.admin = _bruker('adm', admin=True)
@@ -795,7 +796,7 @@ class RessurstabellensDataTests(TestCase):
 
     def setUp(self):
         from vaktliste.models import Kompetanse
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.gfor = Kompetanse.objects.create(navn='GFØR')
         self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.gfor)
         self.syk = Kompetanse.objects.create(navn='Sykepleier')
@@ -860,7 +861,7 @@ class LedigePlasserTests(TestCase):
     """
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.rolle = lag_rolle('Lagleder')
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
@@ -1033,7 +1034,7 @@ class RessursrolleTests(TestCase):
     """
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund')
+        self.korps = lag_korps(navn='Haugesund')
         self.rolle = lag_rolle('Lagleder')
         self.utgatt = lag_rolle('Utgått', er_aktiv=False)
         self.vl = services.opprett_planlagt_vakt('Vakta')

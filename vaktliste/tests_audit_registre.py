@@ -71,12 +71,13 @@ class RegistreneLoggesTests(TilgangsBasis):
                 for r in qs.order_by('pk')]
 
     def test_korps_opprettes_endres_og_slettes(self):
-        res = self.c_leder.post('/vaktliste/api/korps/', data={'navn': 'Sola', 'kortnavn': 'SOLA'},
-                                content_type='application/json')
+        # Katalogen er global admin siden 17. okt. 2026 (`core.Tilhorighet`).
+        res = self.c_adm.post('/vaktliste/api/korps/', data={'navn': 'Sola', 'kortnavn': 'SOLA'},
+                              content_type='application/json')
         self.assertEqual(res.status_code, 201, res.content)
         pk = res.json()['data']['id']
-        self.c_leder.put(f'/vaktliste/api/korps/{pk}/', data={'navn': 'Sola RK'},
-                         content_type='application/json')
+        self.c_adm.put(f'/vaktliste/api/korps/{pk}/', data={'navn': 'Sola RK'},
+                       content_type='application/json')
         self.c_adm.delete(f'/vaktliste/api/korps/{pk}/', data={'confirm': True},
                           content_type='application/json')
         rader = self._rader('vaktliste_korps', pk)

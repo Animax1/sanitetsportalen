@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 3: korpset blir den felles katalogen `core.Tilhorighet` (korps eller «annet», som «Leger»), portalen velger sine, bare admin skriver i den  `#core/tilgang` `#vaktliste/tilgang` `#core/backup`
+
+Tredje fase av `docs/BESLUTNING_PORTALER.md` (§4.3, beslutning 9 og 10). **Synlig endring:
+korps opprettes, endres og slettes nå bare av global admin.** Fram til i dag kunne
+`skriv_full` i vaktlista gjøre det; katalogen er felles for alle portaler, og en endring i den
+gjelder alle. Ellers ser vaktlista ut som før — alle korps som fantes er med i «Standard».
+
+**Modellen flyttet uten SQL mot tabellen.** `vaktliste.Korps` er nå `core.Tilhorighet`, med
+`db_table = 'vaktliste_korps'` — samme grep som `AppSetting` 14. sep. Vaktlista kaller den
+fortsatt `Korps` (`Korps = Tilhorighet`), så koden der står. Nytt felt `type` (`korps` |
+`annet`, `db_default='korps'` for release-vinduet). Nye: `core.Kontotilhorighet` (en konto kan ha
+flere) og `Vaktportal.tilhorigheter` — portalens utvalg.
+
+**Migrasjonene:** `core/0020` (tilstanden flytter; SQL bare for `type` og de to nye
+tabellene), `vaktliste/0030` (**tom SQL** — `DeleteModel` står i `state_operations`, ellers ville
+den slettet tabellen med alle korpsene; kontrollert med `sqlmigrate`), `vaktliste/0031` (alle
+korps med i «Standard», og kontoene får tilhørigheten de alt har: korpset de fører og korpset
+til mannskapsraden de er koblet til). **Prøve i `core/migrasjonsprover.py`**, grønn. Prøvene har
+fått `_ny_konto()`, som setter inn en konto med de kolonnene tabellen faktisk har på det punktet i
+historien — `kan_redigere_*` sto påkrevd der.
+
+**`vaktliste.services.korps_i_portal()` er det ene stedet** vaktlista avgjør hvilke korps som
+finnes: `type='korps'`, med i portalen. Lista på siden, registeret, mannskapssvaret, nytt og
+flyttet mannskap, «Del ut» og kontoens korps går alle gjennom den — et korps fra en annen portal
+kan ikke settes på noen ved å sende ID-en for hånd. Skriver admin et navn som finnes i katalogen,
+tas det inn i portalen (200) i stedet for å avvises.
+
+**Backup:** katalogen står i portalfila, før vaktlista — mannskapet peker på den med et heltall.
+`GAMLE_MODELLNAVN` oversetter `vaktliste.korps` i vaktlistefiler fra før i dag; en test laster en
+slik fil. `Kontotilhorighet` står bare i den hele fila (påkrevd peker til en konto).
+
+**Tester:** `core/tests_tilhorighet.py`, 18 stykker. 15 testfiler laget korps direkte; de bruker
+`lag_korps()` / `hent_eller_lag_korps()`, som også tar korpset med i portalen. **Mutasjoner: 14,
+alle drept til slutt.** Fem overlevde første runde, og alle hadde samme form: regelen sto i
+`korps_i_portal()`, men ingen test gikk gjennom akkurat det kallstedet med et korps fra en annen
+portal. Én test per kallsted.
+
 ## 2026-10-17 — Portaler fase 2: medlemskap per portal, `ModulTilgang` på medlemskapet, portalregelen og fanevakten (409 når en annen fane har byttet portal)  `#core/tilgang` `#accounts/innlogging`
 
 Andre fase av `docs/BESLUTNING_PORTALER.md`. **Med én portal er det ingen synlig endring:**

@@ -373,6 +373,67 @@ def _sjekk_portaltilgang(c):
     assert c.fetchone()[0] == 0, 'en modulrad hang på en annen kontos medlemskap'
 
 
+def _ny_konto(c, navn, rolle='bruker', aktiv=True):
+    """En konto med de kolonnene tabellen faktisk har på dette punktet i historien.
+
+    Prøvebasen settes til én apps forrige migrasjon, og de andre appene står der
+    avhengighetene drar dem — ikke nødvendigvis på dagens skjema. En `INSERT` med
+    dagens kolonneliste feiler da på seg selv, ikke på migrasjonen.
+    """
+    c.execute("""SELECT column_name, data_type, is_nullable, column_default
+                 FROM information_schema.columns WHERE table_name = 'accounts_customuser'""")
+    kolonner_i_basen = c.fetchall()
+    verdier = {'password': '!', 'username': navn, 'role': rolle, 'is_active': aktiv}
+    noytral = {'boolean': False, 'integer': 0, 'bigint': 0, 'smallint': 0}
+    # Påkrevde kolonner uten standardverdi — også de som er borte i dag, som
+    # `kan_redigere_*` — får en nøytral verdi etter typen.
+    for kolonne, type_, nullbar, standard in kolonner_i_basen:
+        if (kolonne not in verdier and kolonne not in ('id', 'created_at', 'updated_at')
+                and nullbar == 'NO' and standard is None):
+            verdier[kolonne] = noytral.get(type_, '')
+    kolonner = list(verdier) + ['created_at', 'updated_at']
+    c.execute(f"""INSERT INTO accounts_customuser ({', '.join(kolonner)})
+                  VALUES ({', '.join(['%s'] * (len(kolonner) - 2))}, now(), now())
+                  RETURNING id""", [verdier[k] for k in kolonner[:-2]])
+    return c.fetchone()[0]
+
+
+# ── vaktliste.0031 (korpsene i «Standard», kontoenes tilhørighet) ─────────────
+
+def _seed_tilhorighet(c):
+    """To korps, en konto som fører ett av dem, og en mannskapsrad med konto i det andre."""
+    def korps(navn):
+        c.execute("""INSERT INTO vaktliste_korps (navn, kortnavn, er_aktiv, created_at, updated_at)
+                     VALUES (%s, '', true, now(), now()) RETURNING id""", [navn])
+        return c.fetchone()[0]
+
+    def konto(navn):
+        return _ny_konto(c, navn)
+
+    hgsd, sola = korps('HGSD'), korps('Sola')
+    forer, mannskap = konto('forer'), konto('mannskap')
+    c.execute("""INSERT INTO vaktliste_kontokorps (user_id, korps_id, created_at, updated_at)
+                 VALUES (%s, %s, now(), now())""", [forer, hgsd])
+    c.execute("""INSERT INTO vaktliste_mannskap
+                 (navn, korps_id, user_id, telefon, epost, epost_fra_leder, issi, er_aktiv,
+                  notat, created_at, updated_at)
+                 VALUES ('Kari', %s, %s, '', '', true, '', true, '', now(), now())""",
+              [sola, mannskap])
+    konto('uten')   # verken kontokorps eller mannskap — skal ikke få noe
+
+
+def _sjekk_tilhorighet(c):
+    c.execute("""SELECT k.navn, k.type FROM core_vaktportal_tilhorigheter t
+                 JOIN core_vaktportal p ON p.id = t.vaktportal_id
+                 JOIN vaktliste_korps k ON k.id = t.tilhorighet_id
+                 WHERE p.slug = 'standard' ORDER BY k.navn""")
+    assert c.fetchall() == [('HGSD', 'korps'), ('Sola', 'korps')], 'korpsene mangler i Standard'
+    c.execute("""SELECT u.username, k.navn FROM core_kontotilhorighet t
+                 JOIN accounts_customuser u ON u.id = t.bruker_id
+                 JOIN vaktliste_korps k ON k.id = t.tilhorighet_id ORDER BY u.username""")
+    assert c.fetchall() == [('forer', 'HGSD'), ('mannskap', 'Sola')], 'kontoene fikk feil tilhørighet'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -403,6 +464,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Hver konto blir medlem av «Standard», radene kobles til medlemskapet',
             seed=_seed_portaltilgang,
             sjekk=_sjekk_portaltilgang,
+        ),
+        Migrasjonsprove(
+            migrasjon='vaktliste.0031_tilhorighet_data',
+            foregaaende='0030_korps_er_tilhorighet',
+            beskrivelse='Korpsene blir med i «Standard», kontoene får tilhørigheten sin',
+            seed=_seed_tilhorighet,
+            sjekk=_sjekk_tilhorighet,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

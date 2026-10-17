@@ -13,6 +13,7 @@ import json
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
+from vaktliste.test_helpers import lag_korps
 from accounts.models import CustomUser
 from patients.js_test_utils import VAKTLISTE_JS, build_harness, node_available, run_node
 from vaktliste.models import Korps, Mannskap
@@ -22,7 +23,7 @@ from vaktliste.tests_tilgang import _bruker, _klient
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class KorpsforerUtenBadgeTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         Mannskap.objects.create(navn='Ola', korps=self.korps)
 
     def test_sida_sier_hvorfor_hun_ikke_faar_redigere(self):
@@ -53,7 +54,7 @@ class KorpsforerUtenBadgeTests(TestCase):
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class KoblingBareForLederTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.kari = CustomUser.objects.create_user(
             username='kari', password='x', email='kari@example.org', must_change_password=False)
 

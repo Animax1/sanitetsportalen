@@ -157,7 +157,7 @@ def del_ut_view(request, pk):
         alle = rad.get('alle') is True
         korps_id = None if alle else _int(rad.get('korps_id'))
         if not alle and (korps_id is None
-                         or not Korps.objects.filter(pk=korps_id).exists()):
+                         or not services.korps_i_portal().filter(pk=korps_id).exists()):
             return json_feil(f'Velg hvem som skal få «{ressurs.navn}».')
         plan.append((ressurs, korps_id, alle))
 

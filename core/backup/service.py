@@ -84,6 +84,9 @@ GAMLE_MODELLNAVN: dict[str, str] = {
     # i 730 dager — radene her er det som gjør dem gjenopprettbare.
     'patients.appsetting': 'core.appsetting',
     'patients.backup': 'core.backup',
+    # Flyttet 17. okt. 2026 (`docs/BESLUTNING_PORTALER.md` §4.3): korpset ble den
+    # felles katalogen. Vaktlistefiler fra før bærer korpsene under det gamle navnet.
+    'vaktliste.korps': 'core.tilhorighet',
 }
 
 

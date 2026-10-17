@@ -28,6 +28,7 @@ from django.db.models.functions import Lower
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
+from vaktliste.test_helpers import lag_korps
 from core.sortering import Norsk, norsk_nokkel, norsk_sql, norsk_tilgjengelig
 
 NAVN = ['Ålesund', 'bergen', 'Aasen', 'Zeta', 'Ørsta', 'Ærø', 'Haugesund', 'Andøy',
@@ -72,7 +73,7 @@ class BasenSortererNorskTests(TestCase):
     def test_korps_sorteres_norsk(self):
         from vaktliste.models import Korps
         for n in NAVN:
-            Korps.objects.create(navn=n, kortnavn=n[:6])
+            lag_korps(navn=n, kortnavn=n[:6])
         self.assertEqual(list(Korps.objects.values_list('navn', flat=True)), NORSK)
 
     def test_ra_sql_er_enig_med_nokkelen(self):
@@ -195,7 +196,7 @@ class RollenFoerNavnetTests(TestCase):
         leder = Ressursrolle.objects.create(gruppe=g, navn='Lagleder', rekkefolge=1)
         medlem = Ressursrolle.objects.create(gruppe=g, navn='Lagsmedlem', rekkefolge=2)
         r = Ressurs.objects.create(vaktliste=vl, navn='Lag 1', gruppe=g)
-        korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         t0 = timezone.now().replace(microsecond=0)
         rader = [('Åse', medlem, 0), ('Ærlig', medlem, 0), ('Øyvind', leder, 0), ('Anne', medlem, 8)]
         for navn, rolle, h in rader:
@@ -239,7 +240,7 @@ class EndepunkteneTests(TestCase):
 
     def test_mannskap(self):
         from vaktliste.models import Korps, Mannskap
-        korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         for navn in ('Åse Åsen', 'Ola Olsen', 'Øyvind Ødegård', 'Anne Berg', 'Ærlig Ærdal'):
             Mannskap.objects.create(navn=navn, korps=korps)
         self.assertEqual([m['navn'] for m in self._hent('/vaktliste/api/mannskap/')['mannskap']],

@@ -36,7 +36,7 @@ from core.modules import get_module
 
 from . import services
 from .models import Kompetanse, Korps, Mannskap, Ressurs, Vaktpost
-from .test_helpers import KO, LAG, gruppe, lag_ressurs, lag_rolle
+from .test_helpers import KO, LAG, gruppe, lag_korps, lag_ressurs, lag_rolle
 from accounts.test_helpers import gi_modultilgang
 
 
@@ -60,8 +60,8 @@ class TilgangsBasis(TestCase):
     """De fire kontoene, to korps, og et oppsett å bryne dem på."""
 
     def setUp(self):
-        self.hgsd = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.karmoy = Korps.objects.create(navn='Karmøy')
+        self.hgsd = lag_korps(navn='Haugesund', kortnavn='HGSD')
+        self.karmoy = lag_korps(navn='Karmøy')
         self.rolle = lag_rolle('Lagleder')
         self.komp = Kompetanse.objects.create(navn='Sykepleier')
 
@@ -274,8 +274,10 @@ class UtdelingTests(TilgangsBasis):
 
         Rollene står ikke her: de er del av vaktoppsettet og krever
         `skriv_leder`. Se `RollerErGruppasTests` i `tests_registre.py`.
+        **Korpsene heller ikke** (17. okt. 2026): de er den felles katalogen
+        `core.Tilhorighet`, og bare global admin endrer den — se testen under.
         """
-        for sti in ('korps', 'kompetanser'):
+        for sti in ('kompetanser',):
             with self.subTest(sti=sti):
                 self.assertEqual(
                     self.c_kb.post(f'/vaktliste/api/{sti}/', data={'navn': 'Nytt'},
@@ -285,6 +287,20 @@ class UtdelingTests(TilgangsBasis):
                     self.c_vl.post(f'/vaktliste/api/{sti}/', data={'navn': f'Ny {sti}'},
                                    content_type='application/json').status_code,
                     201)
+
+    def test_korpsene_er_global_admin(self):
+        """Beslutning 10 i `docs/BESLUTNING_PORTALER.md`: katalogen er felles, og en
+        endring i den gjelder alle portaler. `skriv_full` og `skriv_leder` får
+        ikke opprette, endre eller slette et korps."""
+        from accounts.models import CustomUser
+        self.assertEqual(self.c_vl.post('/vaktliste/api/korps/', data={'navn': 'Nytt'},
+                                        content_type='application/json').status_code, 403)
+        admin = CustomUser.objects.create_user(username='kat_admin', password='x',
+                                               role='admin', must_change_password=False)
+        c = Client()
+        c.force_login(admin)
+        self.assertEqual(c.post('/vaktliste/api/korps/', data={'navn': 'Nytt'},
+                                content_type='application/json').status_code, 201)
 
     def test_verdimengdene_kan_leses_av_alle(self):
         """Nedtrekkslistene trenger dem — også korps-førerens."""

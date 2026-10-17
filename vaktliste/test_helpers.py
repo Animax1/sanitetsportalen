@@ -57,3 +57,28 @@ def lag_ressurs(**kwargs):
     if 'gruppe' not in kwargs and 'gruppe_id' not in kwargs:
         kwargs['gruppe'] = gruppe(ANNET)
     return Ressurs.objects.create(**kwargs)
+
+
+def lag_korps(**felter):
+    """Som `Korps.objects.create(**felter)`, og med i den gjeldende portalen.
+
+    Vaktlista viser bare korpsene portalen har tatt med (17. okt. 2026,
+    `docs/BESLUTNING_PORTALER.md` §4.3) — i prod gjør admin det når korpset
+    opprettes. Et korps laget rett i tabellen ville vært usynlig for vaktlista.
+    """
+    from core.portal import gjeldende_portal
+
+    from .models import Korps
+    korps = Korps.objects.create(**felter)
+    gjeldende_portal().tilhorigheter.add(korps)
+    return korps
+
+
+def hent_eller_lag_korps(navn):
+    """Som `Korps.objects.get_or_create(navn=…)`, med i portalen. Returnerer (korps, ny)."""
+    from core.portal import gjeldende_portal
+
+    from .models import Korps
+    korps, ny = Korps.objects.get_or_create(navn=navn)
+    gjeldende_portal().tilhorigheter.add(korps)
+    return korps, ny

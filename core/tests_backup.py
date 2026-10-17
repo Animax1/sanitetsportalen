@@ -29,6 +29,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from vaktliste.test_helpers import lag_korps
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from core.backup import (
@@ -1890,7 +1891,7 @@ class AlleFileneGjenopprettesTests(TestCase):
         lag_oppdrag(vakt=vakt, oppdragsnummer=1, enhet=enhet,
                                problemstilling='Udefinert', hastegrad='Gul',
                                lokasjon=lok)
-        korps = Korps.objects.create(navn='Testkorps')
+        korps = lag_korps(navn='Testkorps')
         mannskap = Mannskap.objects.create(navn='Kari', korps=korps,
                                            telefon='99887766', issi='0401234')
         liste = Vaktliste.objects.create(vakt=vakt)
@@ -1927,11 +1928,14 @@ class AlleFileneGjenopprettesTests(TestCase):
 
         for slug in self.REKKEFOLGE:
             for etikett in get_handler(slug).get_restore_models():
-                if etikett in ('core.Vakt', 'core.Vaktportal'):
+                if etikett in ('core.Vakt', 'core.Vaktportal', 'core.Tilhorighet'):
                     continue
                 django_apps.get_model(etikett).objects.all().delete()
         Vakt.objects.all().delete()
         Vaktportal.objects.all().delete()
+        from core.models import Kontotilhorighet, Tilhorighet
+        Kontotilhorighet.objects.all().delete()
+        Tilhorighet.objects.all().delete()
 
     def test_alle_modulfilene_kan_lastes_i_rekkefolge(self) -> None:
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -2160,7 +2164,7 @@ class HelBackupTests(TestCase):
             vakt = vakt_for_year(2026)
             Patient.objects.create(pasientnummer=7, vakt=vakt, problemstilling='X')
             Enhet.objects.create(navn='Bil 9')
-            Korps.objects.create(navn='Korpset')
+            lag_korps(navn='Korpset')
             bruker = CustomUser.objects.create_user(
                 username='overlever', password='x', must_change_password=False)
 

@@ -55,42 +55,17 @@ from django.db import models
 from django.db.models import F
 from django.db.models.functions import Lower
 
-from core.models import BaseTimeStampedModel
+from core.models import BaseTimeStampedModel, Tilhorighet
 from core.sortering import Norsk
 
 from . import choices
 
 
-class Korps(BaseTimeStampedModel):
-    """Et korps — organisasjonsenheten mannskapet hører til.
-
-    Badgen i tilgangsmodellen (§4): en ressurs kan reserveres til et korps,
-    og en korps-bruker bemanner bare ressurser reservert sitt eget. Feltet
-    har ingen funksjon utover det — bestillingen var eksplisitt på å ikke
-    overkomplisere korpsbegrepet.
-    """
-
-    navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
-    kortnavn = models.CharField(
-        max_length=20,
-        blank=True,
-        default='',
-        verbose_name='Kortnavn',
-        help_text='Vises i trange kolonner, f.eks. «HGSD». Valgfritt.',
-    )
-    er_aktiv = models.BooleanField(
-        default=True,
-        verbose_name='Aktiv',
-        help_text='Inaktive korps skjules i nedtrekkslister, men beholdes '
-                  'på mannskapet som allerede tilhører dem.',
-    )
-    class Meta:
-        verbose_name = 'Korps'
-        verbose_name_plural = 'Korps'
-        ordering = [Norsk('navn')]
-
-    def __str__(self) -> str:
-        return self.navn
+# **`Korps` er `core.Tilhorighet`** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+# §4.3). Modellen flyttet til `core` så kontoene kan ha en tilhørighet; tabellen
+# heter fortsatt `vaktliste_korps`. Vaktlista kaller den `Korps`, og leser bare
+# de med `type='korps'` som er med i portalen (`services.korps_i_portal`).
+Korps = Tilhorighet
 
 
 class Kompetanse(BaseTimeStampedModel):

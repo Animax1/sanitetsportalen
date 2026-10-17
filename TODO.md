@@ -161,8 +161,6 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
       toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
       i JS, og tas sammen med flatene i fase 5.
-- [ ] **Fase 3:** tilhørighet — `vaktliste.Korps` til `core` som felles katalog med typen
-      `annet` (lege02), kontoens tilhørigheter, og admins utvalg per portal.
 - [ ] **Fase 4:** data per portal — `Mannskap.portal`, verdimengdene og de fem én-til-én-koblingene
       etter notatet §4.12, innstillingene sortert i system og portal, endringsnumre og varsler med
       portal (§4.14), portalfilter i statistikk og arkiv, søk på tvers for innsyn og sletting.

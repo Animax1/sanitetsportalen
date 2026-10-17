@@ -16,7 +16,7 @@ from ko import program, services, tavle
 from ko.models import Kjennetegn, Konserttype, Programbehov, Programpost, Tavleplassering
 from oppdrag.models import Lokasjon
 from vaktliste.models import Ressursgruppe
-from vaktliste.test_helpers import AMBULANSE, LAG, gruppe
+from vaktliste.test_helpers import AMBULANSE, LAG, gruppe, hent_eller_lag_korps
 
 from .tests_hendelseslogg import _bruker, _gi
 from .tests_tavle import _Grunnlag
@@ -399,7 +399,7 @@ class DekningTests(_Program):
         from datetime import datetime, time
         from vaktliste.models import Korps, Mannskap, Vaktpost
         self.Vaktpost = Vaktpost
-        self.korps, _ = Korps.objects.get_or_create(navn='Testkorps')
+        self.korps, _ = hent_eller_lag_korps('Testkorps')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         tz = timezone.get_current_timezone()
         self.dogn = '2026-10-02'

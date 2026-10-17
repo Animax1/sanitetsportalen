@@ -465,6 +465,85 @@ class Notification(models.Model):
         return f'[{self.module_slug}] {self.title} ({status})'
 
 
+class Tilhorighet(BaseTimeStampedModel):
+    """En tilhørighet — et korps, eller «annet» som «Leger» (17. okt. 2026).
+
+    `docs/BESLUTNING_PORTALER.md` §4.3. **Én felles katalog**, ikke en liste
+    per portal: «HGSD» finnes én gang. Portalen velger hvilke tilhørigheter som
+    er med (`Vaktportal.tilhorigheter`), og det ene valget styrer to ting:
+    moderatorens brukerliste, og korpslista i vaktlista (bare `type='korps'`).
+
+    **Var `vaktliste.Korps`.** Tabellen heter fortsatt `vaktliste_korps`, av
+    samme grunn som `patients_appsetting`: i release-vinduet står gammel kode og
+    leser den, og en omdøpt tabell ville gitt 500 der. `core` eier den fordi
+    kontoene skal kunne ha en tilhørighet, og `accounts`/`core` får ikke
+    importere en modul. Vaktlista kaller den fortsatt `Korps`.
+
+    **Bare global admin oppretter og endrer** (beslutning 10): katalogen er
+    felles, og en endring i den gjelder alle portaler.
+    """
+
+    KORPS = 'korps'
+    ANNET = 'annet'
+    TYPE_VALG = [(KORPS, 'Korps'), (ANNET, 'Annet')]
+
+    navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    kortnavn = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='Kortnavn',
+        help_text='Vises i trange kolonner, f.eks. «HGSD». Valgfritt.',
+    )
+    er_aktiv = models.BooleanField(
+        default=True,
+        verbose_name='Aktiv',
+        help_text='Inaktive korps skjules i nedtrekkslister, men beholdes '
+                  'på mannskapet som allerede tilhører dem.',
+    )
+    # `db_default`: gammel kode lager korps uten feltet i release-vinduet.
+    type = models.CharField(
+        max_length=16, choices=TYPE_VALG, default=KORPS, db_default=KORPS,
+        verbose_name='Type',
+        help_text='«Korps» står i vaktlista; «Annet» — som «Leger» — bare i brukerlistene.')
+
+    class Meta:
+        db_table = 'vaktliste_korps'
+        verbose_name = 'Tilhørighet'
+        verbose_name_plural = 'Tilhørigheter'
+        ordering = [Norsk('navn')]
+
+    def __str__(self) -> str:
+        return self.navn
+
+
+class Kontotilhorighet(models.Model):
+    """At en konto hører til en tilhørighet (17. okt. 2026). En konto kan ha flere.
+
+    Domenedata, ikke tilgang — samme skille som `Mannskap.user`. Moderatoren ser
+    kontoene med portalens tilhørigheter; det gir ingen tilgang i seg selv.
+    """
+
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='tilhorigheter', verbose_name='Bruker')
+    # PROTECT, som `Mannskap.korps`: en tilhørighet noen har, forsvinner ikke under dem.
+    tilhorighet = models.ForeignKey(
+        Tilhorighet, on_delete=models.PROTECT,
+        related_name='kontoer_med', verbose_name='Tilhørighet')
+
+    class Meta:
+        verbose_name = 'Kontoens tilhørighet'
+        verbose_name_plural = 'Kontoenes tilhørigheter'
+        constraints = [
+            models.UniqueConstraint(fields=['bruker', 'tilhorighet'],
+                                    name='en_kontotilhorighet_per_par'),
+        ]
+
+    def __str__(self):
+        return f'{self.bruker_id}:{self.tilhorighet_id}'
+
+
 class Vaktportal(models.Model):
     """Én portal — et miljø som kjører sine egne vakter (`docs/BESLUTNING_PORTALER.md`).
 
@@ -495,6 +574,10 @@ class Vaktportal(models.Model):
         default=True, verbose_name='Aktiv',
         help_text='En deaktivert portal kan ikke velges, men alt i den står.')
     opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
+    #: Hvilke tilhørigheter som er med i portalen — admin velger (§4.3).
+    tilhorigheter = models.ManyToManyField(
+        Tilhorighet, blank=True, related_name='portaler',
+        verbose_name='Tilhørigheter')
 
     class Meta:
         verbose_name = 'Portal'

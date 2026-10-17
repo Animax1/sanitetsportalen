@@ -39,7 +39,7 @@ from vaktliste.models import (
     Vaktliste,
     Vaktpost,
 )
-from vaktliste.test_helpers import gruppe
+from vaktliste.test_helpers import gruppe, lag_korps
 
 TEST_BACKUP_DIR = Path('/tmp/test-backups-vaktliste')
 
@@ -60,7 +60,7 @@ class VaktlisteBackupTests(TestCase):
         self.backup_dir = _backup_dir()
         self.vakt = vakt_for_year(2026)
 
-        self.korps = Korps.objects.create(navn='Testkorps')
+        self.korps = lag_korps(navn='Testkorps')
         self.kompetanse = Kompetanse.objects.create(navn='AFØR')
         self.mannskap = Mannskap.objects.create(
             navn='Kari Nordmann', korps=self.korps,
@@ -89,12 +89,22 @@ class VaktlisteBackupTests(TestCase):
             backup = create_backup(slug='vaktliste', kind=KIND_MANUAL)
             raa = gzip.open(self.backup_dir / backup.filename, 'rb').read()
         modeller = {o['model'] for o in json.loads(raa)}
-        for ventet in ('vaktliste.korps', 'vaktliste.mannskap',
+        # **Korpsene står i portalfila** siden 17. okt. 2026: de er den felles
+        # katalogen `core.Tilhorighet`, og mannskapet peker på dem med et heltall.
+        self.assertNotIn('core.tilhorighet', modeller)
+        for ventet in ('vaktliste.mannskap',
                        'vaktliste.kompetanse', 'vaktliste.ressursgruppe',
                        'vaktliste.ressursrolle', 'vaktliste.vaktliste',
                        'vaktliste.ressurs', 'vaktliste.vaktpost'):
             with self.subTest(modell=ventet):
                 self.assertIn(ventet, modeller)
+
+    def test_korpsene_er_i_portalfila(self) -> None:
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+            raa = gzip.open(self.backup_dir / backup.filename, 'rb').read()
+        rader = [o for o in json.loads(raa) if o['model'] == 'core.tilhorighet']
+        self.assertEqual([r['fields']['navn'] for r in rader], ['Testkorps'])
 
     def test_rundtur_gir_dataene_tilbake(self) -> None:
         """Hele veien: backup, slett alt, gjenopprett, og sammenlign."""
@@ -105,7 +115,8 @@ class VaktlisteBackupTests(TestCase):
             Ressurs.objects.all().delete()
             Vaktliste.objects.all().delete()
             Mannskap.objects.all().delete()
-            Korps.objects.all().delete()
+            # Korpset står: det er katalogen, og gjenopprettes fra portalfila,
+            # som lastes før vaktlistefila (`GJENOPPRETTINGSREKKEFOLGE`).
             self.assertEqual(Mannskap.objects.count(), 0)
 
             restore_backup(backup)

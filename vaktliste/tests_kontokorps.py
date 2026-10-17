@@ -24,6 +24,7 @@ from unittest.mock import patch
 from django.core.exceptions import ValidationError
 from django.test import Client, TestCase, override_settings
 
+from vaktliste.test_helpers import lag_korps
 from accounts.models import CustomUser, ModulTilgang
 from audit.models import AuditLog
 from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler, restore_backup
@@ -51,8 +52,8 @@ def _klient(bruker):
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class _Basis(TestCase):
     def setUp(self):
-        self.hgsd = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.karmoy = Korps.objects.create(navn='Karmøy', kortnavn='KRM')
+        self.hgsd = lag_korps(navn='Haugesund', kortnavn='HGSD')
+        self.karmoy = lag_korps(navn='Karmøy', kortnavn='KRM')
         Mannskap.objects.create(navn='Hanne Haugesund', korps=self.hgsd)
         Mannskap.objects.create(navn='Kari Karmøy', korps=self.karmoy)
         self.admin = _bruker('adm', admin=True)
@@ -243,7 +244,7 @@ class BackupTests(TestCase):
             f.unlink(missing_ok=True)
         self.env = patch.dict(os.environ, {'BACKUP_DIR': str(TEST_BACKUP_DIR)})
         self.env.start()
-        self.hgsd = Korps.objects.create(navn='Haugesund')
+        self.hgsd = lag_korps(navn='Haugesund')
         Mannskap.objects.create(navn='Hanne', korps=self.hgsd)
         self.per = _bruker('per', 'les')
         Kontokorps.objects.create(user=self.per, korps=self.hgsd)

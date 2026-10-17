@@ -19,7 +19,7 @@ from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
 from vaktliste.intervaller import slaa_sammen
 from vaktliste.statistikk import bemanning_stats, lengste_hull
-from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+from vaktliste.test_helpers import LAG, gruppe, lag_korps, lag_ressurs
 from oppdrag.test_helpers import lag_oppdrag
 from accounts.test_helpers import gi_modultilgang_oppdater
 
@@ -64,7 +64,7 @@ class Basis(TestCase):
     def setUp(self):
         self.vakt = hent_aktiv_vakt()
         self.vl = Vaktliste.objects.create(vakt=self.vakt)
-        self.korps = Korps.objects.create(navn='Testkorps')
+        self.korps = lag_korps(navn='Testkorps')
         self.enhet = Enhet.objects.create(navn='Ambulanse 1', pa_vakt=True)
         self.enhet2 = Enhet.objects.create(navn='Ambulanse 2', pa_vakt=True)
         self.lokasjon = Lokasjon.objects.create(navn='Scene sør')
@@ -277,7 +277,7 @@ class GateTests(TestCase):
         vakt = hent_aktiv_vakt()
         vl = Vaktliste.objects.create(vakt=vakt)
         r = lag_ressurs(vaktliste=vl, navn='Lag 1', gruppe=gruppe(LAG))
-        korps = Korps.objects.create(navn='K')
+        korps = lag_korps(navn='K')
         m = Mannskap.objects.create(navn='Kari Nordmann Hemmelig', korps=korps)
         naa = timezone.now()
         Vaktpost.objects.create(ressurs=r, mannskap=m, fra_tid=naa - timedelta(hours=1), til_tid=naa + timedelta(hours=1))

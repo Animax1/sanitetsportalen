@@ -22,7 +22,7 @@ from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
-from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+from vaktliste.test_helpers import LAG, gruppe, hent_eller_lag_korps, lag_ressurs
 from oppdrag.test_helpers import lag_oppdrag
 from accounts.test_helpers import gi_modultilgang_oppdater
 
@@ -33,7 +33,7 @@ def _bruker(navn, **kw):
 
 
 def _skift(ressurs):
-    korps, _ = Korps.objects.get_or_create(navn='Testkorps')
+    korps, _ = hent_eller_lag_korps('Testkorps')
     person, _ = Mannskap.objects.get_or_create(navn='Mannskap ' + ressurs.navn, korps=korps)
     naa = timezone.now()
     return Vaktpost.objects.create(ressurs=ressurs, mannskap=person,

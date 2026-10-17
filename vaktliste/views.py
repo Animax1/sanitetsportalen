@@ -556,7 +556,7 @@ def vaktliste_detalj_view(request, pk):
         'overnatting': overnatting.data_for(vl, request.user),
         'korps': [
             {'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn}
-            for k in Korps.objects.filter(er_aktiv=True)
+            for k in services.korps_i_portal().filter(er_aktiv=True)
         ],
         # Samme form som `/api/roller/` gir — rollene administreres fra denne
         # sida nå, og manageren trenger `i_bruk`. Skrev vi formen på nytt her,

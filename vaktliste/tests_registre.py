@@ -19,6 +19,7 @@ from patients.js_test_utils import (
     PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node)
 from django.utils import timezone
 
+from vaktliste.test_helpers import lag_korps
 from accounts.models import CustomUser, ModulTilgang
 from accounts.test_helpers import gi_modultilgang
 
@@ -196,7 +197,7 @@ class VerdimengdeTests(TestCase):
 
 
     def test_korps_i_bruk_kan_ikke_slettes(self):
-        korps = Korps.objects.create(navn='Haugesund')
+        korps = lag_korps(navn='Haugesund')
         Mannskap.objects.create(navn='Kari', korps=korps)
         res = self.c.delete(f'/vaktliste/api/korps/{korps.pk}/')
         self.assertEqual(res.status_code, 409)
@@ -212,7 +213,7 @@ class VerdimengdeTests(TestCase):
         «ubrukt», og da trykker man slett i god tro og får en feilmelding
         framfor en advarsel.
         """
-        korps = Korps.objects.create(navn='Karmøy')
+        korps = lag_korps(navn='Karmøy')
         vl = services.opprett_planlagt_vakt('Vakta')
         lag_ressurs(vaktliste=vl, navn='Lag K', korps=korps)
 
@@ -225,7 +226,7 @@ class VerdimengdeTests(TestCase):
     def test_kompetanse_i_bruk_kan_ikke_slettes(self):
         """M2M-en ville ikke protestert — den ville stilltiende strippet
         kompetansen fra alle som har den. Derfor sjekkes den eksplisitt."""
-        korps = Korps.objects.create(navn='Haugesund')
+        korps = lag_korps(navn='Haugesund')
         komp = Kompetanse.objects.create(navn='Sykepleier')
         person = Mannskap.objects.create(navn='Kari', korps=korps)
         person.kompetanser.add(komp)
@@ -236,7 +237,7 @@ class VerdimengdeTests(TestCase):
         self.assertEqual(person.kompetanser.count(), 1)
 
     def test_rolle_i_bruk_kan_ikke_slettes(self):
-        korps = Korps.objects.create(navn='Haugesund')
+        korps = lag_korps(navn='Haugesund')
         rolle = lag_rolle('Lagleder')
         person = Mannskap.objects.create(navn='Kari', korps=korps)
         vl = services.opprett_planlagt_vakt('Vakta')
@@ -250,7 +251,7 @@ class VerdimengdeTests(TestCase):
     def test_i_bruk_tallet_staar_i_lista(self):
         """Tallet vises i grensesnittet: en verdimengde man kan slette uten å
         vite hva som henger i den, sletter man for lett."""
-        korps = Korps.objects.create(navn='Haugesund')
+        korps = lag_korps(navn='Haugesund')
         Mannskap.objects.create(navn='Kari', korps=korps)
         Mannskap.objects.create(navn='Ola', korps=korps)
         data = self.c.get('/vaktliste/api/korps/').json()['data']
@@ -474,8 +475,8 @@ class RessursgruppeApiTests(TestCase):
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class MannskapApiTests(TestCase):
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.annet = Korps.objects.create(navn='Karmøy')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
+        self.annet = lag_korps(navn='Karmøy')
         self.komp = Kompetanse.objects.create(navn='Sykepleier')
         self.c = _klient(_bruker('adm', admin=True))
 
@@ -653,7 +654,7 @@ class KompetansestigeTests(TestCase):
     """
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund')
+        self.korps = lag_korps(navn='Haugesund')
         self.gfor = Kompetanse.objects.create(navn='GFØR')
         self.vfor = Kompetanse.objects.create(navn='VFØR', bygger_paa=self.gfor)
         self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.vfor)
@@ -762,7 +763,7 @@ class SammeFormBeggeVeierTests(TestCase):
     """
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         gfor = Kompetanse.objects.create(navn='GFØR')
         Kompetanse.objects.create(navn='VFØR', bygger_paa=gfor)
         lag_rolle('Lagleder')
@@ -800,7 +801,7 @@ class KontokoblingTests(TestCase):
     e-posten — se `EpostkoblingTests`."""
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.admin = _bruker('adm', admin=True)
         self.vaktleder = _bruker('vl', 'skriv_full')
         self.vanlig = _bruker('vanlig', 'les')
@@ -858,7 +859,7 @@ class EpostkoblingTests(TestCase):
     brukere med den eposten»)."""
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         # Koblingen er leder og admin (13. sep. 2026) — `skriv_full` lagrer
         # e-posten uten å koble, se `tests_prodtest_13sep.py`.
         self.vaktleder = _bruker('vl', 'skriv_leder')
@@ -1447,7 +1448,7 @@ class RadeneFoelgerRollerangeringenTests(TestCase):
         *innenfor* rollen, som er der den fortsatt betyr noe. Også denne sto
         udekket og bare tilfeldigvis sann i SQLite."""
         person = Mannskap.objects.create(
-            navn='Kari', korps=Korps.objects.create(navn='Haugesund'))
+            navn='Kari', korps=lag_korps(navn='Haugesund'))
         self._plass('Lagsmedlem', person=person)
         self._plass('Lagsmedlem')
         rader = list(Vaktpost.objects.filter(ressurs=self.ressurs))

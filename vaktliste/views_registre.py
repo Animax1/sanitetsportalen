@@ -131,7 +131,8 @@ VERDIMENGDER = {
 
 
 def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
-                    stige=False, gruppe=False, krav='skriv_alt'):
+                    stige=False, gruppe=False, krav='skriv_alt', rader=None,
+                    etter_opprett=None):
     """Bygg (liste-view, detalj-view) for en av verdimengdene.
 
     Args:
@@ -147,12 +148,20 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             ikke dukket opp i noe nedtrekk, altså en rad man lager og aldri
             finner igjen.
         krav: hvilken terskel skriving krever. `'skriv_alt'` for
-            organisasjonsdataene (korps, kompetanser), `'lede'` for rollene:
-            en rolle er del av vaktoppsettet, og `skriv_full` bemanner det
-            oppsettet uten å bestemme det.
+            kompetansene, `'lede'` for rollene: en rolle er del av
+            vaktoppsettet, og `skriv_full` bemanner det oppsettet uten å
+            bestemme det. `'admin'` for korpsene (17. okt. 2026): de er
+            `core.Tilhorighet`, en felles katalog, og en endring gjelder alle
+            portaler (beslutning 10 i `docs/BESLUTNING_PORTALER.md`).
+        rader: hvilke rader registeret viser og slår opp i — korpsene i
+            portalen. Uten: alle.
+        etter_opprett: kalles med raden når den er laget, eller med den som
+            fantes fra før med samme navn — et korps som finnes i katalogen tas
+            inn i portalen i stedet for å avvises.
     """
-    _slipper_inn = (services.kan_lede if krav == 'lede'
-                    else services.kan_skrive_alt)
+    _slipper_inn = {'lede': services.kan_lede,
+                    'admin': er_global_admin}.get(krav, services.kan_skrive_alt)
+    _qs = rader or model.objects.all
 
     def _til_dict(rad):
         return verdi_til_dict(model, rad, ekstra_felt=ekstra_felt,
@@ -173,7 +182,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
         if request.method == 'GET':
             # Inaktive er med: de skal kunne aktiveres igjen, og en rad som
             # forsvinner helt ser ut som en sletting som ikke skjedde.
-            qs = model.objects.all()
+            qs = _qs()
             if gruppe:
                 qs = qs.select_related('gruppe')
             return JsonResponse({'status': 'ok', 'data': [
@@ -200,7 +209,13 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
                     **felter,
                 )
         except IntegrityError:
-            return json_feil(f'«{navn}» finnes allerede.')
+            fra_for = model.objects.filter(navn=navn).first() if etter_opprett else None
+            if fra_for is None or _qs().filter(pk=fra_for.pk).exists():
+                return json_feil(f'«{navn}» finnes allerede.')
+            etter_opprett(fra_for)
+            return JsonResponse({'status': 'ok', 'data': _til_dict(fra_for)}, status=200)
+        if etter_opprett:
+            etter_opprett(rad)
         return JsonResponse({'status': 'ok', 'data': _til_dict(rad)}, status=201)
 
     @modul_kreves('vaktliste', 'les', svar='json')
@@ -212,8 +227,8 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             return _nektet()
 
         try:
-            rad = (model.objects.select_related('gruppe').get(pk=pk) if gruppe
-                   else model.objects.get(pk=pk))
+            rad = (_qs().select_related('gruppe').get(pk=pk) if gruppe
+                   else _qs().get(pk=pk))
         except model.DoesNotExist:
             return json_feil(f'{etikett} ikke funnet', status=404)
 
@@ -279,8 +294,14 @@ def _antall_bruk(model, rad):
     return rad.vaktposter.count()          # Ressursrolle
 
 
+def _ta_inn_i_portalen(korps):
+    from core.portal import gjeldende_portal
+    gjeldende_portal().tilhorigheter.add(korps)
+
+
 korps_view, korps_detalj_view = _register_views(
-    Korps, 'Korpset', 'Korpset', ekstra_felt=('kortnavn',))
+    Korps, 'Korpset', 'Korpset', ekstra_felt=('kortnavn',), krav='admin',
+    rader=lambda: services.korps_i_portal(), etter_opprett=_ta_inn_i_portalen)
 kompetanser_view, kompetanse_detalj_view = _register_views(
     Kompetanse, 'Kompetansen', 'Kompetansen', stige=True)
 roller_view, rolle_detalj_view = _register_views(
@@ -469,7 +490,8 @@ def mannskap_view(request):
                          for m in folk],
             **{
                 nokkel: [verdi_til_dict(modell, r, **kw)
-                         for r in modell.objects.all()]
+                         for r in (services.korps_i_portal() if modell is Korps
+                                   else modell.objects.all())]
                 for nokkel, (modell, kw) in VERDIMENGDER.items()
             },
             # Kontolista er bare med for den som kan bruke den: kontokobling
@@ -484,7 +506,7 @@ def mannskap_view(request):
     if not navn:
         return json_feil('Personen må ha et navn.')
 
-    korps = Korps.objects.filter(pk=_int(data.get('korps_id'))).first()
+    korps = services.korps_i_portal().filter(pk=_int(data.get('korps_id'))).first()
     if korps is None:
         # Uten korps finnes ingen badge, og personen kan verken sorteres i
         # lista eller redigeres av en korps-bruker.
@@ -584,7 +606,7 @@ def mannskap_detalj_view(request, pk):
             return json_feil('Personen må ha et navn.')
         person.navn = navn
     if 'korps_id' in data:
-        korps = Korps.objects.filter(pk=_int(data['korps_id'])).first()
+        korps = services.korps_i_portal().filter(pk=_int(data['korps_id'])).first()
         if korps is None:
             return json_feil('Velg hvilket korps personen hører til.')
         if not services.kan_flytte_mannskap(request.user, person, korps.pk):

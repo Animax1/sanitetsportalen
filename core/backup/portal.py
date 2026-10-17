@@ -51,8 +51,15 @@ class PortalBackupHandler(BaseBackupHandler):
     #: portalen må stå der før vakta lastes. Rekkefølgen innad utledes av
     #: `utled_restore_models` — det er ingen sykel, fordi portalen ikke peker
     #: tilbake på vakta (beslutning 19 i `docs/BESLUTNING_PORTALER.md`).
-    apps = ['core.Vaktportal', 'core.Vakt', 'core.ModuleSettings', 'core.AppSetting',
-            'core.VaktStatistikk']
+    #:
+    #: `Tilhorighet` kom 17. okt. 2026 — det var vaktlistas korps, og lå i
+    #: vaktlistefila. Mannskapet peker på det med et heltall, så det må stå
+    #: før vaktlista lastes, og portalens utvalg (`Vaktportal.tilhorigheter`)
+    #: følger med portalen. `Kontotilhorighet` er **ikke** med, av samme grunn
+    #: som `Notification`: en påkrevd peker til en konto, som ikke kan strippes.
+    #: Den står i den hele fila.
+    apps = ['core.Tilhorighet', 'core.Vaktportal', 'core.Vakt', 'core.ModuleSettings',
+            'core.AppSetting', 'core.VaktStatistikk']
     exclude = []
 
     #: `ModuleSettings.updated_by` er sporet av hvem som slo modulen av eller

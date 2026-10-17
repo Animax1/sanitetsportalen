@@ -67,7 +67,8 @@ nivåene *betyr* i vaktlista, og de to halvdelene som må sjekkes samlet.
   plass noen andre har satt opp» under). `skriv_full` setter opp og deler
   *ut*: skift og tider, ressurser, reservasjoner, nye vakter og verdimengdene — kunne
   korps-brukeren opprette et korps eller omreservere KO, ville badgen sluttet å avgrense
-  noe. Sletting av en vaktliste er global admin.
+  noe. Korpsene: global admin (`core.Tilhorighet`), lista `korps_i_portal()`. Sletting
+  av en vaktliste er global admin.
 - **`Mannskap.korps_id` og `Mannskap.user_id` er unntatt badgen.** Flytting sjekkes mot
   *begge* korps, og kontokobling **for hånd er global admin** (12. sep. 2026) fordi den
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle

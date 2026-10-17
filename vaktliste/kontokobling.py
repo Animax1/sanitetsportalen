@@ -40,7 +40,10 @@ class KontokorpsForm(forms.Form):
         filter_ = Q(er_aktiv=True)
         if self.naa is not None:
             filter_ |= Q(pk=self.naa.korps_id)
-        self.fields['korps'].queryset = Korps.objects.filter(filter_)
+        # Korpsene i portalen (17. okt. 2026) — et korps fra en annen portal
+        # kan ikke føres herfra.
+        from .services import korps_i_portal
+        self.fields['korps'].queryset = korps_i_portal().filter(filter_)
         if not args and 'data' not in kwargs:
             self.fields['korps'].initial = self.naa.korps_id if self.naa else None
         self.mannskapsrad = (Mannskap.objects.filter(user=user)

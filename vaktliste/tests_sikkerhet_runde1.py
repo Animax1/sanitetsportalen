@@ -6,6 +6,7 @@ import json
 
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
+from vaktliste.test_helpers import lag_korps
 from accounts.models import CustomUser
 from patients.js_test_utils import JS_DIR, build_harness, node_available, run_node
 from vaktliste.models import Korps, Mannskap
@@ -22,7 +23,7 @@ class AutokoblingKreverUtdelerTests(TestCase):
     samme kveld (`tests_prodtest_13sep.py`)."""
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.kari = CustomUser.objects.create_user(
             username='kari', password='x', email='kari@example.org', must_change_password=False)
         self.korpsbruker = _bruker('kb_s', 'skriv_handling')
@@ -62,7 +63,7 @@ class PlantetEpostKoblesIkkeTests(TestCase):
     ble den kontoen koblet til korpset i stillhet — og arvet badgen."""
 
     def setUp(self):
-        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.kari = CustomUser.objects.create_user(
             username='kari_pl', password='x', email='kari.pl@example.org',
             must_change_password=False)

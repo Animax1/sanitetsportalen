@@ -50,12 +50,14 @@ class TabellenInneholderFlyttingeneTests(SimpleTestCase):
     venstresida fortsatt finnes, betyr at flyttingen ikke er gjennomført.
     """
 
-    def test_de_to_flyttede_modellene_star_der(self) -> None:
-        """14. sep. 2026, fase 2. Fjernes en av dem, blir eldre offsite-filer
-        uleselige i stillhet — og de lever 730 dager."""
+    def test_de_flyttede_modellene_star_der(self) -> None:
+        """14. sep. 2026, fase 2 — og korpset, som ble `core.Tilhorighet`
+        17. okt. 2026. Fjernes en av dem, blir eldre offsite-filer uleselige i
+        stillhet — og de lever 730 dager."""
         self.assertEqual(GAMLE_MODELLNAVN, {
             'patients.appsetting': 'core.appsetting',
             'patients.backup': 'core.backup',
+            'vaktliste.korps': 'core.tilhorighet',
         })
 
     def test_hoyresida_peker_pa_modeller_som_finnes(self) -> None:
