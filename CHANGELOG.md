@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4c: KOs ansvarsområder, artister og kjennetegn per portal, ansvarsmerket per portal, og parklenken som bærer portalen inn på /lag/r/  `#core/tilgang` `#ko/planleggeren` `#park/modulen`
+
+Tredje del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.12, §4.13). **Med én portal: ingen synlig
+endring.**
+
+**`ko.Ansvarsomraade`, `ko.Konserttype` («Artist») og `ko.Kjennetegn` er `PortalEid`**, med navnet
+unikt per portal — satt opp per arrangement, så Brann og Standard kan ha hver sin «Samband».
+**`ko.Ansvarsmerke` er unikt per (portal, konto)** (beslutning 24): samme person kan ha samband i
+Brann og ressurser i Standard. Notatet sa «henger på `Portaltilgang`»; det ble `PortalEid` i stedet,
+fordi global admin ikke har noe medlemskap og likevel skal kunne sette merket. Notatet er rettet.
+
+**Kallstedene:** valget av ansvarsområde, merket (lest, satt, i «Hvem har KO oppe» og i «i bruk»
+før sletting), artistene og kjennetegnene i programmet. **`skriv_linje` tar merket fra vaktas
+portal**, ikke konteksten — §4.13s «Data»-rad: portalen reiser med raden. Valglistene under
+KO-innstillinger går gjennom `Verdiliste.qs()` fra 4b.
+
+**Parklenken bærer portalen** (§4.13, «Lenke»). `/lag/r/` har ingen innlogging og dermed ingen
+portal; `park_lenke_kreves` legger lenkens portal i konteksten før viewet kjører, og
+`aapen_lenke()` spør etter åpen vakt **i lenkens portal**. Lenkelista, fjerning og «slett etter»
+på `/lag/` er portalens.
+
+**Funnet underveis, to hull:**
+- «Skjul sted for lagene» (`park.views.sted_skjul_view`) slo opp lokasjonen uten portal — 4b
+  gikk glipp av det.
+- Sletting av en registrering slo den opp på ID alene; nå går den gjennom vaktas portal.
+
+Migrasjonene `ko/0025`–`0026` og `park/0005`–`0006`, begge med prøve (elleve prøver, alle
+grønne; en mutant som snudde `portal__isnull` i `ko/0026` ble fanget). `VENTER` i
+`core/tests_portalisolasjon.py` har én modell igjen: `core.Notification` (4d).
+
+**Tester: 14 i `KoOgParkTests`**, hver avvisning med en motprøve. **Mutasjoner: 17 + 1 på
+prøven.** To overlevde første runde:
+- «I bruk»-testen fikk 403 fordi Kari ikke er admin, så den målte ingenting. Den går nå som admin
+  og krever 200.
+- «Slett etter» manglet test.
+
 ## 2026-10-17 — Én vaktliste i drift per portal: «jeg kan ikke forflytte lag i tavlen», og portalvakten som skjulte grunnen  `#vaktliste/tilgang` `#core/tilgang`
 
 André: «Jeg kan ikke forflytte lag i tavlen på mobil eller pc.» Og så selv: «i /vaktliste så var det

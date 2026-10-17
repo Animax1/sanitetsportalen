@@ -103,7 +103,7 @@ def tilstede():
     slipper_inn = admin_ider | med_rad
     # Ansvarsmerkene i én spørring (§5.1): «Kari · samband». Vises, styrer
     # ingenting — og lista polles, så ikke ett oppslag per rad.
-    ansvar = dict(Ansvarsmerke.objects
+    ansvar = dict(Ansvarsmerke.objects.i_portal()
                   .filter(bruker_id__in=slipper_inn)
                   .values_list('bruker_id', 'omraade'))
 

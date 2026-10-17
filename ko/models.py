@@ -25,6 +25,7 @@ from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.models import PortalEid
 from core.sortering import Norsk
 
 
@@ -642,7 +643,7 @@ class HendelseLest(models.Model):
         return f'{self.bruker_id} har sett H{self.hendelse.hendelsesnummer} til {self.til_linje}'
 
 
-class Ansvarsomraade(models.Model):
+class Ansvarsomraade(PortalEid):
     """Ansvarsområdene operatørene kan velge mellom — «samband», «ressurser»…
 
     Var en fast tuppel i kode (`ANSVARSOMRAADER`) til 18. sep. 2026, da André
@@ -652,7 +653,7 @@ class Ansvarsomraade(models.Model):
     et område som omdøpes eller deaktiveres skal ikke skrive om loggen.
     """
 
-    navn = models.CharField(max_length=40, unique=True, verbose_name='Ansvarsområde')
+    navn = models.CharField(max_length=40, verbose_name='Ansvarsområde')
     er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
     rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
 
@@ -660,12 +661,16 @@ class Ansvarsomraade(models.Model):
         verbose_name = 'Ansvarsområde'
         verbose_name_plural = 'Ansvarsområder'
         ordering = ['rekkefolge', Norsk('navn')]
+        # Per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12): satt opp
+        # per arrangement, så Brann og Standard kan ha hver sin «Samband».
+        constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
+                                               name='ko_ansvarsomraade_navn_per_portal')]
 
     def __str__(self):
         return self.navn
 
 
-class Ansvarsmerke(models.Model):
+class Ansvarsmerke(PortalEid):
     """Hva operatøren gjør nå — samband, ressurser, logg, media (§5.1).
 
     **Vises, styrer ingenting** (André, 18. sep. 2026: «bare et merke som gjør
@@ -683,7 +688,9 @@ class Ansvarsmerke(models.Model):
     gjenoppretting er «nå» et annet.
     """
 
-    bruker = models.OneToOneField(
+    #: Én per (portal, konto) fra 17. okt. 2026 (beslutning 24): samme person
+    #: kan ha samband i Brann og ressurser i Standard.
+    bruker = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
         related_name='ko_ansvar', verbose_name='Bruker')
     omraade = models.CharField(max_length=40, blank=True, default='',
@@ -693,6 +700,8 @@ class Ansvarsmerke(models.Model):
     class Meta:
         verbose_name = 'Ansvarsmerke'
         verbose_name_plural = 'Ansvarsmerker'
+        constraints = [models.UniqueConstraint(fields=['portal', 'bruker'],
+                                               name='ko_ansvarsmerke_per_portal')]
 
     def __str__(self):
         return f'{self.bruker_id}: {self.omraade or "—"}'
@@ -860,7 +869,7 @@ BEREDSKAP_VALG: tuple[tuple[str, str], ...] = (
 BEREDSKAP_NAVN: dict[str, str] = dict(BEREDSKAP_VALG)
 
 
-class Konserttype(models.Model):
+class Konserttype(PortalEid):
     """**Artisten** (André, 23. sep. 2026: «Endre navnet konserttyper til
     Artist. For det er slik vi kommer til å gjøre det»). Lista er KO-lederens,
     som ansvarsområdene, og ikke per vakt — samme artist kan komme igjen neste
@@ -870,7 +879,7 @@ class Konserttype(models.Model):
     en oversettelse i `core.backup.GAMLE_MODELLNAVN` for hver backupfil som
     alt er tatt, for et navn bare koden ser."""
 
-    navn = models.CharField(max_length=60, unique=True, verbose_name='Artist')
+    navn = models.CharField(max_length=60, verbose_name='Artist')
     er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
     rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
 
@@ -878,17 +887,21 @@ class Konserttype(models.Model):
         verbose_name = 'Artist'
         verbose_name_plural = 'Artister'
         ordering = ['rekkefolge', Norsk('navn')]
+        # Per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12): satt opp
+        # per arrangement, så Brann og Standard kan ha hver sin «Samband».
+        constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
+                                               name='ko_konserttype_navn_per_portal')]
 
     def __str__(self):
         return self.navn
 
 
-class Kjennetegn(models.Model):
+class Kjennetegn(PortalEid):
     """Avkrysninger på en konsert — «Pyro» først. **En liste KO-leder setter
     opp, ikke faste felt i koden**: svaret fra samarbeidspartneren om hva en
     konsert skal bære, kan da legges inn den dagen det kommer."""
 
-    navn = models.CharField(max_length=60, unique=True, verbose_name='Kjennetegn')
+    navn = models.CharField(max_length=60, verbose_name='Kjennetegn')
     er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
     rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
 
@@ -896,6 +909,10 @@ class Kjennetegn(models.Model):
         verbose_name = 'Kjennetegn'
         verbose_name_plural = 'Kjennetegn'
         ordering = ['rekkefolge', Norsk('navn')]
+        # Per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12): satt opp
+        # per arrangement, så Brann og Standard kan ha hver sin «Samband».
+        constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
+                                               name='ko_kjennetegn_navn_per_portal')]
 
     def __str__(self):
         return self.navn

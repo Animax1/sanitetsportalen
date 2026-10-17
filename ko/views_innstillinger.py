@@ -32,7 +32,7 @@ VERDILISTER = {
     # I bruk = kontoer som bærer merket nå. Linjene teller ikke: de er tekst,
     # og et område som slettes skal ikke skrive om loggen.
     'ansvarsomraader': Verdiliste(
-        Ansvarsomraade, i_bruk=lambda r: Ansvarsmerke.objects.filter(omraade=r.navn).count()),
+        Ansvarsomraade, i_bruk=lambda r: Ansvarsmerke.objects.i_portal().filter(omraade=r.navn).count()),
     # Programmet (tavleplanleggeren, steg 2). I bruk = konserter som peker
     # dit, i alle vakter: en type fjorårets program står med, slettes ikke.
     'konserttyper': Verdiliste(Konserttype, i_bruk=lambda r: r.poster.count()),

@@ -298,7 +298,8 @@ eller en person, er per portal; det som beskriver faget, er globalt** (beslutnin
 
 **En én-til-én fra en global konto til portaldata blir unik per (portal, konto)**
 (beslutning 24). Dagens fem treff: `Mannskap.user`, `Kontokorps.user`,
-`ko.Ansvarsmerke.bruker` (henger på `Portaltilgang`), `Forstehjelper.user` og
+`ko.Ansvarsmerke.bruker` (`PortalEid`, ikke en peker til `Portaltilgang`: global admin har
+ingen og skal kunne ha samband — 4c, 17. okt.), `Forstehjelper.user` og
 `Helsepersonell.user` — og «mine pasienter»-filteret følger med. Regelen står her for at
 den sjette skal finnes ved å lese, ikke ved en tilfeldighet.
 

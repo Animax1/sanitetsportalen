@@ -239,7 +239,7 @@ standard**) er på. Sperren står i `skriv_linje`, ikke bare i skjemaet. Brytere
 Retting arver merket. **Hendelseslinjene vises tydelig**: `koLinjeMerke()` gir
 `hendelse` for `hendelse_*`-kodene, foran `system`; linja er uthevet med den som opprettet.
 
-**Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto
+**Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto og portal
 (samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les` —
 den som bare leser kan likevel ha samband. Lista er `ko.Ansvarsomraade` (redigeres under
 KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen.

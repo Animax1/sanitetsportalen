@@ -75,7 +75,8 @@ ANSVARSOMRAADER_STANDARD: tuple[str, ...] = ('samband', 'ressurser', 'logg', 'me
 
 def ansvarsomraader_aktive() -> list[str]:
     """Navnene operatøren kan velge mellom, i rekkefølge."""
-    return list(Ansvarsomraade.objects.filter(er_aktiv=True).values_list('navn', flat=True))
+    return list(Ansvarsomraade.objects.i_portal().filter(er_aktiv=True)
+                .values_list('navn', flat=True))
 
 #: Grensene for hva fristen kan settes til. `0` er ikke lov: en logg som
 #: slettes samme døgn er ikke en logg, og «skru av oppbevaring» er ikke en
@@ -136,11 +137,12 @@ def chat_tillatt() -> bool:
     return str(raa).strip().lower() in ('1', 'true', 'ja', 'on')
 
 
-def ansvar_for(bruker) -> str:
-    """Operatørens ansvarsmerke, eller tom streng."""
+def ansvar_for(bruker, portal=None) -> str:
+    """Operatørens ansvarsmerke **i portalen**, eller tom streng. `portal` når
+    kalleren har den fra dataene (`skriv_linje` har vakta), ellers konteksten."""
     if bruker is None or not getattr(bruker, 'is_authenticated', False):
         return ''
-    merke = Ansvarsmerke.objects.filter(bruker=bruker).first()
+    merke = Ansvarsmerke.objects.i_portal(portal).filter(bruker=bruker).first()
     return merke.omraade if merke else ''
 
 
@@ -156,7 +158,7 @@ def sett_ansvar(bruker, omraade) -> str:
         if not treff:
             raise Ugyldig('Ukjent ansvarsområde.')
         omraade = treff[0]
-    Ansvarsmerke.objects.update_or_create(bruker=bruker, defaults={'omraade': omraade})
+    Ansvarsmerke.objects.i_portal().update_or_create(bruker=bruker, defaults={'omraade': omraade})
     return omraade
 
 
@@ -244,7 +246,7 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
     if hendelse is not None and hendelse.vakt_id != vakt.pk:
         raise Ugyldig('Hendelsen hører til en annen vakt.')
     if ansvarsomraade is None:
-        ansvarsomraade = ansvar_for(bruker)
+        ansvarsomraade = ansvar_for(bruker, vakt.portal)
     linje = Logglinje(
         vakt=vakt,
         kilde=KILDE_OPERATOR,

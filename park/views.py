@@ -29,6 +29,7 @@ from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves, niv
 from core.jsonkropp import json_body, json_feil
 from core.klientip import klient_ip
 from core.ratelimit import rate_limit
+from core.portal import gjeldende_portal
 from core.vakt import hent_aktiv_vakt
 from core.verdilister import Verdiliste, lag_views
 
@@ -94,7 +95,7 @@ def lenker_view(request):
     naa = timezone.now()
     if request.method == 'GET':
         return JsonResponse({'status': 'ok', 'data': [
-            _lenke_til_dict(lenke, naa) for lenke in Parklenke.objects.all()[:100]]})
+            _lenke_til_dict(lenke, naa) for lenke in Parklenke.objects.i_portal()[:100]]})
     data = json_body(request)
     fra, til = _tidspunkt(data.get('aapen_fra')), _tidspunkt(data.get('aapen_til'))
     if fra is None or til is None:
@@ -115,7 +116,7 @@ def lenker_view(request):
 def lenke_fjern_view(request, pk):
     """Lenken slutter å virke med en gang. Krever `confirm`: tiltakskortet
     peker fortsatt på den, og lagene får en død lenke til det er oppdatert."""
-    lenke = get_object_or_404(Parklenke, pk=pk)
+    lenke = get_object_or_404(Parklenke.objects.i_portal(), pk=pk)
     if not json_body(request).get('confirm'):
         return json_feil('Bekreftelse mangler.')
     services.fjern_lenke(lenke, bruker=request.user, ip=klient_ip(request))
@@ -132,7 +133,7 @@ def lenke_slett_etter_view(request, pk):
     som rydder skal se hvor mye som går før det går. En dør hun må åpne
     bevisst, ikke en vegg (`FORSLAG_KO.md` §4.6).
     """
-    lenke = get_object_or_404(Parklenke, pk=pk)
+    lenke = get_object_or_404(Parklenke.objects.i_portal(), pk=pk)
     data = json_body(request)
     etter = _tidspunkt(data.get('etter'))
     if etter is None:
@@ -169,7 +170,7 @@ def sted_skjul_view(request, pk):
     skal vise stedet, ikke ta det bort fra lagene."""
     from oppdrag.models import Lokasjon
 
-    lokasjon = get_object_or_404(Lokasjon, pk=pk, er_aktiv=True)
+    lokasjon = get_object_or_404(Lokasjon.objects.i_portal(), pk=pk, er_aktiv=True)
     skjult = json_body(request).get('skjult') is True
     services.sett_skjult(lokasjon, skjult, bruker=request.user, ip=klient_ip(request))
     return JsonResponse({'status': 'ok', 'data': {'id': lokasjon.pk, 'navn': lokasjon.navn,
@@ -204,7 +205,8 @@ def registreringer_view(request):
 @require_http_methods(['POST'])
 @rate_limit(group='park:registrering-slett', rate='60/m', method='POST')
 def registrering_slett_view(request, pk):
-    rad = get_object_or_404(Registrering, pk=pk)
+    # Vaktbundet, så portalen går gjennom vakta: en ID fra en annen portal er 404.
+    rad = get_object_or_404(Registrering, pk=pk, vakt__portal=gjeldende_portal())
     try:
         services.slett_registrering(rad, bruker=request.user, grunn=json_body(request).get('grunn'),
                                     ip=klient_ip(request))

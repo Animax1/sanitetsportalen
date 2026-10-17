@@ -115,14 +115,18 @@ def aapen_lenke(token, naa=None) -> Parklenke | None:
         return None
     if 'park' not in ModuleSettings.get_enabled_slugs():
         return None
-    if aapen_vakt() is None:
+    if aapen_vakt(lenke.portal) is None:
         return None
     return lenke
 
 
-def aapen_vakt():
-    """Vakta registreringene havner på, eller ``None`` når den er avsluttet."""
-    vakt = hent_aktiv_vakt()
+def aapen_vakt(portal=None):
+    """Vakta registreringene havner på, eller ``None`` når den er avsluttet.
+
+    **I lenkens portal** (17. okt. 2026): under `/lag/r/` finnes ingen innlogging
+    og dermed ingen portal i konteksten før `park_lenke_kreves` har lagt lenkens
+    der. `aapen_lenke` kaller før det, og oppgir den derfor selv."""
+    vakt = hent_aktiv_vakt(portal)
     return None if vakt.avsluttet is not None else vakt
 
 

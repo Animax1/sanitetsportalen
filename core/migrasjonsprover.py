@@ -498,6 +498,45 @@ def _sjekk_lokasjon_portal(c):
     assert alle >= 2 and alle == i_standard, f'{i_standard} av {alle} i Standard'
 
 
+# ── ko.0026 og park.0006 (KOs lister, ansvarsmerket og parklenkene i «Standard») ─
+
+def _seed_ko_portal(c):
+    for tabell in ('ko_konserttype', 'ko_kjennetegn'):
+        c.execute(f"""INSERT INTO {tabell} (navn, er_aktiv, rekkefolge)
+                      VALUES ('Fra før', true, 10)""")
+    konto = _ny_konto(c, 'kari')
+    c.execute("""INSERT INTO ko_ansvarsmerke (bruker_id, omraade, satt_at)
+                 VALUES (%s, 'samband', now())""", [konto])
+
+
+def _sjekk_ko_portal(c):
+    c.execute("SELECT id FROM core_vaktportal WHERE slug = 'standard'")
+    standard = c.fetchone()[0]
+    # `ko_ansvarsomraade` har de fire `ko/0007` seedet, de andre radene over.
+    for tabell in ('ko_ansvarsomraade', 'ko_konserttype', 'ko_kjennetegn', 'ko_ansvarsmerke'):
+        c.execute(f"SELECT count(*), count(*) FILTER (WHERE portal_id = %s) FROM {tabell}",
+                  [standard])
+        alle, i_standard = c.fetchone()
+        assert alle and alle == i_standard, f'{tabell}: {i_standard} av {alle} i Standard'
+
+
+def _seed_parklenke_portal(c):
+    c.execute("""INSERT INTO park_parklenke
+                 (navn, hemmelighet_hash, aapen_fra, aapen_til, opprettet_at,
+                  opprettet_av_navn, fjernet_av_navn)
+                 VALUES ('Tiltakskort', repeat('a', 64), now(), now() + interval '1 day',
+                         now(), '', '')""")
+
+
+def _sjekk_parklenke_portal(c):
+    c.execute("SELECT id FROM core_vaktportal WHERE slug = 'standard'")
+    standard = c.fetchone()[0]
+    c.execute("SELECT count(*), count(*) FILTER (WHERE portal_id = %s) FROM park_parklenke",
+              [standard])
+    alle, i_standard = c.fetchone()
+    assert alle == 1 and i_standard == 1, f'{i_standard} av {alle} i Standard'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -556,6 +595,20 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Lokasjonene går til «Standard»',
             seed=_seed_lokasjon_portal,
             sjekk=_sjekk_lokasjon_portal,
+        ),
+        Migrasjonsprove(
+            migrasjon='ko.0026_ko_listene_i_standard',
+            foregaaende='0025_ko_listene_per_portal',
+            beskrivelse='KOs lister og ansvarsmerkene går til «Standard»',
+            seed=_seed_ko_portal,
+            sjekk=_sjekk_ko_portal,
+        ),
+        Migrasjonsprove(
+            migrasjon='park.0006_parklenker_i_standard',
+            foregaaende='0005_parklenke_portal',
+            beskrivelse='Parklenkene går til «Standard»',
+            seed=_seed_parklenke_portal,
+            sjekk=_sjekk_parklenke_portal,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

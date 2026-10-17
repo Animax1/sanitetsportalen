@@ -112,7 +112,7 @@ def _kjennetegn(raa) -> list:
     if not isinstance(raa, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in raa):
         raise Ugyldig('Kjennetegnene må være en liste med tall.')
     ider = set(raa)
-    rader = list(Kjennetegn.objects.filter(pk__in=ider))
+    rader = list(Kjennetegn.objects.i_portal().filter(pk__in=ider))
     if len(rader) != len(ider):
         raise Ugyldig('Ukjent kjennetegn — hent listen på nytt.')
     return rader
@@ -208,7 +208,7 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None, naa=None) -> Pr
     type_id = _heltall(data.get('konserttype_id'), 'Konserttype', tomt_er_none=True)
     konserttype = None
     if type_id is not None:
-        konserttype = Konserttype.objects.filter(pk=type_id).first()
+        konserttype = Konserttype.objects.i_portal().filter(pk=type_id).first()
         if konserttype is None:
             raise Ugyldig('Ukjent konserttype.')
         if not konserttype.er_aktiv and (post is None or post.konserttype_id != konserttype.pk):
@@ -317,9 +317,9 @@ def program_data(vakt) -> dict:
         'steder': [{'id': l.pk, 'navn': l.navn}
                    for l in Lokasjon.objects.i_portal().filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'konserttyper': [{'id': t.pk, 'navn': t.navn, 'er_aktiv': t.er_aktiv}
-                         for t in Konserttype.objects.all()],
+                         for t in Konserttype.objects.i_portal()],
         'kjennetegn': [{'id': k.pk, 'navn': k.navn, 'er_aktiv': k.er_aktiv}
-                       for k in Kjennetegn.objects.all()],
+                       for k in Kjennetegn.objects.i_portal()],
         'grupper': [{'id': g.pk, 'navn': g.navn}
                     for g in Ressursgruppe.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'beredskap': [{'verdi': v, 'navn': n} for v, n in BEREDSKAP_NAVN.items()],

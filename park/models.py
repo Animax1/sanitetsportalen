@@ -16,6 +16,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
+from core.models import PortalEid
 from core.sortering import Norsk
 
 
@@ -60,12 +61,14 @@ class Utfall(_Verdi):
         verbose_name_plural = 'Utfall'
 
 
-class Parklenke(models.Model):
+class Parklenke(PortalEid):
     """Lenken i tiltakskortet (B3). Tokenet lagres ikke — bare hashen (§4.1).
 
     **Ikke bundet til en vakt** (B18): tiltakskortet kan stå fra vakt til vakt,
     og oppetiden er grensen. Registreringen havner på vakta som er aktiv når den
-    sendes.
+    sendes — **i lenkens portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+    §4.13). Siden under `/lag/r/` har ingen innlogging og dermed ingen portal;
+    lenken er det eneste som kan bære den.
 
     **Fjerning er en markering, ikke sletting.** Registreringene beholder sin
     peker, og lista viser at lenken fantes — det er slik man finner ut hva en

@@ -36,6 +36,7 @@ from core import kartkobling
 from core.jsonkropp import json_body, json_feil, les_json
 from core.klientip import ratelimit_nokkel
 from core.middleware import PERMISSIONS_POLICY_MED_POSISJON
+from core.portal import aktiver_portal
 from core.ratelimit import er_rate_limited
 
 from . import services
@@ -101,14 +102,17 @@ def park_lenke_kreves(view):
             return json_feil('Siden mangler en nøkkel. Last den på nytt.', status=400)
         request.park_lenke = lenke
         request.park_telefon = telefon
-        if er_rate_limited(request, group='park:telefon', key=_telefon_nokkel,
-                           rate=GRENSE_TELEFON, method=ALL):
-            return json_feil('For mange forespørsler fra denne telefonen. Vent litt.',
-                             status=429)
-        if er_rate_limited(request, group='park:lenke', key=_lenke_nokkel,
-                           rate=GRENSE_LENKE, method=ALL):
-            return json_feil('Siden er overbelastet. Vent litt og prøv igjen.', status=429)
-        return view(request, *args, **kwargs)
+        # **Portalen er lenkens** (§4.13): siden har ingen innlogging, og alt
+        # under — vakta, stedene, lagene — slås opp i den.
+        with aktiver_portal(lenke.portal):
+            if er_rate_limited(request, group='park:telefon', key=_telefon_nokkel,
+                               rate=GRENSE_TELEFON, method=ALL):
+                return json_feil('For mange forespørsler fra denne telefonen. Vent litt.',
+                                 status=429)
+            if er_rate_limited(request, group='park:lenke', key=_lenke_nokkel,
+                               rate=GRENSE_LENKE, method=ALL):
+                return json_feil('Siden er overbelastet. Vent litt og prøv igjen.', status=429)
+            return view(request, *args, **kwargs)
 
     innpakket._park_lenke_kreves = True
     return innpakket

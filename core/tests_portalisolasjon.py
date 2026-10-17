@@ -58,11 +58,6 @@ GLOBALE = {
 
 #: Får portal i resten av fase 4. **Skal bare krympe.**
 VENTER = {
-    'ko.Ansvarsomraade': '4c — satt opp per arrangement',
-    'ko.Ansvarsmerke': '4c — henger på medlemskapet (beslutning 24)',
-    'ko.Konserttype': '4c — artistene er per arrangement',
-    'ko.Kjennetegn': '4c — satt opp per arrangement',
-    'park.Parklenke': '4c — lenken må bære portalen (§4.13)',
     'core.Notification': '4d — varslene får portal (§4.14)',
 }
 
@@ -623,3 +618,247 @@ class HjelperneOgStedeneTests(TestCase):
             self.assertEqual([s.navn for s in services.steder()], ['Scene B'])
             self.assertEqual([s['navn'] for s in services.alle_steder_med_synlighet()],
                              ['Scene B'])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KoOgParkTests(TestCase):
+    """Fase 4c: KOs lister og ansvarsmerket per portal, og parklenken som bærer
+    portalen inn på en side uten innlogging (§4.12, §4.13)."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        from django.db import transaction
+        from django.utils import timezone
+
+        from accounts.models import CustomUser
+        from accounts.test_helpers import gi_modultilgang
+        from core.models import ModuleSettings, Vaktportal
+        from core.portal import aktiver_portal, eneste_portal
+        from core.vakt import gjor_aktiv, opprett_vakt
+        from ko.models import Ansvarsomraade, Kjennetegn, Konserttype
+        from oppdrag.models import Lokasjon
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+        ModuleSettings.objects.update_or_create(slug='park', defaults={'enabled': True})
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        with aktiver_portal(self.standard):
+            self.samband_s = Ansvarsomraade.objects.create(navn='Samband S')
+            self.artist_s = Konserttype.objects.create(navn='Artist S')
+            self.pyro_s = Kjennetegn.objects.create(navn='Pyro S')
+            self.sted_s = Lokasjon.objects.create(navn='Scene S')
+        with aktiver_portal(self.brann):
+            self.samband_b = Ansvarsomraade.objects.create(navn='Samband B')
+            self.artist_b = Konserttype.objects.create(navn='Artist B')
+            self.pyro_b = Kjennetegn.objects.create(navn='Pyro B')
+            self.sted_b = Lokasjon.objects.create(navn='Scene B')
+            self.vakt = opprett_vakt('Brannvakt', year=2026, startet=timezone.now())
+        with transaction.atomic():
+            gjor_aktiv(self.vakt)
+        self.kari = CustomUser.objects.create_user(username='kari', password='x',
+                                                   must_change_password=False)
+        gi_modultilgang(bruker=self.kari, modul_slug='ko', nivaa='skriv_leder', portal=self.brann)
+        self.c = Client()
+        self.c.force_login(self.kari)
+
+    # ── KO ──
+
+    def test_listene_er_portalens(self):
+        for sti, navn in (('ansvarsomraader', 'Samband B'), ('konserttyper', 'Artist B'),
+                          ('kjennetegn', 'Pyro B')):
+            with self.subTest(sti=sti):
+                data = self.c.get(f'/ko/api/{sti}/').json()['data']
+                self.assertEqual([r['navn'] for r in data], [navn])
+
+    def test_ansvarsomraadene_operatoren_velger_mellom(self):
+        from core.portal import aktiver_portal
+        from ko import services
+        with aktiver_portal(self.brann):
+            self.assertEqual(services.ansvarsomraader_aktive(), ['Samband B'])
+
+    def test_ansvar_fra_en_annen_portal_avvises(self):
+        svar = self.c.post('/ko/api/ansvar/', content_type='application/json',
+                           data={'omraade': 'Samband S'})
+        self.assertEqual(svar.status_code, 400)
+        svar = self.c.post('/ko/api/ansvar/', content_type='application/json',
+                           data={'omraade': 'Samband B'})
+        self.assertEqual(svar.status_code, 200, svar.content)
+
+    def test_ansvarsmerket_er_per_portal(self):
+        """Samme person kan ha samband i Brann og ressurser i Standard."""
+        from core.portal import aktiver_portal
+        from ko import services
+        from ko.models import Ansvarsmerke
+        with aktiver_portal(self.standard):
+            services.sett_ansvar(self.kari, 'Samband S')
+        with aktiver_portal(self.brann):
+            self.assertEqual(services.ansvar_for(self.kari), '')
+            services.sett_ansvar(self.kari, 'Samband B')
+            self.assertEqual(services.ansvar_for(self.kari), 'Samband B')
+        with aktiver_portal(self.standard):
+            self.assertEqual(services.ansvar_for(self.kari), 'Samband S')
+        self.assertEqual(Ansvarsmerke.objects.filter(bruker=self.kari).count(), 2)
+
+    def test_linja_stemples_med_merket_i_vaktas_portal(self):
+        """`skriv_linje` har vakta, og tar portalen derfra — ikke fra konteksten."""
+        from core.portal import aktiver_portal
+        from ko import services
+        with aktiver_portal(self.standard):
+            services.sett_ansvar(self.kari, 'Samband S')
+        with aktiver_portal(self.brann):
+            services.sett_ansvar(self.kari, 'Samband B')
+        with aktiver_portal(self.standard):
+            linje = services.skriv_linje(self.vakt, 'Hei', bruker=self.kari)
+        self.assertEqual(linje.ansvarsomraade, 'Samband B')
+
+    def test_tilstede_viser_merket_i_portalen(self):
+        """«Hvem har KO oppe» i Brann viser Brann-merket, ikke Standards."""
+        from core.portal import aktiver_portal
+        from ko import services
+        with aktiver_portal(self.standard):
+            services.sett_ansvar(self.kari, 'Samband S')
+        self.c.get('/ko/')   # en sesjon med KO oppe
+
+        def kari():
+            rader = self.c.get('/ko/api/tilstede/').json()['data']
+            return [r['ansvar'] for r in rader if r['brukernavn'] == 'kari']
+        self.assertEqual(kari(), [''])
+        with aktiver_portal(self.brann):
+            services.sett_ansvar(self.kari, 'Samband B')
+        self.assertEqual(kari(), ['Samband B'])
+
+    def test_programmet_tar_ikke_artist_eller_kjennetegn_fra_en_annen_portal(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from ko import program
+        from ko.services import Ugyldig
+        fra = timezone.now() + timedelta(hours=1)
+
+        def lagre(**data):
+            program.lagre_post(self.vakt, {'navn': 'X', 'lokasjon_id': self.sted_b.pk, **data},
+                               fra=fra, til=fra + timedelta(hours=1), bruker=self.kari)
+        with aktiver_portal(self.brann):
+            with self.assertRaisesMessage(Ugyldig, 'Ukjent konserttype'):
+                lagre(konserttype_id=self.artist_s.pk)
+            with self.assertRaisesMessage(Ugyldig, 'Ukjent kjennetegn'):
+                lagre(kjennetegn=[self.pyro_s.pk])
+            lagre(konserttype_id=self.artist_b.pk, kjennetegn=[self.pyro_b.pk])
+            data = program.program_data(self.vakt)
+        self.assertEqual([t['navn'] for t in data['konserttyper']], ['Artist B'])
+        self.assertEqual([k['navn'] for k in data['kjennetegn']], ['Pyro B'])
+
+    def test_i_bruk_teller_bare_portalens_merker(self):
+        from core.portal import aktiver_portal
+        from ko.models import Ansvarsmerke, Ansvarsomraade
+        with aktiver_portal(self.standard):
+            Ansvarsomraade.objects.create(navn='Felles')
+            Ansvarsmerke.objects.create(bruker=self.kari, omraade='Felles')
+        with aktiver_portal(self.brann):
+            felles = Ansvarsomraade.objects.create(navn='Felles')
+        # Sletting fra en verdiliste er global admin (`core.verdilister`).
+        from accounts.models import CustomUser
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        admin = Client(headers={'X-Portal': 'brann'})
+        admin.force_login(sjef)
+        admin.post('/portal/', {'portal': 'brann'})
+        svar = admin.delete(f'/ko/api/ansvarsomraader/{felles.pk}/',
+                            content_type='application/json', data={'confirm': True})
+        self.assertEqual(svar.status_code, 200, svar.content)   # Standards merke teller ikke
+
+    # ── Park ──
+
+    def _lenke(self, portal):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from park import services
+        naa = timezone.now()
+        with aktiver_portal(portal):
+            _, token = services.lag_lenke(navn=f'Kort {portal.slug}', aapen_fra=naa,
+                                          aapen_til=naa + timedelta(hours=2))
+        return token
+
+    def _oppsett(self, token):
+        import uuid
+        return Client().get('/lag/r/api/oppsett/', HTTP_X_PARK_LENKE=token,
+                            HTTP_X_PARK_TELEFON=str(uuid.uuid4()))
+
+    def test_lenken_baerer_portalen_inn_paa_siden_uten_innlogging(self):
+        svar = self._oppsett(self._lenke(self.brann))
+        self.assertEqual(svar.status_code, 200, svar.content)
+        self.assertEqual(svar.json()['vakt'], 'Brannvakt')
+        self.assertEqual([s['navn'] for s in svar.json()['steder']], ['Scene B'])
+
+    def test_en_lenke_i_en_annen_portal_ser_den_portalen(self):
+        """Motprøven: samme side, en Standard-lenke, og ingenting fra Brann."""
+        svar = self._oppsett(self._lenke(self.standard))
+        self.assertEqual(svar.status_code, 200, svar.content)
+        self.assertNotEqual(svar.json()['vakt'], 'Brannvakt')
+        self.assertEqual([s['navn'] for s in svar.json()['steder']], ['Scene S'])
+
+    def test_lenkelista_og_fjerningen_er_portalens(self):
+        from accounts.test_helpers import gi_modultilgang
+        from park.models import Parklenke
+        gi_modultilgang(bruker=self.kari, modul_slug='park', nivaa='skriv_leder', portal=self.brann)
+        self._lenke(self.standard)
+        self._lenke(self.brann)
+        navn = [r['navn'] for r in self.c.get('/lag/api/lenker/').json()['data']]
+        self.assertEqual(navn, ['Kort brann'])
+        standard = Parklenke.objects.get(navn='Kort standard')
+        svar = self.c.post(f'/lag/api/lenker/{standard.pk}/fjern/',
+                           content_type='application/json', data={'confirm': True})
+        self.assertEqual(svar.status_code, 404)
+        brann = Parklenke.objects.get(navn='Kort brann')
+        svar = self.c.post(f'/lag/api/lenker/{brann.pk}/fjern/',
+                           content_type='application/json', data={'confirm': True})
+        self.assertEqual(svar.status_code, 200)
+
+    def test_et_sted_fra_en_annen_portal_skjules_ikke_herfra(self):
+        from accounts.test_helpers import gi_modultilgang
+        gi_modultilgang(bruker=self.kari, modul_slug='park', nivaa='skriv_leder', portal=self.brann)
+        for sted, ventet in ((self.sted_s, 404), (self.sted_b, 200)):
+            svar = self.c.post(f'/lag/api/steder/{sted.pk}/skjul/',
+                               content_type='application/json', data={'skjult': True})
+            self.assertEqual(svar.status_code, ventet, sted.navn)
+
+    def test_en_registrering_fra_en_annen_portal_slettes_ikke_herfra(self):
+        import uuid
+
+        from accounts.test_helpers import gi_modultilgang
+        from core.vakt import hent_aktiv_vakt
+        from park.models import Parklenke, Registrering
+        gi_modultilgang(bruker=self.kari, modul_slug='park', nivaa='skriv_leder', portal=self.brann)
+        self._lenke(self.standard)
+        self._lenke(self.brann)
+
+        def rad(portal, navn):
+            return Registrering.objects.create(
+                vakt=hent_aktiv_vakt(portal), lenke=Parklenke.objects.get(portal=portal),
+                ressurs_navn='Lag 1', problemstilling='Skrubbsår', utfall='Behandlet',
+                lokasjon_navn=navn, idempotency_key=str(uuid.uuid4()))
+        for registrering, ventet in ((rad(self.standard, 'S'), 404), (rad(self.brann, 'B'), 200)):
+            svar = self.c.post(f'/lag/api/registreringer/{registrering.pk}/slett/',
+                               content_type='application/json', data={'grunn': 'Feil lag'})
+            self.assertEqual(svar.status_code, ventet, svar.content)
+
+    def test_slett_etter_paa_en_annen_portals_lenke(self):
+        from accounts.test_helpers import gi_modultilgang
+        from django.utils import timezone
+
+        from park.models import Parklenke
+        gi_modultilgang(bruker=self.kari, modul_slug='park', nivaa='skriv_leder', portal=self.brann)
+        self._lenke(self.standard)
+        self._lenke(self.brann)
+        for portal, ventet in ((self.standard, 404), (self.brann, 409)):
+            lenke = Parklenke.objects.get(portal=portal)
+            svar = self.c.post(f'/lag/api/lenker/{lenke.pk}/slett-etter/',
+                               content_type='application/json',
+                               data={'etter': timezone.now().isoformat()})
+            self.assertEqual(svar.status_code, ventet, svar.content)
