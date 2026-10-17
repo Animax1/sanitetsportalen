@@ -384,10 +384,11 @@ def brukerens_korps(user):
     """
     if not getattr(user, 'is_authenticated', False):
         return None
-    kk = Kontokorps.objects.filter(user=user).select_related('korps').first()
+    # I portalen brukeren står i (17. okt. 2026): ett korps per portal.
+    kk = Kontokorps.objects.i_portal().filter(user=user).select_related('korps').first()
     if kk is not None:
         return kk.korps
-    mannskap = Mannskap.objects.filter(user=user).select_related('korps').first()
+    mannskap = Mannskap.objects.i_portal().filter(user=user).select_related('korps').first()
     return mannskap.korps if mannskap else None
 
 
@@ -483,7 +484,7 @@ def mannskap_brukeren_kan_sette(user):
     """Personene brukeren får sette på en plass — for nedtrekkene. Speiler
     `kan_redigere_mannskap`: alle for den som skriver alt, eget korps for
     korps-føreren, ingen uten badge."""
-    qs = Mannskap.objects.filter(er_aktiv=True).select_related('korps')
+    qs = Mannskap.objects.i_portal().filter(er_aktiv=True).select_related('korps')
     if kan_skrive_alt(user):
         return qs
     korps = brukerens_korps(user)

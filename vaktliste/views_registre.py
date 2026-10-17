@@ -45,6 +45,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.portal import gjeldende_portal
 from core.ratelimit import rate_limit
 
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe, korpskonflikt,
@@ -378,8 +379,10 @@ def _koble_paa_epost(request, person):
     # korps-føreren plante en adresse og la lederens neste lagring koble den.
     if not person.epost_fra_leder:
         return False
+    # Ledig **i portalen** (17. okt. 2026): kontoen kan være mannskap i hver portal.
     konto = (_koblbare_kontoer(CustomUser)
-             .filter(email__iexact=person.epost, mannskap__isnull=True)
+             .filter(email__iexact=person.epost)
+             .exclude(mannskap__portal=person.portal or gjeldende_portal())
              .first())
     if konto is None:
         return False
@@ -445,12 +448,12 @@ def _kontoer():
     konto.
     """
     from accounts.models import CustomUser
+    # Koblingen i **denne** portalen (17. okt. 2026) — én spørring for alle.
+    koblet = dict(Mannskap.objects.i_portal().filter(user__isnull=False)
+                  .values_list('user_id', 'pk'))
     return [
-        {'id': u.pk, 'brukernavn': u.username,
-         'mannskap_id': getattr(u, 'mannskap', None) and u.mannskap.pk}
-        for u in (_koblbare_kontoer(CustomUser)
-                  .select_related('mannskap')
-                  .order_by('username'))
+        {'id': u.pk, 'brukernavn': u.username, 'mannskap_id': koblet.get(u.pk)}
+        for u in _koblbare_kontoer(CustomUser).order_by('username')
     ]
 
 
@@ -474,7 +477,7 @@ def mannskap_view(request):
         # for å føre sin egen liste.
         from django.db.models import Count
         folk = services.synlig_mannskap(
-            Mannskap.objects
+            Mannskap.objects.i_portal()
             .select_related('korps', 'user')
             .prefetch_related('kompetanser')
             .annotate(i_bruk_antall=Count('vaktposter'))
@@ -579,7 +582,7 @@ def mannskap_detalj_view(request, pk):
     inn, og PROTECT stopper det uansett i det personen har gått en vakt.
     """
     try:
-        person = (Mannskap.objects.select_related('korps', 'user')
+        person = (Mannskap.objects.i_portal().select_related('korps', 'user')
                   .prefetch_related('kompetanser').get(pk=pk))
     except Mannskap.DoesNotExist:
         return json_feil('Personen finnes ikke', status=404)

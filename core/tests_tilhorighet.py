@@ -85,7 +85,8 @@ class KorpsIPortalenTests(TestCase):
         return Vaktliste.objects.create(vakt=vakt)
 
     def test_flytting_til_et_korps_fra_en_annen_portal_avvises(self):
-        ola = Mannskap.objects.create(navn='Ola', korps=self.hgsd)
+        with aktiver_portal(self.brann):
+            ola = Mannskap.objects.create(navn='Ola', korps=self.hgsd)
         svar = self.c.put(f'/vaktliste/api/mannskap/{ola.pk}/', content_type='application/json',
                           data={'korps_id': self.sola.pk})
         self.assertEqual(svar.status_code, 400)

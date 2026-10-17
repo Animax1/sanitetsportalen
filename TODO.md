@@ -161,11 +161,14 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
       toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
       i JS, og tas sammen med flatene i fase 5.
-- [ ] **Fase 4:** data per portal — `Mannskap.portal`, verdimengdene og de fem én-til-én-koblingene
-      etter notatet §4.12, innstillingene sortert i system og portal, endringsnumre og varsler med
-      portal (§4.14), portalfilter i statistikk og arkiv, søk på tvers for innsyn og sletting.
-      Vaktene i notatet §6.1 (hver modell har en vei til portalen eller står på lista over
-      globale) kommer i denne fasen.
+- [ ] **Fase 4b:** `Forstehjelper`, `Helsepersonell` (og `user` unik per portal, «mine pasienter»)
+      og `oppdrag.Lokasjon` per portal, med `core.models.PortalEid` som vaktlista i 4a.
+- [ ] **Fase 4c:** KO (`Ansvarsomraade`, `Ansvarsmerke` på medlemskapet, `Konserttype`, `Kjennetegn`)
+      og park (`Parklenke` bærer portalen, `SkjultSted` følger lokasjonen).
+- [ ] **Fase 4d:** `Vakt.navn` unik per portal, `Notification.portal`, endringsnumrene med portal i
+      nøkkelen, `AppSetting`-nøklene sortert i system og portal (§4.7), portalfilter i statistikk
+      og arkiv, og søk på tvers for innsyn og sletting (§4.5). `VENTER` i
+      `core/tests_portalisolasjon.py` er tom når 4d er levert.
 - [ ] **Fase 5:** flatene — «Ny portal», moduler og tak, moderatorens brukere og tilgang,
       «Avslutt vakt» til moderator, «Sist innlogget» og filtrene «Uten portal»/«Inaktiv 12 mnd»,
       portalvelgeren, og forslaget «mannskap fra de siste 24 månedene» ved ny vakt.

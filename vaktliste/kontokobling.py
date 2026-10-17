@@ -34,7 +34,8 @@ class KontokorpsForm(forms.Form):
 
         from .models import Kontokorps, Korps, Mannskap
         self.user = user
-        self.naa = Kontokorps.objects.filter(user=user).select_related('korps').first()
+        # Korpset kontoen fører **i portalen admin står i** (17. okt. 2026).
+        self.naa = Kontokorps.objects.i_portal().filter(user=user).select_related('korps').first()
         # Inaktive korps tilbys ikke — men det kontoen alt fører, står i lista,
         # ellers ville skjemaet stille byttet det ut ved neste lagring.
         filter_ = Q(er_aktiv=True)
@@ -46,7 +47,7 @@ class KontokorpsForm(forms.Form):
         self.fields['korps'].queryset = korps_i_portal().filter(filter_)
         if not args and 'data' not in kwargs:
             self.fields['korps'].initial = self.naa.korps_id if self.naa else None
-        self.mannskapsrad = (Mannskap.objects.filter(user=user)
+        self.mannskapsrad = (Mannskap.objects.i_portal().filter(user=user)
                              .select_related('korps').first())
 
     def clean_korps(self):
@@ -64,10 +65,10 @@ class KontokorpsForm(forms.Form):
         with transaction.atomic():
             if korps is None:
                 # `delete()` per rad, ikke på spørringen: auditsignalet skal fyre.
-                for rad in Kontokorps.objects.filter(user=self.user):
+                for rad in Kontokorps.objects.i_portal().filter(user=self.user):
                     rad.delete()
                 return
-            rad = Kontokorps.objects.filter(user=self.user).first()
+            rad = Kontokorps.objects.i_portal().filter(user=self.user).first()
             if rad is None:
                 Kontokorps.objects.create(user=self.user, korps=korps)
             elif rad.korps_id != korps.pk:

@@ -588,6 +588,50 @@ class Vaktportal(models.Model):
         return self.navn
 
 
+class PortalQuerySet(models.QuerySet):
+    """Spørresettet til en modell som hører til én portal (`PortalEid`)."""
+
+    def i_portal(self, portal=None):
+        """Radene i portalen — den oppgitte, ellers den gjeldende. Gjetter aldri:
+        uten kontekst og med flere portaler kaster `gjeldende_portal()`."""
+        from core.portal import gjeldende_portal
+        return self.filter(portal=portal or gjeldende_portal())
+
+
+class PortalEid(models.Model):
+    """Mixin for data som hører til én portal, men ikke til én vakt (17. okt. 2026).
+
+    `docs/BESLUTNING_PORTALER.md` §4.12: **det som beskriver et sted eller en
+    person er per portal** — mannskapet, førstehjelperne, lokasjonene, KOs
+    ansvarsområder. Det som henger på en vakt, har portalen gjennom vakta og
+    trenger ikke denne.
+
+    **Én mekanisme, ikke én per modell.** Feltet, oppslaget (`i_portal()`) og
+    hvor portalen kommer fra ved lagring står her. `save()` henter portalen fra
+    konteksten (`core.portal.gjeldende_portal`) når den mangler — i en
+    forespørsel er det portalen brukeren står i, og uten kontekst med flere
+    portaler kaster den i stedet for å gjette.
+
+    `portal` er nullbar i basen bare for release-vinduet og migrasjonene som
+    fyller den; ingen vei lagrer en rad uten.
+    """
+
+    portal = models.ForeignKey(
+        'core.Vaktportal', on_delete=models.PROTECT, null=True, related_name='+',
+        verbose_name='Portal')
+
+    objects = PortalQuerySet.as_manager()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.portal_id is None:
+            from core.portal import gjeldende_portal
+            self.portal = gjeldende_portal()
+        super().save(*args, **kwargs)
+
+
 class Vakt(models.Model):
     """Én vakt — scopet pasienter, oppdrag og statistikk henger på.
 

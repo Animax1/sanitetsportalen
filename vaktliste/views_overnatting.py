@@ -88,7 +88,7 @@ def overnatting_plasser_view(request, pk):
     if rom is None:
         return json_feil('Rommet finnes ikke', status=404)
     data = json_body(request)
-    mannskap = Mannskap.objects.filter(pk=_int(data.get('mannskap_id'))).first()
+    mannskap = Mannskap.objects.i_portal().filter(pk=_int(data.get('mannskap_id'))).first()
     if mannskap is None:
         return json_feil('Velg en person fra mannskapsregisteret.')
     if not overnatting.kan_plassere(request.user, mannskap):

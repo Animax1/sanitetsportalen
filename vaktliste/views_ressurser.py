@@ -278,7 +278,7 @@ def vaktposter_view(request, pk):
     mannskap = None
     if data.get('mannskap_id') not in (None, ''):
         try:
-            mannskap = Mannskap.objects.select_related('korps').get(
+            mannskap = Mannskap.objects.i_portal().select_related('korps').get(
                 pk=_int(data.get('mannskap_id')))
         except Mannskap.DoesNotExist:
             return json_feil('Ukjent mannskap.')
@@ -417,7 +417,7 @@ def vaktpost_detalj_view(request, pk):
         ny_id = _int(data['mannskap_id'])
         ny_person = None
         if ny_id is not None:
-            ny_person = (Mannskap.objects.select_related('korps')
+            ny_person = (Mannskap.objects.i_portal().select_related('korps')
                          .filter(pk=ny_id).first())
             if ny_person is None:
                 return json_feil('Ukjent mannskap.')

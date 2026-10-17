@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4a: mannskapet per portal (Brann ser bare sitt eget), én konto kan være mannskap i hver portal, og vakten som krever en vei til portalen for hver modell  `#core/tilgang` `#vaktliste/tilgang`
+
+Første del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.5, §4.12, §6.1). André: «Brann-portalen
+ser bare mannskapslisten i vaktlisten fra sine vakter.» **Med én portal: ingen synlig endring.**
+
+**`core.models.PortalEid`** er mekanismen for alt som hører til én portal uten å henge på en
+vakt: feltet `portal`, `objects.i_portal()`, og `save()` som henter portalen fra konteksten —
+som aldri gjetter. Vaktlista tok den i bruk først: **`Mannskap` og `Kontokorps` er per portal.**
+`Mannskap.user` og `Kontokorps.user` gikk fra én-til-én til unike per (portal, konto) — Kari kan
+være mannskap og føre et korps i hver portal. Navnet er unikt per (portal, korps, navn).
+Migrasjonene `vaktliste/0032` (skjema) og `0033` (alt til «Standard»), med prøve.
+
+**Hvert oppslag går gjennom `i_portal()`:** registeret, en person, nedtrekket, plassene (ny og
+bytte), overnattingen, kontoens korps, regelen om at kontoens og radens korps er like (gjelder nå
+innen portalen), e-postkoblingen (en konto koblet i Standard kan kobles i Brann) og kontolista.
+
+**Vakten fra §6.1: `core/tests_portalisolasjon.py`.** Hver modell i appene skal ha en vei til en
+portal — en fremmednøkkel direkte eller gjennom vakta — eller stå i `GLOBALE` med en grunn (23
+stykker: kontoene, revisjonsloggen, backup, katalogen, bilene og fagets verdilister). `VENTER`
+har de ti som får portal i 4b–4d, og testen krever at lista krymper. Den ble skrevet slik at koden
+svarte på hvilke modeller som manglet — 34 uten vei, av dem 12 som skal ha portal.
+
+**Tester: 23 i den nye fila. Mutasjoner: 16, alle drept til slutt.** Ni overlevde første runde:
+regelen sto i `i_portal()`, men testene gikk bare gjennom registeret. To av dem overlevde runde to
+også — testene fikk 400 av en annen grunn (lik fra- og til-tid, ingen netter) — og fikk gyldige
+data og en motprøve med portalens egen person, som skal gå gjennom.
+
 ## 2026-10-17 — Portaler fase 3: korpset blir den felles katalogen `core.Tilhorighet` (korps eller «annet», som «Leger»), portalen velger sine, bare admin skriver i den  `#core/tilgang` `#vaktliste/tilgang` `#core/backup`
 
 Tredje fase av `docs/BESLUTNING_PORTALER.md` (§4.3, beslutning 9 og 10). **Synlig endring:

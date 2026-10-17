@@ -55,7 +55,7 @@ from django.db import models
 from django.db.models import F
 from django.db.models.functions import Lower
 
-from core.models import BaseTimeStampedModel, Tilhorighet
+from core.models import BaseTimeStampedModel, PortalEid, Tilhorighet
 from core.sortering import Norsk
 
 from . import choices
@@ -277,7 +277,7 @@ class Ressursrolle(BaseTimeStampedModel):
         return self.navn
 
 
-class Mannskap(BaseTimeStampedModel):
+class Mannskap(BaseTimeStampedModel, PortalEid):
     """Én person i mannskapsregisteret.
 
     Registeret er **globalt** (§11.1 i notatet): personellet organisasjonen
@@ -351,7 +351,9 @@ class Mannskap(BaseTimeStampedModel):
     # Badgen-koblingen (§4): kontoen arver korpset herfra. SET_NULL, ikke
     # CASCADE — slettes kontoen, består personen i registeret. Samme valg
     # som `Enhet.user` og `Forstehjelper.user`.
-    user = models.OneToOneField(
+    # **Per portal** (17. okt. 2026, beslutning 24): én konto kan være mannskap
+    # i hver portal — var en OneToOne, og da kunne Kari bare stå i én.
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
@@ -386,7 +388,10 @@ class Mannskap(BaseTimeStampedModel):
             # «Ola Hansen», men to like navn i samme korps er umulige å
             # skille i en liste — da må det ene få et mellomnavn.
             models.UniqueConstraint(
-                fields=['korps', 'navn'], name='unikt_navn_per_korps'),
+                fields=['portal', 'korps', 'navn'], name='unikt_navn_per_korps_i_portal'),
+            models.UniqueConstraint(
+                fields=['portal', 'user'], condition=models.Q(user__isnull=False),
+                name='en_mannskapsrad_per_konto_i_portal'),
         ]
 
     def __str__(self) -> str:
@@ -397,14 +402,14 @@ class Mannskap(BaseTimeStampedModel):
         # (1. okt. 2026). Viewene sjekker først og svarer 409 med begge navnene;
         # dette stopper en vei som ikke finnes ennå. `loaddata` går utenom
         # `save()` og stoppes ikke.
-        feil = korpskonflikt(self.user_id, self.korps_id, mannskap=self)
+        feil = korpskonflikt(self.user_id, self.korps_id, mannskap=self, portal=self.portal)
         if feil:
             from django.core.exceptions import ValidationError
             raise ValidationError(feil)
         super().save(*args, **kwargs)
 
 
-class Kontokorps(BaseTimeStampedModel):
+class Kontokorps(BaseTimeStampedModel, PortalEid):
     """Korpset en **konto** fører — satt av global admin på brukersiden.
 
     **Hvorfor den finnes** (André, 1. okt. 2026): til da fikk en konto korps
@@ -429,7 +434,8 @@ class Kontokorps(BaseTimeStampedModel):
 
     # CASCADE: raden er bare et svar på «hvilket korps fører denne kontoen»,
     # og uten kontoen finnes ikke spørsmålet.
-    user = models.OneToOneField(
+    # Per portal (17. okt. 2026): kontoen kan føre ett korps i hver portal.
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='kontokorps',
@@ -447,19 +453,23 @@ class Kontokorps(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Kontoens korps'
         verbose_name_plural = 'Kontoenes korps'
+        constraints = [
+            models.UniqueConstraint(fields=['portal', 'user'],
+                                    name='ett_kontokorps_per_konto_i_portal'),
+        ]
 
     def __str__(self) -> str:
         return f'{self.user} fører {self.korps}'
 
     def save(self, *args, **kwargs):
-        feil = korpskonflikt(self.user_id, self.korps_id)
+        feil = korpskonflikt(self.user_id, self.korps_id, portal=self.portal)
         if feil:
             from django.core.exceptions import ValidationError
             raise ValidationError(feil)
         super().save(*args, **kwargs)
 
 
-def korpskonflikt(user_id, korps_id, *, mannskap=None) -> str:
+def korpskonflikt(user_id, korps_id, *, mannskap=None, portal=None) -> str:
     """Tom streng, eller hvorfor kontoen og mannskapsraden er uenige om korpset.
 
     **Regelen** (André, 1. okt. 2026): kontoens korps og korpset på
@@ -472,11 +482,15 @@ def korpskonflikt(user_id, korps_id, *, mannskap=None) -> str:
 
     Meldingen bærer begge navnene, fordi det er den som skal rettes — og den
     som får den, vet ikke nødvendigvis hvilken av de to som er feil.
+
+    **Innen portalen** (17. okt. 2026): kontoen kan føre ett korps og være
+    mannskap i hver portal, og regelen gjelder paret i samme portal.
     """
     if not user_id or not korps_id:
         return ''
     if mannskap is not None:
-        kk = Kontokorps.objects.filter(user_id=user_id).select_related('korps', 'user').first()
+        kk = (Kontokorps.objects.i_portal(portal).filter(user_id=user_id)
+              .select_related('korps', 'user').first())
         if kk is None or kk.korps_id == korps_id:
             return ''
         radkorps = Korps.objects.filter(pk=korps_id).first()
@@ -484,7 +498,8 @@ def korpskonflikt(user_id, korps_id, *, mannskap=None) -> str:
                 f'{radkorps.navn if radkorps else "et annet korps"}. Korpset på kontoen og '
                 f'på mannskapsraden må være like — rett det ene av dem først. Kontoens '
                 f'korps settes i brukeradministrasjonen.')
-    rad = Mannskap.objects.filter(user_id=user_id).select_related('korps', 'user').first()
+    rad = (Mannskap.objects.i_portal(portal).filter(user_id=user_id)
+           .select_related('korps', 'user').first())
     if rad is None or rad.korps_id == korps_id:
         return ''
     nytt = Korps.objects.filter(pk=korps_id).first()

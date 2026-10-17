@@ -434,6 +434,33 @@ def _sjekk_tilhorighet(c):
     assert c.fetchall() == [('forer', 'HGSD'), ('mannskap', 'Sola')], 'kontoene fikk feil tilhørighet'
 
 
+# ── vaktliste.0033 (mannskapet i «Standard») ──────────────────────────────────
+
+def _seed_mannskap_portal(c):
+    c.execute("""INSERT INTO vaktliste_korps (navn, kortnavn, er_aktiv, type, created_at, updated_at)
+                 VALUES ('HGSD', '', true, 'korps', now(), now()) RETURNING id""")
+    korps = c.fetchone()[0]
+    konto = _ny_konto(c, 'kari')
+    for navn, bruker in (('Kari', konto), ('Uten konto', None)):
+        c.execute("""INSERT INTO vaktliste_mannskap
+                     (navn, korps_id, user_id, telefon, epost, epost_fra_leder, issi,
+                      er_aktiv, notat, created_at, updated_at)
+                     VALUES (%s, %s, %s, '', '', true, '', true, '', now(), now())""",
+                  [navn, korps, bruker])
+    c.execute("""INSERT INTO vaktliste_kontokorps (user_id, korps_id, created_at, updated_at)
+                 VALUES (%s, %s, now(), now())""", [konto, korps])
+
+
+def _sjekk_mannskap_portal(c):
+    c.execute("SELECT id FROM core_vaktportal WHERE slug = 'standard'")
+    standard = c.fetchone()[0]
+    for tabell in ('vaktliste_mannskap', 'vaktliste_kontokorps'):
+        c.execute(f"SELECT count(*), count(*) FILTER (WHERE portal_id = %s) FROM {tabell}",
+                  [standard])
+        alle, i_standard = c.fetchone()
+        assert alle and alle == i_standard, f'{tabell}: {i_standard} av {alle} i Standard'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -471,6 +498,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Korpsene blir med i «Standard», kontoene får tilhørigheten sin',
             seed=_seed_tilhorighet,
             sjekk=_sjekk_tilhorighet,
+        ),
+        Migrasjonsprove(
+            migrasjon='vaktliste.0033_mannskap_i_standard',
+            foregaaende='0032_mannskap_per_portal',
+            beskrivelse='Mannskapet og kontoenes korps går til «Standard»',
+            seed=_seed_mannskap_portal,
+            sjekk=_sjekk_mannskap_portal,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

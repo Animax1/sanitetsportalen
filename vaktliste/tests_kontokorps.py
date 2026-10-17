@@ -99,7 +99,9 @@ class KorpsetVirkerTests(_Basis):
         Mannskap.objects.filter(navn='Hanne Haugesund').update(user=per)
         self.assertEqual(services.brukerens_korps(per), self.hgsd)
         # Regelen holder dem like; for å se rekkefølgen må den omgås.
-        Kontokorps.objects.bulk_create([Kontokorps(user=per, korps=self.karmoy)])
+        from core.portal import gjeldende_portal
+        Kontokorps.objects.bulk_create([Kontokorps(user=per, korps=self.karmoy,
+                                                   portal=gjeldende_portal())])
         self.assertEqual(services.brukerens_korps(per), self.karmoy)
 
     def test_siden_sier_hvilket_korps_kontoen_ser(self):
