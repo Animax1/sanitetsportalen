@@ -13,8 +13,10 @@ from datetime import timedelta
 from django.test import override_settings
 from django.utils import timezone
 
+from core.models import Vakt
+from patients.test_helpers import aktiver_vakt
+
 from accounts.models import ModulTilgang
-from core.models import AppSetting
 from oppdrag.models import Enhet
 
 from . import vaktdrift
@@ -30,7 +32,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
 
     def setUp(self):
         super().setUp()
-        AppSetting.set('aktiv_vakt_id', self.vl.vakt.pk)
+        aktiver_vakt(self.vl.vakt)
         # En bil med enhet — den hører til `/oppdrag/` og skal ikke være med.
         self.enhet = Enhet.objects.create(navn='HGSD 56')
         self.bil = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1',
@@ -101,7 +103,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         self.assertEqual((rad['mannskap'][0]['telefon'], rad['mannskap'][0]['issi']), ('99988777', '2401234'))
 
     def test_ingen_liste_gir_tom(self):
-        AppSetting.set('aktiv_vakt_id', 999999)
+        Vakt.objects.update(er_aktiv=False)
         self.vl.delete()
         self.assertEqual(vaktdrift.ressurser_uten_enhet(), [])
 

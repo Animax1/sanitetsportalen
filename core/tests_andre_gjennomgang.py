@@ -104,9 +104,9 @@ class TredjeGjennomgangTests(_MedAdmin):
         from core import vakt as vaktmodul
         ekte = vaktmodul.laas_aktiv_vakt
 
-        def slettet_mens_vi_ventet():
+        def slettet_mens_vi_ventet(*args, **kwargs):
             Vakt.objects.filter(pk=self.gammel.pk).delete()
-            return ekte()
+            return ekte(*args, **kwargs)
 
         with mock.patch('core.views_vakt.laas_aktiv_vakt', side_effect=slettet_mens_vi_ventet):
             svar = self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/gjenaapne/', follow=True)

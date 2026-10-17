@@ -121,14 +121,13 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
     backup for mye — det er riktig vei å feile.
     """
     from core.backup import create_backup
-    from core.models import AppSetting
-    from core.vakt import hent_aktiv_vakt, laas_aktiv_vakt, opprett_vakt
+    from core.vakt import gjor_aktiv, hent_aktiv_vakt, laas_aktiv_vakt, opprett_vakt
     from core.validators import current_local_year
     from core.vaktstatistikk import frys
 
     handlere = all_handlers()
     grunner = [g for g in (h.sperre(vakt) for h in handlere) if g]
-    if hent_aktiv_vakt().pk != vakt.pk:
+    if hent_aktiv_vakt(vakt.portal).pk != vakt.pk:
         # Tidlig, så en avsluttet vakt ikke koster backuper. Vernet er låsen i
         # transaksjonen under — denne sjekken er et kappløp.
         grunner.insert(0, f'«{vakt.navn}» er ikke den aktive vakten.')
@@ -145,7 +144,7 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
         # samtidige avslutninger med hvert sitt nye navn frøs ellers samme vakt
         # to ganger; den andre gangen var radene tømt, og det nyeste settet —
         # det som vises — var nuller.
-        if laas_aktiv_vakt().pk != vakt.pk:
+        if laas_aktiv_vakt(vakt.portal).pk != vakt.pk:
             raise Sperret([f'«{vakt.navn}» er ikke lenger den aktive vakten — '
                            'den er avsluttet i mellomtiden.'])
         # En gang til: backupene tar tid, og et oppdrag lagt på tavla imens
@@ -158,6 +157,8 @@ def avslutt(vakt, *, ny_vakt_navn, bruker, request=None) -> dict:
         vakt.er_aktiv = False
         vakt.avsluttet = timezone.now()
         vakt.save(update_fields=['er_aktiv', 'avsluttet'])
-        ny = opprett_vakt(ny_vakt_navn, year=current_local_year(), startet=timezone.now())
-        AppSetting.set('aktiv_vakt_id', ny.pk)
+        # Den nye vakta hører til samme portal (17. okt. 2026), og gjøres
+        # aktiv etter at den gamle er slått av — rekkefølgen indeksen krever.
+        ny = gjor_aktiv(opprett_vakt(ny_vakt_navn, year=current_local_year(),
+                                     startet=timezone.now(), portal=vakt.portal))
     return {'avsluttet_vakt': vakt.navn, 'ny_vakt': ny.navn, 'tomt': tomt}

@@ -16,6 +16,8 @@ retningen for hele appen for én inspeksjonsjobb. Oppslaget skjer i `handle()`,
 ved kjøring, og binder ingenting ved oppstart.
 """
 from django.apps import apps
+
+from core.sortering import Norsk
 from django.core.management.base import BaseCommand
 
 
@@ -30,7 +32,7 @@ class Command(BaseCommand):
         Vakt = apps.get_model('core', 'Vakt')
         Patient = apps.get_model('patients', 'Patient')
         VaktArkiv = apps.get_model('patients', 'VaktArkiv')
-        AppSetting = apps.get_model('core', 'AppSetting')
+        Vaktportal = apps.get_model('core', 'Vaktportal')
         Oppdrag = apps.get_model('oppdrag', 'Oppdrag')
 
         self.funn = 0
@@ -53,25 +55,23 @@ class Command(BaseCommand):
             self._feil(f'{avvik} arkiv der year_snapshot ikke stemmer med '
                        f'vaktas år.')
 
-        # ── Pekeren ──────────────────────────────────────────────────────
-        raa = AppSetting.objects.filter(key='aktiv_vakt_id').first()
-        if raa is None:
-            self.stdout.write(
-                '  Info: aktiv_vakt_id er ikke satt. Settes ved første '
-                'registrering (lat opprettelse) — bare et funn hvis '
-                'registrering er i gang.')
-        else:
-            try:
-                vakt = Vakt.objects.get(pk=int(raa.value))
-                if not vakt.er_aktiv:
-                    self._feil(f'aktiv_vakt_id peker på «{vakt.navn}», som '
-                               f'ikke er aktiv.')
-                else:
-                    self.stdout.write(f'  Aktiv vakt: «{vakt.navn}» '
-                                      f'(year={vakt.year}).')
-            except (Vakt.DoesNotExist, TypeError, ValueError):
-                self._feil(f'aktiv_vakt_id={raa.value!r} peker på en vakt '
-                           f'som ikke finnes.')
+        # ── Aktiv vakt per portal (17. okt. 2026) ────────────────────────
+        # `er_aktiv` er fasit, og indeksen `en_aktiv_vakt_per_portal` sier at
+        # det er høyst én per portal. Det som gjenstår å sjekke er vakter uten
+        # portal — de kommer fra en backup tatt før portalene, og er usynlige
+        # for `hent_aktiv_vakt` til de tas inn.
+        uten_portal = Vakt.objects.filter(portal__isnull=True).count()
+        if uten_portal:
+            self._feil(f'{uten_portal} vakt(er) uten portal. Gjenåpne dem fra '
+                       f'vaktsiden for å ta dem inn i en portal.')
+        for portal in Vaktportal.objects.order_by(Norsk('navn')):
+            aktiv = Vakt.objects.filter(portal=portal, er_aktiv=True).first()
+            if aktiv is None:
+                self.stdout.write(f'  Info: «{portal.navn}» har ingen aktiv vakt. '
+                                  f'Settes ved første registrering (lat opprettelse).')
+            else:
+                self.stdout.write(f'  Aktiv vakt i «{portal.navn}»: «{aktiv.navn}» '
+                                  f'(year={aktiv.year}).')
 
         # Forhåndssjekken for (vakt, nummer)-kollisjoner er fjernet:
         # sperrene er databasekrav siden deploy 2, og en sjekk som aldri kan

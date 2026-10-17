@@ -146,16 +146,13 @@ def slett_vakt(vakt, *, bruker, request=None) -> list[tuple[str, int]]:
 
     Kaster `KanIkkeSlettes` for den aktive vakta — før noe er rørt.
     """
-    if vakt.pk == _aktiv_pk() or vakt.er_aktiv:
+    # `er_aktiv` er fasit siden 17. okt. 2026 — databasen sier én per portal,
+    # så et oppslag av portalens aktive vakt ved siden av ville spurt det samme.
+    if vakt.er_aktiv:
         raise KanIkkeSlettes(f'«{vakt.navn}» er den aktive vakten og kan ikke slettes. '
                              f'Avslutt den først.')
     with _pagar(f'vakt:{vakt.pk}'):
         return _slett_vakt(vakt, bruker=bruker, request=request)
-
-
-def _aktiv_pk():
-    from core.vakt import hent_aktiv_vakt
-    return hent_aktiv_vakt().pk
 
 
 def _slett_vakt(vakt, *, bruker, request):
@@ -177,7 +174,7 @@ def _slett_vakt(vakt, *, bruker, request):
         # over tar sekunder, og en annen admin kan ha gjenåpnet vakta imens —
         # sjekken i `slett_vakt` gjaldt vakta slik den var før backupen.
         from core.vakt import laas_aktiv_vakt
-        aktiv = laas_aktiv_vakt()
+        aktiv = laas_aktiv_vakt(vakt.portal)
         if vakt.pk == aktiv.pk or Vakt.objects.filter(pk=vakt.pk, er_aktiv=True).exists():
             raise KanIkkeSlettes(f'«{vakt.navn}» ble gjort aktiv mens slettingen pågikk, '
                                  f'og er ikke slettet.')

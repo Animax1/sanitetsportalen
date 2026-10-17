@@ -20,17 +20,17 @@ from __future__ import annotations
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import vaktslutt
 from core.auth_decorators import admin_required
-from core.models import AppSetting, Vakt
+from core.models import Vakt
 from core.ratelimit import rate_limit
 from core.vakt import (
-    VaktnavnOpptatt, hent_aktiv_vakt, laas_aktiv_vakt, vaktnavn_opptatt_melding,
+    VaktnavnOpptatt, gjor_aktiv, hent_aktiv_vakt, laas_aktiv_vakt, vaktnavn_opptatt_melding,
 )
 
 
@@ -104,9 +104,11 @@ def vakt_view(request):
     tidligere = [
         {'vakt': v, 'kan_gjenaapnes': v.pk not in kollapset,
          'nokkel': statistikk_for_vakt.get(v.pk)}
-        # Alle utenom den aktive — ikke `er_aktiv=False`. Pekeren er fasit
-        # (`hent_aktiv_vakt`); en vakt med feil flagg forsvant ellers fra lista.
-        for v in Vakt.objects.exclude(pk=vakt.pk).order_by('-avsluttet', '-startet')
+        # Alle i portalen utenom den aktive. En vakt uten portal (lastet fra en
+        # backup tatt før portalene fantes) vises også, så den kan gjenåpnes
+        # og tas inn — ellers ville den forsvunnet fra lista uten spor.
+        for v in (Vakt.objects.filter(Q(portal=vakt.portal) | Q(portal__isnull=True))
+                  .exclude(pk=vakt.pk).order_by('-avsluttet', '-startet'))
     ]
     return render(request, 'core/vakt.html', {
         'vakt': vakt,
@@ -202,18 +204,14 @@ def vakt_gjenaapne_view(request, pk):
         # Låst, og alle andre med flagget ryddes — ikke bare den forrige
         # (28. sep. 2026). Et kappløp kunne etterlate to aktive; dette retter
         # opp også en slik tilstand, i stedet for å bygge videre på den.
-        laas_aktiv_vakt()
+        laas_aktiv_vakt(vakt.portal)
         # Under låsen: en sletting kan ha holdt den, og vakta er borte når vi
         # slipper til (tredje gjennomgang 29. sep. — ellers 500).
         if not Vakt.objects.filter(pk=vakt.pk).exists():
             messages.error(request, f'«{vakt.navn}» ble slettet før den rakk å gjenåpnes.')
             return redirect('portaladmin:vakt')
-        Vakt.objects.filter(er_aktiv=True).exclude(pk=vakt.pk).update(
-            er_aktiv=False, avsluttet=timezone.now())
-        vakt.er_aktiv = True
-        vakt.avsluttet = None
-        vakt.save(update_fields=['er_aktiv', 'avsluttet'])
-        AppSetting.set('aktiv_vakt_id', vakt.pk)
+        # Slår av den andre aktive i samme portal før denne slås på (17. okt. 2026).
+        gjor_aktiv(vakt)
     messages.success(request, f'Vakten «{vakt.navn}» er aktiv igjen.')
     return redirect('portaladmin:vakt')
 
@@ -252,7 +250,7 @@ def vakt_slett_view(request, pk):
 
     return render(request, 'core/vakt_slett.html', {
         'vakt': vakt,
-        'aktiv': vakt.pk == hent_aktiv_vakt().pk or vakt.er_aktiv,
+        'aktiv': vakt.er_aktiv,
         'oversikt': vaktsletting.oversikt(vakt),
     })
 

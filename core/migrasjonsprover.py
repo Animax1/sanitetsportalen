@@ -278,6 +278,49 @@ def _sjekk_backupplan(c):
     assert 'interval_minutes' not in kolonner, kolonner
 
 
+# ── core.0018 (Vaktportal, er_aktiv blir fasit) ──────────────────────────────
+
+def _seed_vaktportal(c):
+    """Den inkonsistensen prod kan ha: pekeren og flagget er uenige.
+
+    Tre vakter. To står med `er_aktiv=True` — en taper fra et gammelt kappløp,
+    og en som ble lagt inn med standardverdien — mens pekeren viser til den
+    tredje, som har `er_aktiv=False`. Det er pekeren portalen registrerte på,
+    så den skal vinne. I en tom base finner 0018 ingen av dem, og går grønt
+    uten å ha gjort noe.
+    """
+    ider = {}
+    for navn, aktiv in (('Taperen', True), ('Pekt paa', False), ('Standardverdi', True)):
+        c.execute("""INSERT INTO core_vakt (navn, year, startet, er_aktiv)
+                     VALUES (%s, 2026, now(), %s) RETURNING id""", [navn, aktiv])
+        ider[navn] = c.fetchone()[0]
+    c.execute("""INSERT INTO patients_appsetting (key, value)
+                 VALUES ('aktiv_vakt_id', %s)
+                 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value""",
+              [str(ider['Pekt paa'])])
+
+
+def _sjekk_vaktportal(c):
+    c.execute("SELECT id, slug FROM core_vaktportal")
+    portaler = c.fetchall()
+    assert [r[1] for r in portaler] == ['standard'], portaler
+    standard = portaler[0][0]
+
+    c.execute("SELECT navn, er_aktiv, portal_id FROM core_vakt ORDER BY navn")
+    vakter = {r[0]: r[1:] for r in c.fetchall()}
+    assert all(portal == standard for _, portal in vakter.values()), vakter
+    # Pekeren vant, og bare den er aktiv.
+    assert vakter['Pekt paa'][0] is True, vakter
+    assert vakter['Taperen'][0] is False, vakter
+    assert vakter['Standardverdi'][0] is False, vakter
+
+    # Indeksen fra 0019 står — og avviser en vakt til som påstår å være aktiv.
+    c.execute("""SELECT indexdef FROM pg_indexes
+                 WHERE indexname = 'en_aktiv_vakt_per_portal'""")
+    rad = c.fetchone()
+    assert rad and 'WHERE er_aktiv' in rad[0], rad
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -294,6 +337,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='ModuleBackupConfig blir Backupplan, med rader i basen',
             seed=_seed_backupplan,
             sjekk=_sjekk_backupplan,
+        ),
+        Migrasjonsprove(
+            migrasjon='core.0018_vaktportal_standard',
+            foregaaende='0017_vaktportal',
+            beskrivelse='Vaktene får portalen «Standard», og pekeren blir er_aktiv',
+            seed=_seed_vaktportal,
+            sjekk=_sjekk_vaktportal,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

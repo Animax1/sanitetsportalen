@@ -23,10 +23,11 @@ from .models import Kontokorps, Mannskap, Ressurs, Vaktliste
 def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
     """Lag en `core.Vakt` som ikke er aktiv, og en tom vaktliste for den.
 
-    **Rører ikke portalens peker.** `AppSetting['aktiv_vakt_id']` står som
-    den står — oktobervakta skal kunne planlegges i august uten at pasienter
-    og oppdrag plutselig scopes til den. Aktiv vakt byttes der den alltid
-    byttes, i vaktadministrasjonen.
+    **Gjør ikke vakta aktiv.** Portalens aktive vakt står som den står —
+    oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
+    plutselig scopes til den. Aktiv vakt byttes der den alltid byttes, i
+    vaktadministrasjonen. Vakta havner i den gjeldende portalen
+    (`core.portal.gjeldende_portal`, 17. okt. 2026).
 
     Vakta lages av `core.vakt.opprett_vakt` (26. sep. 2026), som alle andre
     steder som lager vakter: navnekappløpet gir 400, ikke 500.
@@ -46,7 +47,7 @@ def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
         raise ValueError('Vakten må slutte etter at den begynner.')
     with transaction.atomic():
         vakt = opprett_vakt(navn, year=timezone.localtime(startet).year,
-                            startet=startet, er_aktiv=False)
+                            startet=startet)
         return Vaktliste.objects.create(vakt=vakt, planlagt_slutt=planlagt_slutt)
 
 

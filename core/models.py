@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from core.sortering import Norsk
+
 
 class BaseTimeStampedModel(models.Model):
     """Abstrakt baseklasse som gir created_at + updated_at automatisk.
@@ -463,6 +465,46 @@ class Notification(models.Model):
         return f'[{self.module_slug}] {self.title} ({status})'
 
 
+class Vaktportal(models.Model):
+    """Én portal — et miljø som kjører sine egne vakter (`docs/BESLUTNING_PORTALER.md`).
+
+    «Brann» kjører kamp 1–15, «Landsskytter» ett stevne i året, og de skal ikke
+    se hverandres mannskap, pasienter eller oppdrag. Portalen ligger **over**
+    vakta: hver vakt hører til én portal, og hver portal har høyst én aktiv vakt
+    (`Vakt.Meta.constraints`).
+
+    **Heter `Vaktportal` i koden og «portal» på skjermen.** «portal» betyr
+    allerede produktet i `base_portal.html`, `portal-utils.js` og `PORTAL_MILJO`;
+    ett ord for to ting gjør `grep` ubrukelig.
+
+    **Ingen peker til aktiv vakt her** (beslutning 19). En `aktiv_vakt`-FK ville
+    gitt sykelen `Vaktportal → Vakt → Vaktportal`, og `utled_restore_models`
+    legger sykler bakerst — i `portal`-handleren, som gjenopprettes først. Den
+    aktive vakta er `Vakt.er_aktiv`, og databasen håndhever at det er én.
+
+    Slettes ikke når den har vakter (`Vakt.portal` er `PROTECT`); den
+    deaktiveres. Bærer ingen personopplysninger.
+    """
+
+    navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    slug = models.SlugField(
+        max_length=64, unique=True, verbose_name='Kortnavn',
+        help_text='Sendes til kartet og står i offline-nøklene. Endres ikke etter at '
+                  'portalen er tatt i bruk.')
+    er_aktiv = models.BooleanField(
+        default=True, verbose_name='Aktiv',
+        help_text='En deaktivert portal kan ikke velges, men alt i den står.')
+    opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
+
+    class Meta:
+        verbose_name = 'Portal'
+        verbose_name_plural = 'Portaler'
+        ordering = [Norsk('navn')]
+
+    def __str__(self):
+        return self.navn
+
+
 class Vakt(models.Model):
     """Én vakt — scopet pasienter, oppdrag og statistikk henger på.
 
@@ -476,11 +518,16 @@ class Vakt(models.Model):
     gitt `oppdrag → patients` for noe som ikke er pasientdata — samme
     begrunnelse som `core.stats_cache` og `core.arkiv`.
 
-    **Én aktiv vakt om gangen** — pekt på av `AppSetting['aktiv_vakt_id']`,
-    ikke av `er_aktiv` alene. Flere samtidige vakter ville krevd et vaktvalg i
-    hver eneste visning, og en feil i det valget er en pasient registrert på
-    feil vakt. Modellen sperrer det ikke for framtiden; grensesnittet
-    forutsetter én.
+    **Én aktiv vakt per portal**, håndhevet av databasen: en delvis unik
+    indeks på `portal` der `er_aktiv` (17. okt. 2026, beslutning 19 i
+    `docs/BESLUTNING_PORTALER.md`). Fram til da var `AppSetting['aktiv_vakt_id']`
+    fasit og `er_aktiv` en kopi som kunne komme i utakt. Flere samtidige vakter
+    i *samme* portal ville krevd et vaktvalg i hver eneste visning, og en feil i
+    det valget er en pasient registrert på feil vakt.
+
+    **`portal` er nullbar med vilje.** Backupfiler fra før portalene fantes
+    ligger 730 dager offsite og har ikke feltet; `core.vakt.opprett_vakt` krever
+    det, og ingen produksjonsvei lager en vakt uten.
 
     Bærer ingen personopplysninger: navn på arrangementet og tidspunkter.
     """
@@ -503,7 +550,13 @@ class Vakt(models.Model):
                   'fram til arkivet er kollapset — etter det finnes ikke '
                   'radnivået lenger.',
     )
-    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    # **Standard `False`** (17. okt. 2026, var `True`). Med den unike indeksen
+    # feiler en ny rad som påstår å være aktiv mens portalen har en — en vakt
+    # gjøres aktiv med vilje (`core.vakt.gjor_aktiv`), aldri ved å bli laget.
+    er_aktiv = models.BooleanField(default=False, verbose_name='Aktiv')
+    portal = models.ForeignKey(
+        Vaktportal, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='vakter', verbose_name='Portal')
 
     # Bevisst ikke BaseTimeStampedModel: `startet` er vaktas egen tid og skal
     # kunne settes og rettes; en auto_now_add ved siden av ville vært en
@@ -514,6 +567,11 @@ class Vakt(models.Model):
         verbose_name = 'Vakt'
         verbose_name_plural = 'Vakter'
         ordering = ['-startet']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['portal'], condition=models.Q(er_aktiv=True),
+                name='en_aktiv_vakt_per_portal'),
+        ]
 
     def __str__(self):
         return self.navn

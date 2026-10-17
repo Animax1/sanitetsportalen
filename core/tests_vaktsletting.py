@@ -196,10 +196,18 @@ class SlettVaktTests(SlettingBasis):
         self.assertEqual(_rader(self.aktiv.pk), for_)
         self.assertFalse(Backup.objects.filter(kind='pre_slett').exists())
 
-    def test_pekeren_til_aktiv_vakt_vinner_over_flagget(self):
-        """Står `aktiv_vakt_id` på en vakt med `er_aktiv=False` — en inkonsistens,
-        men en mulig en — er det likevel den portalen registrerer på."""
-        AppSetting.set('aktiv_vakt_id', self.gammel.pk)
+    def test_aktiv_vakt_i_en_annen_portal_slettes_ikke(self):
+        """Sperra spør vaktas egen portal, ikke den gjeldende (17. okt. 2026).
+
+        Erstatter testen av at pekeren vant over flagget: pekeren finnes ikke
+        lenger, og inkonsistensen den testet kan ikke oppstå. Det som kan gå galt
+        nå, er å spørre feil portal — da ville den aktive vakta i Brann sett ut
+        som en tidligere vakt fra Landsskytter.
+        """
+        from core.models import Vaktportal
+        brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        Vakt.objects.filter(pk=self.gammel.pk).update(portal=brann, er_aktiv=True)
+        self.gammel.refresh_from_db()
         with self.assertRaises(vaktsletting.KanIkkeSlettes):
             vaktsletting.slett_vakt(self.gammel, bruker=self.admin)
         self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists())

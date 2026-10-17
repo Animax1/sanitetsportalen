@@ -33,6 +33,8 @@ from django.db import transaction
 
 from patients.choices import validate_patient_choice_fields
 from patients.models import Patient, Forstehjelper, Helsepersonell
+from core.models import Vaktportal
+from core.portal import UklarPortal, gjeldende_portal
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from audit.models import AuditLog
 
@@ -59,6 +61,10 @@ class Command(BaseCommand):
         parser.add_argument('--year', type=int, default=None)
         parser.add_argument('--dry-run', action='store_true')
         parser.add_argument(
+            '--portal', default=None,
+            help='Portalens kortnavn (slug). Kan utelates når det bare finnes én portal.',
+        )
+        parser.add_argument(
             '--force', action='store_true',
             help='Importer selv om kliniske felt bryter whitelisten i choices.py.',
         )
@@ -68,7 +74,14 @@ class Command(BaseCommand):
         if not path.exists():
             raise CommandError(f'Finner ikke filen: {path}')
 
-        year = opts['year'] or hent_aktiv_vakt().year
+        # En kommando har ingen forespørsel å hente portalen fra, så den
+        # oppgis — eller er den eneste (`docs/BESLUTNING_PORTALER.md` §4.13).
+        try:
+            portal = (Vaktportal.objects.get(slug=opts['portal']) if opts['portal']
+                      else gjeldende_portal())
+        except (Vaktportal.DoesNotExist, UklarPortal) as feil:
+            raise CommandError(f'Oppgi en gyldig --portal: {feil}') from None
+        year = opts['year'] or hent_aktiv_vakt(portal).year
         dry = opts['dry_run']
 
         # Åpne offline-SQLite som read-only
@@ -101,7 +114,7 @@ class Command(BaseCommand):
 
         # Renummerer fra vaktas eget maks — pasientnummer er unikt per vakt
         # siden deploy 2, ikke globalt.
-        vakt = vakt_for_year(year)
+        vakt = vakt_for_year(year, portal)
         existing_max = (Patient.objects.filter(vakt=vakt)
                         .order_by('-pasientnummer').first())
         next_nr = (existing_max.pasientnummer if existing_max else 0) + 1
@@ -133,7 +146,7 @@ class Command(BaseCommand):
                         # Vakta for radens eget år, ikke den aktive: en
                         # offline-import kan i prinsippet bære et annet år,
                         # og da skal koblingen følge året.
-                        vakt=vakt_for_year(year),
+                        vakt=vakt,
                         forstehjelper=forstehjelper_obj,
                         helsepersonell_ref=hp_obj,
                     )

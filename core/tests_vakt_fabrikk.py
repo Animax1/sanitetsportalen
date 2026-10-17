@@ -18,8 +18,8 @@ from django.db.models.query import QuerySet
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser
-from core.models import AppSetting, Vakt
-from core.vakt import VaktnavnOpptatt, opprett_vakt, vakt_for_year
+from core.models import Vakt
+from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, opprett_vakt, vakt_for_year
 from django.utils import timezone
 
 
@@ -105,7 +105,7 @@ class GjennomEndepunkteneTests(TestCase):
         self.assertTrue(Patient.objects.filter(vakt=self.vakt).exists(), 'ingen pasienter slettet')
         self.vakt.refresh_from_db()
         self.assertTrue(self.vakt.er_aktiv)
-        self.assertEqual(int(AppSetting.get('aktiv_vakt_id')), self.vakt.pk)
+        self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
 
 
 class IngenAndreLagerVakterTests(SimpleTestCase):

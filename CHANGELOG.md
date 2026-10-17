@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 1: `Vaktportal`, én aktiv vakt per portal håndhevet av databasen, pekeren `aktiv_vakt_id` leses ikke lenger, pasientens fallback fjernet  `#core/vakt` `#core/backup`
+
+Første fase av `docs/BESLUTNING_PORTALER.md`. **Ingen synlig endring:** alt som finnes
+går til portalen «Standard», og med én portal svarer alt som før.
+
+**Modellen.** `core.Vaktportal(navn, slug, er_aktiv)`, og `Vakt.portal` (FK, `PROTECT`,
+nullbar — backupfiler fra før portalene har ikke feltet). **Aktiv vakt er `Vakt.er_aktiv`**
+med den delvis unike indeksen `en_aktiv_vakt_per_portal`. `AppSetting['aktiv_vakt_id']`
+var fasit fram til nå, og `er_aktiv` en kopi som kunne komme i utakt. Ingen peker på
+portalen: den ville gitt sykelen `Vaktportal → Vakt → Vaktportal` i backupens
+gjenopprettingsrekkefølge. `Vakt.er_aktiv` har standard `False` — en vakt gjøres aktiv med
+`core.vakt.gjor_aktiv()`, aldri ved å bli laget.
+
+**Migrasjonene, i tre:** `core/0017` skjemaet, `0018` data (Standard, alle vakter dit, og
+`er_aktiv` rettet etter pekeren — pekeren vinner over flagget), `0019` indeksen. Delt så data
+og skjema aldri står i samme transaksjon. **Prøve i `core/migrasjonsprover.py`:** tre vakter
+der pekeren og flagget er uenige; kjørt mot PostgreSQL 16 lokalt, grønn.
+
+**`core/portal.py`** er ny: `gjeldende_portal()` leser konteksten (`aktiver_portal()`, settes
+av middlewaren i fase 2), ellers den eneste aktive portalen — og **kaster `UklarPortal` når det
+er flere**. Den gjetter aldri. `hent_aktiv_vakt`, `laas_aktiv_vakt`, `vakt_for_year` og
+`opprett_vakt` tar `portal`. «Avslutt vakt», gjenåpning og sletting spør vaktas egen portal, og
+låsen sitter på portalraden i stedet for `AppSetting`-raden. Vaktsiden viser også vakter uten
+portal, så en vakt fra en gammel backup kan gjenåpnes og tas inn; `verifiser_vakt` melder dem.
+`import_offline_data` fikk `--portal`.
+
+**Pasientens fallback er fjernet** (beslutning 22): `Patient.save()` fylte inn aktiv vakt når den
+manglet. Bare én test lente seg på den, ikke de om lag 25 som var anslått — resten setter vakt
+selv. `patients.test_helpers.lag_pasient()` og `aktiver_vakt()` er nye; testen som sa at
+fallbacken virket, sier nå at den ikke finnes.
+
+**Backup og audit:** `core.Vaktportal` er med i portalfila, først. Den lages, døpes om og
+deaktiveres med auditrad, og `Vakt.portal` logges som de andre vaktfeltene.
+
+**Tester:** `core/tests_vaktportal.py`, 16 stykker — den viktigste er at to portaler uten
+kontekst stopper. Ti eksisterende tester beskrev pekeren og er skrevet om til flagget.
+**Mutasjoner: 19, alle drept til slutt.** To overlevde første runde: `vakt_for_year` uten
+portalfilter (hullet — ny test: årets vakt hentes fra riktig portal), og slettesperra uten
+`er_aktiv` (overlevde fordi oppslaget ved siden av spurte det samme — oppslaget er fjernet).
+
 ## 2026-10-17 — Portalnotatet gjennomgått tre runder: aktiv vakt som unik indeks, `ModulTilgang` på medlemskapet, portalregelen, pasientens fallback fjernes, verdimengdene fordelt  `#core/tilgang` `#core/vakt` `#core/dokumentasjon`
 
 André lot en annen modell lese `docs/BESLUTNING_PORTALER.md` mot koden og limte svarene

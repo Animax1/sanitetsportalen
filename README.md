@@ -90,8 +90,10 @@ En modul vises bare hvis `ModuleSettings.enabled=True` **og** brukeren har en
 ### Datamodeller — de viktigste
 
 **core**
-- **Vakt** — scopet alt annet henger på. Pasienter og oppdrag hører til én vakt.
-  Én aktiv om gangen, pekt på av `AppSetting['aktiv_vakt_id']`
+- **Vaktportal** — et miljø som kjører sine egne vakter («Brann», «Landsskytter»).
+  Se `docs/BESLUTNING_PORTALER.md`
+- **Vakt** — scopet alt annet henger på. Pasienter og oppdrag hører til én vakt, og
+  vakta til én portal. Én aktiv per portal: `er_aktiv`, håndhevet av en unik indeks
 - **AppSetting** — nøkkel/verdi for det portalvide. `db_table = 'patients_appsetting'`,
   beholdt med vilje da modellen flyttet (se «Migrasjoner» i `CLAUDE.md`)
 - **Backup** — metadata om backupfiler. `db_table = 'patients_backup'`, samme grunn

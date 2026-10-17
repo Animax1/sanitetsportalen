@@ -6,15 +6,21 @@ det, og da måtte oppdragsmodulen, vaktlista og statistikken importere
 *pasientmodulen* for å vite hvilken vakt de var i. Se
 `docs/PLAN_FLYTTING_TIL_CORE.md`.
 
-Ingen av de to rører pasientdata. De leser `core.Vakt` og `core.AppSetting`, og
-hører derfor hjemme her.
+Ingen av de to rører pasientdata. De leser `core.Vakt`, og hører derfor hjemme her.
+
+**Aktiv vakt er per portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+§4.1). `AppSetting['aktiv_vakt_id']` var fasit fram til da; nå er det
+`Vakt.er_aktiv`, og en delvis unik indeks sier at hver portal har høyst én.
+Hver funksjon her tar `portal`; utelates den, brukes `core.portal.gjeldende_portal()`,
+som aldri gjetter.
 """
 from __future__ import annotations
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone as djtz
 
-from core.models import AppSetting, Vakt
+from core.models import Vakt, Vaktportal
+from core.portal import gjeldende_portal
 from core.validators import current_local_year
 
 
@@ -28,7 +34,7 @@ def vaktnavn_opptatt_melding(navn: str) -> str:
             f'Legg på en dato eller velg et annet navn.')
 
 
-def opprett_vakt(navn, *, year, startet, er_aktiv=True):
+def opprett_vakt(navn, *, year, startet, portal=None):
     """Den ene fabrikken for `Vakt`-rader (26. sep. 2026).
 
     **Databasen avgjør om navnet er ledig, ikke et `exists()` foran.** Tre
@@ -37,76 +43,103 @@ def opprett_vakt(navn, *, year, startet, er_aktiv=True):
     den andre fikk 500 fra unikhetskravet. Her fanges `IntegrityError` i et
     eget savepoint, så en kaller inne i en større transaksjon kan fortsette,
     og svaret blir det samme som om sjekken hadde sagt nei.
+
+    **Vakta lages aldri aktiv** (17. okt. 2026). Med den unike indeksen ville
+    en ny rad som påstod å være aktiv feilet så snart portalen hadde en — og
+    feilen ville blitt meldt som «navnet er tatt». Det å gjøre en vakt aktiv er
+    `gjor_aktiv()`, en egen handling.
     """
     navn = (navn or '').strip()
     if not navn:
         raise ValueError('Vakten må ha et navn.')
+    portal = portal or gjeldende_portal()
     try:
         with transaction.atomic():
             return Vakt.objects.create(navn=navn, year=year, startet=startet,
-                                       er_aktiv=er_aktiv)
+                                       portal=portal, er_aktiv=False)
     except IntegrityError:
         raise VaktnavnOpptatt(vaktnavn_opptatt_melding(navn)) from None
 
 
-def vakt_for_year(year):
-    """Vakta for et år — finn den, eller lag den.
+def vakt_for_year(year, portal=None):
+    """Vakta for et år i portalen — finn den, eller lag den.
 
     Lat opprettelse — en fersk installasjon skal ikke trenge et oppsettsteg
     for at registrering skal virke. Navnet blir årstallet — samme ærlighet som
     backfillen: vi vet ikke hva vakta heter, og påstår det ikke. Admin endrer
-    navnet når hun vet det.
+    navnet når hun vet det. Vakta som lages er **ikke** aktiv.
 
-    Finnes flere vakter for året (mulig fra deploy 2), velges den nyeste —
-    men før deploy 2 finnes maks én per år.
+    Finnes flere vakter for året, velges den nyeste.
     """
-    vakt = Vakt.objects.filter(year=year).order_by('-startet').first()
+    portal = portal or gjeldende_portal()
+    vakt = Vakt.objects.filter(portal=portal, year=year).order_by('-startet').first()
     if vakt is not None:
         return vakt
     try:
-        return opprett_vakt(str(year), year=year, startet=djtz.now())
+        return opprett_vakt(str(year), year=year, startet=djtz.now(), portal=portal)
     except VaktnavnOpptatt:
         # En samtidig forespørsel rakk å lage den. Finnes den fortsatt ikke,
-        # er navnet tatt av en vakt for et annet år — det skal synes.
-        vakt = Vakt.objects.filter(year=year).order_by('-startet').first()
+        # er navnet tatt av en vakt i en annen portal eller et annet år — det
+        # skal synes.
+        vakt = Vakt.objects.filter(portal=portal, year=year).order_by('-startet').first()
         if vakt is None:
             raise
         return vakt
 
 
-def laas_aktiv_vakt():
-    """Lås pekeren til aktiv vakt og returner vakta. **Bare inne i en transaksjon.**
+def gjor_aktiv(vakt):
+    """Gjør `vakt` til portalens aktive vakt, og returner den. **Bare i en transaksjon.**
 
-    For de to som *bytter* aktiv vakt — «Avslutt vakt» og gjenåpning
-    (sikkerhetsgjennomgangen 28. sep. 2026). Begge leste `hent_aktiv_vakt()`
+    Låser portalen, og slår av en annen aktiv vakt i samme portal *før* denne
+    slås på — rekkefølgen den unike indeksen krever. Den andre får `avsluttet`
+    satt, som gjenåpningen alltid har gjort. En vakt uten portal (fra en backup
+    tatt før portalene) tas inn i den gjeldende.
+    """
+    if vakt.portal_id is None:
+        vakt.portal = gjeldende_portal()
+        vakt.save(update_fields=['portal'])
+    Vaktportal.objects.select_for_update().filter(pk=vakt.portal_id).first()
+    (Vakt.objects.filter(portal_id=vakt.portal_id, er_aktiv=True)
+     .exclude(pk=vakt.pk).update(er_aktiv=False, avsluttet=djtz.now()))
+    vakt.er_aktiv = True
+    vakt.avsluttet = None
+    vakt.save(update_fields=['er_aktiv', 'avsluttet'])
+    return vakt
+
+
+def laas_aktiv_vakt(portal=None):
+    """Lås portalen og returner dens aktive vakt. **Bare inne i en transaksjon.**
+
+    For de som *bytter* aktiv vakt — «Avslutt vakt», gjenåpning og sletting
+    (sikkerhetsgjennomgangen 28. sep. 2026). Alle leste `hent_aktiv_vakt()`
     utenfor transaksjonen: to samtidige gjenåpninger ga to vakter med
     `er_aktiv=True`, og to samtidige avslutninger kunne fryse samme vakt to
     ganger — den andre gangen med tomme tall, som da ble de som ble vist.
-    Raden `aktiv_vakt_id` er det ene stedet begge skriver, så det er den som
-    låses; den andre venter og leser pekeren etter at den første er ferdig.
-    PostgreSQL låser; SQLite serialiserer skrivinger uansett.
+    Låsen satt på `AppSetting['aktiv_vakt_id']` fram til 17. okt. 2026; nå er
+    det portalraden, som er det ene stedet alle som bytter i portalen må
+    innom. PostgreSQL låser; SQLite serialiserer skrivinger uansett.
     """
-    AppSetting.objects.select_for_update().filter(key='aktiv_vakt_id').first()
-    return hent_aktiv_vakt()
+    portal = portal or gjeldende_portal()
+    Vaktportal.objects.select_for_update().filter(pk=portal.pk).first()
+    return hent_aktiv_vakt(portal)
 
 
-def hent_aktiv_vakt():
-    """Vakta nye rader skal peke på. Aldri ``None``.
+def hent_aktiv_vakt(portal=None):
+    """Vakta nye rader i portalen skal peke på. Aldri ``None``.
 
-    `AppSetting['aktiv_vakt_id']` er fasit når den finnes og peker på noe
-    ekte. Gjør den ikke det — fersk installasjon, slettet rad, eller en
-    rollback som tok vaktene — faller vi tilbake til vakta for aktivt år og
-    reparerer pekeren. Fail-open i samme retning som resten av huset: en
-    pasient som ikke lar seg registrere fordi en peker er borte, er verre enn
-    en peker som må repareres.
+    `Vakt.er_aktiv` er fasit, og indeksen sier at det er høyst én per portal.
+    Har portalen ingen — fersk installasjon, eller en gjenoppretting som tok
+    vaktene — gjøres vakta for året aktiv. Fail-open i samme retning som
+    resten av huset: en pasient som ikke lar seg registrere fordi portalen
+    mangler en aktiv vakt, er verre enn en vakt som må gis riktig navn.
     """
-    raa = AppSetting.get('aktiv_vakt_id', None)
-    if raa is not None:
-        try:
-            return Vakt.objects.get(pk=int(raa))
-        except (Vakt.DoesNotExist, TypeError, ValueError):
-            pass
-
-    vakt = vakt_for_year(current_local_year())
-    AppSetting.set('aktiv_vakt_id', vakt.pk)
-    return vakt
+    portal = portal or gjeldende_portal()
+    vakt = Vakt.objects.filter(portal=portal, er_aktiv=True).first()
+    if vakt is not None:
+        return vakt
+    try:
+        with transaction.atomic():
+            return gjor_aktiv(vakt_for_year(current_local_year(), portal))
+    except IntegrityError:
+        # En samtidig forespørsel rakk å gjøre en annen vakt aktiv.
+        return Vakt.objects.get(portal=portal, er_aktiv=True)

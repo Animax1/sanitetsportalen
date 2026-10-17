@@ -30,8 +30,10 @@ from patients.js_test_utils import (
     run_node)
 from django.utils import timezone
 
+from core.models import Vakt
+from patients.test_helpers import aktiver_vakt
+
 from oppdrag.models import Enhet
-from core.models import AppSetting
 
 from . import choices, services
 from .models import Mannskap, Vaktpost
@@ -46,7 +48,7 @@ class BesetningTests(TilgangsBasis):
         super().setUp()
         # Vaktlista må høre til portalens aktive vakt: sentralbordet står i
         # den vakta, og besetningen er den som er på bilen *nå*.
-        AppSetting.set('aktiv_vakt_id', self.vl.vakt.pk)
+        aktiver_vakt(self.vl.vakt)
         self.enhet = Enhet.objects.create(navn='HGSD 56')
         self.bil = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1',
                                gruppe=gruppe(AMBULANSE), enhet=self.enhet)
@@ -284,7 +286,7 @@ class BesetningTests(TilgangsBasis):
         """Uten en aktiv vakt i portalen fant endepunktet ingenting før."""
         self.vl.status = choices.DRIFT
         self.vl.save(update_fields=['status'])
-        AppSetting.set('aktiv_vakt_id', '')
+        Vakt.objects.update(er_aktiv=False)
         self._skift(self.p_hgsd)
         d = self._hent().json()['data']
         self.assertEqual(['Kari'], [m['navn'] for m in d['mannskap']])

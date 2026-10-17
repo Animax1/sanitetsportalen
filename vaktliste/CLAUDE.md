@@ -139,8 +139,8 @@ regel ble funnet, står i CHANGELOG på datoen.
   et anslag man flytter på. Spennet er det bemanningskurven tegnes over.
 - **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
   `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen.
-- **«Ny planlagt vakt» lager en `core.Vakt` med `er_aktiv=False` og lar `aktiv_vakt_id`
-  stå.** Oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
+- **«Ny planlagt vakt» lager en `core.Vakt` med `er_aktiv=False` og lar portalens aktive
+  vakt stå.** Oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
   registrert i dag scopes til den. Kopiering av oppsett tar ressursene, **aldri**
   personene — en liste ingen har sagt ja til ser ferdig ut.
 - **Skrivinger som kan bryte en unik-skranke står i `transaction.atomic()`.** Databasen

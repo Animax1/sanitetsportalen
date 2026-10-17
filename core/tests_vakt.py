@@ -3,7 +3,12 @@
 Skrevet for deploy 1 (FK-en skrives, `year` leses) og omskrevet da deploy 2
 fjernet `year` fra radene. Testene som sammenlignet de to kildene er borte
 med grunnlaget sitt — det som står igjen er det som fortsatt kan være galt:
-skrivestiene, pekeren, og arkivets frosne år mot vaktas.
+skrivestiene, aktiv vakt, og arkivets frosne år mot vaktas.
+
+**Pekeren er borte** (17. okt. 2026): `AppSetting['aktiv_vakt_id']` er
+erstattet av `Vakt.er_aktiv` med én aktiv per portal. Testene som sa
+«pekeren er fasit» sier nå det samme om flagget. Portalreglene selv står i
+`core/tests_vaktportal.py`.
 """
 from io import StringIO
 
@@ -15,7 +20,7 @@ from accounts.models import CustomUser, ModulTilgang
 from core.models import Vakt
 from core.validators import current_local_year
 from patients.models import Patient, VaktArkiv
-from core.models import AppSetting
+from core.portal import eneste_portal
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
 from oppdrag.test_helpers import lag_oppdrag
@@ -27,30 +32,34 @@ class HentAktivVaktTests(TestCase):
     def test_lat_opprettelse_paa_fersk_base(self):
         """En fersk installasjon skal ikke trenge et oppsettsteg.
 
-        Uten peker og uten vakter faller `hent_aktiv_vakt` tilbake til
-        inneværende år — `active_year`-nøkkelen den falt tilbake til før
-        deploy 2 finnes ikke lenger.
+        Uten vakter faller `hent_aktiv_vakt` tilbake til inneværende år, i
+        portalen — og gjør den aktiv.
         """
         self.assertEqual(Vakt.objects.count(), 0)
         vakt = hent_aktiv_vakt()
         self.assertEqual(vakt.year, current_local_year())
         self.assertEqual(vakt.navn, str(current_local_year()))
         self.assertTrue(vakt.er_aktiv)
-        self.assertEqual(AppSetting.get('aktiv_vakt_id'), str(vakt.pk))
+        self.assertEqual(vakt.portal, eneste_portal())
 
-    def test_pekeren_er_fasit_naar_den_finnes(self):
-        vakt = Vakt.objects.create(
-            navn='Landsskytterstevnet', year=AAR, startet=timezone.now())
-        AppSetting.set('aktiv_vakt_id', vakt.pk)
+    def test_flagget_er_fasit(self):
+        vakt = Vakt.objects.create(navn='Landsskytterstevnet', year=AAR,
+                                   startet=timezone.now(), portal=eneste_portal(),
+                                   er_aktiv=True)
         self.assertEqual(hent_aktiv_vakt().pk, vakt.pk)
         self.assertEqual(Vakt.objects.count(), 1)
 
-    def test_doed_peker_repareres(self):
-        """En rollback som tok vaktene skal ikke stoppe registrering."""
-        AppSetting.set('aktiv_vakt_id', 99999)
-        vakt = hent_aktiv_vakt()
-        self.assertEqual(vakt.year, current_local_year())
-        self.assertEqual(AppSetting.get('aktiv_vakt_id'), str(vakt.pk))
+    def test_uten_aktiv_vakt_gjoeres_aarets_aktiv(self):
+        """En gjenoppretting som tok den aktive skal ikke stoppe registrering.
+
+        Den som fantes for året gjenbrukes — som pekeren ble reparert til før."""
+        gammel = Vakt.objects.create(navn=str(current_local_year()),
+                                     year=current_local_year(),
+                                     startet=timezone.now(), portal=eneste_portal())
+        self.assertFalse(gammel.er_aktiv)
+        self.assertEqual(hent_aktiv_vakt().pk, gammel.pk)
+        gammel.refresh_from_db()
+        self.assertTrue(gammel.er_aktiv)
 
     def test_to_kall_gir_samme_vakt(self):
         self.assertEqual(hent_aktiv_vakt().pk, hent_aktiv_vakt().pk)
@@ -58,7 +67,7 @@ class HentAktivVaktTests(TestCase):
 
     def test_vakt_for_year_gjenbruker_eksisterende(self):
         vakt = Vakt.objects.create(
-            navn='LS97', year=2097, startet=timezone.now())
+            navn='LS97', year=2097, startet=timezone.now(), portal=eneste_portal())
         self.assertEqual(vakt_for_year(2097).pk, vakt.pk)
         self.assertEqual(vakt_for_year(2096).navn, '2096')
 
@@ -163,11 +172,12 @@ class VerifiserVaktTests(TestCase):
         self.assertEqual(kode, 0)
         self.assertIn('fra før grupperingen', ut)
 
-    def test_roed_paa_doed_aktiv_peker(self):
-        AppSetting.set('aktiv_vakt_id', 99999)
+    def test_roed_paa_vakt_uten_portal(self):
+        """En vakt fra en backup tatt før portalene er usynlig til den tas inn."""
+        Vakt.objects.create(navn='Fra gammel backup', year=2095, startet=timezone.now())
         kode, ut = self._kjor()
         self.assertEqual(kode, 1)
-        self.assertIn('finnes', ut)
+        self.assertIn('uten portal', ut)
 
     def test_nummerkollisjon_stoppes_av_skjemaet(self):
         """Kollisjonssjekken i kommandoen er fjernet — sperren bor i basen nå.

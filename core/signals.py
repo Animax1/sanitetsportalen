@@ -1,4 +1,4 @@
-"""Audit-logging for portalens egne tabeller: `AppSetting`, `ModuleSettings`, `Backupplan`, `Vakt`.
+"""Audit-logging for portalens egne tabeller: `AppSetting`, `ModuleSettings`, `Backupplan`, `Vakt`, `Vaktportal`.
 
 **Hullet dette lukker** (14. sep. 2026, meldt av André ved staging-verifisering:
 «logges ingenting fra core?»). Svaret var nesten nei, og det var ikke nytt av
@@ -50,13 +50,14 @@ from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 from core.klientip import klient_ip
 
-from .models import AppSetting, Backupplan, ModuleSettings, Vakt
+from .models import AppSetting, Backupplan, ModuleSettings, Vakt, Vaktportal
 
 logger = logging.getLogger(__name__)
 
 APPSETTING_TABELL = 'patients_appsetting'      # db_table, se core/models.py
 MODULESETTINGS_TABELL = 'core_modulesettings'
 VAKT_TABELL = 'core_vakt'
+VAKTPORTAL_TABELL = 'core_vaktportal'
 
 #: Nøkkelprefikser som **ikke** gir en auditrad. Maskinskriving uten et
 #: menneske bak — se modulens docstring for hvorfor telleren er det
@@ -268,7 +269,7 @@ def backupplan_pre_save(sender, instance, **kwargs):
 # `user=None`. Det er riktig: de *ble* opprettet, og «av systemet» er et
 # sannere svar enn ingen rad.
 
-VAKT_FELTER = ('navn', 'er_aktiv', 'startet', 'avsluttet')
+VAKT_FELTER = ('navn', 'er_aktiv', 'startet', 'avsluttet', 'portal')
 
 
 @receiver(pre_save, sender=Vakt)
@@ -312,4 +313,45 @@ def vakt_post_save(sender, instance, created, **kwargs):
         new_value=str(instance),
         user=bruker,
         ip=ip,
+    )
+
+
+# ── Vaktportal (17. okt. 2026) ───────────────────────────────────────────────
+#
+# Å lage, døpe om eller deaktivere en portal endrer hvem som ser hva. Samme
+# regel som vakta: ingen personopplysninger, feltene logges med verdi.
+
+VAKTPORTAL_FELTER = ('navn', 'slug', 'er_aktiv')
+
+
+@receiver(pre_save, sender=Vaktportal)
+@ikke_under_loaddata
+def vaktportal_pre_save(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+    gammel = Vaktportal.objects.filter(pk=instance.pk).first()
+    if gammel is None:
+        return
+    bruker, ip = _bruker_og_ip()
+    for felt in VAKTPORTAL_FELTER:
+        gammel_verdi = _verdi(getattr(gammel, felt, None))
+        ny_verdi = _verdi(getattr(instance, felt, None))
+        if gammel_verdi == ny_verdi:
+            continue
+        AuditLog.objects.create(
+            table_name=VAKTPORTAL_TABELL, record_id=instance.pk, action='UPDATE',
+            field_name=felt, old_value=gammel_verdi, new_value=ny_verdi,
+            user=bruker, ip=ip,
+        )
+
+
+@receiver(post_save, sender=Vaktportal)
+@ikke_under_loaddata
+def vaktportal_post_save(sender, instance, created, **kwargs):
+    if not created:
+        return
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=VAKTPORTAL_TABELL, record_id=instance.pk, action='CREATE',
+        field_name='', old_value='', new_value=str(instance), user=bruker, ip=ip,
     )

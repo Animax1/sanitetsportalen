@@ -331,12 +331,15 @@ Brukes som FK-referanse (`helsepersonell_ref`) fra `Patient` med `on_delete=PROT
 | `year` | IntegerField | Utledet, men lagret: sesongstatistikken grupperer på år |
 | `startet` | DateTimeField | |
 | `avsluttet` | DateTimeField | `NULL` mens vakta pågår |
-| `er_aktiv` | BooleanField | |
+| `er_aktiv` | BooleanField | Fasit for aktiv vakt siden 17. okt. 2026 |
+| `portal` | FK → `Vaktportal` | Nullbar: backupfiler fra før portalene har den ikke |
 
-**Én aktiv vakt om gangen**, pekt på av `AppSetting['aktiv_vakt_id']` — ikke av `er_aktiv`
-alene. Flere samtidige vakter ville krevd et vaktvalg i hver eneste visning, og en feil i
-det valget er en pasient registrert på feil vakt. Modellen sperrer det ikke for
-framtiden; grensesnittet forutsetter én.
+**Én aktiv vakt per portal**, håndhevet av databasen: en delvis unik indeks på `portal`
+der `er_aktiv` (`en_aktiv_vakt_per_portal`). Fram til 17. okt. 2026 var
+`AppSetting['aktiv_vakt_id']` fasit og `er_aktiv` en kopi. Flere samtidige vakter i samme
+portal ville krevd et vaktvalg i hver eneste visning, og en feil i det valget er en
+pasient registrert på feil vakt. Hvilken portal en forespørsel gjelder, avgjør
+`core/portal.py` — se `docs/BESLUTNING_PORTALER.md`.
 
 Modellen erstattet `year` som avgrensning (`docs/BESLUTNING_VAKT_SOM_SCOPE.md`). Den
 ligger i `core` fordi **begge** modulene scopes på den; i `patients` ville den gitt
@@ -366,7 +369,7 @@ Kjente nøkler:
 
 | Nøkkel | Beskrivelse | Auditlogges? |
 |---|---|---|
-| `aktiv_vakt_id` | Peker på gjeldende `Vakt` | Ja |
+| `aktiv_vakt_id` | **Leses ikke lenger** (17. okt. 2026) — står igjen for en eventuell tilbakerulling, ryddes senere | Ja |
 | `session_timeout_hours` | Sesjonslevetid i timer (1–24), default 8 | Ja |
 | `oppdrag_lyd_aktiv`, `oppdrag_lyd_nytt`, `oppdrag_krev_grov_avreist` | Bilinnstillinger | Ja |
 | `vaktliste.fil.*` | Mottakere og intervall for vaktlista på e-post | Ja |

@@ -46,7 +46,13 @@ class PortalBackupHandler(BaseBackupHandler):
     #: `VaktStatistikk` kom 28. sep. 2026: tallene for avsluttede vakter. Her og
     #: ikke i modulfilene, fordi de peker på vakta og ikke på noe i en modul —
     #: og fordi radene de ble regnet fra er borte, så denne fila er eneste kopi.
-    apps = ['core.Vakt', 'core.ModuleSettings', 'core.AppSetting', 'core.VaktStatistikk']
+    #:
+    #: `Vaktportal` kom 17. okt. 2026: hver vakt peker på sin portal, og
+    #: portalen må stå der før vakta lastes. Rekkefølgen innad utledes av
+    #: `utled_restore_models` — det er ingen sykel, fordi portalen ikke peker
+    #: tilbake på vakta (beslutning 19 i `docs/BESLUTNING_PORTALER.md`).
+    apps = ['core.Vaktportal', 'core.Vakt', 'core.ModuleSettings', 'core.AppSetting',
+            'core.VaktStatistikk']
     exclude = []
 
     #: `ModuleSettings.updated_by` er sporet av hvem som slo modulen av eller

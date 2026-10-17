@@ -21,6 +21,8 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
+from patients.test_helpers import aktiver_vakt
+
 from accounts.models import CustomUser, ModulTilgang
 from core.models import Vakt
 from oppdrag.models import Enhet
@@ -96,9 +98,8 @@ class PlanlagtVaktTests(TestCase):
         """
         for _ in range(3):
             services.opprett_planlagt_vakt(f'Vakt {_}')
-        self.assertEqual(
-            AppSetting.objects.get(key='aktiv_vakt_id').value,
-            str(self.aktiv.pk))
+        self.aktiv.refresh_from_db()
+        self.assertTrue(self.aktiv.er_aktiv)
 
         from core.vakt import hent_aktiv_vakt
         self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
@@ -1133,8 +1134,7 @@ class ArkiveringAvVaktlisteTests(ApiTests):
         enhet = Enhet.objects.create(navn='Sola 56')
         self._ressurs(arkivert, 'Bil gammel', enhet=enhet)
         self._ressurs(levende, 'Bil levende', enhet=enhet)
-        Vakt.objects.filter(pk=levende.vakt_id).update(er_aktiv=True)
-        AppSetting.set('aktiv_vakt_id', str(levende.vakt_id))
+        aktiver_vakt(levende.vakt)
 
         self.assertNotEqual(vaktdrift.vaktliste_i_bruk(), arkivert)
         besetning = vaktdrift.besetning(enhet.pk)

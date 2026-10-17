@@ -127,13 +127,14 @@ class LokaltAarTests(TestCase):
         with self._frys('2026-12-31T22:00:00'):
             self.assertEqual(current_local_year(), 2026)
 
-    def test_patient_save_bruker_lokalt_aar(self):
-        """`Patient.save` uten vakt faller tilbake til aktiv vakt, som på
-        fersk base opprettes for *lokalt* år — samme N5-poeng, ny mekanisme
-        (year-kolonnen forsvant i deploy 2)."""
-        with self._frys('2026-12-31T23:30:00'):
-            pasient = Patient.objects.create(pasientnummer=906)
-        self.assertEqual(pasient.vakt.year, 2027)
+    def test_patient_save_fyller_ikke_inn_vakt(self):
+        """`Patient.save` fylte inn aktiv vakt når den manglet — fjernet
+        17. okt. 2026 (beslutning 22 i `docs/BESLUTNING_PORTALER.md`). Med flere
+        portaler ville den gjettet portal i modellaget. Kommer den tilbake, blir
+        denne rød; lokalt år dekkes av testen under."""
+        from django.db import IntegrityError, transaction
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Patient.objects.create(pasientnummer=906)
 
     def test_hent_aktiv_vakt_bruker_lokalt_aar(self):
         """Fallbacken i `hent_aktiv_vakt` (ingen peker, ingen vakter) skal

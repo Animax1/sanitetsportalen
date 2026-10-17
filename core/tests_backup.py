@@ -1919,18 +1919,19 @@ class AlleFileneGjenopprettesTests(TestCase):
         }
 
     def _tom_alt(self):
-        """Tøm i barn-først-rekkefølge, vakta til slutt — den er det alt
-        henger på, og PROTECT stopper den ellers."""
+        """Tøm i barn-først-rekkefølge, vakta og portalen til slutt — det er
+        det alt henger på, og PROTECT stopper dem ellers."""
         from django.apps import apps as django_apps
 
-        from core.models import Vakt
+        from core.models import Vakt, Vaktportal
 
         for slug in self.REKKEFOLGE:
             for etikett in get_handler(slug).get_restore_models():
-                if etikett == 'core.Vakt':
+                if etikett in ('core.Vakt', 'core.Vaktportal'):
                     continue
                 django_apps.get_model(etikett).objects.all().delete()
         Vakt.objects.all().delete()
+        Vaktportal.objects.all().delete()
 
     def test_alle_modulfilene_kan_lastes_i_rekkefolge(self) -> None:
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):

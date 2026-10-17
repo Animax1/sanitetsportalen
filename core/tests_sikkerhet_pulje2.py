@@ -86,24 +86,40 @@ class AktivVaktLaasesTests(TestCase):
     def _vakt(self, navn, **kw):
         kw.setdefault('er_aktiv', False)
         kw.setdefault('avsluttet', timezone.now())
+        kw.setdefault('portal', self.vakt.portal)
         return Vakt.objects.create(navn=navn, year=2026, startet=timezone.now(), **kw)
 
-    def test_gjenaapning_rydder_alle_andre_aktive(self):
-        """To samtidige gjenåpninger kunne gi to vakter med `er_aktiv=True`."""
-        vill = self._vakt('Vill', er_aktiv=True, avsluttet=None)
+    def test_to_aktive_i_samme_portal_avvises_av_basen(self):
+        """To samtidige gjenåpninger kunne gi to vakter med `er_aktiv=True`.
+
+        Fram til 17. okt. 2026 ryddet gjenåpningen opp etter et slikt kappløp.
+        Nå kan tilstanden ikke oppstå: indeksen `en_aktiv_vakt_per_portal`."""
+        from django.db import IntegrityError, transaction
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._vakt('Vill', er_aktiv=True, avsluttet=None)
+
+    def test_gjenaapning_slaar_av_den_aktive(self):
         gammel = self._vakt('Gammel')
         self.c.post(f'/portal-admin/vakt/{gammel.pk}/gjenaapne/')
         self.assertEqual(hent_aktiv_vakt().pk, gammel.pk)
         self.assertEqual(list(Vakt.objects.filter(er_aktiv=True)), [gammel])
-        vill.refresh_from_db()
-        self.assertIsNotNone(vill.avsluttet)
+        self.vakt.refresh_from_db()
+        self.assertIsNotNone(self.vakt.avsluttet)
 
-    def test_tidligere_vakter_viser_ogsaa_en_med_feil_flagg(self):
-        """Taperen av et kappløp skal ikke forsvinne fra lista."""
-        vill = self._vakt('Vill', er_aktiv=True, avsluttet=None)
+    def test_tidligere_vakter_viser_ogsaa_en_uten_portal(self):
+        """En vakt fra en backup tatt før portalene skal ikke forsvinne fra lista —
+        den må kunne gjenåpnes for å tas inn."""
+        uten = self._vakt('Fra gammel backup', portal=None)
         svar = self.c.get('/portal-admin/vakt/')
-        self.assertIn(vill.pk, [t['vakt'].pk for t in svar.context['tidligere']])
+        self.assertIn(uten.pk, [t['vakt'].pk for t in svar.context['tidligere']])
         self.assertNotIn(self.vakt.pk, [t['vakt'].pk for t in svar.context['tidligere']])
+
+    def test_gjenaapning_tar_en_vakt_uten_portal_inn(self):
+        uten = self._vakt('Fra gammel backup', portal=None)
+        self.c.post(f'/portal-admin/vakt/{uten.pk}/gjenaapne/')
+        uten.refresh_from_db()
+        self.assertEqual(uten.portal, self.vakt.portal)
+        self.assertEqual(hent_aktiv_vakt().pk, uten.pk)
 
     def test_en_vakt_som_ikke_er_aktiv_kan_ikke_avsluttes(self):
         """Den andre av to samtidige avslutninger har en vakt som alt er avsluttet."""
@@ -119,13 +135,14 @@ class AktivVaktLaasesTests(TestCase):
     def test_laasen_tar_den_som_ble_avsluttet_mens_backupene_gikk(self):
         """Den tidlige sjekken er et kappløp: backupene tar tid, og den andre
         avslutningen kan ha kommet først. Da er det låsen i transaksjonen som holder."""
-        from core.vakt import opprett_vakt
-        from core.models import AppSetting
+        from django.db import transaction
+
+        from core.vakt import gjor_aktiv, opprett_vakt
 
         def annen_avslutning_imens(*args, **kwargs):
             if not Vakt.objects.filter(navn='Kom først').exists():
-                ny = opprett_vakt('Kom først', year=2026, startet=timezone.now())
-                AppSetting.set('aktiv_vakt_id', ny.pk)
+                with transaction.atomic():
+                    gjor_aktiv(opprett_vakt('Kom først', year=2026, startet=timezone.now()))
 
         with mock.patch('core.backup.create_backup', side_effect=annen_avslutning_imens):
             with self.assertRaises(vaktslutt.Sperret):

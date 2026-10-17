@@ -152,17 +152,11 @@ class Patient(models.Model):
     def __str__(self):
         return f'Pasient #{self.pasientnummer} – {self.problemstilling or "ukjent"}'
 
-    def save(self, *args, **kwargs):
-        """Sett vakta til den aktive hvis den ikke er satt.
-
-        Samme idiom som `year`-defaulten feltet hadde før deploy 2:
-        skrivestiene setter vakta eksplisitt, og denne fanger resten — først
-        og fremst tester og shell-bruk, som ellers måtte kjenne scopet.
-        """
-        if self.vakt_id is None:
-            from core.vakt import hent_aktiv_vakt  # noqa: WPS433 — sykel ved modul-last
-            self.vakt = hent_aktiv_vakt()
-        super().save(*args, **kwargs)
+    # **Ingen `save()` som fyller inn vakta** (17. okt. 2026, beslutning 22 i
+    # `docs/BESLUTNING_PORTALER.md`). Den falt tilbake på aktiv vakt «for tester
+    # og shell»; ingen produksjonsvei brukte den — begge skrivestiene setter vakta
+    # selv. Med flere portaler ville den gjettet portal i modellaget, der det
+    # ikke finnes noen bruker å spørre. Tester bruker `test_helpers.lag_pasient()`.
 
 
 class VaktArkiv(models.Model):
