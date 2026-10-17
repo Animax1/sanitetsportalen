@@ -1,8 +1,9 @@
 # Beslutningsnotat: flere portaler i én installasjon
 
-Status: **besluttet 17. okt. 2026, ikke påbegynt.** Avklart med André i én samtale samme
-dag; svarene står i §3 med hans ord der de var avgjørende. Faseplanen er §6, og hver fase
-står som eget punkt i `TODO.md`.
+Status: **besluttet 17. okt. 2026.** Avklart med André i én samtale samme dag; svarene står
+i §3 med hans ord der de var avgjørende. Deretter **gjennomgått tre runder mot koden**, av
+to modeller som kontrollerte hverandre (§9) — rettelsene derfra står inne i teksten, og
+beslutningene 19–24 kom av dem. Faseplanen er §6, og hver fase står i `TODO.md`.
 
 **Slettes** når modellen er levert. Da er begrunnelsen CHANGELOG sin.
 
@@ -67,6 +68,12 @@ endres, ikke vakta.
 | 16 | Opprydding | **Admin ser «Sist innlogget», portalene, og filtrene «Uten portal» og «Inaktiv 12 mnd»** |
 | 17 | Innstillingene | **Sorteres i system og portal** (§4.7) |
 | 18 | Kartet | **Gruppe → én portal, gruppevelger i kartet, ny vakt tømmer posisjonene** (§4.10). Separate innlogginger står |
+| 19 | Hvilken vakt er aktiv | **`Vakt.er_aktiv` med en delvis unik indeks per portal**, ikke en peker (§4.1) |
+| 20 | Medlemskap og modulrad | **`ModulTilgang` henger på `Portaltilgang` med `CASCADE`** — én sannhet (§4.2) |
+| 21 | Ingen portal valgt | **Portalregelen** (§4.4): én mulig velges og lagres i sesjonen; flere stopper lesing og skriving til valget er tatt; null er foreldreløs. **Aldri «Standard» som reserve** |
+| 22 | Pasientens fallback | **Fjernes**, med `lag_pasient()` til testene (§4.13) |
+| 23 | Verdimengdene | **Sted og person er per portal, fag er globalt** — tabellen i §4.12 |
+| 24 | Én-til-én fra konto til portaldata | **Unik per (portal, konto)** — `Mannskap.user`, `Kontokorps`, `Ansvarsmerke`, `Forstehjelper.user`, `Helsepersonell.user` (§4.12) |
 
 ## 4. Modellen
 
@@ -86,11 +93,22 @@ Vaktportal                                  «Brann», «Landsskytter»
 
 ### 4.1 `Vaktportal` og aktiv vakt
 
-`core.Vaktportal(navn, slug, aktiv_vakt, er_aktiv)`. `core.Vakt` får `portal` (FK,
-`PROTECT` — en portal med vakter slettes ikke, den deaktiveres). **`aktiv_vakt` flytter
-fra `AppSetting` til portalen**, og `core.vakt.hent_aktiv_vakt()` får portalen som
-argument. Én aktiv vakt *per portal* — samme begrunnelse som før (et vaktvalg i hver
-visning er en pasient på feil vakt), bare én etasje ned.
+`core.Vaktportal(navn, slug, er_aktiv)`. `core.Vakt` får `portal` (FK, `PROTECT` — en
+portal med vakter slettes ikke, den deaktiveres). Én aktiv vakt *per portal* — samme
+begrunnelse som før (et vaktvalg i hver visning er en pasient på feil vakt), bare én etasje ned.
+
+**Ingen peker** (beslutning 19). `AppSetting['aktiv_vakt_id']` erstattes av
+`Vakt.er_aktiv` med en **delvis unik indeks på `(portal) WHERE er_aktiv`**, og
+`core.vakt.hent_aktiv_vakt(portal)` leser den. Tre grunner:
+
+- **Databasen håndhever regelen.** I dag er pekeren fasit og `er_aktiv` en kopi som kan
+  komme i utakt (`core/views_vakt.py` sier det selv: «Pekeren er fasit»).
+- **En peker på portalen ville gitt en sykel** `Vaktportal → Vakt → Vaktportal`.
+  `utled_restore_models` legger sykler bakerst alfabetisk og logger — i `portal`-handleren,
+  som står først i gjenopprettingsrekkefølgen.
+- **Låsen finnes fortsatt:** `laas_aktiv_vakt()` låser portalraden (`select_for_update`)
+  i stedet for `AppSetting`-raden. Gjenåpningen slår allerede av de andre før den slår på
+  sin egen (`core/views_vakt.py`), som er rekkefølgen en unik indeks krever.
 
 Eksisterende data går til én portal, «Standard». **Med én portal skal ingenting se
 annerledes ut:** ingen velger, ingen ny meny. Det er det som gjør de første deployene trygge.
@@ -99,10 +117,14 @@ annerledes ut:** ingen velger, ingen ny meny. Det er det som gjør de første de
 
 - **`Portaltilgang(bruker, portal, rolle)`** med `moderator | medlem`. Ingen rad = ingen
   tilgang til portalen, samme prinsipp som `ModulTilgang`.
-- **`ModulTilgang` får `portal`**, og unikheten blir `(bruker, portal, modul_slug)`.
-  Mekanismen, matrisen, `@modul_kreves` og `har_tilgang` står — de spør bare i portalen
-  forespørselen gjelder. En ny rollepakke ved siden av ville gitt to sannheter om tilgang;
-  det er feilen `kan_redigere_*`-flaggene var.
+- **`ModulTilgang` henger på `Portaltilgang`, med `CASCADE`** (beslutning 20), og
+  unikheten blir `(portaltilgang, modul_slug)`. En modulrad uten medlemskap kan da ikke
+  finnes, og «fjern fra portalen» er én sletting. En egen `portal`-FK ved siden av
+  medlemskapet ville gitt to sannheter om samme ting — feilen `kan_redigere_*`-flaggene var.
+- **`har_tilgang(user, …)` beholder signaturen.** Den aktive portalen legges på
+  brukerobjektet av middlewaren som leser sesjonen, ved siden av tilgangscachen som alt
+  ligger der (`core/auth_decorators.py`). De 56 kallstedene endres ikke. **Mangler
+  portalen på brukeren, er svaret ingen tilgang** — aldri «Standard» (se §4.4).
 - **`Portalmodul(portal, modul_slug, tak)`**, satt av admin. Moderator deler ut innenfor
   taket. En modul uten rad finnes ikke i portalen, heller ikke i menyen.
 - **Moderator kan aldri dele ut over eget nivå eller over taket**, og aldri gjøre noen til
@@ -132,8 +154,22 @@ flytter, `db_table` beholdes, og `core.backup.GAMLE_MODELLNAVN` oversetter
 
 ### 4.4 Hvilken portal står du i — sesjonen og fanevakten
 
-Den aktive portalen ligger i sesjonen og velges etter innlogging (én portal: ingen velger).
-**Alene er det farlig:** bytter fane B portal, skriver fane A plutselig i feil portal.
+**Portalregelen** (beslutning 21). *Mulige portaler* er de aktive portalene brukeren har
+`Portaltilgang` i — for global admin alle aktive.
+
+| Mulige | Hva skjer |
+|---|---|
+| Én | Velges automatisk og **skrives i sesjonen** |
+| Flere, ingen valgt | **Både lesing og skriving** stoppes; brukeren sendes til portalvelgeren |
+| Null | Foreldreløs konto: en side som sier det, ikke en tom portal |
+
+Valget lagres **én gang** og står til brukeren bytter selv — regnes det ut per forespørsel,
+blir hun kastet til velgeren midt i arbeidet den dagen admin legger henne til i portal
+nummer to. Men det **kontrolleres ved hver forespørsel**: er hun fjernet fra portalen, eller
+er den deaktivert, er valget ugyldig med en gang. Med én portal i installasjonen velges den
+for alle — testene som logger inn med `force_login` går derfor uendret.
+
+**Sesjonen alene er farlig:** bytter fane B portal, skriver fane A plutselig i feil portal.
 
 Derfor **fanevakten**: siden vet hvilken portal den ble tegnet for, `apiFetch` sender den
 i `X-Portal` (samme grep som `X-Portal-Inaktiv`), og en middleware svarer **409** — «Du
@@ -158,7 +194,10 @@ er nettopp den formen B trenger.
 - **«Hent inn fra de siste to årene»:** når en vakt opprettes, foreslås alle med en
   `Vaktpost` i portalens vakter de siste 24 månedene. Samme frist som radnivået ellers.
 - **Følgefeil som må tas med:** `Mannskap.user` og `Kontokorps.user` er `OneToOneField` i
-  dag. Én konto skal kunne kobles i hver portal, så de blir unike per `(portal, user)`.
+  dag. Én konto skal kunne kobles i hver portal, så de blir unike per `(portal, user)` —
+  regelen i §4.12.
+- **Personvernet:** retting og sletting av én person skjer i flere rader. Innsyn og sletting
+  krever derfor et søk på tvers av portalene, på e-post og navn, for admin.
 - Overnattingsregelen «én person, ett sted, per natt» gjelder innen portalen.
 
 ### 4.6 Bilkontoene er globale
@@ -245,6 +284,49 @@ Brann-laget havne på Landsskytters «Hovedpost».
   (`AdminUserEditForm`, `_kan_degraderes()`, `RollenSettesBareGjennomSkjemaeneTests`)
   gjelder uendret — moderatorens flate skriver aldri `role`.
 
+### 4.12 Verdimengdene
+
+Alle er unike på navn for hele installasjonen i dag. **Regelen: det som beskriver et sted
+eller en person, er per portal; det som beskriver faget, er globalt** (beslutning 23).
+
+| Per portal | Global |
+|---|---|
+| `oppdrag.Lokasjon` («skifter fra vakt til vakt») | `oppdrag.Problemstilling` og hastegrad («faglige verdimengder») |
+| `patients.Forstehjelper`, `patients.Helsepersonell` — personnavn | `oppdrag.Enhetstype` — bilene er globale |
+| KO: `Ansvarsomraade`, `Artist`, `Kjennetegn` — satt opp per arrangement | `vaktliste.Kompetanse`, `vaktliste.Ressursgruppe` |
+| `core.Vakt.navn` — unik **per portal**, så begge kan ha «Kamp 7» | park: `Problemstilling`, `Utfall` |
+
+**En én-til-én fra en global konto til portaldata blir unik per (portal, konto)**
+(beslutning 24). Dagens fem treff: `Mannskap.user`, `Kontokorps.user`,
+`ko.Ansvarsmerke.bruker` (henger på `Portaltilgang`), `Forstehjelper.user` og
+`Helsepersonell.user` — og «mine pasienter»-filteret følger med. Regelen står her for at
+den sjette skal finnes ved å lese, ikke ved en tilfeldighet.
+
+### 4.13 Kallstedene uten forespørsel
+
+De 29 kallstedene i §8 deles i fire, etter hvor portalen kan komme fra:
+
+| Har | Eksempel | Portalen kommer fra |
+|---|---|---|
+| **Request** | viewene | `request.user` (§4.2) |
+| **Data** | `ko.signals.posisjon_delt`, stemplingen | Reiser med signalet og raden — **slås aldri opp** |
+| **Lenke** | parks side uten innlogging (`Parklenke` har verken vakt eller portal) | Lenken bærer portalen |
+| **Ingenting** | kommandoer, cron, `import_offline_data` (slår opp på *år*) | Oppgis eksplisitt, ellers feil |
+
+**Pasientens fallback fjernes** (beslutning 22). `Patient.save()` faller tilbake på aktiv
+vakt «for tester og shell»; ingen produksjonskode bruker den — begge skrivestiene setter
+vakt selv. Et vilkår om «én portal finnes» ville vært installasjonsskopet, ikke brukerens,
+og virket helt til portal nummer to ble opprettet. `patients.test_helpers.lag_pasient()`
+erstatter den, etter mønsteret fra `oppdrag.test_helpers.lag_oppdrag()`.
+
+### 4.14 Cachenøklene og varslene
+
+- **Endringsnumrene** (`core/endringer.py`) får portalen i nøkkelen. De lekker ingenting —
+  de sier bare «hent på nytt» — men med to samtidige arrangementer henter hver Brann-fane
+  på nytt ved hver skriving i Landsskytter.
+- **Full statistikk** er allerede per vakt (`full:{slug}:vakt:{pk}`), og dermed per portal.
+- **Varslene** (`core.Notification`) får portalen, og vises med portalnavn.
+
 ## 5. Utenfor denne runden
 
 | Hva | Hvorfor |
@@ -263,11 +345,11 @@ kommer først i fase 5.
 
 | Fase | Innhold | Synlig endring |
 |---|---|---|
-| **0** | `/portal-admin/` → `/admin/`, 301 fra den gamle. Uavhengig av resten | Adressen |
-| **1** | `core.Vaktportal`, `Vakt.portal` fylt til «Standard», aktiv vakt flytter til portalen, `hent_aktiv_vakt(portal)` i alle 29 filene | Ingen |
-| **2** | `Portaltilgang`, `ModulTilgang.portal`, aktiv portal i sesjonen, fanevakten (`X-Portal`, 409), portal i offline-nøklene | Ingen med én portal |
+| **0** | `/portal-admin/` → `/admin/`, 301 fra den gamle. **Tas rett før fase 5**, så de nye sidene får riktig sti fra starten | Adressen |
+| **1** | `core.Vaktportal`, `Vakt.portal` fylt til «Standard», aktiv vakt som delvis unik indeks, `hent_aktiv_vakt(portal)` i alle 29 filene etter §4.13, pasientens fallback fjernet | Ingen |
+| **2** | `Portaltilgang`, `ModulTilgang` på medlemskapet, portalregelen og aktiv portal på brukerobjektet, fanevakten (`X-Portal`, 409), portal i offline-nøklene | Ingen med én portal |
 | **3** | Tilhørighet: `vaktliste.Korps` → `core`, typen `annet`, kontoens tilhørigheter, portalens utvalg | Admin får katalogen |
-| **4** | Data per portal: `Mannskap.portal`, `Kontokorps` og `Mannskap.user` unike per portal, innstillingene i system og portal, portalfilter i statistikk og arkiv | Ingen med én portal |
+| **4** | Data per portal: `Mannskap.portal`, verdimengdene og én-til-én-koblingene etter §4.12, innstillingene, cachenøkler og varsler (§4.14), portalfilter i statistikk og arkiv, søk på tvers for innsyn | Ingen med én portal |
 | **5** | Flatene: «Ny portal», moduler og tak, moderatorens brukere og tilgang, «Avslutt vakt» til moderator, «Sist innlogget» og filtrene, portalvelgeren, «hent fra 24 mnd» | Alt |
 | **6** | Kartet, i begge repoer: slug og vakt-ID i meldingen, `Gruppe.portal`, `steder_for()`, gruppevelgeren | Kartet |
 | **7** | Sladding: KO, så oppdrag, så pasient med ny signering. **Uavhengig av portalene** og kan tas når som helst | Admin |
@@ -317,6 +399,24 @@ gjør hvert av dem til et spørsmål om *portalens* aktive vakt.
 | `statistikk` | `views.py` |
 | `vaktliste` | `services.py`, `vaktdrift.py` |
 
-De to migrasjonene røres ikke — de er historikk. `vaktdrift.lister_i_drift()` («sist satt
+De to migrasjonene røres ikke — de er historikk. Inndelingen etter hvor portalen kommer
+fra, står i §4.13. `vaktdrift.lister_i_drift()` («sist satt
 i drift vinner») må i tillegg avgrenses til portalen: med to portaler i drift samtidig
 ville den ellers valgt den andre portalens liste til sentralbordets besetning.
+
+## 9. Gjennomgangene
+
+Notatet ble lest mot koden i tre runder 17. okt. 2026, av to modeller som kontrollerte
+hverandres påstander (André limte svarene mellom dem). Det som endret planen:
+
+| Runde | Funn | Hvor |
+|---|---|---|
+| 1 | `har_tilgang` kjenner ingen forespørsel; to kallsteder har ingen request; medlemskap og modulrad var to sannheter; pekeren ga en sykel; verdimengdene var ikke avgjort | §4.1, §4.2, §4.12, §4.13 |
+| 2 | Park-lenken; `Ansvarsmerke` og hjelperregistrene er én-til-én; lesing må stoppes like mye som skriving | §4.4, §4.12, §4.13 |
+| 3 | Valget lagres i sesjonen; fallbacken er installasjonsskop, ikke brukerskop | §4.4, §4.13 |
+
+**Én påstand ble godtatt av begge og var feil:** at header-chipsene lå i en global
+statistikkcache (`stats:basic`). Strengen står i en docstring i `core/stats_cache.py`;
+det eneste kallstedet bærer vakt-ID i nøkkelen. Søket bekreftet at teksten *fantes*, ikke
+at den ble *brukt* — samme felle som kommentarråte i `CLAUDE.md`. Testene i §6.1 er
+fasiten for isolasjonen, ikke en gjennomlesing.

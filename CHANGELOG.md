@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portalnotatet gjennomgått tre runder: aktiv vakt som unik indeks, `ModulTilgang` på medlemskapet, portalregelen, pasientens fallback fjernes, verdimengdene fordelt  `#core/tilgang` `#core/vakt` `#core/dokumentasjon`
+
+André lot en annen modell lese `docs/BESLUTNING_PORTALER.md` mot koden og limte svarene
+mellom oss i tre runder. Beslutningene 19–24 og §4.12–4.14 kom av det; §9 i notatet har
+hva hver runde fant.
+
+**Det som endret designet:** `har_tilgang(user, …)` kjenner ingen forespørsel (56 kallsteder),
+så aktiv portal legges på brukerobjektet. `Portaltilgang` og `ModulTilgang.portal` ville vært
+to sannheter — modulraden henger nå på medlemskapet med `CASCADE`. En peker til aktiv vakt på
+portalen ville gitt en sykel i backupens gjenopprettingsrekkefølge — erstattet av en delvis
+unik indeks på `Vakt.er_aktiv`. Verdimengdene (`Lokasjon`, `Forstehjelper`, `Artist`, …) var
+ikke avgjort: **sted og person er per portal, fag er globalt.** Park-lenken bærer ingen vakt,
+og må bære portalen.
+
+**Portalregelen:** én mulig portal velges og lagres i sesjonen, flere stopper både lesing og
+skriving, null er en foreldreløs konto — aldri «Standard» som reserve. **Pasientens fallback
+fjernes:** ingen produksjonskode bruker den, og et vilkår om «én portal finnes» ville virket
+til portal nummer to ble opprettet.
+
+**Én feil godtatt av begge:** at header-chipsene lå i en global cache (`stats:basic`). Strengen
+står bare i en docstring; søket bekreftet at teksten *fantes*, ikke at den ble *brukt*.
+
 ## 2026-10-17 — Beslutningsnotat: flere portaler i én installasjon — moderator, tilhørighet (korps og «annet»), mannskap per portal, kartgruppe per portal  `#core/tilgang` `#core/vakt` `#core/kartkobling`
 
 André: «Jeg vil se på om vi kan lage det til flere som vil kjøre andre vakter.» Diskutert og

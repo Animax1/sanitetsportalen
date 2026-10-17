@@ -147,16 +147,21 @@ Besluttet 17. okt. 2026, ikke påbegynt. Andre i organisasjonen skal kunne kjør
 global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for seg, og
 **portal nummer to opprettes ikke i prod før fase 4 er levert** (notatet §6).
 
-- [ ] **Fase 0:** `/portal-admin/` → `/admin/`, med 301 fra den gamle stien. Uavhengig av resten.
-- [ ] **Fase 1:** `core.Vaktportal`, `Vakt.portal` fylt til «Standard», aktiv vakt flytter fra
-      `AppSetting['aktiv_vakt_id']` til portalen i alle 29 filene (notatet §8). Ingen synlig
-      endring; to deployer på grunn av release-vinduet, og migrasjonsprøve mot PostgreSQL.
-- [ ] **Fase 2:** `Portaltilgang` (moderator/medlem), `ModulTilgang.portal`, aktiv portal i
-      sesjonen, fanevakten (`X-Portal`, 409 ved bytte i en annen fane), portalen i offline-nøklene.
+- [ ] **Fase 0:** `/portal-admin/` → `/admin/`, med 301 fra den gamle stien. Tas rett før fase 5,
+      så de nye administrasjonssidene får riktig sti fra starten.
+- [ ] **Fase 1:** `core.Vaktportal`, `Vakt.portal` fylt til «Standard», og aktiv vakt som
+      `Vakt.er_aktiv` med delvis unik indeks per portal i stedet for `AppSetting['aktiv_vakt_id']`
+      (notatet §4.1). Alle 29 kallstedene etter inndelingen i §4.13, og pasientens fallback i
+      `Patient.save()` fjernet med `lag_pasient()` til testene. Ingen synlig endring;
+      migrasjonsprøve mot PostgreSQL.
+- [ ] **Fase 2:** `Portaltilgang` (moderator/medlem), `ModulTilgang` på medlemskapet med `CASCADE`,
+      portalregelen (§4.4) og aktiv portal på brukerobjektet så de 56 `har_tilgang`-kallene står,
+      fanevakten (`X-Portal`, 409 ved bytte i en annen fane), portalen i offline-nøklene.
 - [ ] **Fase 3:** tilhørighet — `vaktliste.Korps` til `core` som felles katalog med typen
       `annet` (lege02), kontoens tilhørigheter, og admins utvalg per portal.
-- [ ] **Fase 4:** data per portal — `Mannskap.portal`, `Kontokorps` og `Mannskap.user` unike per
-      portal, innstillingene sortert i system og portal, portalfilter i statistikk og arkiv.
+- [ ] **Fase 4:** data per portal — `Mannskap.portal`, verdimengdene og de fem én-til-én-koblingene
+      etter notatet §4.12, innstillingene sortert i system og portal, endringsnumre og varsler med
+      portal (§4.14), portalfilter i statistikk og arkiv, søk på tvers for innsyn og sletting.
       Vaktene i notatet §6.1 (hver modell har en vei til portalen eller står på lista over
       globale) kommer i denne fasen.
 - [ ] **Fase 5:** flatene — «Ny portal», moduler og tak, moderatorens brukere og tilgang,
