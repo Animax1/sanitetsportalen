@@ -58,8 +58,10 @@ class PortalBackupHandler(BaseBackupHandler):
     #: følger med portalen. `Kontotilhorighet` er **ikke** med, av samme grunn
     #: som `Notification`: en påkrevd peker til en konto, som ikke kan strippes.
     #: Den står i den hele fila.
-    apps = ['core.Tilhorighet', 'core.Vaktportal', 'core.Vakt', 'core.ModuleSettings',
-            'core.AppSetting', 'core.VaktStatistikk']
+    #:
+    #: `Portalmodul` kom 17. okt. 2026 (fase 5a): portalens moduler og tak.
+    apps = ['core.Tilhorighet', 'core.Vaktportal', 'core.Portalmodul', 'core.Vakt',
+            'core.ModuleSettings', 'core.AppSetting', 'core.VaktStatistikk']
     exclude = []
 
     #: `ModuleSettings.updated_by` er sporet av hvem som slo modulen av eller
@@ -71,7 +73,10 @@ class PortalBackupHandler(BaseBackupHandler):
     #: Oppdateres på primærnøkkel, tømmes ikke — se `BaseBackupHandler.beholdes`.
     #: `patients.Forstehjelper.portal` er `PROTECT`, og en nymigrert base har
     #: alt «Behandler 1–10» i Standard-portalen.
-    beholdes = ['core.Vaktportal', 'core.Tilhorighet']
+    #:
+    #: `Portalmodul` står også her: en fil tatt før fase 5a har ingen rader, og
+    #: en tømming ville tatt alle modulene fra alle andre enn global admin.
+    beholdes = ['core.Vaktportal', 'core.Tilhorighet', 'core.Portalmodul']
 
     strip_fields = {'core.ModuleSettings': ['updated_by'],
                     'core.VaktStatistikk': ['frosset_av']}

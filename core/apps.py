@@ -33,7 +33,25 @@ def _ensure_module_settings_defaults(sender, **kwargs):
         modell = historisk.get_model('core', 'ModuleSettings') if historisk else None
     except LookupError:
         return   # core er ikke migrert så langt ennå; ingen tabell å fylle
-    ModuleSettings.ensure_defaults_exist(modell)
+    try:
+        portalmodell = historisk.get_model('core', 'Portalmodul') if historisk else None
+    except LookupError:
+        portalmodell = None   # før `core/0023`: ingen portalmoduler å fylle
+    if portalmodell is not None:
+        # Den historiske modellen har ikke dagens klassemetoder.
+        from core.models import Portalmodul
+        portalmodell = _Historisk(portalmodell, Portalmodul)
+    ModuleSettings.ensure_defaults_exist(modell, portalmodell)
+
+
+class _Historisk:
+    """`legg_i_alle_portaler` på den historiske modellen."""
+
+    def __init__(self, modell, dagens):
+        self.modell, self.dagens = modell, dagens
+
+    def legg_i_alle_portaler(self, slug):
+        self.dagens.legg_i_alle_portaler(slug, modell=self.modell)
 
 
 class CoreConfig(AppConfig):

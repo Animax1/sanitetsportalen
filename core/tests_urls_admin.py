@@ -26,6 +26,8 @@ from django.urls import get_resolver
 KARTET = {
     # Vakta (28. sep. 2026): flyttet fra `/pasienter/api/avslutt-vakt/` m.fl.
     'admin/vakt/': 'vakt',
+    'admin/portaler/': 'portaler',
+    'admin/portaler/<int:pk>/': 'portal',
     'admin/vakt/navn/': 'vakt_navn',
     'admin/vakt/avslutt/': 'vakt_avslutt',
     'admin/vakt/<int:pk>/gjenaapne/': 'vakt_gjenaapne',
@@ -149,6 +151,8 @@ class AdminsideneRendrerTests(TestCase):
         'admin_server_status_json', 'audit_log_csv_export',
         # Skjemaene på Vakt-siden (`core/tests_vakt_side.py`); siden selv er GET.
         'vakt_navn', 'vakt_avslutt', 'vakt_gjenaapne', 'vakt_slett', 'vakt_arkiv_slett',
+        # Én portal tar en ID (`core/tests_portaladmin.py`); lista er GET her.
+        'portal',
     }
 
     def setUp(self) -> None:

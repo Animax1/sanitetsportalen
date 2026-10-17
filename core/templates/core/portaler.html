@@ -1,0 +1,63 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Portaler – Sanitetsportalen{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2">Portaler</h1>
+  <p class="text-muted mb-0">
+    Hver portal har sine egne vakter, sitt mannskap og sine steder. Kontoene er felles —
+    én innlogging, og et medlemskap i hver portal kontoen skal brukes i.
+  </p>
+</section>
+
+<div class="table-responsive mb-4">
+<table class="table table-hover align-middle">
+  <thead>
+    <tr><th>Portal</th><th>Kortnavn</th><th>Status</th><th>Medlemmer</th><th>Moderatorer</th><th>Moduler</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for rad in rader %}
+    <tr>
+      <td><strong>{{ rad.portal.navn }}</strong></td>
+      <td><code class="text-muted">{{ rad.portal.slug }}</code></td>
+      <td>
+        {% if rad.portal.er_aktiv %}
+          <span class="badge bg-success">Aktiv</span>
+        {% else %}
+          <span class="badge bg-secondary">Deaktivert</span>
+        {% endif %}
+      </td>
+      <td>{{ rad.medlemmer }}</td>
+      <td class="text-muted">{{ rad.moderatorer|join:", "|default:"–" }}</td>
+      <td>{{ rad.moduler }}</td>
+      <td><a href="{% url 'portaladmin:portal' pk=rad.portal.pk %}" class="btn btn-sm btn-primary">
+        <i class="bi bi-pencil me-1"></i>Sett opp</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="row"><div class="col-lg-6">
+<div class="card">
+  <div class="card-header"><strong>Ny portal</strong></div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <label class="form-label" for="navn">Navn</label>
+      <input type="text" id="navn" name="navn" class="form-control mb-2" required maxlength="120"
+             placeholder="Landsskytterstevnet">
+      <label class="form-label" for="slug">Kortnavn <span class="text-muted">(valgfritt)</span></label>
+      <input type="text" id="slug" name="slug" class="form-control" maxlength="64"
+             pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="landsskytterstevnet">
+      <div class="form-text mb-3">
+        Små bokstaver, tall og bindestrek. Lages av navnet om det står tomt, og
+        <strong>kan ikke endres</strong> etterpå — kartet og åpne faner kjenner portalen på det.
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Opprett</button>
+    </form>
+  </div>
+</div>
+</div></div>
+{% endblock %}

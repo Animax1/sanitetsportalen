@@ -119,26 +119,46 @@ def _tilganger(user, portal=None):
     utenfor en forespørsel (`notify`).
     """
     if portal is not None:
-        from accounts.models import ModulTilgang  # noqa: WPS433
-        return dict(ModulTilgang.objects
-                    .filter(portaltilgang__bruker=user, portaltilgang__portal=portal)
-                    .values_list('modul_slug', 'nivaa'))
+        return _i_portalen(user, portal)
     cache = getattr(user, _TILGANG_CACHE, None)
     if cache is None:
-        from accounts.models import ModulTilgang  # noqa: WPS433
         from core.portal import brukerens_portal  # noqa: WPS433
 
         # **Bare radene i portalen kontoen står i** (17. okt. 2026, §4.2 i
         # `docs/BESLUTNING_PORTALER.md`). Uten portal er svaret ingen tilgang —
         # aldri «Standard», og aldri summen av alle portalene.
         portal = brukerens_portal(user)
-        cache = {} if portal is None else dict(
-            ModulTilgang.objects
-            .filter(portaltilgang__bruker=user, portaltilgang__portal=portal)
-            .values_list('modul_slug', 'nivaa')
-        )
+        cache = {} if portal is None else _i_portalen(user, portal)
         setattr(user, _TILGANG_CACHE, cache)
     return cache
+
+
+def _i_portalen(user, portal) -> dict:
+    """{modul_slug: nivaa} i portalen — **kappet av portalens tak** (fase 5a).
+
+    En modul uten `Portalmodul`-rad finnes ikke i portalen, og nivået er det
+    laveste av kontoens rad og taket. Taket gjelder derfor også det som alt er
+    delt ut: senker admin det, gjelder det med en gang. Et ukjent tak gir ingen
+    tilgang — en skrivefeil skal stenge døra, ikke åpne den.
+    """
+    from django.db.models import OuterRef, Subquery  # noqa: WPS433
+
+    from accounts.models import ModulTilgang  # noqa: WPS433
+    from core.models import Portalmodul  # noqa: WPS433
+
+    # Én spørring, ikke to: taket hentes som en underspørring på hver rad.
+    # Dette kjøres ved hver forespørsel (`CacheTests`).
+    tak = Portalmodul.objects.filter(portal=portal, modul_slug=OuterRef('modul_slug'))
+    rader = (ModulTilgang.objects
+             .filter(portaltilgang__bruker=user, portaltilgang__portal=portal)
+             .annotate(tak=Subquery(tak.values('tak')[:1]))
+             .values_list('modul_slug', 'nivaa', 'tak'))
+    ut = {}
+    for slug, nivaa, taket in rader:
+        if taket not in NIVAA_HIERARKI:
+            continue
+        ut[slug] = taket if NIVAA_HIERARKI.get(nivaa, -1) > NIVAA_HIERARKI[taket] else nivaa
+    return ut
 
 
 def _modul_er_aktiv(user, modul_slug):

@@ -550,7 +550,16 @@ class ModulTilgangForm(forms.Form):
         # lagret, og matrisen skal likevel ikke gi den mer enn den kan ha.
         self._for_regelen = _SOM_DELT if blir_delt else bruker
 
-        for modul in self.moduler():
+        # **Bare portalens moduler, og bare opp til taket** (fase 5a, §4.2). Et
+        # valg over taket ville gitt en rad som ikke gir noe — `_tilganger`
+        # kapper den — og det er en kontroll som lyver.
+        from core.auth_decorators import NIVAA_HIERARKI
+        from core.models import Portalmodul
+        self._tak = dict(Portalmodul.objects.filter(portal=self.portal)
+                         .values_list('modul_slug', 'tak'))
+        self._moduler = [m for m in self.moduler() if m.slug in self._tak]
+
+        for modul in self._moduler:
             navn = self.PREFIKS + modul.slug
             har = self._naavaerende.get(modul.slug, self.INGEN)
             valg = [(self.INGEN, 'Ingen tilgang')]
@@ -560,7 +569,9 @@ class ModulTilgangForm(forms.Form):
             # `TilgangsNivaa` beholdes: en skrivefeil i `nivaaer` skal ikke
             # kunne lage et valg som ikke finnes i modellen.
             kjente = dict(TilgangsNivaa.choices)
-            valg += [(v, modul.etikett_for(v)) for v in modul.nivaaer if v in kjente]
+            taket = NIVAA_HIERARKI.get(self._tak[modul.slug], -1)
+            valg += [(v, modul.etikett_for(v)) for v in modul.nivaaer
+                     if v in kjente and NIVAA_HIERARKI.get(v, 99) <= taket]
             # **En delt konto tilbys bare «Ingen tilgang»** på moduler som ikke
             # tillater den (8. okt. 2026, FORSLAG_KO §5.2) — et valg som gir
             # feilmelding er en kontroll som fører til en vegg. En rad som fantes
@@ -602,7 +613,7 @@ class ModulTilgangForm(forms.Form):
 
     def rader(self):
         """(felt, nåværende nivå) for malen, så den slipper å slå opp navn."""
-        for modul in self.moduler():
+        for modul in self._moduler:
             yield self[self.PREFIKS + modul.slug]
 
     def endringer(self):
@@ -613,7 +624,7 @@ class ModulTilgangForm(forms.Form):
         er nettopp det man vil kunne se i ettertid.
         """
         ut = []
-        for modul in self.moduler():
+        for modul in self._moduler:
             navn = self.PREFIKS + modul.slug
             # **Fravær av nøkkel er ikke «velg ingen».** Et felt som ikke ble
             # sendt inn i det hele tatt skal la tilgangen stå. Uten dette

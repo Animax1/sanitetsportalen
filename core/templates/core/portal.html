@@ -1,0 +1,131 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}{{ portal.navn }} – Portaler – Sanitetsportalen{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <p class="mb-1"><a href="{% url 'portaladmin:portaler' %}"><i class="bi bi-arrow-left me-1"></i>Portaler</a></p>
+  <h1 class="mb-2">{{ portal.navn }}</h1>
+  <p class="text-muted mb-0">Kortnavn <code>{{ portal.slug }}</code> — settes én gang.</p>
+</section>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Navn og status</strong></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="handling" value="grunnlag">
+          <label class="form-label" for="navn">Navn</label>
+          <input type="text" id="navn" name="navn" class="form-control mb-2" required
+                 maxlength="120" value="{{ portal.navn }}">
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="er_aktiv" name="er_aktiv"
+                   {% if portal.er_aktiv %}checked{% endif %}>
+            <label class="form-check-label" for="er_aktiv">Aktiv</label>
+            <div class="form-text">En deaktivert portal kan ingen stå i. Vaktene og dataene står.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">Lagre</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><strong>Moderatorer</strong></div>
+      <div class="card-body">
+        <p class="form-text mt-0">
+          En moderator legger til og tar ut kontoer i portalen, og gir dem tilgang innenfor
+          taket under. Bare du kan gjøre noen til moderator.
+        </p>
+        <ul class="list-unstyled mb-3">
+          {% for t in moderatorer %}
+          <li class="d-flex align-items-center mb-1">
+            <span class="me-auto">{{ t.bruker.username }}</span>
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="handling" value="moderator">
+              <input type="hidden" name="brukernavn" value="{{ t.bruker.username }}">
+              <input type="hidden" name="er_moderator" value="0">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Ta bort rollen</button>
+            </form>
+          </li>
+          {% empty %}
+          <li class="text-muted">Ingen moderatorer ennå.</li>
+          {% endfor %}
+        </ul>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="handling" value="moderator">
+          <input type="hidden" name="er_moderator" value="1">
+          <input type="text" name="brukernavn" class="form-control" placeholder="Brukernavn" required>
+          <button type="submit" class="btn btn-primary text-nowrap">Gjør til moderator</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><strong>Tilhørigheter</strong></div>
+      <div class="card-body">
+        <p class="form-text mt-0">
+          Styrer to ting: hvilke kontoer moderator ser, og hvilke korps vaktlisten har i portalen.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="handling" value="tilhorigheter">
+          {% for rad in katalog %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="t{{ rad.t.pk }}" name="tilhorighet"
+                   value="{{ rad.t.pk }}" {% if rad.valgt %}checked{% endif %}>
+            <label class="form-check-label" for="t{{ rad.t.pk }}">
+              {{ rad.t.navn }}{% if rad.t.type == 'annet' %} <span class="text-muted">(annet)</span>{% endif %}
+            </label>
+          </div>
+          {% empty %}
+          <p class="text-muted">Katalogen er tom.</p>
+          {% endfor %}
+          <button type="submit" class="btn btn-primary mt-3">Lagre tilhørighetene</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Moduler og tak</strong></div>
+      <div class="card-body">
+        <p class="form-text mt-0">
+          En modul som ikke er med, finnes ikke i portalen. Taket er det høyeste nivået
+          moderator kan dele ut — og det gjelder også det som alt er delt ut.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="handling" value="moduler">
+          <table class="table align-middle mb-3">
+            <thead><tr><th>Med</th><th>Modul</th><th>Tak</th></tr></thead>
+            <tbody>
+              {% for rad in moduler %}
+              <tr>
+                <td><input class="form-check-input" type="checkbox" name="med_{{ rad.modul.slug }}"
+                           aria-label="{{ rad.modul.name }} med i portalen"
+                           {% if rad.med %}checked{% endif %}></td>
+                <td>{{ rad.modul.name }}</td>
+                <td>
+                  <select name="tak_{{ rad.modul.slug }}" class="form-select form-select-sm"
+                          aria-label="Tak for {{ rad.modul.name }}">
+                    {% for verdi, etikett in rad.valg %}
+                    <option value="{{ verdi }}" {% if verdi == rad.tak %}selected{% endif %}>{{ etikett }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <button type="submit" class="btn btn-primary">Lagre modulene</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1730,7 +1730,8 @@ class SlettelistaDekkerDumpenTests(TestCase):
         """Unntaket skal ikke bli en vei rundt regelen over. Vokser lista, skal
         det skje her, med en begrunnelse ved siden av."""
         beholder = {h.slug: sorted(h.beholdes) for h in all_handlers() if h.beholdes}
-        self.assertEqual(beholder, {'portal': ['core.Tilhorighet', 'core.Vaktportal']})
+        self.assertEqual(beholder, {'portal': ['core.Portalmodul', 'core.Tilhorighet',
+                                               'core.Vaktportal']})
 
     def test_lydvarsel_er_dekket(self) -> None:
         """Gjeldspunkt 3.4, navngitt: den ene modellen den håndskrevne lista
@@ -1828,6 +1829,28 @@ class PortalBackupTests(TestCase):
         self.assertEqual(gjenopprettet.pk, vakt.pk,
                          'Primærnøkkelen må overleve — modulfilene peker på '
                          'vakta med et heltall.')
+
+    def test_en_fil_uten_portalmoduler_toemmer_dem_ikke(self) -> None:
+        """En portalfil fra før fase 5a har ingen `Portalmodul`. Ble tabellen
+        tømt før innlasting, ville alle andre enn admin mistet alle modulene."""
+        import gzip
+        import json
+
+        from core.models import Portalmodul
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            vakt_for_year(2026)
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+            sti = self.backup_dir / backup.filename
+            with gzip.open(sti, 'rb') as f:
+                rader = json.loads(f.read())
+            gammel = [r for r in rader if r['model'] != 'core.portalmodul']
+            self.assertLess(len(gammel), len(rader), 'fila hadde portalmoduler')
+            with gzip.open(sti, 'wb') as f:
+                f.write(json.dumps(gammel).encode())
+            for_ = Portalmodul.objects.count()
+            restore_backup(backup)
+        self.assertEqual(Portalmodul.objects.count(), for_)
 
     def test_modulesettings_uten_bruker(self) -> None:
         """`updated_by` strippes: med natural_foreign ville en slettet konto

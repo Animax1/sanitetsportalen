@@ -107,7 +107,7 @@ class ModuleSettings(models.Model):
         return set(cls.objects.filter(enabled=True).values_list('slug', flat=True))
 
     @classmethod
-    def ensure_defaults_exist(cls, modell=None) -> None:
+    def ensure_defaults_exist(cls, modell=None, portalmodell=None) -> None:
         """Sørg for at hver registrert modul har en rad i tabellen.
 
         Idempotent: kjører ``get_or_create`` for hver modul. Kalles fra
@@ -129,10 +129,16 @@ class ModuleSettings(models.Model):
 
         modell = modell or cls
         for module in get_all_modules():
-            modell.objects.get_or_create(
+            _, ny = modell.objects.get_or_create(
                 slug=module.slug,
                 defaults={'enabled': True},
             )
+            # **En ny modul kommer inn i alle portaler** (17. okt. 2026), med
+            # taket på toppen — samme regel som `enabled=True` over: admin tar
+            # den ut der den ikke skal være. Bare når raden er ny: en modul admin
+            # har tatt ut av en portal, skal ikke komme tilbake ved neste deploy.
+            if ny and portalmodell is not None:
+                portalmodell.legg_i_alle_portaler(module.slug)
 
 
 class Backupplan(models.Model):
@@ -593,6 +599,63 @@ class Vaktportal(models.Model):
 
     def __str__(self):
         return self.navn
+
+
+class Portalmodul(models.Model):
+    """En modul i en portal, og taket for hva moderator kan dele ut (17. okt. 2026).
+
+    `docs/BESLUTNING_PORTALER.md` §4.2: **admin setter hver portals moduler og
+    tak**; moderator deler ut innenfor. **En modul uten rad finnes ikke i
+    portalen** — ingen kan få tilgang til den der, og den står ikke i menyen.
+    Nivået en konto får er det laveste av raden sin og taket
+    (`core.auth_decorators._tilganger`), så et tak som senkes gjelder med en gang,
+    også for det som alt er delt ut.
+
+    **En ny portal får alle modulene med taket på toppen**
+    (`core.signals.portalens_moduler`); admin snevrer inn på samme side. Det er
+    ufarlig fordi portalen ikke har medlemmer ennå. **En ny modul kommer inn i
+    alle portaler** når `ModuleSettings` får raden sin (`ensure_defaults_exist`),
+    som `enabled=True` alt gjør — admin tar den ut der den ikke skal være.
+    """
+
+    portal = models.ForeignKey(Vaktportal, on_delete=models.CASCADE,
+                               related_name='moduler', verbose_name='Portal')
+    modul_slug = models.CharField(max_length=64, verbose_name='Modul')
+    tak = models.CharField(max_length=32, verbose_name='Tak',
+                           help_text='Det høyeste nivået moderator kan dele ut i portalen.')
+
+    class Meta:
+        verbose_name = 'Modul i portalen'
+        verbose_name_plural = 'Moduler i portalen'
+        ordering = ['portal', 'modul_slug']
+        constraints = [models.UniqueConstraint(fields=['portal', 'modul_slug'],
+                                               name='en_rad_per_modul_i_portalen')]
+
+    def __str__(self):
+        return f'{self.portal}: {self.modul_slug} (tak {self.tak})'
+
+    #: Toppen av stigen. Taket en ny portal og en ny modul får er **modulens**
+    #: øverste nivå (`toppen_for`); denne er for en modul registeret ikke kjenner.
+    TOPPEN = 'skriv_leder'
+
+    @classmethod
+    def toppen_for(cls, slug) -> str:
+        """Det øverste nivået modulen selv har — statistikken har bare `les`."""
+        from core.auth_decorators import NIVAA_HIERARKI
+        from core.modules import get_module
+        modul = get_module(slug)
+        if modul is None or not modul.nivaaer:
+            return cls.TOPPEN
+        return max(modul.nivaaer, key=lambda n: NIVAA_HIERARKI.get(n, -1))
+
+    @classmethod
+    def legg_i_alle_portaler(cls, slug, modell=None) -> None:
+        """Modulen inn i hver portal som ikke har den, med modulens øverste nivå som tak."""
+        modell = modell or cls
+        portal_modell = modell._meta.get_field('portal').related_model
+        for portal in portal_modell.objects.all():
+            modell.objects.get_or_create(portal=portal, modul_slug=slug,
+                                         defaults={'tak': cls.toppen_for(slug)})
 
 
 class PortalQuerySet(models.QuerySet):

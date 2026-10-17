@@ -21,6 +21,8 @@
   "/admin/innstillinger/",
   "/admin/moduler/",
   "/admin/moduler/x/",
+  "/admin/portaler/",
+  "/admin/portaler/1/",
   "/admin/server-status/",
   "/admin/server-status/json/",
   "/admin/server-status/sessions/",

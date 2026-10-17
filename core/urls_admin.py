@@ -19,7 +19,7 @@ her bestemmer *adressen*, appene bestemmer *oppførselen*.
 from django.urls import path
 
 from accounts import views as accounts_views
-from core import admin_status, views_admin, views_backup, views_vakt
+from core import admin_status, views_admin, views_backup, views_portaler, views_vakt
 
 #: **Ett navnerom for hele adminflaten.**
 #:
@@ -44,6 +44,8 @@ urlpatterns = [
          name='vakt_arkiv_slett'),
 
     # ── Portalinnstillinger, moduler og logg ────────────────────────────────
+    path('portaler/', views_portaler.portaler_view, name='portaler'),
+    path('portaler/<int:pk>/', views_portaler.portal_view, name='portal'),
     path('innstillinger/', views_admin.portal_settings_view,
          name='portal_settings'),
     path('moduler/', views_admin.module_admin_list_view,

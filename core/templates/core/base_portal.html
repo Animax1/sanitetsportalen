@@ -299,6 +299,9 @@
           <li><a class="dropdown-item{% if '/admin/brukere' in request.path %} active{% endif %}" href="{% url 'portaladmin:user_list' %}">
             <i class="bi bi-people me-2"></i>Brukere
           </a></li>
+          <li><a class="dropdown-item{% if '/admin/portaler' in request.path %} active{% endif %}" href="{% url 'portaladmin:portaler' %}">
+            <i class="bi bi-diagram-3 me-2"></i>Portaler
+          </a></li>
           <li><a class="dropdown-item{% if '/admin/server-status' in request.path %} active{% endif %}" href="{% url 'portaladmin:admin_server_status' %}">
             <i class="bi bi-speedometer2 me-2"></i>Server-status
           </a></li>

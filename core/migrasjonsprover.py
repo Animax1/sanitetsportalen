@@ -537,6 +537,30 @@ def _sjekk_parklenke_portal(c):
     assert alle == 1 and i_standard == 1, f'{i_standard} av {alle} i Standard'
 
 
+# ── core.0024 (modulene i hver portal) ───────────────────────────────────────
+
+def _seed_portalmoduler(c):
+    """To portaler, og ingen portalmoduler — `post_migrate` har alt fylt
+    tabellen etter forrige `migrate`, så radene tas ut: det er migrasjonen som
+    prøves, ikke kroken."""
+    c.execute("DELETE FROM core_portalmodul")
+    c.execute("""INSERT INTO core_vaktportal (navn, slug, er_aktiv, opprettet_at)
+                 VALUES ('Brann', 'brann', true, now())""")
+
+
+def _sjekk_portalmoduler(c):
+    c.execute("SELECT count(*) FROM core_modulesettings")
+    moduler = c.fetchone()[0]
+    c.execute("SELECT count(*) FROM core_vaktportal")
+    portaler = c.fetchone()[0]
+    c.execute("SELECT count(*), count(DISTINCT tak) FROM core_portalmodul")
+    rader, tak = c.fetchone()
+    assert moduler and portaler == 2, (moduler, portaler)
+    assert rader == moduler * portaler, f'{rader} rader, ventet {moduler} × {portaler}'
+    c.execute("SELECT DISTINCT tak FROM core_portalmodul")
+    assert [r[0] for r in c.fetchall()] == ['skriv_leder']
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -609,6 +633,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Parklenkene går til «Standard»',
             seed=_seed_parklenke_portal,
             sjekk=_sjekk_parklenke_portal,
+        ),
+        Migrasjonsprove(
+            migrasjon='core.0024_portalens_moduler',
+            foregaaende='0023_portalmodul',
+            beskrivelse='Hver portal får alle modulene, med taket på toppen',
+            seed=_seed_portalmoduler,
+            sjekk=_sjekk_portalmoduler,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

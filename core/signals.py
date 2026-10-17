@@ -50,7 +50,7 @@ from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 from core.klientip import klient_ip
 
-from .models import AppSetting, Backupplan, ModuleSettings, Vakt, Vaktportal
+from .models import AppSetting, Backupplan, ModuleSettings, Portalmodul, Vakt, Vaktportal
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +347,23 @@ def vaktportal_pre_save(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Vaktportal)
 @ikke_under_loaddata
+def portalens_moduler(sender, instance, created, **kwargs):
+    """En ny portal får alle modulene med taket på toppen (`core.models.Portalmodul`).
+
+    Ufarlig fordi portalen ikke har medlemmer ennå, og admin snevrer inn på
+    samme side. Uten det var en ny portal tom, og hver test og hver
+    kommandolinjeportal måtte husket å fylle den."""
+    if not created:
+        return
+    from core.modules import get_all_modules
+    from core.models import Portalmodul
+    for modul in get_all_modules():
+        Portalmodul.objects.get_or_create(portal=instance, modul_slug=modul.slug,
+                                          defaults={'tak': Portalmodul.toppen_for(modul.slug)})
+
+
+@receiver(post_save, sender=Vaktportal)
+@ikke_under_loaddata
 def vaktportal_post_save(sender, instance, created, **kwargs):
     if not created:
         return
@@ -354,4 +371,49 @@ def vaktportal_post_save(sender, instance, created, **kwargs):
     AuditLog.objects.create(
         table_name=VAKTPORTAL_TABELL, record_id=instance.pk, action='CREATE',
         field_name='', old_value='', new_value=str(instance), user=bruker, ip=ip,
+    )
+
+
+# ── Portalmodul (fase 5a) ────────────────────────────────────────────────────
+#
+# Hvilke moduler en portal har, og taket moderator deler ut under, avgjør hva
+# hver konto i portalen får — samme grunn som `ModuleSettings` over.
+
+PORTALMODUL_TABELL = Portalmodul._meta.db_table
+
+
+@receiver(pre_save, sender=Portalmodul)
+@ikke_under_loaddata
+def portalmodul_pre_save(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+    gammel = Portalmodul.objects.filter(pk=instance.pk).first()
+    if gammel is None or gammel.tak == instance.tak:
+        return
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=PORTALMODUL_TABELL, record_id=instance.pk, action='UPDATE',
+        field_name='tak', old_value=gammel.tak, new_value=instance.tak, user=bruker, ip=ip,
+    )
+
+
+@receiver(post_save, sender=Portalmodul)
+@ikke_under_loaddata
+def portalmodul_post_save(sender, instance, created, **kwargs):
+    if not created:
+        return
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=PORTALMODUL_TABELL, record_id=instance.pk, action='CREATE',
+        field_name='', old_value='', new_value=str(instance), user=bruker, ip=ip,
+    )
+
+
+@receiver(post_delete, sender=Portalmodul)
+@ikke_under_loaddata
+def portalmodul_post_delete(sender, instance, **kwargs):
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=PORTALMODUL_TABELL, record_id=instance.pk or 0, action='DELETE',
+        field_name='', old_value=str(instance), new_value='', user=bruker, ip=ip,
     )

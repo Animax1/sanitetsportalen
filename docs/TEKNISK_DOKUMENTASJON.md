@@ -448,7 +448,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **218 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **220 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 33 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, «Send posisjon», verdimengder |
 | `/vaktliste/` | 38 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/admin/` | 27 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/admin/` | 29 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
 | `/ko/` | 45 | `ko/urls.py` | Sida, utskriften med service workeren for kopien uten nett, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
@@ -592,7 +592,7 @@ de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
 ### 5.5 Adminflaten (`/admin/`)
 
-27 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
+29 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
 og vanlig bruker.
 

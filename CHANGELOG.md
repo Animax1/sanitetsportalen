@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 5a: «Portaler» under Administrasjon — ny portal, tilhørigheter, moduler med tak og moderatorer  `#core/tilgang`
+
+Første pulje av fase 5 (`docs/BESLUTNING_PORTALER.md` §4.2–§4.3). **Synlig endring for admin:**
+«Portaler» i Administrasjon-menyen (`/admin/portaler/`). **For alle andre: ingenting** — Standard
+har alle modulene med taket på toppen, som før.
+
+**`core.Portalmodul(portal, modul_slug, tak)`** — hvilke moduler en portal har, og det høyeste
+nivået moderator kan dele ut der.
+- **Håndhevet i `_tilganger`**, det ene stedet tilgangen regnes ut:
+  - en modul uten rad finnes ikke i portalen (ingen tilgang, ikke i menyen);
+  - nivået er det laveste av kontoens rad og taket — så et senket tak gjelder også det som alt er
+    delt ut;
+  - et ukjent tak gir ingen tilgang.
+
+  Taket hentes som en underspørring på samme spørring, så tilgangen koster fortsatt én spørring
+  (`CacheTests`).
+- **Global admin er uberørt**: alle moduler, toppen av stigen.
+- **En ny portal får alle modulene, med hver moduls eget toppnivå som tak** (statistikken har bare
+  `les`). Ufarlig fordi den ikke har medlemmer ennå; admin snevrer inn på samme side.
+- **En ny modul kommer inn i alle portaler** når `ModuleSettings` får raden sin (`post_migrate`) —
+  samme regel som `enabled=True` alt har. Bare når raden er ny: en modul admin har tatt ut av en
+  portal, kommer ikke tilbake ved neste deploy. Det løste også en felle før den slo til: i en fersk
+  base lages `ModuleSettings`-radene *etter* migrasjonene, og datamigrasjonen (`core/0024`) ville
+  gitt Standard null moduler.
+- **Matrisen på brukersiden** tilbyr bare portalens moduler, og nivåer opp til taket.
+
+**Siden for én portal** — fire skjemaer, hvert med sin `handling`:
+- **Navn og status.** Siste aktive portal kan ikke deaktiveres, for da har ingen en portal å stå i.
+- **Moderatorer.** Bare admin utnevner; global admin trenger ikke rollen. Endringen logges.
+- **Tilhørigheter** fra katalogen — styrer moderatorens brukerliste (5b) og vaktlistas korps.
+- **Moduler og tak.** En modul ut av portalen sletter ikke tilgangene: de står og gir ingenting, og
+  er der igjen om modulen settes inn. `core` og `accounts` (bare admin) står utenfor.
+
+**Kortnavnet (slug) settes én gang**, lages av navnet med æ/ø/å skrevet om («Røros» → «roros»): det
+står i fanevakten og i meldingene til kartet. Reglene står i `core/portaladmin.py`.
+
+**Backup:** `Portalmodul` er med i portalfila, og står i **`beholdes`** med portalene og
+katalogen: en portalfil fra før i dag har ingen rader, og en tømming ved gjenoppretting ville tatt
+alle modulene fra alle andre enn admin.
+
+**Audit:** opprettet, endret tak og fjernet logges (`core/signals.py`).
+
+**Tester:** 24 i `core/tests_portaladmin.py`, pluss en i `PortalBackupTests`, pluss prøven for
+`core/0024` (tolv prøver, alle grønne). **Mutasjoner: 21, alle drept.**
+
 ## 2026-10-17 — Fase 0: adminflaten heter `/admin/`, og `/portal-admin/` sender dit med 301  `#core/grensesnitt`
 
 **Synlig endring:** adressen til brukere, moduler, backup, server-status, vakt og innstillinger

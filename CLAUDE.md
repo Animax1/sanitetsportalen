@@ -205,8 +205,8 @@ Portalens rammeverk. Hver app deklarerer sin modul i `<app>/module.py`, og regis
 2. Importer den i `_build_registry()` i `core/modules.py`
 3. Ingen migrasjon — tilgang er `ModulTilgang`-rader
 
-En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
-`ModulTilgang`-rad på modulen. Global admin ser alt.
+En modul vises kun hvis `ModuleSettings.enabled=True`, portalen har den (`Portalmodul`,
+med et tak som kapper nivået) **og** brukeren har en `ModulTilgang`-rad. Global admin ser alt.
 
 ### Tilgangskontroll
 
