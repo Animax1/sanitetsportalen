@@ -50,7 +50,7 @@ def frys(vakt, *, bruker=None) -> list[VaktStatistikk]:
         ]
 
 
-def tidligere_vakter() -> list[dict]:
+def tidligere_vakter(portal=None) -> list[dict]:
     """Vaktene statistikken kan vise, nyeste først (steg 3).
 
     Hver oppføring har `kilder`: fanens slug → hvor tallene hentes fra, enten
@@ -76,7 +76,9 @@ def tidligere_vakter() -> list[dict]:
     from core.arkiv import all_handlers as arkivhandlere
 
     sett: dict[tuple, dict] = {}
-    for rad in VaktStatistikk.objects.order_by('-frosset_at', 'slug'):
+    from core.vakt import i_portalens_historikk
+    i_portalen = i_portalens_historikk(portal)
+    for rad in VaktStatistikk.objects.filter(i_portalen).order_by('-frosset_at', 'slug'):
         oppforing = sett.setdefault((rad.vakt_id, rad.frosset_at), {
             'nokkel': f'frosset:{rad.vakt_id or 0}:{rad.frosset_at.isoformat()}',
             'vakt_id': rad.vakt_id,
@@ -93,7 +95,8 @@ def tidligere_vakter() -> list[dict]:
         if modell is None:
             continue
         # Nyeste først: har en vakt to arkiver i samme modul, vises det siste.
-        for arkiv in modell.objects.select_related('vakt').order_by('-importert_at'):
+        for arkiv in (modell.objects.filter(i_portalen).select_related('vakt')
+                      .order_by('-importert_at')):
             if arkiv.vakt_id in frosne_vakter:
                 continue
             nokkel = (f'vakt:{arkiv.vakt_id}' if arkiv.vakt_id

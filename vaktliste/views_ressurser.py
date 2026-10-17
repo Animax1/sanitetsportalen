@@ -43,7 +43,7 @@ def ressurser_view(request, pk):
         return _nektet()
 
     try:
-        vl = Vaktliste.objects.get(pk=pk)
+        vl = Vaktliste.objects.i_portal().get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
@@ -174,7 +174,7 @@ def ressurs_detalj_view(request, pk):
     et uhell, og CASCADE tar alle skiftene med seg.
     """
     try:
-        ressurs = (Ressurs.objects
+        ressurs = (Ressurs.objects.i_portal()
                    .select_related('korps', 'enhet', 'gruppe').get(pk=pk))
     except Ressurs.DoesNotExist:
         return json_feil('Enhet ikke funnet', status=404)
@@ -265,7 +265,7 @@ def vaktposter_view(request, pk):
     `services.reservert_korps()` slår de to nivåene sammen.
     """
     try:
-        ressurs = Ressurs.objects.select_related('korps').get(pk=pk)
+        ressurs = Ressurs.objects.i_portal().select_related('korps').get(pk=pk)
     except Ressurs.DoesNotExist:
         return json_feil('Enhet ikke funnet', status=404)
 
@@ -373,7 +373,7 @@ def vaktpost_detalj_view(request, pk):
     på en annen ressurs ved å oppgi sin egen.
     """
     try:
-        vaktpost = Vaktpost.objects.select_related(
+        vaktpost = Vaktpost.objects.i_portal().select_related(
             'ressurs', 'ressurs__korps', 'mannskap', 'mannskap__korps', 'rolle'
         ).get(pk=pk)
     except Vaktpost.DoesNotExist:

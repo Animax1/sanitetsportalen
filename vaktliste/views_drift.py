@@ -55,7 +55,7 @@ def drift_view(request, pk, tilstand):
         return _nektet()
 
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
@@ -116,7 +116,7 @@ def fil_view(request, pk):
     if not services.kan_skrive_alt(request.user):
         return HttpResponse('Ingen tilgang', status=403)
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return HttpResponse('Vaktliste ikke funnet', status=404)
     svar = HttpResponse(fil.bygg_fil(vl), content_type='text/html; charset=utf-8')
@@ -139,7 +139,7 @@ def send_fil_view(request, pk):
     if not services.kan_skrive_alt(request.user):
         return _nektet()
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
     if not fil.mottakere(vl.vakt.portal):
@@ -184,7 +184,7 @@ def stempling_view(request, pk, handling):
         return _nektet()
 
     try:
-        vp = (Vaktpost.objects
+        vp = (Vaktpost.objects.i_portal()
               .select_related('ressurs__vaktliste', 'mannskap__korps', 'rolle')
               .get(pk=pk))
     except Vaktpost.DoesNotExist:

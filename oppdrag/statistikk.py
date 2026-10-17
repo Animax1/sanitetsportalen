@@ -806,10 +806,12 @@ class OppdragStatistikkHandler(BaseStatistikkHandler):
         lenger, og å regne på ingenting ville gitt nuller som så ut som
         målinger.
         """
+        from core.vakt import i_portalens_historikk
+
         from .models import OppdragArkiv
 
         try:
-            arkiv = OppdragArkiv.objects.get(pk=pk)
+            arkiv = OppdragArkiv.objects.filter(i_portalens_historikk()).get(pk=pk)
         except OppdragArkiv.DoesNotExist:
             return None
         if arkiv.er_kollapset:

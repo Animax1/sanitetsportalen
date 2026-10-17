@@ -101,7 +101,7 @@ def generer_view(request, pk):
         return _nektet()
 
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
@@ -139,7 +139,7 @@ def del_ut_view(request, pk):
     if not services.kan_sette_opp_skift(request.user):
         return _nektet('Enhetene deles ut av den som setter opp skiftene.')
     try:
-        vl = Vaktliste.objects.get(pk=pk)
+        vl = Vaktliste.objects.i_portal().get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
@@ -183,7 +183,7 @@ def belastning_view(request, pk):
     skal kunne svare på hva «korteste hvile» betyr.
     """
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
@@ -269,7 +269,7 @@ def pauser_view(request, pk):
     samme terskel som planleggeren og resten av oppsettet."""
     if not services.kan_lede(request.user):
         return _nektet('Pausene settes av den som setter opp vakten.')
-    ressurs = Ressurs.objects.filter(pk=pk).first()
+    ressurs = Ressurs.objects.i_portal().filter(pk=pk).first()
     if ressurs is None:
         return json_feil('Enhet ikke funnet', status=404)
     fra, til = _pausetider(json_body(request))
@@ -287,7 +287,7 @@ def pause_detalj_view(request, pk):
     """Flytt eller fjern en pause. Lederens, som opprettingen."""
     if not services.kan_lede(request.user):
         return _nektet('Pausene settes av den som setter opp vakten.')
-    pause = Pause.objects.select_related('ressurs').filter(pk=pk).first()
+    pause = Pause.objects.i_portal().select_related('ressurs').filter(pk=pk).first()
     if pause is None:
         return json_feil('Pausen finnes ikke', status=404)
     if request.method == 'DELETE':

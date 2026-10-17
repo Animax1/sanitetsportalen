@@ -367,7 +367,7 @@ def vaktlister_view(request):
             kopiert = 0
             kopier_fra = _int(data.get('kopier_fra'))
             if kopier_fra:
-                kilde = Vaktliste.objects.filter(pk=kopier_fra).first()
+                kilde = Vaktliste.objects.i_portal().filter(pk=kopier_fra).first()
                 if kilde is not None:
                     kopiert = services.kopier_oppsett(kilde, ny)
     except ValueError as feil:
@@ -394,7 +394,7 @@ def vaktliste_arkiver_view(request, pk, retning):
     if retning not in ('arkiver', 'gjenopprett'):
         return json_feil('Ukjent retning.', status=404)
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
     if retning == 'arkiver':
@@ -448,7 +448,7 @@ def vaktliste_detalj_view(request, pk):
         return _nektet()
 
     try:
-        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+        vl = Vaktliste.objects.i_portal().select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 

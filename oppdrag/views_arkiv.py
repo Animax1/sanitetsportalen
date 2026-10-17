@@ -24,6 +24,7 @@ from core.jsonkropp import json_body
 from core.arkiv import verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
+from core.vakt import i_portalens_historikk
 
 from .arkiv import OppdragArkivHandler
 from .models import OppdragArkiv
@@ -82,7 +83,7 @@ def arkiv_liste_view(request):
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
     return JsonResponse({'status': 'ok', 'data': [
         _arkiv_til_dict(a) for a in
-        OppdragArkiv.objects.select_related('importert_av')
+        OppdragArkiv.objects.filter(i_portalens_historikk()).select_related('importert_av')
     ]})
 
 
@@ -101,7 +102,8 @@ def arkiv_detalj_view(request, pk):
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     try:
-        arkiv = OppdragArkiv.objects.select_related('importert_av').get(pk=pk)
+        arkiv = (OppdragArkiv.objects.filter(i_portalens_historikk())
+                 .select_related('importert_av').get(pk=pk))
     except OppdragArkiv.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Arkiv ikke funnet'}, status=404)

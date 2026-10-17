@@ -206,7 +206,8 @@ def kilde_frosset_view(request, slug, pk):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
     from core.models import VaktStatistikk
 
-    rad = VaktStatistikk.objects.filter(pk=pk, slug=slug).first()
+    from core.vakt import i_portalens_historikk
+    rad = VaktStatistikk.objects.filter(i_portalens_historikk(), pk=pk, slug=slug).first()
     if rad is None:
         return JsonResponse({'error': 'Fant ikke tallene'}, status=404)
     svar = JsonResponse(rad.data)

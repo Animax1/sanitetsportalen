@@ -290,10 +290,13 @@ class EnListeIDriftPerPortalTests(TilgangsBasis):
         self.assertEqual(200, self._sett(self.andre, 'start').status_code)
 
     def test_en_liste_i_en_annen_portal_teller_ikke(self):
+        """Lista i drift flyttes til Brann etterpå; den som står igjen i
+        portalen, kan settes i drift. (Fra 4d-3 kan vaktlederen ikke nå en
+        liste i en annen portal i det hele tatt — den gir 404.)"""
         from core.models import Vakt, Vaktportal
         brann = Vaktportal.objects.create(navn='Brann', slug='brann')
-        Vakt.objects.filter(pk=self.andre.vakt_id).update(portal=brann)
-        self._sett(self.vl, 'start')
+        self.assertEqual(200, self._sett(self.vl, 'start').status_code)
+        Vakt.objects.filter(pk=self.vl.vakt_id).update(portal=brann)
         self.assertEqual(200, self._sett(self.andre, 'start').status_code)
 
     def test_klokka_venter_mens_en_annen_er_i_drift(self):

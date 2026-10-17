@@ -34,7 +34,7 @@ def overnattingsrom_view(request, pk):
     """Nytt rom på en vaktliste. Lederens, som ressursene."""
     if not overnatting.kan_sette_opp(request.user):
         return _nektet('Rommene settes opp av den som setter opp vakten.')
-    vl = Vaktliste.objects.select_related('vakt').filter(pk=pk).first()
+    vl = Vaktliste.objects.i_portal().select_related('vakt').filter(pk=pk).first()
     if vl is None:
         return json_feil('Vaktliste ikke funnet', status=404)
     try:
@@ -58,7 +58,7 @@ def overnattingsrom_detalj_view(request, pk):
     """
     if not overnatting.kan_sette_opp(request.user):
         return _nektet('Rommene settes opp av den som setter opp vakten.')
-    rom = Overnattingsrom.objects.select_related('vaktliste').filter(pk=pk).first()
+    rom = Overnattingsrom.objects.i_portal().select_related('vaktliste').filter(pk=pk).first()
     if rom is None:
         return json_feil('Rommet finnes ikke', status=404)
     data = json_body(request)
@@ -84,7 +84,7 @@ def overnatting_plasser_view(request, pk):
     Sover hun et annet sted en av nettene, er svaret **409 med nettene** —
     vinduet spør om hun skal flyttes, og sender da `flytt: true`.
     """
-    rom = Overnattingsrom.objects.select_related('vaktliste__vakt').filter(pk=pk).first()
+    rom = Overnattingsrom.objects.i_portal().select_related('vaktliste__vakt').filter(pk=pk).first()
     if rom is None:
         return json_feil('Rommet finnes ikke', status=404)
     data = json_body(request)
@@ -111,7 +111,7 @@ def overnatting_plasser_view(request, pk):
 @rate_limit(group='vaktliste:overnatting-fjern', rate='120/m', method='DELETE')
 def overnatting_detalj_view(request, pk):
     """Ta en person ut av rommet én natt. Samme terskel som å plassere."""
-    rad = Overnatting.objects.select_related('mannskap').filter(pk=pk).first()
+    rad = Overnatting.objects.i_portal().select_related('mannskap').filter(pk=pk).first()
     if rad is None:
         return json_feil('Plasseringen finnes ikke', status=404)
     if not overnatting.kan_plassere(request.user, rad.mannskap):

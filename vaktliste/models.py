@@ -55,7 +55,7 @@ from django.db import models
 from django.db.models import F
 from django.db.models.functions import Lower
 
-from core.models import BaseTimeStampedModel, PortalEid, Tilhorighet
+from core.models import BaseTimeStampedModel, PortalEid, Tilhorighet, VaktbundetQuerySet
 from core.sortering import Norsk
 
 from . import choices
@@ -526,6 +526,10 @@ class Vaktliste(BaseTimeStampedModel):
     portalens aktive vakt — det byttes i vaktadministrasjonen, som før.
     """
 
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
+
     # PROTECT: vakta er listas identitet. Slettes den under, står lista igjen
     # uten å kunne si hvilken vakt den gjaldt.
     vakt = models.OneToOneField(
@@ -680,6 +684,10 @@ class Ressurs(BaseTimeStampedModel):
     av et oppsettsvalg i en annen modul.
     """
 
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'vaktliste__vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
+
     vaktliste = models.ForeignKey(
         Vaktliste,
         on_delete=models.CASCADE,
@@ -765,6 +773,10 @@ class Vaktpost(BaseTimeStampedModel):
     Raden blir stående — den forteller at plassen ble tom, og at det var
     kjent på forhånd.
     """
+
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'ressurs__vaktliste__vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
 
     ressurs = models.ForeignKey(
         Ressurs,
@@ -924,6 +936,10 @@ class Pause(BaseTimeStampedModel):
     Retningen er `ko` → `vaktliste`: vaktlista vet ingenting om det.
     """
 
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'ressurs__vaktliste__vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
+
     ressurs = models.ForeignKey(
         Ressurs, on_delete=models.CASCADE, related_name='pauser',
         verbose_name='Ressurs')
@@ -955,6 +971,10 @@ class Overnattingsrom(BaseTimeStampedModel):
     det sperrer ikke** — samme linje som timetaket: den som står med en
     person til og ingen seng, må kunne føre det riktig og ta stilling.
     """
+
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'vaktliste__vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
 
     vaktliste = models.ForeignKey(
         Vaktliste, on_delete=models.CASCADE, related_name='overnattingsrom',
@@ -1001,6 +1021,10 @@ class Overnatting(BaseTimeStampedModel):
     PROTECT på mannskapet, som på skiftene: en person som står på en
     brannliste skal ikke kunne forsvinne fra den ved en sletting i registeret.
     """
+
+    #: Portalen gjennom vakta — `core.models.VaktbundetQuerySet.i_portal()`.
+    PORTAL_STI = 'rom__vaktliste__vakt__portal'
+    objects = VaktbundetQuerySet.as_manager()
 
     rom = models.ForeignKey(
         Overnattingsrom, on_delete=models.CASCADE, related_name='overnattinger',

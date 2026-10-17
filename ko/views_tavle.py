@@ -42,7 +42,7 @@ def _tavle_ressurs(request, data):
     bil man ikke får se, finnes ikke: 404, ikke 403."""
     from vaktliste.models import Ressurs
     try:
-        ressurs = Ressurs.objects.get(pk=int(data.get('ressurs_id')))
+        ressurs = Ressurs.objects.i_portal().get(pk=int(data.get('ressurs_id')))
     except (Ressurs.DoesNotExist, TypeError, ValueError):
         return None
     if ressurs.enhet_id is not None and not har_tilgang(request.user, 'oppdrag', 'les'):

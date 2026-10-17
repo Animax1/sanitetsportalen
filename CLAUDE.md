@@ -217,10 +217,10 @@ førstehjelper, helsepersonell, bil — er modulens sak, og meldes inn gjennom
 Importér alltid fra `core.auth_decorators`. **`accounts/decorators.py` er slettet**
 (14. sep. 2026, gjeldspunkt 3.3): en ren re-eksport av `admin_required`.
 
-*Og slettingen avdekket at regelen sto brutt:* testen lette bare etter
-`from accounts.decorators import`, mens `accounts/views.py` brukte `from .decorators
-import` — et år grønt. En regel som dekker halve syntaksen måler noe annet enn den later
-som; `core/tests.py` dekker nå begge.
+Testen så bare `from accounts.decorators import`, ikke `from .decorators` — et år grønt.
+
+**Et oppslag på en ID fra klienten går gjennom `i_portal()`** (17. okt. 2026): `PortalEid`
+for det portalen eier, `VaktbundetQuerySet` for det som henger på en vakt.
 
 **Tre kategorier, ikke én.** Se `docs/BESLUTNING_ROLLEMODELLEN.md`:
 

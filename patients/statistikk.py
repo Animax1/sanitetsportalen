@@ -35,11 +35,13 @@ class PasientStatistikkHandler(BaseStatistikkHandler):
         pasientmodulens modell. Slik slipper statistikkappen å importere den
         — det var nettopp den importen fase 6 fjernet.
         """
+        from core.vakt import i_portalens_historikk
+
         from .models import VaktArkiv
         from .services import compute_arkiv_full_stats
 
         try:
-            arkiv = VaktArkiv.objects.get(pk=pk)
+            arkiv = VaktArkiv.objects.filter(i_portalens_historikk()).get(pk=pk)
         except VaktArkiv.DoesNotExist:
             return None
         return compute_arkiv_full_stats(arkiv)

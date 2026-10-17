@@ -1277,3 +1277,224 @@ class InnstillingenePerPortalTests(TestCase):
         AppSetting.set_i_portal(fil.MOTTAKERE_NOKKEL, 'a@ex.no', portal=self.brann)
         rad = fil.send_fil(vl)
         self.assertEqual(rad.mottakere, 'a@ex.no')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class VaktlistasRuterMedIdTests(TestCase):
+    """Fase 4d-3: **hver** rute i vaktlista som tar en ID, svarer 404 for en rad i
+    en annen portal — utledet av `urlpatterns`, ikke skrevet for hånd.
+
+    Hullet var reelt: lister, ressurser, skift, pauser og overnattingsrom ble
+    slått opp på ID alene, så en vaktleder i Brann kunne endre Standards liste
+    ved å sende ID-en. En ny rute som glemmer `i_portal()` blir rød her."""
+
+    #: Rutene etter hva ID-en peker på. Ukjente prefikser feiler testen — en ny
+    #: rute skal tas stilling til.
+    PEKER_PAA = {
+        'api/vaktlister/': 'vl', 'api/ressurser/': 'ressurs', 'api/pauser/': 'pause',
+        'api/vaktposter/': 'vaktpost', 'api/overnattingsrom/': 'rom',
+        'api/overnattinger/': 'overnatting',
+    }
+    #: Rader som ikke hører til én vakt: portalens egne (mannskap, korps — se
+    #: `VaktlistaHolderPortaleneAdskiltTests`) eller faget (grupper, roller,
+    #: kompetanser), og bilen, som er global.
+    UTENFOR = ('api/mannskap/', 'api/korps/', 'api/kompetanser/', 'api/grupper/',
+               'api/roller/', 'api/enhet/')
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.db import transaction
+        from django.utils import timezone
+
+        from accounts.models import CustomUser
+        from accounts.test_helpers import gi_modultilgang
+        from core.models import Tilhorighet, Vaktportal
+        from core.portal import aktiver_portal, eneste_portal
+        from core.vakt import gjor_aktiv, opprett_vakt
+        from vaktliste import overnatting
+        from vaktliste.models import Mannskap, Pause, Vaktliste, Vaktpost
+        from vaktliste.test_helpers import lag_ressurs
+
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        naa = timezone.now()
+        with aktiver_portal(self.standard):
+            vakt = opprett_vakt('Standardvakt', year=2026, startet=naa,
+                                portal=self.standard)
+            hgsd = Tilhorighet.objects.create(navn='HGSD')
+            self.standard.tilhorigheter.add(hgsd)
+            kari = Mannskap.objects.create(navn='Kari', korps=hgsd)
+        vl = Vaktliste.objects.create(vakt=vakt, planlagt_slutt=naa + timedelta(days=2))
+        ressurs = lag_ressurs(vaktliste=vl, navn='Bil 1')
+        vaktpost = Vaktpost.objects.create(ressurs=ressurs, mannskap=kari, fra_tid=naa,
+                                           til_tid=naa + timedelta(hours=8))
+        pause = Pause.objects.create(ressurs=ressurs, fra=naa + timedelta(hours=2),
+                                     til=naa + timedelta(hours=2, minutes=30))
+        rom = overnatting.lagre_rom(vl, {'navn': 'Gymsal'})
+        natt = overnatting.netter_i_vakta(vl)[0].isoformat()
+        rad = overnatting.plasser(rom, kari, [natt])[0]
+        self.rader = {'vl': vl, 'ressurs': ressurs, 'vaktpost': vaktpost, 'pause': pause,
+                      'rom': rom, 'overnatting': rad}
+        with aktiver_portal(self.brann):
+            brannvakt = opprett_vakt('Brannvakt', year=2026, startet=naa, portal=self.brann)
+        with transaction.atomic():
+            gjor_aktiv(brannvakt)
+        leder = CustomUser.objects.create_user(username='leder', password='x',
+                                               must_change_password=False)
+        gi_modultilgang(bruker=leder, modul_slug='vaktliste', nivaa='skriv_leder',
+                        portal=self.brann)
+        self.c = Client()
+        self.c.force_login(leder)
+        # Global admin ser alle portaler, men står i én om gangen — og
+        # arkivering og sletting av en liste er hennes, så de prøves bare her.
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        self.admin = Client(headers={'X-Portal': 'brann'})
+        self.admin.force_login(sjef)
+        self.admin.post('/portal/', {'portal': 'brann'})
+
+    def _ruter(self):
+        from django.urls import URLPattern
+
+        from vaktliste import urls
+        for p in urls.urlpatterns:
+            if isinstance(p, URLPattern) and '<int:pk>' in str(p.pattern):
+                yield str(p.pattern), p.name
+
+    def test_hver_rute_med_id_svarer_404_for_en_annen_portal(self):
+        from django.urls import reverse
+        for rute, navn in self._ruter():
+            if rute.startswith(self.UTENFOR):
+                continue
+            prefiks = next((p for p in self.PEKER_PAA if rute.startswith(p)), None)
+            self.assertIsNotNone(prefiks, f'Ny rute med ID: {rute} — ta stilling til den.')
+            kwargs = {'pk': self.rader[self.PEKER_PAA[prefiks]].pk}
+            if '<str:tilstand>' in rute:
+                kwargs['tilstand'] = 'start'
+            if '<str:handling>' in rute:
+                kwargs['handling'] = 'mott'
+            url = reverse(navn, kwargs=kwargs)
+            for hvem, klient, lov in (('leder', self.c, (403, 404, 405)),
+                                      ('admin', self.admin, (404, 405))):
+                for metode in ('get', 'post', 'put', 'delete'):
+                    with self.subTest(rute=rute, metode=metode, hvem=hvem):
+                        svar = getattr(klient, metode)(url, content_type='application/json',
+                                                       data={'confirm': True})
+                        self.assertIn(svar.status_code, lov, svar.content[:200])
+
+    def test_motproeve_samme_ruter_virker_i_egen_portal(self):
+        """Uten motprøven kunne 404 kommet av noe annet enn portalen."""
+        from django.urls import reverse
+        from core.models import Vakt
+        Vakt.objects.filter(pk=self.rader['vl'].vakt_id).update(portal=self.brann, er_aktiv=False)
+        svar = self.c.get(reverse('vaktliste_api_vaktliste_detalj',
+                                  kwargs={'pk': self.rader['vl'].pk}))
+        self.assertEqual(svar.status_code, 200, svar.content[:200])
+        svar = self.c.put(reverse('vaktliste_api_ressurs_detalj',
+                                  kwargs={'pk': self.rader['ressurs'].pk}),
+                          content_type='application/json', data={'navn': 'Bil 2'})
+        self.assertEqual(svar.status_code, 200, svar.content[:200])
+
+    def test_oppsettet_kopieres_ikke_fra_en_annen_portals_liste(self):
+        """`kopier_fra` står i kroppen, ikke i adressen — og var et oppslag på ID alene."""
+        def ny(navn):
+            svar = self.c.post('/vaktliste/api/vaktlister/', content_type='application/json',
+                               data={'navn': navn, 'kopier_fra': self.rader['vl'].pk})
+            self.assertEqual(svar.status_code, 201, svar.content)
+            return svar.json()['data']['kopierte_ressurser']
+        self.assertEqual(ny('Fra Standard'), 0)
+        from core.models import Vakt
+        Vakt.objects.filter(pk=self.rader['vl'].vakt_id).update(portal=self.brann, er_aktiv=False)
+        self.assertEqual(ny('Fra egen'), 1, 'motprøven: fra egen portal kopieres den')
+
+    def test_ko_tavla_tar_ikke_en_annen_portals_ressurs(self):
+        from unittest import mock
+
+        from accounts.models import CustomUser
+        from accounts.test_helpers import gi_modultilgang
+        from oppdrag.models import Lokasjon
+        from core.portal import aktiver_portal
+        ko = CustomUser.objects.create_user(username='ko', password='x', must_change_password=False)
+        for slug in ('ko', 'vaktliste'):
+            gi_modultilgang(bruker=ko, modul_slug=slug, nivaa='skriv_full', portal=self.brann)
+        with aktiver_portal(self.brann):
+            sted = Lokasjon.objects.create(navn='Scene B')
+        c = Client()
+        c.force_login(ko)
+        with mock.patch('ko.tavle.plasser', return_value=mock.Mock(pk=1)):
+            svar = c.post('/ko/api/tavle/plasser/', content_type='application/json',
+                          data={'ressurs_id': self.rader['ressurs'].pk, 'lokasjon_id': sted.pk})
+        self.assertEqual(svar.status_code, 404, svar.content)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class HistorikkenPerPortalTests(TestCase):
+    """Fase 4d-3: frosne tall og arkiver vises i portalen admin står i. Rader
+    uten vakt, eller med en vakt uten portal, vises i alle."""
+
+    def setUp(self):
+        from django.utils import timezone
+
+        from accounts.models import CustomUser
+        from core.models import Vakt, VaktStatistikk, Vaktportal
+        from core.portal import eneste_portal
+        from oppdrag.models import OppdragArkiv
+        from patients.models import VaktArkiv
+
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        naa = timezone.now()
+
+        def vakt(navn, portal):
+            return Vakt.objects.create(navn=navn, year=2025, startet=naa, portal=portal)
+        self.vakter = {'S': vakt('Standardvakt', self.standard), 'B': vakt('Brannvakt', self.brann),
+                       'uten portal': vakt('Gammel', None)}
+        self.frosne, self.oppdragsarkiv, self.pasientarkiv = {}, {}, {}
+        for nokkel, v in {**self.vakter, 'uten vakt': None}.items():
+            navn = v.navn if v else 'Slettet'
+            self.frosne[nokkel] = VaktStatistikk.objects.create(
+                vakt=v, vakt_navn=navn, slug='patients', data={}, frosset_at=naa, versjon=2)
+            self.oppdragsarkiv[nokkel] = OppdragArkiv.objects.create(
+                tittel=navn, vakt=v, vakt_navn=navn, antall_rader=0)
+            self.pasientarkiv[nokkel] = VaktArkiv.objects.create(
+                tittel=navn, arrangement_navn=navn, vakt=v, antall_pasienter=0,
+                year_snapshot=2025)
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        self.c = Client(headers={'X-Portal': 'brann'})
+        self.c.force_login(sjef)
+        self.c.post('/portal/', {'portal': 'brann'})
+
+    SYNLIGE_I_BRANN = {'B', 'uten portal', 'uten vakt'}
+
+    def test_tidligere_vakter_er_portalens(self):
+        from core.vaktstatistikk import tidligere_vakter
+        navn = {o['navn'] for o in tidligere_vakter(self.brann)}
+        self.assertEqual(navn, {'Brannvakt', 'Gammel', 'Slettet'})
+
+    def test_frosne_tall_fra_en_annen_portal_er_404(self):
+        for nokkel, rad in self.frosne.items():
+            with self.subTest(nokkel=nokkel):
+                svar = self.c.get(f'/statistikk/api/kilde/patients/frosset/{rad.pk}/')
+                self.assertEqual(svar.status_code,
+                                 200 if nokkel in self.SYNLIGE_I_BRANN else 404)
+
+    def test_arkivlistene_er_portalens(self):
+        oppdrag = {a['tittel'] for a in self.c.get('/oppdrag/api/arkiv/').json()['data']}
+        self.assertEqual(oppdrag, {'Brannvakt', 'Gammel', 'Slettet'})
+        pasient = {a['tittel'] for a in self.c.get('/pasienter/api/innstillinger/arkiv/').json()}
+        self.assertEqual(pasient, {'Brannvakt', 'Gammel', 'Slettet'})
+
+    def test_et_arkiv_fra_en_annen_portal_er_404(self):
+        for sti, rader in (('/oppdrag/api/arkiv/{}/', self.oppdragsarkiv),
+                           ('/pasienter/api/innstillinger/arkiv/{}/', self.pasientarkiv),
+                           ('/statistikk/api/kilde/oppdrag/arkiv/{}/full-stats/', self.oppdragsarkiv),
+                           ('/statistikk/api/kilde/patients/arkiv/{}/full-stats/', self.pasientarkiv)):
+            for nokkel, rad in rader.items():
+                with self.subTest(sti=sti, nokkel=nokkel):
+                    svar = self.c.get(sti.format(rad.pk))
+                    if nokkel in self.SYNLIGE_I_BRANN:
+                        self.assertNotEqual(svar.status_code, 404, svar.content[:200])
+                    else:
+                        self.assertEqual(svar.status_code, 404, svar.content[:200])

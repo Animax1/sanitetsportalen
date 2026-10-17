@@ -35,7 +35,8 @@ def arkiv_liste_view(request):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     from .models import VaktArkiv
-    arkiver = VaktArkiv.objects.select_related('importert_av').all()
+    from core.vakt import i_portalens_historikk
+    arkiver = VaktArkiv.objects.filter(i_portalens_historikk()).select_related('importert_av')
     data = [{
         'id': a.pk,
         'tittel': a.tittel,
@@ -59,7 +60,9 @@ def arkiv_detalj_view(request, pk):
     from .models import VaktArkiv
 
     try:
-        arkiv = VaktArkiv.objects.select_related('importert_av').get(pk=pk)
+        from core.vakt import i_portalens_historikk
+        arkiv = (VaktArkiv.objects.filter(i_portalens_historikk())
+                 .select_related('importert_av').get(pk=pk))
     except VaktArkiv.DoesNotExist:
         return JsonResponse({'error': 'Arkiv ikke funnet'}, status=404)
 

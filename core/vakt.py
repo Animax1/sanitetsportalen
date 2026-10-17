@@ -143,3 +143,14 @@ def hent_aktiv_vakt(portal=None):
     except IntegrityError:
         # En samtidig forespørsel rakk å gjøre en annen vakt aktiv.
         return Vakt.objects.get(portal=portal, er_aktiv=True)
+
+
+def i_portalens_historikk(portal=None):
+    """Filteret for det som hører til en vakt i portalen: frosne tall og arkiver
+    (17. okt. 2026, fase 4d-3). **En rad uten vakt, eller med en vakt uten
+    portal, tas med** — vakta er slettet («Slett tidligere vakt»), eller den er
+    lastet fra en backup tatt før portalene fantes, og da kan ingen si hvilken
+    portal den hørte til. Samme regel som lista over tidligere vakter på
+    vaktsiden: heller synlig i alle enn borte i alle."""
+    from django.db.models import Q
+    return Q(vakt__portal=portal or gjeldende_portal()) | Q(vakt__portal__isnull=True)

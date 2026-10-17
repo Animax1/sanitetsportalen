@@ -605,6 +605,20 @@ class PortalQuerySet(models.QuerySet):
         return self.filter(portal=portal or gjeldende_portal())
 
 
+class VaktbundetQuerySet(models.QuerySet):
+    """`i_portal()` for rader som har portalen **gjennom vakta** (17. okt. 2026).
+
+    `PortalEid` er for det som hører til en portal uten å henge på en vakt.
+    Vaktlistas lister, ressurser og skift henger på vakta, og vakta har
+    portalen — men et oppslag på ID alene går forbi den. Modellen oppgir veien
+    i `PORTAL_STI`, og hvert oppslag på en ID fra klienten går gjennom her.
+    """
+
+    def i_portal(self, portal=None):
+        from core.portal import gjeldende_portal
+        return self.filter(**{self.model.PORTAL_STI: portal or gjeldende_portal()})
+
+
 class PortalEid(models.Model):
     """Mixin for data som hører til én portal, men ikke til én vakt (17. okt. 2026).
 

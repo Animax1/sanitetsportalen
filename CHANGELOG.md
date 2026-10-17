@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4d-3: vaktlistas oppslag på ID går gjennom portalen, og statistikk og arkiv viser portalens historikk — fase 4 er ferdig  `#core/tilgang` `#vaktliste/tilgang` `#statistikk/oppdragsfanen`
+
+Siste pulje av fase 4. **Med én portal: ingen synlig endring.**
+
+**Hullet: vaktlistas oppslag på ID.** Lister, ressurser, skift, pauser, overnattingsrom og
+overnattinger ble slått opp på ID alene. Med to portaler kunne en vaktleder i Brann ha endret,
+satt i drift eller slettet Standards liste ved å sende ID-en for hånd. Det samme gjaldt
+«Kopier oppsett fra» (ID-en i kroppen) og ressursen i KOs tavle.
+
+**Mekanismen: `core.models.VaktbundetQuerySet`**, søsteren til `PortalEid` for det som henger på
+en vakt: modellen oppgir veien til portalen i `PORTAL_STI`, og `i_portal()` går den. Vaktlistas
+seks modeller har den, og hvert oppslag på en ID fra klienten går gjennom den.
+
+**Testen utleder rutene, den skriver dem ikke opp** (`VaktlistasRuterMedIdTests`). Den går gjennom
+hver rute i `vaktliste/urls.py` som tar en ID, med rader fra en annen portal, med alle fire
+metodene, som vaktleder og som global admin i Brann — og krever 404. **En ny rute med ID som ikke
+er tatt stilling til, gjør testen rød.** Motprøven: de samme rutene virker i egen portal.
+
+**Statistikk og arkiv viser portalens historikk** (`core.vakt.i_portalens_historikk()`):
+- tidligere vakter i statistikken og på vaktsiden;
+- de frosne tallene;
+- arkivlistene og arkivene i pasient- og oppdragsmodulen;
+- fullstatistikken for et arkiv.
+
+Alt er global admin, så ingen lekket — men admin står i én portal om gangen, og listene skal følge
+den. **Rader uten vakt, eller med en vakt uten portal, vises i alle**: vakta er slettet, eller lastet
+fra en backup tatt før portalene fantes, og da kan ingen si hvor de hørte til. Samme regel som vaktsiden.
+
+**Flyttet til fase 5:** søk på tvers av portalene for innsyn og sletting (§4.5) — det er en flate.
+
+**Tester: 10 nye** (`VaktlistasRuterMedIdTests`, `HistorikkenPerPortalTests`). **Mutasjoner: 37, alle
+drept til slutt** — hvert oppslag, hver forekomst av linjene som står likt flere steder (prøvd én om
+gangen), hvert filter i historikken. To overlevde første runde: «Kopier oppsett fra» og KOs tavle
+hadde ID-en i kroppen, og ruteprøven ser bare adressen. De fikk egne tester.
+
 ## 2026-10-17 — Portaler fase 4d-2: portalens innstillinger lagres per portal, med systemets verdi som standard  `#core/tilgang` `#vaktliste/offline` `#ko/planleggeren`
 
 Andre pulje av fase 4d (`docs/BESLUTNING_PORTALER.md` §4.7). **Med én portal: ingen synlig
