@@ -140,6 +140,34 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Flere portaler i én installasjon — se [`docs/BESLUTNING_PORTALER.md`](./docs/BESLUTNING_PORTALER.md)
+
+Besluttet 17. okt. 2026, ikke påbegynt. Andre i organisasjonen skal kunne kjøre egne vakter
+(«Brann», kamp 1–15) uten å se hverandres mannskap, pasienter eller oppdrag. Rollene er
+global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for seg, og
+**portal nummer to opprettes ikke i prod før fase 4 er levert** (notatet §6).
+
+- [ ] **Fase 0:** `/portal-admin/` → `/admin/`, med 301 fra den gamle stien. Uavhengig av resten.
+- [ ] **Fase 1:** `core.Vaktportal`, `Vakt.portal` fylt til «Standard», aktiv vakt flytter fra
+      `AppSetting['aktiv_vakt_id']` til portalen i alle 29 filene (notatet §8). Ingen synlig
+      endring; to deployer på grunn av release-vinduet, og migrasjonsprøve mot PostgreSQL.
+- [ ] **Fase 2:** `Portaltilgang` (moderator/medlem), `ModulTilgang.portal`, aktiv portal i
+      sesjonen, fanevakten (`X-Portal`, 409 ved bytte i en annen fane), portalen i offline-nøklene.
+- [ ] **Fase 3:** tilhørighet — `vaktliste.Korps` til `core` som felles katalog med typen
+      `annet` (lege02), kontoens tilhørigheter, og admins utvalg per portal.
+- [ ] **Fase 4:** data per portal — `Mannskap.portal`, `Kontokorps` og `Mannskap.user` unike per
+      portal, innstillingene sortert i system og portal, portalfilter i statistikk og arkiv.
+      Vaktene i notatet §6.1 (hver modell har en vei til portalen eller står på lista over
+      globale) kommer i denne fasen.
+- [ ] **Fase 5:** flatene — «Ny portal», moduler og tak, moderatorens brukere og tilgang,
+      «Avslutt vakt» til moderator, «Sist innlogget» og filtrene «Uten portal»/«Inaktiv 12 mnd»,
+      portalvelgeren, og forslaget «mannskap fra de siste 24 månedene» ved ny vakt.
+- [ ] **Fase 6:** kartet, i begge repoer — portalens slug og vakt-ID i meldingen, `Gruppe.portal`
+      i stedet for `viser_portalen`, `steder_for()` per portal, gruppevelgeren.
+- [ ] **Fase 7:** sladding av fritekst for admin, med sladderegister som kjøres på nytt etter en
+      gjenoppretting. KO først, så oppdrag, så pasient (med ny signering av arkivet).
+      Uavhengig av portalene.
+
 ### Sikkerhetsgjennomgangen 28. sep. 2026 — alle fire puljer levert, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
 
 Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`), 3 (backup og offsite) og 4

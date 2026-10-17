@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Beslutningsnotat: flere portaler i én installasjon — moderator, tilhørighet (korps og «annet»), mannskap per portal, kartgruppe per portal  `#core/tilgang` `#core/vakt` `#core/kartkobling`
+
+André: «Jeg vil se på om vi kan lage det til flere som vil kjøre andre vakter.» Diskutert og
+avklart i én økt; ingen kode endret. **`docs/BESLUTNING_PORTALER.md`** har beslutningene,
+funnene og faseplanen (fase 0–7), og fasene står i TODO.
+
+**Beslutningene i korte trekk:** A — flere portaler i én installasjon for samme organisasjon;
+B — én installasjon per organisasjon — holdes i bakhånd. «portal» på skjermen, `Vaktportal` i
+koden, `/portal-admin/` blir `/admin/`. Roller: global admin, moderator og medlem, **ingen
+portaladmin** («Admin er admin og moderator er den som styrer sin portal»). Moderator
+oppretter kontoer, legger til og fjerner, men sletter aldri, og ser bare kontoene med de
+tilhørighetene admin har lagt i portalen — korps, eller «annet» som lege02. Mannskapet er per
+portal («Brann-portalen ser bare mannskapslisten fra sine vakter»), bilkontoene globale.
+Moderator avslutter vakt; gjenoppretting, hard-delete og sladding er admin — en datert
+endring av rollemodellens §3.3. Den aktive portalen ligger i sesjonen, med en fanevakt
+(`X-Portal`, 409) mot at én fane skriver i feil portal etter et bytte i en annen.
+
+**Funnene som styrte designet:** `CustomUser.last_login_at` fantes og ble oppdatert, men
+ble ikke vist noe sted utenfor Django-admin — «sist innlogget» er en manglende flate.
+`AppSetting['aktiv_vakt_id']` leses i 29 filer. I kartet ser alle grupper med
+`viser_portalen` alle biler, og `steder_for()` slår opp «Hovedpost» i alle slike grupper.
+
+**Korrigert underveis:** jeg sa i samtalen at sladding av fritekst bryter signaturen i
+oppdragsarkivet. Det gjør den ikke — `fritekst` arkiveres ikke. Bare pasientarkivet har
+tekstfelt i `sha_payload()`, og derfor kommer pasient sist i sladdefasen.
+
 ## 2026-10-17 — `Cache-Control: private, no-store` som standard; Railways CDN ikke slått på («Hvis vi tjener så lite så avstår vi»)  `#core/sikkerhet` `#core/personvern`
 
 André spurte om CDN-caching i Railway for portalen, kartet og Postgres. **Nei:** gevinsten er
