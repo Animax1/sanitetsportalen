@@ -53,7 +53,7 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
         from park import services
 
         if 'ko_posisjon' in verdier:
-            AppSetting.set(services.KO_POSISJON_NOKKEL, 'true' if verdier['ko_posisjon'] else 'false')
+            AppSetting.set_i_portal(services.KO_POSISJON_NOKKEL, 'true' if verdier['ko_posisjon'] else 'false')
         if 'angrefrist' in verdier:
             AppSetting.set(services.ANGREFRIST_NOKKEL, verdier['angrefrist'])
 

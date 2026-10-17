@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4d-2: portalens innstillinger lagres per portal, med systemets verdi som standard  `#core/tilgang` `#vaktliste/offline` `#ko/planleggeren`
+
+Andre pulje av fase 4d (`docs/BESLUTNING_PORTALER.md` §4.7). **Med én portal: ingen synlig
+endring.** Det du har satt opp, står — den globale verdien er standarden alle portaler arver.
+
+**Mekanismen:** `AppSetting.get_i_portal()` og `set_i_portal()`. Portalens verdi lagres som
+`<nøkkel>@p<portal-id>`; lesing gir portalens verdi, ellers den globale, ellers standarden i
+koden. To valg:
+- **Etterledd, ikke forstavelse.** Auditens unntaksliste (`nokkel_logges`), tavlas
+  `ko.tavle*`-lytter og `cron.*` leser starten av nøkkelen, og virker uendret.
+- **To navngitte kall, ikke et register i `core`.** Det står i koden hvilke nøkler som er
+  portalens, og `core` kjenner ingen modulnøkkel ved navn.
+
+Skriving uten portal og med flere kaster (`UklarPortal`) — en innstilling skal aldri havne i feil
+portal. Lesing uten portal og med flere gir systemets verdi.
+
+**Portalens:** vaktlistefila på e-post (mottakere, ved drift, intervall, bare ved endring),
+pausene på utskriften, lydvarselet og grovsorteringen i bilene, chatten i KO, og tavlas oppsett
+(tidsvindu, døgnstart, rulling, «På tavla», «Følg besøk»), og «Forhåndsvalg fra KO-tavla» i park.
+**Systemets:** sesjonstid, backup og offsite, statusmelding, kartets varighet, cron, angrefristen i
+park, og de to slettefristene — KO-loggen og fritekst i oppdrag, fordi en frist er personvern og
+hører til systemet (§4.7, «Avgjøres»).
+
+**Der det ikke finnes en forespørsel, bærer lista portalen:** klokka som setter lister i drift og
+intervallsendingen av fila leser hver listes portal, og fila tar mottakerne og pausene fra lista
+den sendes for.
+
+**Flatene** — moderatorens kort med portalens innstillinger, admins kort med begge (§4.7) — kommer
+i fase 5. Til da skriver `/portal-admin/innstillinger/` i portalen admin står i.
+
+**Tester: 13 i `InnstillingenePerPortalTests`.** **Mutasjoner: 32, alle drept til slutt.** Tre
+overlevde første runde: testen brukte `06:00` og `120`, som *er* standardverdiene — da måles
+ingenting. Den bruker nå `07:30` og `90`.
+
 ## 2026-10-17 — Portaler fase 4d-1: vaktnavnet unikt per portal, varslene med portal, endringsnumrene per portal, og lista i drift slått opp i portalen  `#core/tilgang` `#core/vakt` `#vaktliste/tilgang`
 
 Første pulje av fase 4d i `docs/BESLUTNING_PORTALER.md` (§4.12, §4.14). **Med én portal: ingen

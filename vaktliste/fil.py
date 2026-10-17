@@ -48,30 +48,33 @@ MAKS_INTERVALL_MIN = 24 * 60
 
 # ── Innstillingene ───────────────────────────────────────────────────────────
 
-def mottakere() -> list[str]:
+# **Portalens innstillinger** (§4.7): `portal` når kalleren har lista og ikke en
+# forespørsel — klokka som setter lister i drift, og intervallsendingen.
+
+def mottakere(portal=None) -> list[str]:
     """Adressene admin har satt, én per linje eller kommaseparert."""
     from core.models import AppSetting
-    raa = AppSetting.get(MOTTAKERE_NOKKEL, '') or ''
+    raa = AppSetting.get_i_portal(MOTTAKERE_NOKKEL, '', portal) or ''
     return [a for a in (x.strip() for x in re.split(r'[,\n;]', raa)) if a]
 
 
-def sendes_ved_drift() -> bool:
+def sendes_ved_drift(portal=None) -> bool:
     from core.models import AppSetting
-    return AppSetting.get(VED_DRIFT_NOKKEL, '1') == '1'
+    return AppSetting.get_i_portal(VED_DRIFT_NOKKEL, '1', portal) == '1'
 
 
-def intervall_minutter() -> int:
+def intervall_minutter(portal=None) -> int:
     """Hvor ofte lista sendes på nytt mens den er i drift. 0 = aldri."""
     from core.models import AppSetting
     try:
-        return max(0, int(AppSetting.get(INTERVALL_NOKKEL, '0') or 0))
+        return max(0, int(AppSetting.get_i_portal(INTERVALL_NOKKEL, '0', portal) or 0))
     except (TypeError, ValueError):
         return 0
 
 
-def bare_ved_endring() -> bool:
+def bare_ved_endring(portal=None) -> bool:
     from core.models import AppSetting
-    return AppSetting.get(BARE_ENDRET_NOKKEL, '1') == '1'
+    return AppSetting.get_i_portal(BARE_ENDRET_NOKKEL, '1', portal) == '1'
 
 
 def valider_mottakere(raa: str) -> list[str]:
@@ -142,7 +145,7 @@ def rader_for(vaktliste):
     # Pausene (23. sep. 2026): mannskapet ser dem i fila, med mindre admin har
     # skjult dem. Per ressurs, som tekst — fila skal kunne leses uten portalen.
     per_ressurs_pauser: dict[int, list] = {}
-    if pauser.vises_for_mannskapet():
+    if pauser.vises_for_mannskapet(vaktliste.vakt.portal):
         for p in Pause.objects.filter(ressurs__vaktliste=vaktliste).order_by('fra', 'id'):
             per_ressurs_pauser.setdefault(p.ressurs_id, []).append(_tidsspenn(p.fra, p.til))
 
@@ -200,7 +203,7 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
     Kaster aldri: den som ringer (knappen, «Sett i drift») skal kunne melde
     fra uten selv å falle. Uten mottakere sendes ingenting, og raden sier det.
     """
-    adresser = list(adresser) if adresser is not None else mottakere()
+    adresser = list(adresser) if adresser is not None else mottakere(vaktliste.vakt.portal)
     naa = timezone.now()
     rad = Utsending(
         vaktliste=vaktliste, sendt_av=bruker if getattr(bruker, 'pk', None) else None,
@@ -282,16 +285,18 @@ def send_planlagte(naa=None) -> list:
     """
     from . import vaktdrift
 
-    minutter = intervall_minutter()
-    if not minutter or not mottakere():
-        return []
     naa = naa or timezone.now()
     ut = []
     for vl in vaktdrift.lister_i_drift().select_related('vakt'):
+        # Hver liste etter sin portals innstillinger — ingen forespørsel her.
+        portal = vl.vakt.portal
+        minutter = intervall_minutter(portal)
+        if not minutter or not mottakere(portal):
+            continue
         siste = vl.utsendinger.first()
         if siste is not None and (naa - siste.created_at) < timedelta(minutes=minutter):
             continue
-        if bare_ved_endring():
+        if bare_ved_endring(portal):
             sist_sendt = vl.utsendinger.filter(feil='').first()
             if sist_sendt is not None and sist_sendt.innhold_sha256 == signatur(
                     rader_for(vl), overnatting.brannliste(vl)):

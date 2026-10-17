@@ -52,7 +52,7 @@ def angrefrist_min() -> int:
 
 def ko_posisjon_paa() -> bool:
     """Skal forhåndsvalget bruke KO-tavla? **På** til noen slår den av."""
-    raa = AppSetting.get(KO_POSISJON_NOKKEL, None)
+    raa = AppSetting.get_i_portal(KO_POSISJON_NOKKEL, None)
     if raa is None:
         return True
     return str(raa).strip().lower() in ('1', 'true', 'ja', 'on')

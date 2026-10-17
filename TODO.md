@@ -161,8 +161,6 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
       toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
       i JS, og tas sammen med flatene i fase 5.
-- [ ] **Fase 4d-2:** `AppSetting`-nøklene sortert i system og portal (§4.7) — portalens
-      innstillinger lagres per portal, med systemverdien som standard.
 - [ ] **Fase 4d-3:** portalfilter i statistikk og arkiv, søk på tvers for innsyn og sletting
       (§4.5), og en gjennomgang av oppslag på ID i vaktbundne tabeller — `Registrering` i park
       slo opp på ID alene til 4c; finnes det flere, er det samme hull.

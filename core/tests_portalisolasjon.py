@@ -1088,3 +1088,192 @@ class Fase4dTests(TestCase):
             self.assertIsNone(vaktdrift.koblet_i_annen_vakt(bil.pk))
         with aktiver_portal(self.standard):
             self.assertEqual(vaktdrift.koblet_i_annen_vakt(bil.pk), 'Standardvakt')
+
+
+class InnstillingenePerPortalTests(TestCase):
+    """Fase 4d-2: portalens innstillinger (§4.7). Den globale verdien er
+    standarden; en portal som setter sin, rører ikke de andre."""
+
+    def setUp(self):
+        from core.models import Vaktportal
+        from core.portal import eneste_portal
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+
+    def _i(self, portal):
+        from core.portal import aktiver_portal
+        return aktiver_portal(portal)
+
+    # ── Mekanismen ──
+
+    def test_global_verdi_er_standarden_og_portalens_vinner(self):
+        from core.models import AppSetting
+        AppSetting.set('x.nokkel', 'global')
+        with self._i(self.brann):
+            self.assertEqual(AppSetting.get_i_portal('x.nokkel'), 'global')
+            AppSetting.set_i_portal('x.nokkel', 'brann')
+            self.assertEqual(AppSetting.get_i_portal('x.nokkel'), 'brann')
+        with self._i(self.standard):
+            self.assertEqual(AppSetting.get_i_portal('x.nokkel'), 'global')
+        self.assertEqual(AppSetting.get('x.nokkel'), 'global', 'den globale står')
+
+    def test_uklart_gir_systemverdien_ved_lesing_og_feil_ved_skriving(self):
+        from core.models import AppSetting
+        from core.portal import UklarPortal
+        AppSetting.set('x.nokkel', 'global')
+        with self._i(self.brann):
+            AppSetting.set_i_portal('x.nokkel', 'brann')
+        self.assertEqual(AppSetting.get_i_portal('x.nokkel'), 'global')
+        with self.assertRaises(UklarPortal):
+            AppSetting.set_i_portal('x.nokkel', 'hvor?')
+
+    def test_oppgitt_portal_vinner_over_konteksten(self):
+        from core.models import AppSetting
+        with self._i(self.brann):
+            AppSetting.set_i_portal('x.nokkel', 'brann')
+        with self._i(self.standard):
+            self.assertEqual(AppSetting.get_i_portal('x.nokkel', portal=self.brann), 'brann')
+
+    def test_etterleddet_lar_forstavelsene_virke(self):
+        """`nokkel_logges`, tavlas lytter og `cron.*` leser starten."""
+        from core.models import AppSetting
+        from core.signals import nokkel_logges
+        nokkel = AppSetting.portalnokkel('ko.tavle_timer', self.brann)
+        self.assertTrue(nokkel.startswith('ko.tavle'))
+        self.assertTrue(nokkel_logges(nokkel))
+        self.assertLessEqual(len(nokkel), 64)
+
+    # ── Hver nøkkel ──
+
+    def _naa_og_i_standard(self, les, skriv, ventet, standard_verdi):
+        with self._i(self.brann):
+            skriv()
+            self.assertEqual(les(), ventet)
+        with self._i(self.standard):
+            self.assertEqual(les(), standard_verdi)
+
+    def test_vaktlistefila_og_pausene(self):
+        from vaktliste import fil, pauser
+        from vaktliste.portalinnstillinger import VaktlistefilInnstillinger
+        h = VaktlistefilInnstillinger()
+        with self._i(self.brann):
+            h.lagre(h.valider({'vaktliste_fil_mottakere': 'a@ex.no',
+                               'vaktliste_fil_intervall_min': '30'}))
+            self.assertEqual(fil.mottakere(), ['a@ex.no'])
+            self.assertEqual(fil.intervall_minutter(), 30)
+            self.assertFalse(fil.sendes_ved_drift())
+            self.assertFalse(fil.bare_ved_endring())
+            self.assertFalse(pauser.vises_for_mannskapet())
+        with self._i(self.standard):
+            self.assertEqual(fil.mottakere(), [])
+            self.assertEqual(fil.intervall_minutter(), 0)
+            self.assertTrue(fil.sendes_ved_drift())
+            self.assertTrue(fil.bare_ved_endring())
+            self.assertTrue(pauser.vises_for_mannskapet())
+
+    def test_ko_chat_og_tavla(self):
+        from ko import services, tavle
+        from ko.portalinnstillinger import KoInnstillinger
+        h = KoInnstillinger()
+        with self._i(self.brann):
+            # Verdier ulik standarden — ellers måler testen ingenting (tre mutanter
+            # overlevde med `06:00` og `120`, som *er* standarden).
+            h.lagre({'chat': True, 'tavle_timer': 20, 'tavle_dognstart': '07:30'})
+            tavle.lagre_rulling(andel=40, steg=90)
+            self.assertTrue(services.chat_tillatt())
+            self.assertEqual((tavle.timer(), tavle.dognstart()), (20, '07:30'))
+            self.assertEqual((tavle.andel_bak(), tavle.steg_min()), (40, 90))
+        with self._i(self.standard):
+            self.assertFalse(services.chat_tillatt())
+            self.assertEqual((tavle.timer(), tavle.dognstart()),
+                             (tavle.STANDARD_TIMER, tavle.STANDARD_DOGNSTART))
+            self.assertEqual((tavle.andel_bak(), tavle.steg_min()),
+                             (tavle.STANDARD_ANDEL_BAK, tavle.STANDARD_STEG))
+
+    def test_ko_logg_dager_er_systemets(self):
+        """En slettefrist er personvern og gjelder alle portaler (§4.7)."""
+        from core.models import AppSetting
+        from ko import services
+        from ko.portalinnstillinger import KoInnstillinger
+        with self._i(self.brann):
+            KoInnstillinger().lagre({'dager': 400})
+        self.assertEqual(AppSetting.get(services.DAGER_NOKKEL), '400')
+
+    def test_tavlas_skjulte_og_fulgte(self):
+        from ko import tavle
+        from oppdrag.models import Lokasjon
+        with self._i(self.brann):
+            sted = Lokasjon.objects.create(navn='Scene B')
+            tavle.lagre_oppsett(skjulte_ider=[sted.pk], fulgte_ider=[sted.pk])
+            self.assertEqual((tavle.skjulte(), tavle.fulgte()), ([sted.pk], [sted.pk]))
+        with self._i(self.standard):
+            self.assertEqual((tavle.skjulte(), tavle.fulgte()), ([], []))
+
+    def test_bilenes_brytere(self):
+        from core.models import AppSetting
+        from oppdrag import verdier
+        for nokkel, les, standard in (
+                (verdier.LYD_NYTT_NOKKEL, verdier.lyd_ved_nytt_oppdrag, True),
+                (verdier.LYD_AKTIV_NOKKEL, verdier.lyd_aktiv, True),
+                (verdier.KREV_GROV_AVREIST_NOKKEL, verdier.krev_grov_for_avreist, False)):
+            with self.subTest(nokkel=nokkel):
+                self._naa_og_i_standard(
+                    les, lambda: AppSetting.set_i_portal(nokkel, '0' if standard else '1'),
+                    not standard, standard)
+
+    def test_bilenes_brytere_lagres_i_portalen_fra_endepunktet(self):
+        from accounts.models import CustomUser
+        from oppdrag import verdier
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        c = Client(headers={'X-Portal': 'brann'})
+        c.force_login(sjef)
+        c.post('/portal/', {'portal': 'brann'})
+        svar = c.put('/oppdrag/api/bilinnstillinger/', content_type='application/json',
+                     data={'lyd_aktiv': False})
+        self.assertEqual(svar.status_code, 200, svar.content)
+        with self._i(self.standard):
+            self.assertTrue(verdier.lyd_aktiv())
+        with self._i(self.brann):
+            self.assertFalse(verdier.lyd_aktiv())
+
+    def test_park_ko_posisjon(self):
+        from park import services
+        from park.portalinnstillinger import ParkInnstillinger
+        h = ParkInnstillinger()
+        self._naa_og_i_standard(services.ko_posisjon_paa,
+                                lambda: h.lagre({'ko_posisjon': False}), False, True)
+
+    # ── Uten forespørsel: lista bærer portalen ──
+
+    def _liste_i_drift(self, portal, navn):
+        from django.utils import timezone
+
+        from core.vakt import opprett_vakt
+        from vaktliste import choices
+        from vaktliste.models import Vaktliste
+        vakt = opprett_vakt(navn, year=2026, startet=timezone.now(), portal=portal)
+        return Vaktliste.objects.create(vakt=vakt, status=choices.DRIFT,
+                                        satt_i_drift_at=timezone.now())
+
+    def test_intervallsendingen_leser_hver_listes_portal(self):
+        from unittest import mock
+
+        from core.models import AppSetting
+        from vaktliste import fil
+        i_brann = self._liste_i_drift(self.brann, 'Brannvakt')
+        self._liste_i_drift(self.standard, 'Standardvakt')
+        for nokkel, verdi in ((fil.MOTTAKERE_NOKKEL, 'a@ex.no'), (fil.INTERVALL_NOKKEL, '30'),
+                              (fil.BARE_ENDRET_NOKKEL, '0')):
+            AppSetting.set_i_portal(nokkel, verdi, portal=self.brann)
+        with mock.patch.object(fil, 'send_fil', return_value='sendt') as send:
+            fil.send_planlagte()
+        self.assertEqual([k.args[0] for k in send.call_args_list], [i_brann])
+
+    def test_fila_bruker_listas_portal_uten_forespoersel(self):
+        from core.models import AppSetting
+        from vaktliste import fil
+        vl = self._liste_i_drift(self.brann, 'Brannvakt')
+        AppSetting.set_i_portal(fil.MOTTAKERE_NOKKEL, 'a@ex.no', portal=self.brann)
+        rad = fil.send_fil(vl)
+        self.assertEqual(rad.mottakere, 'a@ex.no')

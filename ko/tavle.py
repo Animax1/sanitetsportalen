@@ -603,7 +603,7 @@ STEG_MIN, STEG_MAKS, STANDARD_STEG = 15, 720, 120
 def _klemt_tall(nokkel, standard, lav, hoy) -> int:
     from core.models import AppSetting
     try:
-        verdi = int(AppSetting.get(nokkel, standard))
+        verdi = int(AppSetting.get_i_portal(nokkel, standard))
     except (TypeError, ValueError):
         return standard
     return max(lav, min(hoy, verdi))
@@ -631,8 +631,8 @@ def lagre_rulling(*, andel, steg) -> None:
         raise Ugyldig(f'Andelen bak nå må være mellom {ANDEL_BAK_MIN} og {ANDEL_BAK_MAKS} prosent.')
     if not STEG_MIN <= steg <= STEG_MAKS:
         raise Ugyldig(f'Steget må være mellom {STEG_MIN} og {STEG_MAKS} minutter.')
-    AppSetting.set(ANDEL_BAK_NOKKEL, str(andel))
-    AppSetting.set(STEG_NOKKEL, str(steg))
+    AppSetting.set_i_portal(ANDEL_BAK_NOKKEL, str(andel))
+    AppSetting.set_i_portal(STEG_NOKKEL, str(steg))
 
 
 def rulling() -> dict:
@@ -644,7 +644,7 @@ def timer() -> int:
     en tavle på null timer."""
     from core.models import AppSetting
     try:
-        verdi = int(AppSetting.get(TIMER_NOKKEL, STANDARD_TIMER))
+        verdi = int(AppSetting.get_i_portal(TIMER_NOKKEL, STANDARD_TIMER))
     except (TypeError, ValueError):
         return STANDARD_TIMER
     return max(TIMER_MIN, min(TIMER_MAKS, verdi))
@@ -664,13 +664,13 @@ def gyldig_klokke(raa) -> str | None:
 
 def dognstart() -> str:
     from core.models import AppSetting
-    return gyldig_klokke(AppSetting.get(DOGNSTART_NOKKEL, STANDARD_DOGNSTART)) or STANDARD_DOGNSTART
+    return gyldig_klokke(AppSetting.get_i_portal(DOGNSTART_NOKKEL, STANDARD_DOGNSTART)) or STANDARD_DOGNSTART
 
 
 def _idliste(nokkel) -> list[int]:
     from core.models import AppSetting
     try:
-        raa = json.loads(AppSetting.get(nokkel, '[]'))
+        raa = json.loads(AppSetting.get_i_portal(nokkel, '[]'))
     except (TypeError, ValueError):
         return []
     return sorted({int(i) for i in raa if isinstance(i, int)}) if isinstance(raa, list) else []
@@ -698,8 +698,8 @@ def lagre_oppsett(*, skjulte_ider, fulgte_ider) -> None:
         ider |= set(liste)
     if Lokasjon.objects.i_portal().filter(pk__in=ider).count() != len(ider):
         raise Ugyldig('Listen inneholder ukjente lokasjoner — hent den på nytt.')
-    AppSetting.set(SKJULTE_NOKKEL, json.dumps(sorted(set(skjulte_ider))))
-    AppSetting.set(FULGTE_NOKKEL, json.dumps(sorted(set(fulgte_ider))))
+    AppSetting.set_i_portal(SKJULTE_NOKKEL, json.dumps(sorted(set(skjulte_ider))))
+    AppSetting.set_i_portal(FULGTE_NOKKEL, json.dumps(sorted(set(fulgte_ider))))
 
 
 # ── Det klienten får ──────────────────────────────────────────────────────────

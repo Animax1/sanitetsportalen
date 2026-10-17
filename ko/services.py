@@ -133,7 +133,7 @@ def oppbevaringsdager() -> int:
 
 def chat_tillatt() -> bool:
     """Får operatørene skrive uformelle linjer? Lest fra `AppSetting`."""
-    raa = AppSetting.get(CHAT_NOKKEL, None)
+    raa = AppSetting.get_i_portal(CHAT_NOKKEL, None)
     return str(raa).strip().lower() in ('1', 'true', 'ja', 'on')
 
 

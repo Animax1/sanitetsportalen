@@ -60,11 +60,11 @@ class VaktlistefilInnstillinger(BasePortalinnstillingHandler):
         from core.models import AppSetting
         from vaktliste import fil, pauser
 
-        AppSetting.set(fil.MOTTAKERE_NOKKEL, '\n'.join(verdier['mottakere']))
-        AppSetting.set(fil.VED_DRIFT_NOKKEL, verdier['ved_drift'])
-        AppSetting.set(fil.INTERVALL_NOKKEL, verdier['intervall'])
-        AppSetting.set(fil.BARE_ENDRET_NOKKEL, verdier['bare_endret'])
-        AppSetting.set(pauser.VIS_NOKKEL, verdier['vis_pauser'])
+        AppSetting.set_i_portal(fil.MOTTAKERE_NOKKEL, '\n'.join(verdier['mottakere']))
+        AppSetting.set_i_portal(fil.VED_DRIFT_NOKKEL, verdier['ved_drift'])
+        AppSetting.set_i_portal(fil.INTERVALL_NOKKEL, verdier['intervall'])
+        AppSetting.set_i_portal(fil.BARE_ENDRET_NOKKEL, verdier['bare_endret'])
+        AppSetting.set_i_portal(pauser.VIS_NOKKEL, verdier['vis_pauser'])
 
 
 def register_handlers() -> None:

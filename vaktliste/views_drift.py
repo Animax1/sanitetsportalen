@@ -91,7 +91,7 @@ def drift_view(request, pk, tilstand):
     # e-posttjeneste som er nede skal ikke hindre at innsjekken åpner.
     # `send_fil` kaster ikke; svaret bærer resultatet.
     utsending = None
-    if fil.sendes_ved_drift() and fil.mottakere():
+    if fil.sendes_ved_drift(vl.vakt.portal) and fil.mottakere(vl.vakt.portal):
         utsending = fil.send_fil(vl, bruker=request.user, utloest=Utsending.DRIFT)
     return _svar(request, vl, utsending)
 
@@ -142,7 +142,7 @@ def send_fil_view(request, pk):
         vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
-    if not fil.mottakere():
+    if not fil.mottakere(vl.vakt.portal):
         return json_feil('Ingen mottakere er satt. Global admin setter dem under '
                      'Portalinnstillinger → «Vaktlisten på e-post».')
     rad = fil.send_fil(vl, bruker=request.user, utloest=Utsending.KNAPP)

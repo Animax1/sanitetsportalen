@@ -142,7 +142,8 @@ def sett_i_drift_ved_start(vl, naa=None) -> bool:
         with uten_request():
             laast.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
                                       'drift_automatisk', 'updated_at'])
-    if fil.sendes_ved_drift() and fil.mottakere():
+    # Lista bærer portalen — klokka går uten forespørsel.
+    if fil.sendes_ved_drift(laast.vakt.portal) and fil.mottakere(laast.vakt.portal):
         fil.send_fil(laast, bruker=None, utloest=Utsending.DRIFT)
     return True
 

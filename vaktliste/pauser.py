@@ -42,11 +42,11 @@ class Ugyldig(ValueError):
     """Pausen lar seg ikke lagre. Meldingen går til brukeren."""
 
 
-def vises_for_mannskapet() -> bool:
+def vises_for_mannskapet(portal=None) -> bool:
     """Står pausene på utskriften og i fila? Leses på hvert kall — en
-    innstilling admin nettopp endret, skal gjelde neste utskrift."""
+    innstilling admin nettopp endret, skal gjelde neste utskrift. Per portal."""
     from core.models import AppSetting
-    return AppSetting.get(VIS_NOKKEL, '1') != '0'
+    return AppSetting.get_i_portal(VIS_NOKKEL, '1', portal) != '0'
 
 
 def _klokke(t) -> str:

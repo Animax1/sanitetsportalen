@@ -846,6 +846,46 @@ class AppSetting(models.Model):
         )
         return obj
 
+    # ── Portalens innstillinger (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.7) ──
+    #
+    # Noen nøkler er portalens: mottakerne av vaktlistefila, lydvarselet i bilene,
+    # tavlas oppsett. De lagres som `<nøkkel>@p<portal-id>`, og **den globale
+    # verdien er standarden** — en ny portal arver det systemet er satt opp med.
+    #
+    # **Etterledd, ikke forstavelse:** auditens unntaksliste, tavlas `ko.tavle*`-
+    # lytter og `cron.*` leser starten av nøkkelen, og virker da uendret.
+    # **To navngitte kall, ikke et register:** det står i koden hvilke nøkler som
+    # er portalens, og `core` slipper å kjenne modulenes nøkkelnavn.
+
+    @staticmethod
+    def portalnokkel(key, portal) -> str:
+        return f'{key}@p{portal.pk}'
+
+    @classmethod
+    def get_i_portal(cls, key, default=None, portal=None):
+        """Portalens verdi, ellers den globale, ellers `default`. `portal` når
+        kalleren har den fra dataene; ellers `gjeldende_portal()` — konteksten,
+        eller den eneste. Er det uklart (flere, ingen kontekst), er svaret
+        systemets verdi: standarden, ikke en gjetning på en portal."""
+        from core.portal import UklarPortal, gjeldende_portal
+        if portal is None:
+            try:
+                portal = gjeldende_portal()
+            except UklarPortal:
+                portal = None
+        if portal is not None:
+            verdi = cls.get(cls.portalnokkel(key, portal))
+            if verdi is not None:
+                return verdi
+        return cls.get(key, default)
+
+    @classmethod
+    def set_i_portal(cls, key, value, portal=None):
+        """Sett portalens verdi. Uten portal og med flere kaster
+        `gjeldende_portal()` — en innstilling skal aldri havne i feil portal."""
+        from core.portal import gjeldende_portal
+        return cls.set(cls.portalnokkel(key, portal or gjeldende_portal()), value)
+
 
 class Backup(models.Model):
     """Metadata om en backup-fil. Selve filen ligger på disk/volume."""

@@ -95,13 +95,13 @@ class KoInnstillinger(BasePortalinnstillingHandler):
         from ko import services, tavle
 
         if 'chat' in verdier:
-            AppSetting.set(services.CHAT_NOKKEL, 'true' if verdier['chat'] else 'false')
+            AppSetting.set_i_portal(services.CHAT_NOKKEL, 'true' if verdier['chat'] else 'false')
         if 'dager' in verdier:
             AppSetting.set(services.DAGER_NOKKEL, verdier['dager'])
         if 'tavle_timer' in verdier:
-            AppSetting.set(tavle.TIMER_NOKKEL, verdier['tavle_timer'])
+            AppSetting.set_i_portal(tavle.TIMER_NOKKEL, verdier['tavle_timer'])
         if 'tavle_dognstart' in verdier:
-            AppSetting.set(tavle.DOGNSTART_NOKKEL, verdier['tavle_dognstart'])
+            AppSetting.set_i_portal(tavle.DOGNSTART_NOKKEL, verdier['tavle_dognstart'])
 
 
 def register_handlers() -> None:

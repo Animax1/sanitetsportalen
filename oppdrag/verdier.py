@@ -115,7 +115,7 @@ KREV_GROV_AVREIST_NOKKEL = 'oppdrag_krev_grov_avreist'
 
 def _bryter(nokkel, standard='1') -> bool:
     from core.models import AppSetting
-    return AppSetting.get(nokkel, standard) == '1'
+    return AppSetting.get_i_portal(nokkel, standard) == '1'
 
 
 def lydvarsel_aktive() -> dict[str, bool]:

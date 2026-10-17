@@ -162,5 +162,5 @@ def bilinnstillinger_view(request):
                          ('lyd_aktiv', verdier.LYD_AKTIV_NOKKEL),
                          ('krev_grov_avreist', verdier.KREV_GROV_AVREIST_NOKKEL)):
         if felt in data:
-            AppSetting.set(nokkel, '1' if data[felt] else '0')
+            AppSetting.set_i_portal(nokkel, '1' if data[felt] else '0')
     return JsonResponse({'status': 'ok', 'data': verdier.bilinnstillinger()})

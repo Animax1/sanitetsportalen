@@ -585,10 +585,10 @@ arbeidsdeling som i `core.arkiv`.
 (`vaktlister_i_drift`, `siste_utsending`, `oppdrag`) settes i `core`, ikke i handlerne —
 er en modul av, skal kortet vise «–» og ikke forsvinne.
 
-**Portalinnstillingene validerer alt før noe lagres.** `valider()` og `lagre()` er delt i
-to nettopp fordi hver modul skriver sitt, uten transaksjon mellom seg: en modul som
-nekter skal stoppe hele innsendingen, også portalens egne felter.
-`core/tests_registre.py` prøver begge egenskapene med oppdiktede handlere.
+**Portalinnstillingene validerer alt før noe lagres:** hver modul skriver sitt uten felles
+transaksjon, så en som nekter skal stoppe hele innsendingen (`core/tests_registre.py`).
+**Portalens nøkler går gjennom `AppSetting.get_i_portal`/`set_i_portal`** (17. okt. 2026);
+den globale verdien er standarden.
 
 **`core/kartkobling.py` er klienten mot kart.sanitet.net** (30. sep. 2026): oppdrag sender
 bilens posisjon, KO lagenes sted, bil og lag «Send posisjon» («OBS: Posisjon delt»), og
