@@ -4,6 +4,11 @@
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h4 class="mb-0"><i class="bi bi-people me-2"></i>Brukere</h4>
   <div class="d-flex gap-2 flex-wrap">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Filter">
+      <a href="?" class="btn btn-outline-secondary{% if not filter %} active{% endif %}">Alle</a>
+      <a href="?filter=uten_portal" class="btn btn-outline-secondary{% if filter == 'uten_portal' %} active{% endif %}">Uten portal</a>
+      <a href="?filter=inaktiv" class="btn btn-outline-secondary{% if filter == 'inaktiv' %} active{% endif %}">Ikke innlogget på 12 mnd</a>
+    </div>
     <a href="{% url 'portaladmin:user_create' %}" class="btn btn-primary btn-sm">
       <i class="bi bi-person-plus me-1"></i>Ny bruker
     </a>
@@ -18,6 +23,7 @@
           <th>Brukernavn</th>
           <th>E-post</th>
           <th>Rolle</th>
+          <th>Portaler</th>
           <th>MFA</th>
           <th>Status</th>
           <th>Siste innlogging</th>
@@ -38,6 +44,9 @@
             {% else %}
               <span class="badge bg-secondary">{{ user.get_role_display }}</span>
             {% endif %}
+          </td>
+          <td>
+            {% for t in user.portaltilganger.all %}<span class="badge bg-secondary me-1">{{ t.portal.navn }}{% if t.rolle == 'moderator' %} · mod{% endif %}</span>{% empty %}{% if user.role == 'admin' %}<span class="text-muted">Alle</span>{% else %}<span class="badge bg-warning text-dark">Ingen</span>{% endif %}{% endfor %}
           </td>
           <td>
             {% if user.mfa_required %}
@@ -67,7 +76,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-3">Ingen brukere funnet.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-3">Ingen brukere funnet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

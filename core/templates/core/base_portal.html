@@ -321,6 +321,13 @@
             <i class="bi bi-cloud-arrow-up me-2"></i>Backup
           </a></li>
           {% endif %}
+          {% if er_moderator %}
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Moderator</h6></li>
+          <li><a class="dropdown-item{% if '/moderator/brukere' in request.path %} active{% endif %}" href="{% url 'accounts:moderator_brukere' %}">
+            <i class="bi bi-people me-2"></i>Brukere i {{ aktiv_portal.navn }}
+          </a></li>
+          {% endif %}
           <li><hr class="dropdown-divider"></li>
           <li>
             <form method="post" action="{% url 'accounts:logout' %}" data-utlogging>

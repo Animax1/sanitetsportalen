@@ -1,4 +1,5 @@
 """Views for brukerkontoer og admin-panel."""
+from datetime import timedelta
 import base64
 import hmac
 import io
@@ -739,8 +740,19 @@ def user_list_view(request):
     trekkes tilbake, tror admin at jobben er gjort. Tilgang settes per konto i
     matrisen på ``user_detail``, som skriver til tabellen håndhevelsen leser.
     """
-    users = CustomUser.objects.all().order_by('username')
-    return render(request, 'accounts/user_list.html', {'users': users})
+    # **Filtrene fra §4.11** (fase 5b): når moderatorer oppretter og tar ut
+    # kontoer, blir noen foreldreløse — de kan logge inn, men ser ingenting.
+    users = (CustomUser.objects.all().order_by('username')
+             .prefetch_related('portaltilganger__portal'))
+    filter_ = request.GET.get('filter', '')
+    if filter_ == 'uten_portal':
+        users = users.filter(portaltilganger__isnull=True).exclude(role='admin')
+    elif filter_ == 'inaktiv':
+        grense = timezone.now() - timedelta(days=365)
+        users = users.filter(Q(last_login_at__lt=grense) | Q(last_login_at__isnull=True))
+    else:
+        filter_ = ''
+    return render(request, 'accounts/user_list.html', {'users': users, 'filter': filter_})
 
 
 @admin_required

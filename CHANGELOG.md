@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 5b: moderatorens brukere — «Brukere i portalen», legg til, ta ut, gi tilgang, ny konto  `#core/tilgang`
+
+Andre pulje av fase 5 (`docs/BESLUTNING_PORTALER.md` §4.2, §4.3, §4.11; beslutning 7, 8, 13).
+**Synlig endring for en moderator:** «Brukere i ‹portal›» i avatar-menyen, under «Moderator».
+**For admin:** kolonnen «Portaler» og filtrene «Uten portal» og «Ikke innlogget på 12 mnd» på
+`/admin/brukere/`. «Siste innlogging» sto der fra før. **For alle andre: ingenting.**
+
+**`/moderator/brukere/`, ikke `/admin/…`.** Alt under `/admin/` er admin-only, og
+`PortalAdminRuteneErStengtTests` krever det. Den nye dekoratøren `moderator_kreves` slipper inn
+moderator i portalen kontoen står i, og global admin. Den setter markøren `_moderator_kreves`, og
+testen går gjennom rutene som anonym, medlem, moderator og admin.
+
+**Reglene står i `accounts/moderering.py`:**
+- **Hvem moderatoren ser.** Kontoene med portalens tilhørigheter, og portalens medlemmer — også dem
+  uten tilhørighet, som en bil. De er gruppert og sortert på tilhørighet, og en konto med to står
+  under begge. Kontoer utenfor er 404, også på ID. **Global admin er aldri blant dem.**
+- **En moderator rører ikke en moderator, heller ikke seg selv.** Moderatorer utnevnes av admin.
+  Hadde de kunnet ta hverandre ut, ville utnevnelsen vært en mening, ikke en regel.
+- **«Ta ut av portalen» tar medlemskapet og modulradene (`CASCADE`), aldri kontoen.** Medlemskap i
+  andre portaler står.
+- **Aldri over taket, aldri over eget nivå.** `utdelbart()` gir det laveste av portalens tak og
+  moderatorens eget nivå. `ModulTilgangForm(utdeler=…)` tilbyr ikke mer, og avviser mer
+  (`ChoiceField`). En modul moderatoren ikke har selv, er ikke med i matrisen hennes. Tilgang gis
+  bare til medlemmer — «Legg til i portalen» først.
+- **Ny konto er en person, med en av portalens tilhørigheter** (`ModeratorKontoForm`). Ellers ville
+  kontoen forsvunnet fra moderatorens egen liste idet den ble tatt ut.
+  - Skjemaet arver brukernavnregelen fra admins skjema, men tar bort kontotype, enhet, rolle og
+    MFA-krav. **`role` kan ikke settes herfra**: en innsendt `role=admin` gir `bruker`.
+  - Invitasjon når e-posten finnes, ellers engangspassord med `must_change_password`.
+  - **En e-post som alt har en konto, gir ikke konto nummer to.** Ved treff svarer skjemaet «be en
+    administrator legge den til» — to kontoer for samme menneske er to innlogginger og to
+    historikker.
+- Medlemskap og tilgang logges (`accounts_portaltilgang`, `accounts_modultilgang`).
+
+**Mutasjoner: 37, alle drept til slutt.** Tre overlevde i første runde, og ingen av dem var et
+hull — alle tre var regler som sto to ganger:
+- «admin er ikke mål» (admin er allerede utenfor de synlige);
+- «ikke seg selv» (den som handler, er moderator og treffer moderatorsperra);
+- `eget is None` (dekket av `not in NIVAA_HIERARKI`).
+
+De ble fjernet, så hver regel står ett sted. Det kom til én ny test: et ukjent tak gir ingenting å
+dele ut, heller ikke for admin.
+
 ## 2026-10-17 — Portaler fase 5a: «Portaler» under Administrasjon — ny portal, tilhørigheter, moduler med tak og moderatorer  `#core/tilgang`
 
 Første pulje av fase 5 (`docs/BESLUTNING_PORTALER.md` §4.2–§4.3). **Synlig endring for admin:**

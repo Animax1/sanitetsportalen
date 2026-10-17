@@ -20,7 +20,7 @@ ikke berøres av flyttingen.
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views
+from . import views, views_moderator
 
 app_name = 'accounts'
 
@@ -40,6 +40,12 @@ urlpatterns = [
          name='passord_reset'),
     path('accounts/invitasjon/<str:token>/', views.invitasjon_view,
          name='invitasjon'),
+
+    # ── Moderatorens brukere (fase 5b) ───────────────────────────────────
+    # Utenfor `/admin/`: alt der er admin-only. Gjelder portalen kontoen står i.
+    path('moderator/brukere/', views_moderator.brukere_view, name='moderator_brukere'),
+    path('moderator/brukere/ny/', views_moderator.ny_view, name='moderator_ny'),
+    path('moderator/brukere/<int:pk>/', views_moderator.bruker_view, name='moderator_bruker'),
 
     # ── Administrasjon (admin) ───────────────────────────────────────────
 

@@ -95,6 +95,40 @@ def admin_required(view_func):
     return wrapper
 
 
+def er_moderator(user, portal=None):
+    """True hvis kontoen er moderator i `portal` (standard: den den står i).
+
+    Global admin er det **ikke** — hun står over, og gates med `er_global_admin`.
+    Kallsteder som slipper inn begge, sier det selv (`moderator_kreves`).
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if portal is None:
+        from core.portal import brukerens_portal  # noqa: WPS433
+        portal = brukerens_portal(user)
+    if portal is None:
+        return False
+    from accounts.models import PortalRolle, Portaltilgang  # noqa: WPS433
+    return Portaltilgang.objects.filter(
+        bruker=user, portal=portal, rolle=PortalRolle.MODERATOR).exists()
+
+
+def moderator_kreves(view_func):
+    """Krev moderator i portalen kontoen står i, eller global admin (fase 5b).
+
+    Stiene ligger under `/moderator/`, ikke `/admin/`: alt der er admin-only, og
+    `PortalAdminRuteneErStengtTests` krever det.
+    """
+    @wraps(view_func)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not (er_global_admin(request.user) or er_moderator(request.user)):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    wrapper._moderator_kreves = True
+    return wrapper
+
+
 def tom_tilgangscache(user):
     """Glem det som er cachet på brukerobjektet.
 

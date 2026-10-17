@@ -133,7 +133,8 @@ class PortalAdminRuteneErStengtTests(TestCase):
     def test_anonym_slipper_ikke_inn(self):
         c = Client()
         ruter = [r for r in _ruter_under('admin/') + _ruter_under('varsler/')
-                 + _ruter_under('api/varsler/') + _ruter_under('min-profil/')]
+                 + _ruter_under('api/varsler/') + _ruter_under('min-profil/')
+                 + _ruter_under('moderator/')]
         self.assertGreaterEqual(len(ruter), 20)
         for full, navn, cb in ruter:
             res = c.get(self._sti(full))

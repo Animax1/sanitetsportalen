@@ -536,7 +536,8 @@ class ModulTilgangForm(forms.Form):
     # oppdragsmodulen, som er den nivået ble laget for, og tilbød `skriv_full`
     # på statistikk, der skriving ikke finnes.
 
-    def __init__(self, *args, bruker=None, blir_delt=False, portal=None, **kwargs):
+    def __init__(self, *args, bruker=None, blir_delt=False, portal=None, utdeler=None,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         self.bruker = bruker
         # **Matrisen gjelder én portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
@@ -557,6 +558,12 @@ class ModulTilgangForm(forms.Form):
         from core.models import Portalmodul
         self._tak = dict(Portalmodul.objects.filter(portal=self.portal)
                          .values_list('modul_slug', 'tak'))
+        # **Og aldri over eget nivå** (fase 5b): `utdeler` er moderatoren, og
+        # grensen er det laveste av taket og hennes eget nivå. En modul hun ikke
+        # har, er ikke med i matrisen hennes.
+        if utdeler is not None:
+            from accounts.moderering import utdelbart
+            self._tak = utdelbart(utdeler, self.portal)
         self._moduler = [m for m in self.moduler() if m.slug in self._tak]
 
         for modul in self._moduler:
@@ -677,3 +684,45 @@ class ModulTilgangForm(forms.Form):
         # Uten dette ville en visning i samme request lest det gamle svaret.
         tom_tilgangscache(bruker)
         return endringer
+
+
+class ModeratorKontoForm(AdminUserCreateForm):
+    """Ny konto, opprettet av en moderator (fase 5b, §4.11).
+
+    **Bare en person, og aldri en rolle.** Skjemaet arver brukernavnregelen og
+    e-postnormaliseringen fra admins skjema, men tar bort kontotypen, enheten,
+    rollen og MFA-kravet: en moderator lager ikke biler, og skriver aldri
+    `role` (`RollenSettesBareGjennomSkjemaeneTests`). Kontoen får standarden,
+    `bruker`.
+
+    **Tilhørigheten kreves, og er en av portalens** (§4.3) — ellers forsvinner
+    kontoen fra moderatorens egen liste i det den fjernes fra portalen.
+    """
+
+    tilhorighet = forms.ModelChoiceField(
+        queryset=None,
+        label='Tilhørighet',
+        empty_label='Velg …',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text='Hvilket korps eller hvilken gruppe kontoen hører til.',
+    )
+
+    class Meta(AdminUserCreateForm.Meta):
+        fields = ['username', 'fullt_navn', 'email']
+
+    def __init__(self, *args, portal=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        for navn in ('kontotype', 'enhetsnavn'):
+            self.fields.pop(navn, None)
+        self.fields['tilhorighet'].queryset = portal.tilhorigheter.filter(er_aktiv=True)
+
+    def clean_email(self):
+        epost = super().clean_email()
+        # En person som alt har en konto, skal legges til — ikke få en til. To
+        # kontoer for samme menneske er to innlogginger, to MFA-er og to
+        # historikker som ikke henger sammen.
+        if epost and CustomUser.objects.filter(email__iexact=epost).exists():
+            raise forms.ValidationError(
+                'Det finnes allerede en konto med denne e-posten. Står den ikke i '
+                'listen, be en administrator legge den til i portalen.')
+        return epost

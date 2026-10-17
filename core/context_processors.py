@@ -87,9 +87,16 @@ def portal(request):
     merket i toppen: med én portal vises ingenting, så ingen ser en endring
     før portal nummer to finnes.
     """
+    from core.auth_decorators import er_global_admin, er_moderator
+
+    portal = getattr(request, 'portal', None)
+    user = getattr(request, 'user', None)
     return {
-        'aktiv_portal': getattr(request, 'portal', None),
+        'aktiv_portal': portal,
         'flere_portaler': getattr(request, 'portal_antall', 0) > 1,
+        # Menylenken «Brukere i portalen» (fase 5b). Admin har sin egen liste.
+        'er_moderator': (portal is not None and not er_global_admin(user)
+                         and er_moderator(user, portal)),
     }
 
 
