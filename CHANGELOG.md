@@ -4,6 +4,60 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Databasen på vakt: hva ett poll koster, talt lag for lag, og fem tiltak å vurdere — PgBouncer hjelper ikke, psycopg 3 litt, sesjonsskrivingen er saken  `#core/drift` `#core/dokumentasjon`
+
+André: «Har vi max_requests_jitter på?» — ja: `--max-requests-jitter 50` i `Procfile`, 5 % av
+`--max-requests 1000`. Greit for to workers; 100 er et rundere tall ved fire. (Kartets
+`bin/start.sh` har ingen jitter, og trenger den ikke med én worker.) Og: «vi har snakket om
+mulig treghet med databasen og ikke at det har så mye med workers og tråder å gjøre. Kan du
+forklare meg det?» — så «hva med pgbouncer», «hva har vi å hente på psycopg 3», og «konkret
+hva kan vi gjøre for å hjelpe med databasen». **Ingen kode.** Svarene er ført inn i `TODO.md`
+«Skalering mot 2027», som fire punkter å vurdere.
+
+**Talt opp:** ett poll mot `/api/endringer/` er **sju lesinger og én skriving** mot Postgres —
+`SELECT 1` (`conn_health_checks`), sesjonsraden, brukeren, `session_timeout_hours`, kontoens
+portaler, aktive moduler og tilgangsradene, og `UPDATE django_session`. Notatet fra 4. okt.
+sa «én `ModulTilgang`-spørring per område»; `_tilganger()` cacher per brukerobjekt, så det
+er én. Skrivingen er den som koster: ny radversjon per oppdatering, og `expire_date` er
+indeksert.
+
+**Hvorfor workers og tråder ikke hjelper:** de styrer hvor mange som kan *vente samtidig*,
+ikke hvor fort det ventes på svarer. Er databasen treg eller låst, gir flere prosesser bare
+flere i kø — det runbooken §2 alt sier med «se CPU». Redis tar endringsnummeret og cachen,
+men **ikke sesjonene**: de går til Postgres ved hvert poll.
+
+**PgBouncer: nei, F8 står.** Den gjør veien *inn* billigere, ikke arbeidet der inne; portalen
+bruker ~12 av 100 tilkoblinger og gjenbruker dem i ti minutter (`conn_max_age=600`). Koden
+ville trolig tålt transaksjonsmodus — klokka låser en rad, ikke en sesjon, og `SET
+CONSTRAINTS` står bare i migrasjoner — men det gir ingenting. **psycopg 3: ingen fart, men
+Djangos innebygde pool** erstatter `conn_max_age` og er det lettere alternativet til
+PgBouncer; kartet kjører alt psycopg 3. Byttet rører koden ett sted. Eget TODO-punkt.
+
+**Fem tiltak i TODO, i rekkefølge:** (1) forny sesjonen høyst hvert tiende minutt i stedet
+for ved hvert poll — `SESSION_SAVE_EVERY_REQUEST` av, `DynamicSessionTimeoutMiddleware`
+skrives om; 99 % av skrivingene, ingen endret oppførsel; (2) `cached_db`; (3) cache
+`session_timeout_hours`; (4) autovacuum-terskel på `django_session`, etter 1; (5) tell
+spørringer per sti — det eneste før generalprøven. Og, på Andrés ord «noe å se på, ikke
+nødvendigvis implementere»: **én fane poller på vegne av alle i samme nettleser**.
+
+**Kapasitet** (André: «hvor mye belastning takler oppsettet vårt per nå? Hvor mange
+brukere?» — regnet fra vakt-modus: Redis på, 2 workers × 4 tråder, som nå er standarden å
+regne fra): per fane fra runbooken §3d er en KO-fane ~0,6 forespørsler/s, sentralbordet ~0,5,
+pasientsiden ~0,15, en bil ~0,07, vaktlista og parksiden ~0. Lasten André beskrev 4. okt.
+(10 KO, 10 biler, 15 pasienter) er ~9/s i ro mot 8 samtidige spor, altså ~5–10 % av
+web-laget; runbooken anslår 100–300/s. **Rundt 100 pollende KO-faner før web-laget er
+grensen** — og da er sesjonsskrivingen 40/s, så databasen når sin først. Det ikke-målte er
+støtet når noe endres: alle KO-faner henter tavla, loggen og sentralbordet innen 2,5 s, og
+KO er ikke målt (§3c). Det er generalprøven §8.
+
+**Og én dokumentfeil**, ført som TODO-punkt: runbooken §4 sier backupklokka bruker en
+«advisory lock»; koden bruker en radlås. (Runbookens «gunicorn venter 120 sekunder» i §1d
+gjelder kartet, som har `--timeout 120` — den er riktig; portalen har 60.)
+
+Bare `.md`-filer endret; dokumenttestene kjørt.
+
+---
+
 ## 2026-10-17 — Portaler fase 4c: KOs ansvarsområder, artister og kjennetegn per portal, ansvarsmerket per portal, og parklenken som bærer portalen inn på /lag/r/  `#core/tilgang` `#ko/planleggeren` `#park/modulen`
 
 Tredje del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.12, §4.13). **Med én portal: ingen synlig
