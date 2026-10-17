@@ -178,6 +178,35 @@ PERMISSIONS_POLICY_MED_POSISJON = PERMISSIONS_POLICY.replace(
     'geolocation=()', 'geolocation=(self)')
 
 
+#: Standarden for svar der viewet ikke har bestemt noe selv (17. okt. 2026).
+STANDARD_CACHE_CONTROL = 'private, no-store'
+
+
+def sett_standard_cache_control(response):
+    """Ingen mellomlager skal ta vare på et svar viewet ikke har tatt stilling til.
+
+    **Standarden er «ikke lagre», og caching må velges.** `private` holder delte
+    mellomlagre ute — Railways kant, en proxy på et hotellnett — og `no-store`
+    holder svaret ute av nettleserens disk, så en side med pasienter ikke kan
+    hentes fram med «tilbake» etter utlogging. Railways CDN tar en
+    informasjonskapsel verken som grunn til å la være eller som del av
+    nøkkelen; 30. mars 2026 cachet den svar for domener som ikke hadde slått den
+    på. Uten denne regelen var det bare viewene med `@never_cache` som var vernet.
+
+    **Bare der viewet ikke har satt headeren.** ETag-endepunktene setter sin egen
+    (`private, must-revalidate`, `private, max-age=…`, `@never_cache`), og
+    service-workerne `no-cache`; de skal stå. Et `=` her i stedet for
+    `setdefault` ville overstyrt dem. JavaScript holder ETag-en selv
+    (`etagMine`, `etagOppdrag`), og service-workerne lagrer med Cache-API-et,
+    som ikke leser `Cache-Control` — så `no-store` bryter verken 304 eller offline.
+
+    Statiske filer når aldri hit: WhiteNoise står over i `MIDDLEWARE` og svarer
+    selv, med lang levetid på de hashede navnene.
+    """
+    response.setdefault('Cache-Control', STANDARD_CACHE_CONTROL)
+    return response
+
+
 class SecurityHeadersMiddleware:
     """Legger til sikkerhetsheadere som Django ikke setter automatisk.
 
@@ -185,6 +214,8 @@ class SecurityHeadersMiddleware:
     - Referrer-Policy: begrenser hva som sendes til eksterne lenker
     - Permissions-Policy: slår av funksjoner vi ikke bruker
     - X-Robots-Tag: holder portalen ute av søkeresultater og AI-crawlere
+    - Cache-Control: `private, no-store` der viewet ikke har satt noe
+      (`sett_standard_cache_control`)
 
     Nonce settes på ``request.csp_nonce`` *før* viewet kjører, slik at
     templaten kan lese det via context-prosessoren i ``core.context_processors``.
@@ -216,6 +247,7 @@ class SecurityHeadersMiddleware:
             'X-Robots-Tag',
             'noindex, nofollow, noarchive, nosnippet, noimageindex',
         )
+        sett_standard_cache_control(response)
         return response
 
 

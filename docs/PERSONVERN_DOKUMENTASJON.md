@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 15. oktober 2026  
-**Versjon:** 1.28  
+**Siste oppdatering:** 17. oktober 2026  
+**Versjon:** 1.29  
 **Behandlingsansvarlig:** Kverneland Røde Kors  
 **Systemansvarlig:** André Eritsland
 
@@ -847,6 +847,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Tiltak | Beskrivelse |
 |---|---|
 | Kryptering i hvile | AES-256 (Railway infrastruktur, PostgreSQL-database) |
+| Ingen mellomlagring av svar | Alt portalen og kartet svarer, får `Cache-Control: private, no-store` med mindre svaret selv sier noe annet (fra 17. okt. 2026). Delte mellomlagre — Railways kant, proxyer på nett vi ikke styrer — skal ikke ta vare på svar med personopplysninger, og nettleseren skal ikke legge dem på disk, så en side med pasienter ikke kan hentes fram med «tilbake» etter utlogging. Railways CDN er ikke slått på, med vilje: gevinsten var liten, og den lagrer kopier globalt |
 | Kryptering i transitt | TLS tvunget i produksjon (`SECURE_SSL_REDIRECT`); HSTS aktivert med 1 års varighet, subdomener og preload |
 | Passord-hashing | Djangos standard PBKDF2-HMAC-SHA256 med 1 000 000 iterasjoner; passord lagres aldri i klartekst. Argon2 er ikke installert i dag, men kan aktiveres ved å legge til `argon2-cffi`. Under testkjøring byttes hasheren til MD5 for fart — betingelsen er snever (`manage.py test`) og påvirker ikke drift |
 | Multifaktorautentisering (MFA) | TOTP (tidsbasert engangspassord) med backup-koder (engangs). MFA trust-cookie (30 dager, signert, enhets-bundet). MFA-hendelser logges |
@@ -1376,10 +1377,11 @@ Dokumentet er utarbeidet av systemansvarlig og godkjennes av behandlingsansvarli
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.28 – sist oppdatert 15. oktober 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.29 – sist oppdatert 17. oktober 2026*
 
 **Endringslogg:**
 
+- **v1.29 (17.10.2026):** **A.10:** nytt tiltak — ingen mellomlagring av svar. Portalen og kartet sender `Cache-Control: private, no-store` på alt som ikke selv sier noe annet. Railways CDN er vurdert og ikke slått på.
 - **v1.28 (15.10.2026):** **A.12: DPIA-vurderingen kontrollert mot Datatilsynet.** Listen over
   behandlinger som alltid krever DPIA (14 punkter, 27.07.2023) utløses ikke; nærmest er punkt 7,
   lokasjonsdata. Men **to av de ni kriteriene er oppfylt** — særlige kategorier og sårbare

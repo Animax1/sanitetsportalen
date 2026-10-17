@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — `Cache-Control: private, no-store` som standard; Railways CDN ikke slått på («Hvis vi tjener så lite så avstår vi»)  `#core/sikkerhet` `#core/personvern`
+
+André spurte om CDN-caching i Railway for portalen, kartet og Postgres. **Nei:** gevinsten er
+liten (få brukere, de statiske filene har innholds-hash og caches i nettleseren av WhiteNoise),
+og Railways CDN tar ikke en informasjonskapsel som grunn til å la være eller som del av
+nøkkelen — et svar én innlogget bruker får, kan serveres til neste som spør etter samme
+adresse. Kopiene ligger globalt, uten EU-valg. Postgres har ingen HTTP. André: «Hvis vi
+tjener så lite så avstår vi. Men punkt 1 om det er å anse som lurt for sikkerhet så gjør vi det.»
+
+**Punkt 1: standarden er «ikke lagre».** `core.middleware.sett_standard_cache_control`,
+kalt fra `SecurityHeadersMiddleware`, setter `private, no-store` der viewet ikke har satt
+`Cache-Control` selv. Vern mot en feilkonfigurert kant (Railway cachet 30. mars 2026 svar for
+domener som ikke hadde slått på CDN), proxyer, og at en side med pasienter hentes fram med
+«tilbake» etter utlogging. **`setdefault`, ikke `=`:** ETag-endepunktene (`private,
+must-revalidate`, `private, max-age=…`, `@never_cache`), service-workerne (`no-cache`),
+`/personvern/` (`no-cache`) og `robots.txt` (`max-age`) har bestemt selv og står. JavaScript
+holder ETag-en selv og service-workerne bruker Cache-API-et, så verken 304 eller offline
+påvirkes.
+
+**Tester:** `core/tests_cache_control.py`, 8 stykker, gjennom den ekte stakken (404,
+omdirigering, innlogget side, ETag-endepunkt med 304, `/personvern/`, `robots.txt`).
+**Mutasjoner: 5 av 5 drept** — kallstedet fjernet, `setdefault` → `=`, uten `no-store`, uten
+`private`, regelen tom. Protokollen v1.29 (A.10). `CLAUDE.md`: regelen inn i ETag-avsnittet
+(64 478 tegn, grensa er 64 500). Kartet får det samme i sitt repo.
+
 ## 2026-10-15 — DPIA kontrollert mot Datatilsynet: to av ni kriterier oppfylt, utgangspunktet er at DPIA skal gjøres; risiko for de registrerte (art. 35(7)(c)) skrevet  `#core/dokumentasjon` `#core/personvern`
 
 To TODO-punkter fra GDPR-gjennomgangen («Sjekk mot primærkilde», «Skriv art. 35(7)(c)»).
