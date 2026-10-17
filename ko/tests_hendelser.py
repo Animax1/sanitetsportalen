@@ -27,6 +27,7 @@ from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kwargs):
@@ -35,7 +36,7 @@ def _bruker(navn, **kwargs):
 
 
 def _gi(bruker, modul, nivaa):
-    ModulTilgang.objects.update_or_create(
+    gi_modultilgang_oppdater(
         bruker=bruker, modul_slug=modul, defaults={'nivaa': nivaa})
     return bruker
 

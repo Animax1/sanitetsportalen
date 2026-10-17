@@ -94,7 +94,9 @@ class EndepunktetTests(_Rent, TestCase):
 
     def setUp(self):
         super().setUp()
-        CustomUser.objects.create_user(username='u', password='x', must_change_password=False)
+        from accounts.test_helpers import medlemskap
+        medlemskap(CustomUser.objects.create_user(username='u', password='x',
+                                                  must_change_password=False))
         endringer.registrer('aapen', lambda r: True)
         endringer.registrer('stengt', lambda r: False)
 

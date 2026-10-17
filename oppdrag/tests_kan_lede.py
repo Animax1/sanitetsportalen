@@ -11,13 +11,14 @@ from django.test import RequestFactory, TestCase, override_settings
 from accounts.models import CustomUser, ModulTilgang
 from oppdrag.models import Enhet
 from oppdrag.views import sentralbordkontekst
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, *, enhet=False, nivaa='skriv_leder'):
     u = CustomUser.objects.create_user(username=navn, password='x', role='bruker',
                                        must_change_password=False)
-    ModulTilgang.objects.create(bruker=u, modul_slug='oppdrag', nivaa=nivaa)
-    ModulTilgang.objects.create(bruker=u, modul_slug='ko', nivaa='les')
+    gi_modultilgang(bruker=u, modul_slug='oppdrag', nivaa=nivaa)
+    gi_modultilgang(bruker=u, modul_slug='ko', nivaa='les')
     if enhet:
         Enhet.objects.create(navn=f'Bil {navn}', user=u)
     return CustomUser.objects.get(pk=u.pk)

@@ -153,6 +153,7 @@
   "/portal-admin/vakt/arkiv/x/1/slett/",
   "/portal-admin/vakt/avslutt/",
   "/portal-admin/vakt/navn/",
+  "/portal/",
   "/statistikk/",
   "/statistikk/api/kilde/x/arkiv/1/full-stats/",
   "/statistikk/api/kilde/x/frosset/1/",

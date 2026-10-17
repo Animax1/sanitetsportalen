@@ -4,3 +4,5 @@
 <link rel="icon" href="{% static 'img/logo.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
 <meta name="theme-color" content="#0f3460">
+{# Portalen siden ble tegnet for (17. okt. 2026). `apiFetch` og skjemaene sender den, og serveren svarer 409 når en annen fane har byttet portal — `core/portal_middleware.py`. #}
+<meta name="portal" content="{{ aktiv_portal.slug|default:'' }}">

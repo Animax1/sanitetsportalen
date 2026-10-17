@@ -226,7 +226,7 @@ som; `core/tests.py` dekker nå begge.
 
 1. **Global admin** (`role == 'admin'`) — brukeradmin, backup, moduloppsett, audit, arkiv,
    og alt irreversibelt. Står utenfor modulaksen og trenger ingen rader.
-2. **Modulbasert** — `accounts.ModulTilgang(bruker, modul_slug, nivaa)`.
+2. **Modulbasert** — `accounts.ModulTilgang`, per portal (`Portaltilgang`).
 3. **Globalt uten admin** — innlogging, min profil, passordbytte, MFA.
 
 ```python

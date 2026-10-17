@@ -17,6 +17,7 @@ from core.auth_decorators import (
     tom_tilgangscache,
 )
 from core.models import ModuleSettings
+from accounts.test_helpers import gi_modultilgang, gi_modultilgang_oppdater
 
 
 def _bruker(navn, rolle='bruker', **kwargs):
@@ -43,6 +44,14 @@ class BackfillTests(TestCase):
     vært identiske og testen kunne ikke lenger feilet. En test som ikke kan
     feile er verre enn ingen test: den ser ut som et vern. Regelen den
     beskyttet står fortsatt i §8.1, og kartleggingen låses av testen under.
+
+    **`test_backfillen_kan_kjores_om_igjen` sto her fram til 17. okt. 2026.**
+    Migrasjonen er idempotent fordi `bulk_create(ignore_conflicts=True)` traff
+    unikheten (bruker, modul) — den som fantes da 0012 kjørte. `accounts/0018`
+    flyttet unikheten til (medlemskap, modul), og testen kjører migrasjonen mot
+    *dagens* skjema: den målte da noe som ikke kan skje. En ny kjøring av 0012
+    krever en tilbakerulling forbi 0018, og den legger den gamle unikheten
+    tilbake.
     """
 
     FASIT = {
@@ -68,15 +77,6 @@ class BackfillTests(TestCase):
         for rolle, fasit in self.FASIT.items():
             with self.subTest(rolle=rolle):
                 self.assertEqual(self._rader(brukere[rolle]), fasit)
-
-    def test_backfillen_kan_kjores_om_igjen(self):
-        """Etter en rollback og ny fram skal andre forsøk ikke krasje."""
-        bruker = _bruker('bf_igjen', 'lead')
-        ModulTilgang.objects.all().delete()
-        self._kjor_backfill()
-        antall = ModulTilgang.objects.filter(bruker=bruker).count()
-        self._kjor_backfill()
-        self.assertEqual(ModulTilgang.objects.filter(bruker=bruker).count(), antall)
 
     def test_ingen_far_et_nivaa_som_ikke_finnes(self):
         for r in self.FASIT:
@@ -107,7 +107,7 @@ class NivaaTests(TestCase):
         self.bruker = _bruker('nivaa')
 
     def _sett(self, nivaa):
-        ModulTilgang.objects.update_or_create(
+        gi_modultilgang_oppdater(
             bruker=self.bruker, modul_slug='patients', defaults={'nivaa': nivaa},
         )
         tom_tilgangscache(self.bruker)
@@ -187,7 +187,7 @@ class GlobalAdminTests(TestCase):
 
     def test_deaktivert_modul_stenger_for_andre(self):
         bruker = _bruker('deakt')
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='skriv_full')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='skriv_full')
         ModuleSettings.objects.update_or_create(
             slug='patients', defaults={'enabled': False})
         self.assertFalse(har_tilgang(bruker, 'patients', 'les'))
@@ -202,16 +202,18 @@ class CacheTests(TestCase):
 
     def test_gjentatte_oppslag_gir_en_spørring(self):
         bruker = _bruker('cache')
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         tom_tilgangscache(bruker)
-        with self.assertNumQueries(2):  # tilganger + ModuleSettings
+        # tilganger + portalen + ModuleSettings. Portalen slås opp én gang når
+        # middlewaren ikke har lagt den på brukeren; i en forespørsel er det 2.
+        with self.assertNumQueries(3):
             for _ in range(10):
                 har_tilgang(bruker, 'patients', 'les')
 
     def test_cachen_kan_tommes(self):
         bruker = _bruker('cache2')
         self.assertFalse(har_tilgang(bruker, 'patients', 'les'))
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         self.assertFalse(har_tilgang(bruker, 'patients', 'les'),
                          'uten tømming skal det gamle svaret stå')
         tom_tilgangscache(bruker)
@@ -241,12 +243,12 @@ class ModulKrevesDekoratorTests(TestCase):
 
     def test_med_tilgang_slipper_gjennom(self):
         bruker = _bruker('dek_med')
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         self.assertEqual(self._kall(bruker).status_code, 200)
 
     def test_for_lavt_nivaa_gir_403(self):
         bruker = _bruker('dek_lav')
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         with self.assertRaises(PermissionDenied):
             self._kall(bruker, 'skriv_full')
 
@@ -295,7 +297,7 @@ class VerifiserKommandoTests(TestCase):
 
     def test_kommandoen_skriver_ingenting(self):
         bruker = _bruker('vk_uroert')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='les')
         foer = set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa'))
         self._kjor()
@@ -317,7 +319,7 @@ class VerifiserKommandoTests(TestCase):
     def test_rad_paa_ukjent_modul_meldes(self):
         """En slug ingen modul har gir ingen tilgang, men ser ut som tilgang."""
         bruker = _bruker('vk_slug')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='pasienter', nivaa='les')
         ut = self._kjor()
         self.assertIn('vk_slug: pasienter:les', ut)
@@ -325,7 +327,7 @@ class VerifiserKommandoTests(TestCase):
     def test_kjent_modul_meldes_ikke(self):
         """Vern mot at slug-testen passerer fordi alt meldes."""
         bruker = _bruker('vk_ok')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='les')
         ut = self._kjor()
         self.assertIn('Rader på en modul som ikke finnes i registeret\n  Ingen.', ut)
@@ -333,7 +335,7 @@ class VerifiserKommandoTests(TestCase):
     def test_ukjent_nivaa_meldes(self):
         """Et nivå stigen ikke kjenner stenger døra — stille, uten denne."""
         bruker = _bruker('vk_nivaa')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='skriv')
         self.assertIn('vk_nivaa: patients:skriv', self._kjor())
 
@@ -351,7 +353,7 @@ class VerifiserKommandoTests(TestCase):
 
     def test_vis_alle_lister_radene(self):
         bruker = _bruker('vk_liste')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='skriv_full')
         self.assertIn('patients:skriv_full', self._kjor(**{'vis_alle': True}))
 

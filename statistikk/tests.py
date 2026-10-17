@@ -7,7 +7,7 @@ og at ingen fikk mer tilgang enn før flyttingen.
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
-from accounts.test_helpers import PROFILER
+from accounts.test_helpers import PROFILER, gi_modultilgang
 from core.auth_decorators import har_tilgang, nivaa_for
 from core.models import ModuleSettings
 from core.modules import get_module, get_visible_modules
@@ -43,7 +43,7 @@ def _bruker(profil, *, tilganger=None):
         must_change_password=False,
     )
     for slug, nivaa in (PROFILER[profil] if tilganger is None else tilganger):
-        ModulTilgang.objects.create(bruker=bruker, modul_slug=slug, nivaa=nivaa)
+        gi_modultilgang(bruker=bruker, modul_slug=slug, nivaa=nivaa)
     return bruker
 
 

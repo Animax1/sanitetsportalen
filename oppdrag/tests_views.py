@@ -18,6 +18,7 @@ from core.models import AppSetting
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag, Statusmelding
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 AAR = 2098
 
@@ -27,7 +28,7 @@ def _bruker(navn, nivaa=None, *, admin=False, delt=False):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False, er_delt_konto=delt)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
     return b
 
 

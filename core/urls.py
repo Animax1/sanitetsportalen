@@ -14,7 +14,7 @@ myproject/urls.py.
 from django.shortcuts import redirect
 from django.urls import path, re_path
 
-from . import views_admin, views_portal, views_varsler
+from . import views_admin, views_portal, views_portalvalg, views_varsler
 
 app_name = 'core'
 
@@ -24,6 +24,11 @@ urlpatterns = [
 
     # Min profil (alle innloggede brukere)
     path('min-profil/', views_portal.profile_view, name='profile'),
+
+    # Portalvelgeren (17. okt. 2026, docs/BESLUTNING_PORTALER.md §4.4). Står
+    # utenfor portalregelen i `core/portal_middleware.py` — den er der man
+    # velger.
+    path('portal/', views_portalvalg.velg_view, name='portal_velg'),
 
     # ── Admin-UI ────────────────────────────────────────────────────────────
     # Rutene under /portal-admin/ flyttet til `core/urls_admin.py` 14. sep.

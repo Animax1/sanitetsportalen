@@ -19,6 +19,7 @@ from oppdrag import choices, services
 from oppdrag.choices import validate_oppdrag_choice_fields
 from oppdrag.models import Enhet, Enhetsbytte, Lokasjon, Oppdrag, Statusmelding
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 
 AAR = 2098
@@ -581,7 +582,7 @@ class ModulRegistreringTests(TestCase):
         bruker = CustomUser.objects.create_user(
             username='sjekk_url', password='x', role='bruker',
             must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='oppdrag', nivaa='les')
         modul = get_module('oppdrag')
         # Grenen `if modul.url is None: skipTest(...)` sto her til 26. sep. 2026.
@@ -613,7 +614,7 @@ class ModulRegistreringTests(TestCase):
         bruker = CustomUser.objects.create_user(
             username='sentral3', password='x', role='bruker',
             must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
 
         slugs = {m.slug for m in get_visible_modules(bruker, only_enabled=False)}
@@ -626,7 +627,7 @@ class ModulRegistreringTests(TestCase):
         bruker = CustomUser.objects.create_user(
             username='sentral4', password='x', role='bruker',
             must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='oppdrag', nivaa='skriv_handling')
 
         self.assertIn('oppdrag', {m.slug for m in get_nav_modules(bruker)})

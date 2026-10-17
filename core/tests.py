@@ -30,7 +30,7 @@ from core.validators import (
     validate_patient_time_fields,
     validate_time_string,
 )
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang, gi_standardtilgang
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -338,7 +338,7 @@ class PortalDashboardViewTests(TestCase):
             username='dashbruker', password='x', role='bruker',
             must_change_password=False,
         )
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.user, modul_slug='patients', nivaa='les',
         )
         self.client = Client()
@@ -698,7 +698,7 @@ class ModuleVisibilityTests(TestCase):
             username='ja_pas', password='x', role='bruker',
             must_change_password=False,
         )
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertIn('patients', slugs)
 
@@ -722,7 +722,7 @@ class ModuleVisibilityTests(TestCase):
             username='ja_pas2', password='x', role='bruker',
             must_change_password=False,
         )
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=bruker, modul_slug='patients', nivaa='les')
         # Deaktiver patients i ModuleSettings.
         ms, _ = ModuleSettings.objects.get_or_create(slug='patients')
         ms.enabled = False
@@ -814,6 +814,9 @@ class DashboardRendringTests(TestCase):
             username='dash_no', password='x', role='bruker',
             must_change_password=False,
         )
+        # Medlem av portalen, som hver aktiv konto i prod (`accounts/0019`) — men uten rader.
+        from accounts.test_helpers import medlemskap
+        medlemskap(bruker)
         self.client.force_login(bruker)
         resp = self.client.get('/')
         self.assertEqual(resp.status_code, 200)
@@ -862,6 +865,9 @@ class NavMenuTests(TestCase):
             username='nav_no', password='x', role='bruker',
             must_change_password=False,
         )
+        # Medlem av portalen, som hver aktiv konto i prod (`accounts/0019`) — men uten rader.
+        from accounts.test_helpers import medlemskap
+        medlemskap(bruker)
         self.client.force_login(bruker)
         resp = self.client.get('/')
         # Verken nav-lenke eller kort skal være med.
@@ -1296,7 +1302,7 @@ class ProfilModulTilgangKortetTests(TestCase):
         b = User.objects.create_user(
             username=navn, password='x', role=rolle, must_change_password=False)
         for slug, nivaa in tilganger:
-            ModulTilgang.objects.create(bruker=b, modul_slug=slug, nivaa=nivaa)
+            gi_modultilgang(bruker=b, modul_slug=slug, nivaa=nivaa)
         return b
 
     def test_nivaaet_vises_ikke_bare_ja(self):

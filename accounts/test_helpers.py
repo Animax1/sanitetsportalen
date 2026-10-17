@@ -21,7 +21,32 @@ Navnene beskriver tilgang, ikke de gamle rollene. `leder_les` er ikke «en
 lead_view» — det er «leser pasienter, leser statistikk», som er den eneste
 forskjellen den rollen noen gang gjorde.
 """
-from accounts.models import ModulTilgang
+from accounts.models import ModulTilgang, Portaltilgang
+
+
+def medlemskap(bruker, portal=None, rolle='medlem'):
+    """Kontoens medlemskap i portalen — finn eller lag det (17. okt. 2026).
+
+    Modulradene henger på medlemskapet (`docs/BESLUTNING_PORTALER.md` §4.2), så
+    en test som gir en modulrad må ha et å henge den på. Uten `portal` brukes
+    den gjeldende — i testbasen «Standard», og med to portaler kaster den.
+    """
+    from core.portal import gjeldende_portal
+    tilgang, _ = Portaltilgang.objects.get_or_create(
+        bruker=bruker, portal=portal or gjeldende_portal(), defaults={'rolle': rolle})
+    return tilgang
+
+
+def gi_modultilgang(*, bruker, modul_slug, nivaa, portal=None):
+    """Som `ModulTilgang.objects.create(bruker=…, modul_slug=…, nivaa=…)`, i en portal."""
+    return ModulTilgang.objects.create(
+        portaltilgang=medlemskap(bruker, portal), modul_slug=modul_slug, nivaa=nivaa)
+
+
+def gi_modultilgang_oppdater(*, bruker, modul_slug, defaults, portal=None):
+    """Som `ModulTilgang.objects.update_or_create(...)`, i en portal. Returnerer (rad, ny)."""
+    return ModulTilgang.objects.update_or_create(
+        portaltilgang=medlemskap(bruker, portal), modul_slug=modul_slug, defaults=defaults)
 
 #: Profil → radene profilen gir. Verdiene er de samme kombinasjonene
 #: ``accounts/migrations/0012_fyll_modultilgang.py`` fylte tabellen med, slik at
@@ -49,8 +74,8 @@ def gi_standardtilgang(bruker, profil):
         raise ValueError(
             f'Ukjent profil {profil!r}. Gyldige: {", ".join(sorted(PROFILER))}'
         )
+    if profil != 'admin':
+        medlemskap(bruker)
     for slug, nivaa in PROFILER[profil]:
-        ModulTilgang.objects.update_or_create(
-            bruker=bruker, modul_slug=slug, defaults={'nivaa': nivaa},
-        )
+        gi_modultilgang_oppdater(bruker=bruker, modul_slug=slug, defaults={'nivaa': nivaa})
     return bruker

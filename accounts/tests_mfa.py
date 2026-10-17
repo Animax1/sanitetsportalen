@@ -67,8 +67,13 @@ class MFASetupFlowTests(TestCase):
         self.assertContains(resp2, 'Sett opp to-faktor')
 
     def test_vanlig_bruker_uten_mfa_krav_gaar_rett_inn(self):
-        """Konto uten MFA-krav skal gå rett inn."""
+        """Konto uten MFA-krav skal gå rett inn.
+
+        Kontoen er medlem av portalen, slik hver konto i prod er etter
+        `accounts/0019` — uten medlemskap lander den på «Ingen portal» (403)."""
+        from accounts.test_helpers import medlemskap
         user = self._create_user('bruker', mfa_required=False)
+        medlemskap(user)
         resp = self.client.post(self.url, {
             'username': user.username, 'password': 'TestPassord123!',
         }, follow=True)

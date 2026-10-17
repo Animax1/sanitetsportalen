@@ -247,6 +247,12 @@
       <span class="brand-navn">Sanitetsportalen</span>
     </a>
     {% include "partials/_statusmerke.html" %}
+    {% if flere_portaler %}
+      {# Bare når kontoen har flere portaler: med én ser ingen en endring. #}
+      <a href="{% url 'core:portal_velg' %}?neste={{ request.get_full_path|urlencode }}" class="portalmerke" title="Bytt portal">
+        <i class="bi bi-grid-3x3-gap"></i> {{ aktiv_portal.navn }}
+      </a>
+    {% endif %}
   </div>
   {# Modul-meny — i headeren fra 22. sep. 2026. Ingen Dashboard-lenke: merkenavnet over går dit. nav_modules er filtrert på tilgang og enabled. #}
   <nav class="portal-nav" aria-label="Moduler">

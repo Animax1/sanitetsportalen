@@ -23,6 +23,7 @@ from . import vaktdrift
 from .models import Mannskap, Vaktpost
 from .test_helpers import AMBULANSE, gruppe, lag_ressurs
 from .tests_tilgang import TilgangsBasis
+from accounts.test_helpers import gi_modultilgang, gi_modultilgang_oppdater
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -112,7 +113,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         lagene her — samme regel som besetningen (M3)."""
         svar = self.c_leser.get(self.STI)
         self.assertEqual(svar.status_code, 403)
-        ModulTilgang.objects.update_or_create(
+        gi_modultilgang_oppdater(
             bruker=self.leser, modul_slug='oppdrag', defaults={'nivaa': 'les'})
         self._skift(self.res_hgsd, self.p_hgsd)
         svar = self.c_leser.get(self.STI)
@@ -124,7 +125,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         from django.test import Client
         bruker = CustomUser.objects.create_user(
             username='bareoppdrag', password='x', must_change_password=False)
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
+        gi_modultilgang(bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
         c = Client()
         c.force_login(bruker)
         self.assertEqual(c.get(self.STI).status_code, 403)

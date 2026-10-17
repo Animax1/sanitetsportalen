@@ -14,6 +14,7 @@ from accounts.models import CustomUser, ModulTilgang
 from backlog import services
 from backlog.models import Innspill, Innspilltype, Kommentar
 from core.modules import get_module
+from accounts.test_helpers import gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kw):
@@ -22,7 +23,7 @@ def _bruker(navn, **kw):
 
 
 def _gi(bruker, nivaa):
-    ModulTilgang.objects.update_or_create(
+    gi_modultilgang_oppdater(
         bruker=bruker, modul_slug='backlog', defaults={'nivaa': nivaa})
     return bruker
 

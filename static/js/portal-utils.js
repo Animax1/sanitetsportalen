@@ -140,10 +140,41 @@ function fanetittel(tittel) {
   return (globalThis.PORTAL_FANEPREFIKS || '') + tittel;
 }
 
+// **Og portalen** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.4): en kø
+// skrevet i Brann skal ikke spilles av i Landsskytter på samme PC. «Standard»
+// beholder den gamle nøkkelen, så køer skrevet før portalene fantes fortsatt
+// sendes — de hører alle til den.
 function brukerNokkel(prefiks) {
   const id = globalThis.PORTAL_BRUKER_ID;
   if (id === undefined || id === null || id === '') return null;
-  return `${prefiks}:u${id}`;
+  const portal = sidensPortal();
+  return portal && portal !== 'standard' ? `${prefiks}:u${id}:p${portal}` : `${prefiks}:u${id}`;
+}
+
+// Portalen siden ble tegnet for — `<meta name="portal">` fra `_ikoner.html`.
+// Tom når siden ikke gjelder én portal.
+function sidensPortal() {
+  const meta = globalThis.document?.querySelector?.('meta[name="portal"]');
+  return meta ? (meta.getAttribute('content') || '') : '';
+}
+
+// Skjemaer bærer portalen i et skjult felt, så en innsending fra en fane som
+// står i en annen portal enn sesjonen avvises (409) i stedet for å skrive feil
+// sted. Ett felt per skjema, lagt til når det sendes.
+function leggPortalPaaSkjema(skjema) {
+  const portal = sidensPortal();
+  if (!portal || !skjema || (skjema.method || '').toLowerCase() !== 'post') return;
+  let felt = skjema.querySelector('input[name="_portal"]');
+  if (!felt) {
+    felt = globalThis.document.createElement('input');
+    felt.type = 'hidden';
+    felt.name = '_portal';
+    skjema.appendChild(felt);
+  }
+  felt.value = portal;
+}
+if (globalThis.document?.addEventListener) {
+  globalThis.document.addEventListener('submit', (e) => leggPortalPaaSkjema(e.target), true);
 }
 
 
@@ -154,6 +185,9 @@ async function apiFetch(url, options = {}) {
   // Sekunder, ikke et tidspunkt: da slipper serveren å stole på klientens
   // klokke, som kan stå hvor som helst på en delt drifts-PC.
   headers['X-Portal-Inaktiv'] = String(sekunderSidenInteraksjon());
+  // Portalen siden ble tegnet for — fanevakten i `core/portal_middleware.py`.
+  const portal = sidensPortal();
+  if (portal) headers['X-Portal'] = portal;
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     headers['X-CSRFToken'] = getCsrfToken();

@@ -16,7 +16,7 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang_oppdater, gi_standardtilgang
 from core.models import Vakt, VaktStatistikk
 from core.vaktstatistikk import tidligere_vakter
 from oppdrag.models import OppdragArkiv
@@ -129,7 +129,7 @@ class EndepunkteneTests(TestCase):
         strengere beskyttet, som arkivene."""
         from accounts.models import ModulTilgang
         for modul in ('statistikk', 'park'):
-            ModulTilgang.objects.update_or_create(
+            gi_modultilgang_oppdater(
                 bruker=self.leder, modul_slug=modul, defaults={'nivaa': 'les'})
         c = self._c(self.leder)
         self.assertEqual(c.get('/statistikk/api/kilde/park/full-stats/').status_code, 200)

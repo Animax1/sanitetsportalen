@@ -23,6 +23,7 @@ from core.backup import KIND_MANUAL, create_backup, restore_backup
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, Oppdragsenhet, Statusmelding
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 
 AAR = 2098
@@ -33,7 +34,7 @@ def _bruker(navn, nivaa=None, *, admin=False):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
     return b
 
 
@@ -1930,7 +1931,7 @@ class VarselbjellaTests(FlereEnheterBasis):
         from accounts.models import CustomUser, ModulTilgang
         self.bilbruker = CustomUser.objects.create_user(
             username='bil56', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.bilbruker, modul_slug='oppdrag', nivaa='skriv_handling')
         self.a.user = self.bilbruker
         self.a.save(update_fields=['user'])
@@ -2037,7 +2038,7 @@ class VarselbjellaTests(FlereEnheterBasis):
         from core.models import Notification
         bil_b = CustomUser.objects.create_user(
             username='bil12', password='x', must_change_password=False)
-        ModulTilgang.objects.create(bruker=bil_b, modul_slug='oppdrag', nivaa='skriv_handling')
+        gi_modultilgang(bruker=bil_b, modul_slug='oppdrag', nivaa='skriv_handling')
         from oppdrag.models import Enhetstype
         self.b.user = bil_b
         self.b.enhetstype = Enhetstype.objects.create(navn='Lege', kan_passiv_vakt=True)

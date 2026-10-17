@@ -10,7 +10,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang, gi_standardtilgang
 from audit.models import AuditLog
 from core.auth_decorators import NIVAA_HIERARKI, har_tilgang, nivaa_for
 from core.jsdata import js_json
@@ -111,7 +111,7 @@ class AdminFaarToppenAvStigenTests(TestCase):
 
     def test_vanlig_bruker_uendret(self):
         b = CustomUser.objects.create_user(username='b_top', password='x', must_change_password=False)
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa='skriv_full')
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa='skriv_full')
         self.assertEqual(nivaa_for(b, 'vaktliste'), 'skriv_full')
         self.assertFalse(har_tilgang(b, 'vaktliste', 'skriv_leder'))
 

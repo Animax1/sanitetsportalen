@@ -116,9 +116,15 @@ def _tilganger(user):
     cache = getattr(user, _TILGANG_CACHE, None)
     if cache is None:
         from accounts.models import ModulTilgang  # noqa: WPS433
-        cache = dict(
+        from core.portal import brukerens_portal  # noqa: WPS433
+
+        # **Bare radene i portalen kontoen står i** (17. okt. 2026, §4.2 i
+        # `docs/BESLUTNING_PORTALER.md`). Uten portal er svaret ingen tilgang —
+        # aldri «Standard», og aldri summen av alle portalene.
+        portal = brukerens_portal(user)
+        cache = {} if portal is None else dict(
             ModulTilgang.objects
-            .filter(bruker=user)
+            .filter(portaltilgang__bruker=user, portaltilgang__portal=portal)
             .values_list('modul_slug', 'nivaa')
         )
         setattr(user, _TILGANG_CACHE, cache)

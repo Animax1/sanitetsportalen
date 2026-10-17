@@ -154,3 +154,15 @@ code {
 .vakt-liste > summary { cursor: pointer; list-style: revert; }
 .vakt-rull { max-height: 45vh; overflow-y: auto; }
 .vakt-rull thead th { position: sticky; top: 0; z-index: 1; background: var(--portal-surface-2); }
+
+/* Portalmerket i toppen (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.4) —
+   bare når kontoen har flere portaler. Det sier hvor det du gjør havner, og er
+   veien til velgeren. */
+.portalmerke {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--portal-border); background: var(--portal-surface-2);
+  color: var(--portal-header-fg); font-size: 0.85rem; text-decoration: none;
+  white-space: nowrap;
+}
+.portalmerke:hover { border-color: var(--portal-accent); color: var(--portal-header-fg); }

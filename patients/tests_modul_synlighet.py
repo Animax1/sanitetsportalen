@@ -12,6 +12,7 @@ gjøre arbeidet før hen får vite at det ikke gikk.
 from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, nivaa):
@@ -19,7 +20,7 @@ def _bruker(navn, nivaa):
         username=navn, password='x', role='bruker', must_change_password=False,
     )
     if nivaa:
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa=nivaa)
     return bruker
 
@@ -72,7 +73,7 @@ class ServerSideSynlighetTests(TestCase):
         bruker = CustomUser.objects.create_user(
             username=navn, password='x', role=rolle, must_change_password=False)
         if nivaa:
-            ModulTilgang.objects.create(
+            gi_modultilgang(
                 bruker=bruker, modul_slug='patients', nivaa=nivaa)
         c = Client()
         c.force_login(bruker)

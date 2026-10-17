@@ -45,6 +45,9 @@ class CsrfFeilTests(TestCase):
     def test_vanlig_403_sier_fortsatt_ingen_tilgang(self):
         bruker = CustomUser.objects.create_user(username='csrf_vanlig', password='x',
                                                 must_change_password=False)
+        # Medlem av portalen, som hver aktiv konto i prod (`accounts/0019`) — men uten rader.
+        from accounts.test_helpers import medlemskap
+        medlemskap(bruker)
         c = Client()
         c.force_login(bruker)
         svar = c.get('/portal-admin/server-status/')

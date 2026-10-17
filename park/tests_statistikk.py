@@ -21,6 +21,7 @@ from . import services
 from .models import Problemstilling, Registrering, Utfall
 from .statistikk import park_stats
 from .tests import _bruker, _Grunnlag
+from accounts.test_helpers import gi_modultilgang
 
 
 class TalleneTests(_Grunnlag):
@@ -98,7 +99,7 @@ class GatenTests(TestCase):
     def _klient(self, navn, tilganger):
         b = _bruker(navn)
         for slug, nivaa in tilganger:
-            ModulTilgang.objects.create(bruker=b, modul_slug=slug, nivaa=nivaa)
+            gi_modultilgang(bruker=b, modul_slug=slug, nivaa=nivaa)
         c = Client()
         c.force_login(b)
         return c
@@ -134,7 +135,7 @@ class EnesteKildeTests(TestCase):
     def test_panelet_er_aktivt_naar_det_er_alene(self):
         b = _bruker('alene')
         for slug in ('statistikk', 'park'):
-            ModulTilgang.objects.create(bruker=b, modul_slug=slug, nivaa='les')
+            gi_modultilgang(bruker=b, modul_slug=slug, nivaa='les')
         c = Client()
         c.force_login(b)
         with override_settings(SECURE_SSL_REDIRECT=False):

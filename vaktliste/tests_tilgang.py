@@ -37,6 +37,7 @@ from core.modules import get_module
 from . import services
 from .models import Kompetanse, Korps, Mannskap, Ressurs, Vaktpost
 from .test_helpers import KO, LAG, gruppe, lag_ressurs, lag_rolle
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -44,7 +45,7 @@ def _bruker(navn, nivaa=None, *, admin=False):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
     return b
 
 
@@ -576,7 +577,7 @@ class NivaaEtikettTests(TestCase):
         from core.views_portal import modultilganger_for_visning
         bruker = CustomUser.objects.create_user(
             username='m3', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='vaktliste', nivaa='skriv_handling')
         rader = {r['navn']: r['nivaa']
                  for r in modultilganger_for_visning(bruker)}

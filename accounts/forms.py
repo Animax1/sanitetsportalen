@@ -536,10 +536,15 @@ class ModulTilgangForm(forms.Form):
     # oppdragsmodulen, som er den nivået ble laget for, og tilbød `skriv_full`
     # på statistikk, der skriving ikke finnes.
 
-    def __init__(self, *args, bruker=None, blir_delt=False, **kwargs):
+    def __init__(self, *args, bruker=None, blir_delt=False, portal=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.bruker = bruker
-        self._naavaerende = self._les_naavaerende(bruker)
+        # **Matrisen gjelder én portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+        # §4.2): den admin står i, fra konteksten middlewaren setter. Samme konto
+        # kan ha andre nivåer i en annen portal, og de røres ikke herfra.
+        from core.portal import gjeldende_portal
+        self.portal = portal or gjeldende_portal()
+        self._naavaerende = self._les_naavaerende(bruker, self.portal)
         # Kontoen regelen spørres om. `blir_delt`: kontoen opprettes som, eller
         # gjøres til, en delt konto i samme innsending — da er flagget ennå ikke
         # lagret, og matrisen skal likevel ikke gi den mer enn den kan ha.
@@ -587,11 +592,11 @@ class ModulTilgangForm(forms.Form):
         return [m for m in get_all_modules() if not m.admin_only]
 
     @staticmethod
-    def _les_naavaerende(bruker):
+    def _les_naavaerende(bruker, portal):
         if bruker is None or bruker.pk is None:
             return {}
         return dict(
-            ModulTilgang.objects.filter(bruker=bruker)
+            ModulTilgang.objects.filter(bruker=bruker, portaltilgang__portal=portal)
             .values_list('modul_slug', 'nivaa')
         )
 
@@ -637,14 +642,24 @@ class ModulTilgangForm(forms.Form):
         bruker = bruker or self.bruker
         endringer = self.endringer()
 
+        from accounts.models import Portaltilgang
+        from core.auth_decorators import er_global_admin
+
         with transaction.atomic():
+            # **En konto som lagres i matrisen står i portalen** — også uten
+            # moduler: en ny konto skal ikke lande utenfor alle portaler. Global
+            # admin trenger ingen medlemskap, men får ett når hun får rader.
+            tilgang = None
+            if endringer or not er_global_admin(bruker):
+                tilgang, _ = Portaltilgang.objects.get_or_create(
+                    bruker=bruker, portal=self.portal)
             for slug, _fra, til in endringer:
                 if til == self.INGEN:
                     ModulTilgang.objects.filter(
-                        bruker=bruker, modul_slug=slug).delete()
+                        portaltilgang=tilgang, modul_slug=slug).delete()
                 else:
                     ModulTilgang.objects.update_or_create(
-                        bruker=bruker, modul_slug=slug,
+                        portaltilgang=tilgang, modul_slug=slug,
                         defaults={'nivaa': til},
                     )
 

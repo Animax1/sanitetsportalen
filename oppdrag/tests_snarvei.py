@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
 from core.models import ModuleSettings
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -18,7 +19,7 @@ def _bruker(navn, nivaa=None, *, admin=False):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
     return b
 
 
@@ -61,5 +62,5 @@ class SnarveienTests(TestCase):
         from core.modules import get_module
         self.assertEqual(get_module('ko').snarvei_for_nivaaer, ())
         b = _bruker('koleser')
-        ModulTilgang.objects.create(bruker=b, modul_slug='ko', nivaa='les')
+        gi_modultilgang(bruker=b, modul_slug='ko', nivaa='les')
         self.assertTrue(get_module('ko').har_snarvei_for(b))

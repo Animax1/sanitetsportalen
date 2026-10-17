@@ -184,8 +184,56 @@ class TilgangsNivaa(models.TextChoices):
     SKRIV_LEDER = 'skriv_leder', 'Skrive: leder'
 
 
+class PortalRolle(models.TextChoices):
+    """Rollen i én portal. **Ingen portaladmin** (beslutning 4 i
+    `docs/BESLUTNING_PORTALER.md`): global admin er admin overalt, og moderator
+    styrer sin portal."""
+
+    MODERATOR = 'moderator', 'Moderator'
+    MEDLEM = 'medlem', 'Medlem'
+
+
+class Portaltilgang(BaseTimeStampedModel):
+    """At en konto er med i en portal, og i hvilken rolle (17. okt. 2026).
+
+    Kontoen er global — én innlogging, én MFA — og medlemskapet er per portal.
+    Kari kan være moderator i «Brann» og medlem i «Landsskytter»: rollen hører
+    til paret (konto, portal), ikke til kontoen.
+
+    **Ingen rad er ingen tilgang til portalen**, samme prinsipp som
+    `ModulTilgang`. Global admin trenger ingen rader.
+
+    **Modulradene henger på medlemskapet** (`ModulTilgang.portaltilgang`,
+    `CASCADE`). Å fjerne noen fra portalen er derfor én sletting, og en modulrad
+    uten medlemskap kan ikke finnes — en egen `portal`-kolonne på modulraden
+    ville gitt to sannheter om det samme (beslutning 20).
+    """
+
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='portaltilganger', verbose_name='Bruker')
+    portal = models.ForeignKey(
+        'core.Vaktportal', on_delete=models.CASCADE,
+        related_name='portaltilganger', verbose_name='Portal')
+    rolle = models.CharField(
+        max_length=16, choices=PortalRolle.choices, default=PortalRolle.MEDLEM,
+        verbose_name='Rolle')
+
+    class Meta:
+        verbose_name = 'Portaltilgang'
+        verbose_name_plural = 'Portaltilganger'
+        ordering = ['portal_id', 'bruker__username']
+        constraints = [
+            models.UniqueConstraint(fields=['bruker', 'portal'],
+                                    name='en_portaltilgang_per_bruker_og_portal'),
+        ]
+
+    def __str__(self):
+        return f'{self.bruker_id}@{self.portal_id}:{self.rolle}'
+
+
 class ModulTilgang(BaseTimeStampedModel):
-    """Én brukers tilgangsnivå på én modul.
+    """Én brukers tilgangsnivå på én modul, i én portal.
 
     Erstatter de fem ``kan_redigere_*``-flaggene på ``CustomUser``. Flaggene
     var både feilnavngitt og virkningsløse: de leses kun av
@@ -205,12 +253,21 @@ class ModulTilgang(BaseTimeStampedModel):
     slettingen — eller forsvinne stille med en CASCADE.
     """
 
+    # **Avledet av medlemskapet**, aldri skrevet alene: `save()` setter den fra
+    # `portaltilgang` og nekter en som er uenig. Den står fordi oppslaget på
+    # hver forespørsel, matrisen og varslene leser på den, og fordi gammel kode
+    # i release-vinduet gjør det samme.
     bruker = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='modultilganger',
         verbose_name='Bruker',
     )
+    # Nullbar i basen bare for release-vinduet og migrasjonen som fyller den
+    # (17. okt. 2026); `save()` krever den. Gjøres `NOT NULL` i neste runde.
+    portaltilgang = models.ForeignKey(
+        Portaltilgang, on_delete=models.CASCADE, null=True,
+        related_name='modulrader', verbose_name='Portaltilgang')
     modul_slug = models.CharField(
         max_length=64,
         verbose_name='Modul',
@@ -227,9 +284,11 @@ class ModulTilgang(BaseTimeStampedModel):
         verbose_name_plural = 'Modultilganger'
         ordering = ['bruker__username', 'modul_slug']
         constraints = [
+            # Per medlemskap, ikke per bruker (17. okt. 2026): samme konto kan
+            # ha ulike nivåer på samme modul i to portaler.
             models.UniqueConstraint(
-                fields=['bruker', 'modul_slug'],
-                name='unik_modultilgang_per_bruker',
+                fields=['portaltilgang', 'modul_slug'],
+                name='unik_modultilgang_per_portaltilgang',
             ),
         ]
         # Ingen eksplisitt indeks på `bruker`: ForeignKey lager sin egen, og
@@ -255,6 +314,13 @@ class ModulTilgang(BaseTimeStampedModel):
         er laget før, slik at en ny skrivevei sier fra med det samme i stedet for
         å lage en rad som ser ut som tilgang uten å være det.
         """
+        if self.portaltilgang_id is None:
+            raise ValueError('En modultilgang må høre til et medlemskap i en portal '
+                             '(Portaltilgang). Se docs/BESLUTNING_PORTALER.md §4.2.')
+        if self.bruker_id is None:
+            self.bruker_id = self.portaltilgang.bruker_id
+        elif self.bruker_id != self.portaltilgang.bruker_id:
+            raise ValueError('Modultilgangens bruker er ikke medlemskapets bruker.')
         if delt_konto_sperret(self.bruker, self.modul_slug):
             from django.core.exceptions import ValidationError
             raise ValidationError(DELT_KONTO_SPERRET.format(modul=self.modul_slug))

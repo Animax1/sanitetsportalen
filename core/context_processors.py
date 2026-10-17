@@ -80,6 +80,19 @@ def versjon(request):
     return {'versjon': hent_versjon()}
 
 
+def portal(request):
+    """Legg til ``aktiv_portal`` og ``flere_portaler`` (17. okt. 2026).
+
+    Middlewaren har lagt portalen på forespørselen. ``flere_portaler`` styrer
+    merket i toppen: med én portal vises ingenting, så ingen ser en endring
+    før portal nummer to finnes.
+    """
+    return {
+        'aktiv_portal': getattr(request, 'portal', None),
+        'flere_portaler': getattr(request, 'portal_antall', 0) > 1,
+    }
+
+
 def statusmerke(request):
     """Legg til ``miljo`` og ``statusmelding`` — merket i toppmenyen.
 

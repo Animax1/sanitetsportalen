@@ -14,7 +14,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from audit.models import AuditLog
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang, gi_standardtilgang
 from oppdrag.test_helpers import lag_oppdrag
 
 
@@ -472,7 +472,7 @@ class MatriseNivaaerTests(TestCase):
         bruker = CustomUser.objects.create_user(
             username='arvet', password='x', role='bruker',
             must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='statistikk', nivaa='skriv_full')
 
         felt = ModulTilgangForm(bruker=bruker).fields[

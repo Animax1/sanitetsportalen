@@ -17,6 +17,7 @@ from accounts.models import CustomUser, ModulTilgang
 from core.models import ModuleSettings
 from core.modules import get_module
 from ko.tilstede import tilstede
+from accounts.test_helpers import gi_modultilgang, gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kwargs):
@@ -25,7 +26,7 @@ def _bruker(navn, **kwargs):
 
 
 def _gi_ko(bruker, nivaa='les'):
-    return ModulTilgang.objects.update_or_create(
+    return gi_modultilgang_oppdater(
         bruker=bruker, modul_slug='ko', defaults={'nivaa': nivaa})
 
 
@@ -97,7 +98,7 @@ class TilgangenVirkerTests(TestCase):
         """Vern mot at testen over passerer fordi alt er stengt for alle på
         feil grunnlag: tilgang til *en* modul er ikke tilgang til KO."""
         bruker = _bruker('annen')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='skriv_full')
         self.client.force_login(bruker)
         self.assertEqual(self.client.get('/ko/').status_code, 403)
@@ -178,7 +179,7 @@ class SidebarenTests(TestCase):
         oppført som til stede i KO.
         """
         bruker = _bruker('pasientfolk')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='patients', nivaa='skriv_full')
         self._logg_inn_som(bruker)
         self.assertEqual([r['brukernavn'] for r in tilstede()], [])
@@ -246,7 +247,9 @@ class SidebarenTests(TestCase):
         nå står den ikke der, heller ikke med en KO-rad fra før regelen."""
         from accounts.models import ModulTilgang
         bruker = _bruker('enhet-2', er_delt_konto=True)
-        ModulTilgang.objects.bulk_create([ModulTilgang(bruker=bruker, modul_slug='ko', nivaa='les')])
+        from accounts.test_helpers import medlemskap
+        ModulTilgang.objects.bulk_create([ModulTilgang(
+            bruker=bruker, portaltilgang=medlemskap(bruker), modul_slug='ko', nivaa='les')])
         self._logg_inn_som(bruker)
         operator = _bruker('operator')
         _gi_ko(operator)
@@ -304,7 +307,7 @@ class SidenHarIngenFanerTests(TestCase):
         # oppdragslista av oppdragsmodulen, ikke av KO — så en konto uten den
         # raden ser loggen og ingenting mer, og da måler denne testen
         # tilgangen i stedet for layouten.
-        ModulTilgang.objects.update_or_create(
+        gi_modultilgang_oppdater(
             bruker=bruker, modul_slug='oppdrag', defaults={'nivaa': 'skriv_full'})
         self.client.force_login(bruker)
 
@@ -400,7 +403,7 @@ class SidenHarIngenFanerTests(TestCase):
         hendelse» i hendelsesloggen. Verktøylinja har bare det som gjelder
         hele sida. Målt på rekkefølgen i markupen. Oppdragsleder her, så
         «KO-innstillinger» finnes å måle på."""
-        ModulTilgang.objects.update_or_create(
+        gi_modultilgang_oppdater(
             bruker=CustomUser.objects.get(username='operator'), modul_slug='oppdrag',
             defaults={'nivaa': 'skriv_leder'})
         markup = self._markup()

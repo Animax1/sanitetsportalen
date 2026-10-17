@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 2: medlemskap per portal, `ModulTilgang` på medlemskapet, portalregelen og fanevakten (409 når en annen fane har byttet portal)  `#core/tilgang` `#accounts/innlogging`
+
+Andre fase av `docs/BESLUTNING_PORTALER.md`. **Med én portal er det ingen synlig endring:**
+alle aktive kontoer er medlem av «Standard», portalen velges av seg selv, og merket i toppen
+vises først når en konto har flere.
+
+**Modellen.** `accounts.Portaltilgang(bruker, portal, rolle)` — `moderator` eller `medlem`,
+ingen portaladmin (beslutning 4). **`ModulTilgang` henger på medlemskapet** (`portaltilgang`,
+`CASCADE`): å fjerne noen fra en portal er én sletting, og en modulrad uten medlemskap kan ikke
+lagres. `bruker` står igjen som avledet kolonne — `save()` setter den fra medlemskapet og nekter
+en som er uenig — fordi oppslaget på hver forespørsel og gammel kode i release-vinduet leser
+den. Unikheten er flyttet fra (bruker, modul) til (medlemskap, modul): samme konto kan ha
+ulike nivåer i to portaler.
+
+**Migrasjonene:** `accounts/0018` skjemaet, `0019` fyller — hver konto med rader og hver aktiv
+konto uten admin-rolle blir medlem av «Standard», og radene kobles til. Ingen blir moderator.
+**Prøve i `core/migrasjonsprover.py`** med fem kontoer, én per regel; grønn mot PostgreSQL.
+
+**Portalregelen** (`core/portal_middleware.py`, `core/portal.py`): mulige portaler er de aktive
+kontoen er med i — for global admin alle. **Én mulig velges og skrives i sesjonen; flere uten
+gyldig valg stopper både lesing og skriving** (sider til `/portal/`, API 409); null er en
+foreldreløs konto («Ingen portal», 403). Valget kontrolleres mot de mulige ved hver forespørsel.
+Portalen legges på `request.user`, og `har_tilgang` leser bare radene i den — **de 56
+kallstedene er uendret**. Uten portal er svaret ingen tilgang, aldri «Standard».
+
+**Fanevakten:** `<meta name="portal">` i `_ikoner.html`, `X-Portal` fra `apiFetch` og et skjult
+`_portal` i hvert POST-skjema. Feil portal gir **409** («Du byttet til portalen … i en annen
+fane»). Har kontoen flere portaler, *må* en skriving bære den. **Offline-nøklene** har portalen
+med, men «Standard» beholder den gamle nøkkelen så køer skrevet før i dag fortsatt sendes.
+Matrisen på brukersiden skriver i portalen admin står i; KO-sidebaren teller bare KO-rader der.
+
+**Funnet underveis:** middlewaren leste `request.POST` for å finne skjemafeltet, og det tømte
+datastrømmen — stemplingen i vaktlista leser `request.body` etterpå, og fikk
+`RawPostDataException`. Feltet leses nå bare for kontoer med flere portaler, og kroppen leses
+inn først.
+
+**Tester:** `core/tests_portaltilgang.py`, 36 stykker, gjennom den ekte middlewaren. 47
+testfiler laget modulrader direkte; de bruker nå `gi_modultilgang()` / `gi_modultilgang_oppdater()`
+(samme nøkkelord), og tre `bulk_create`-steder fikk medlemskapet — uten det ville radene vært
+usynlige, og testene av delt-konto-sperra grønne på feil grunnlag. `test_backfillen_kan_kjores_om_igjen`
+er fjernet med begrunnelse: den kjørte `0012` mot dagens skjema, der unikheten den lente seg på
+ikke finnes. **Mutasjoner: 22, alle drept til slutt.** Fire overlevde første runde — skjemafeltet,
+matrisens lesing og sletting, KO-sidebaren og `apiFetch` — og fikk hver sin test. Den siste
+«døde» først fordi testen selv var rød; den ble rettet og mutanten kjørt på nytt.
+
 ## 2026-10-17 — Portaler fase 1: `Vaktportal`, én aktiv vakt per portal håndhevet av databasen, pekeren `aktiv_vakt_id` leses ikke lenger, pasientens fallback fjernet  `#core/vakt` `#core/backup`
 
 Første fase av `docs/BESLUTNING_PORTALER.md`. **Ingen synlig endring:** alt som finnes

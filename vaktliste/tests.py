@@ -16,6 +16,7 @@ from core.modules import get_module, get_visible_modules
 from .models import Kompetanse, Korps, Mannskap, Ressursrolle
 from .test_helpers import LAG, gruppe
 from .signals import SKJULT, TABELLNAVN
+from accounts.test_helpers import gi_modultilgang
 
 User = get_user_model()
 
@@ -235,7 +236,7 @@ class ModulRegistreringTests(TestCase):
         from accounts.models import ModulTilgang
         bruker = User.objects.create_user(
             username='vl_leser', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='vaktliste', nivaa='les')
         self.assertIn('vaktliste',
                       [m.slug for m in get_visible_modules(bruker)])

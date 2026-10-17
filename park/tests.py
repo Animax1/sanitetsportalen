@@ -37,6 +37,7 @@ from vaktliste.test_helpers import LAG, SAMLEPLASS, gruppe, lag_ressurs
 
 from . import services, views_lag
 from .models import Parklenke, Problemstilling, Registrering, Utfall
+from accounts.test_helpers import gi_modultilgang, gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kw):
@@ -45,7 +46,7 @@ def _bruker(navn, **kw):
 
 
 def _gi(bruker, nivaa):
-    ModulTilgang.objects.update_or_create(bruker=bruker, modul_slug='park',
+    gi_modultilgang_oppdater(bruker=bruker, modul_slug='park',
                                           defaults={'nivaa': nivaa})
     return bruker
 
@@ -1038,7 +1039,7 @@ class RutingflaggetIVaktlistaTests(_Grunnlag):
 
     def _vaktliste(self, navn, nivaa):
         b = _bruker(navn)
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
         return b
 
     def test_leder_snur_flagget_og_lagnedtrekket_foelger(self):

@@ -20,13 +20,14 @@ from accounts.models import CustomUser, ModulTilgang
 from audit.models import AuditLog
 from patients.models import Patient
 from patients.services import SLETTEVINDU, kan_slette_selv
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, nivaa='skriv_full', rolle='bruker'):
     b = CustomUser.objects.create_user(
         username=navn, password='x', role=rolle, must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='patients', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='patients', nivaa=nivaa)
     return b
 
 

@@ -1,0 +1,24 @@
+{% extends "core/base_portal.html" %}
+{% block title %}Velg portal{% endblock %}
+{% block content %}
+<div class="container py-4 velg-portal">
+  <h1 class="h4 mb-3">Velg portal</h1>
+  {% if feil %}<div class="alert alert-danger">{{ feil }}</div>{% endif %}
+  {% if mulige %}
+    <p class="portal-dempet">Du har tilgang til flere portaler. Det du gjør, gjelder portalen du står i — bytt når som helst fra toppen av siden.</p>
+    <div class="list-group">
+      {% for p in mulige %}
+        <form method="post" class="list-group-item d-flex justify-content-between align-items-center">
+          {% csrf_token %}
+          <input type="hidden" name="portal" value="{{ p.slug }}">
+          <input type="hidden" name="neste" value="{{ neste }}">
+          <span>{{ p.navn }}{% if p.pk == valgt_id %} <span class="badge bg-secondary ms-2">Står i nå</span>{% endif %}</span>
+          <button type="submit" class="btn btn-sm btn-primary">Gå til</button>
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>Kontoen din er ikke med i noen portal. Be en administrator eller moderator om tilgang.</p>
+  {% endif %}
+</div>
+{% endblock %}

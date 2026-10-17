@@ -39,6 +39,7 @@ from . import choices, services
 from .models import Mannskap, Vaktpost
 from .test_helpers import gruppe, lag_ressurs, lag_rolle, AMBULANSE
 from .tests_tilgang import TilgangsBasis, _bruker, _klient
+from accounts.test_helpers import gi_modultilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -336,7 +337,7 @@ class BesetningTests(TilgangsBasis):
         from accounts.models import ModulTilgang
         self._skift(self.p_hgsd)
         self.assertEqual(403, self._hent(self.c_leser).status_code)
-        ModulTilgang.objects.create(bruker=self.leser, modul_slug='oppdrag', nivaa='les')
+        gi_modultilgang(bruker=self.leser, modul_slug='oppdrag', nivaa='les')
         self.assertEqual(200, self._hent(_klient(self.leser)).status_code)
 
     def test_uten_vaktlistetilgang_er_det_stengt(self):
@@ -345,7 +346,7 @@ class BesetningTests(TilgangsBasis):
         i hvem som går vakt."""
         from accounts.models import ModulTilgang
         bruker = _bruker('operator')
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='oppdrag',
+        gi_modultilgang(bruker=bruker, modul_slug='oppdrag',
                                     nivaa='skriv_full')
         self.assertEqual(403, self._hent(_klient(bruker)).status_code)
 

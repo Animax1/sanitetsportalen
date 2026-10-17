@@ -24,6 +24,7 @@ from core.portal import eneste_portal
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 AAR = 2098
 
@@ -81,9 +82,9 @@ class SkrivestierTests(TestCase):
         sett_aktiv_vakt(AAR)
         self.bruker = CustomUser.objects.create_user(
             username='skriver', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.bruker, modul_slug='patients', nivaa='skriv_full')
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.bruker, modul_slug='oppdrag', nivaa='skriv_full')
         self.client = Client()
         self.client.force_login(self.bruker)

@@ -113,6 +113,9 @@ MIDDLEWARE = [
     'audit.middleware.RequestAuditMiddleware',
     'accounts.middleware.MustChangePasswordMiddleware',
     'accounts.middleware.DynamicSessionTimeoutMiddleware',
+    # Portalregelen og fanevakten (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+    # §4.4): etter innloggingen og passordbyttet, før alt som leser tilgang.
+    'core.portal_middleware.PortalMiddleware',
     # **Etter autentiseringen, før arbeidet** (16. sep. 2026): den trenger
     # `request.user` og `request.session`, og den skal notere at noen var her
     # også når viewet under svarer med en feil.
@@ -145,6 +148,7 @@ TEMPLATES = [
                 'core.context_processors.tilgang',
                 'core.context_processors.versjon',
                 'core.context_processors.statusmerke',
+                'core.context_processors.portal',
             ],
         },
     },

@@ -16,6 +16,7 @@ from django.test import Client, RequestFactory, TestCase, override_settings
 from accounts.models import CustomUser, ModulTilgang
 from core.vakt import vakt_for_year
 from oppdrag.models import Enhet
+from accounts.test_helpers import gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kwargs):
@@ -24,7 +25,7 @@ def _bruker(navn, **kwargs):
 
 
 def _gi(bruker, modul, nivaa):
-    ModulTilgang.objects.update_or_create(
+    gi_modultilgang_oppdater(
         bruker=bruker, modul_slug=modul, defaults={'nivaa': nivaa})
     return bruker
 

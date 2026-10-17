@@ -30,6 +30,7 @@ from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler, rest
 
 from . import services
 from .models import Kontokorps, Korps, Mannskap
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, nivaa=None, *, admin=False, epost=''):
@@ -37,7 +38,7 @@ def _bruker(navn, nivaa=None, *, admin=False, epost=''):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False, email=epost)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
     return b
 
 

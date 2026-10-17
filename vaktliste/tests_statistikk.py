@@ -21,6 +21,7 @@ from vaktliste.intervaller import slaa_sammen
 from vaktliste.statistikk import bemanning_stats, lengste_hull
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang_oppdater
 
 
 class IntervallTests(TestCase):
@@ -248,7 +249,7 @@ class GateTests(TestCase):
     def _med(self, navn, tilganger):
         bruker = CustomUser.objects.create_user(username=navn, password='x', must_change_password=False)
         for modul, nivaa in tilganger:
-            ModulTilgang.objects.update_or_create(bruker=bruker, modul_slug=modul, defaults={'nivaa': nivaa})
+            gi_modultilgang_oppdater(bruker=bruker, modul_slug=modul, defaults={'nivaa': nivaa})
         c = Client(); c.force_login(bruker); return c
 
     def test_handleren_krever_les_alle(self):

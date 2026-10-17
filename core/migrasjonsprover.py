@@ -321,6 +321,58 @@ def _sjekk_vaktportal(c):
     assert rad and 'WHERE er_aktiv' in rad[0], rad
 
 
+# ── accounts.0019 (medlemskap i «Standard») ──────────────────────────────────
+
+def _seed_portaltilgang(c):
+    """Fem kontoer, én for hver regel i migrasjonen.
+
+    I en tom base finner 0019 ingen kontoer, og går grønt uten å ha gjort noe.
+    """
+    def konto(navn, rolle, aktiv=True):
+        c.execute("""INSERT INTO accounts_customuser
+                     (password, is_superuser, username, fullt_navn, er_delt_konto, role,
+                      is_active, is_staff, must_change_password, mfa_required,
+                      failed_login_attempts, created_at, updated_at)
+                     VALUES ('!', false, %s, '', false, %s, %s, false, false, false, 0,
+                             now(), now()) RETURNING id""", [navn, rolle, aktiv])
+        return c.fetchone()[0]
+
+    def rad(bruker, modul):
+        c.execute("""INSERT INTO accounts_modultilgang
+                     (bruker_id, modul_slug, nivaa, created_at, updated_at)
+                     VALUES (%s, %s, 'les', now(), now())""", [bruker, modul])
+
+    med = konto('med_rader', 'bruker')
+    rad(med, 'patients')
+    rad(med, 'oppdrag')
+    konto('uten_rader', 'bruker')
+    admin_med = konto('admin_med_rad', 'admin')
+    rad(admin_med, 'ko')
+    konto('admin_uten', 'admin')
+    konto('inaktiv', 'bruker', aktiv=False)
+
+
+def _sjekk_portaltilgang(c):
+    c.execute("""SELECT u.username, p.slug, t.rolle
+                 FROM accounts_portaltilgang t
+                 JOIN accounts_customuser u ON u.id = t.bruker_id
+                 JOIN core_vaktportal p ON p.id = t.portal_id ORDER BY u.username""")
+    medlem = {r[0]: r[1:] for r in c.fetchall()}
+    assert medlem.get('med_rader') == ('standard', 'medlem'), medlem
+    assert medlem.get('uten_rader') == ('standard', 'medlem'), 'en konto uten rader ble foreldreløs'
+    assert medlem.get('admin_med_rad') == ('standard', 'medlem'), 'adminens rader må høre til noe'
+    assert 'admin_uten' not in medlem, 'global admin trenger ikke medlemskap'
+    assert 'inaktiv' not in medlem, medlem
+    assert not any(r[1] == 'moderator' for r in medlem.values()), 'ingen blir moderator av seg selv'
+
+    c.execute("SELECT count(*) FROM accounts_modultilgang WHERE portaltilgang_id IS NULL")
+    assert c.fetchone()[0] == 0, 'modulrader uten medlemskap'
+    c.execute("""SELECT count(*) FROM accounts_modultilgang m
+                 JOIN accounts_portaltilgang t ON t.id = m.portaltilgang_id
+                 WHERE t.bruker_id <> m.bruker_id""")
+    assert c.fetchone()[0] == 0, 'en modulrad hang på en annen kontos medlemskap'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -344,6 +396,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Vaktene får portalen «Standard», og pekeren blir er_aktiv',
             seed=_seed_vaktportal,
             sjekk=_sjekk_vaktportal,
+        ),
+        Migrasjonsprove(
+            migrasjon='accounts.0019_portaltilgang_standard',
+            foregaaende='0018_portaltilgang',
+            beskrivelse='Hver konto blir medlem av «Standard», radene kobles til medlemskapet',
+            seed=_seed_portaltilgang,
+            sjekk=_sjekk_portaltilgang,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

@@ -22,6 +22,7 @@ from ko.models import KILDE_SYSTEM, Logglinje
 from oppdrag import choices, services as oservices
 from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 
 class ListaErEnKontraktTests(TestCase):
@@ -367,7 +368,7 @@ class MottakerneKasterIkkeTests(TestCase):
         vakt = hent_aktiv_vakt()
         bil = CustomUser.objects.create_user(
             username='bil_a3', password='x', role='bruker', must_change_password=False)
-        ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
+        gi_modultilgang(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
         enhet = Enhet.objects.create(navn='HGSD 56', user=bil)
         oppdrag = lag_oppdrag(
             vakt=vakt, oppdragsnummer=1, enhet=enhet,

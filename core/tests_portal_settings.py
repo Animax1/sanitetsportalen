@@ -11,13 +11,14 @@ from django.urls import reverse
 from accounts.models import CustomUser, ModulTilgang
 from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt
+from accounts.test_helpers import gi_modultilgang
 
 
 def _bruker(navn, rolle='bruker', nivaa='skriv_full'):
     b = CustomUser.objects.create_user(
         username=navn, password='x', role=rolle, must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='patients', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='patients', nivaa=nivaa)
     return b
 
 

@@ -20,6 +20,7 @@ from patients.js_test_utils import (
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
+from accounts.test_helpers import gi_modultilgang
 
 from . import services
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
@@ -33,7 +34,7 @@ def _bruker(navn, nivaa=None, *, admin=False):
         username=navn, password='x', role='admin' if admin else 'bruker',
         must_change_password=False)
     if nivaa:
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa=nivaa)
     return b
 
 

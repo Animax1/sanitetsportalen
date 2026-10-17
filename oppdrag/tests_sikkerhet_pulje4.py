@@ -13,6 +13,7 @@ from django.urls import URLPattern, URLResolver
 from accounts.models import ModulTilgang
 from oppdrag.models import Enhet, Oppdrag
 from oppdrag.tests_views import OppdragBasis, _bruker, _klient
+from accounts.test_helpers import gi_modultilgang
 
 
 def _monstre(resolver, ut=None):
@@ -95,8 +96,10 @@ class StatistikkForBilkontoTests(OppdragBasis):
         # En rad fra før delte kontoer ble sperret ute av alt annet enn oppdrag
         # (8. okt. 2026, FORSLAG_KO §5.2) — `save()` nekter den nå, så den legges
         # inn utenom. Testene viser at den heller ikke gir noe.
+        from accounts.test_helpers import medlemskap
         ModulTilgang.objects.bulk_create([ModulTilgang(
-            bruker=self.bilbruker, modul_slug='statistikk', nivaa='les')])
+            bruker=self.bilbruker, portaltilgang=medlemskap(self.bilbruker),
+            modul_slug='statistikk', nivaa='les')])
         Enhet.objects.filter(pk=self.enhet.pk).update(user=self.bilbruker)
         self.bilbruker.refresh_from_db()
 
@@ -112,5 +115,5 @@ class StatistikkForBilkontoTests(OppdragBasis):
         """Motprøven."""
         from statistikk.views import lesbare_kilder
         sentral = _bruker('sentral_stat', 'les')
-        ModulTilgang.objects.create(bruker=sentral, modul_slug='statistikk', nivaa='les')
+        gi_modultilgang(bruker=sentral, modul_slug='statistikk', nivaa='les')
         self.assertIn('oppdrag', [h.slug for h in lesbare_kilder(sentral)])

@@ -83,3 +83,42 @@ def eneste_portal() -> Vaktportal:
     except IntegrityError:
         # En samtidig forespørsel rakk å lage den.
         return Vaktportal.objects.get(slug=STANDARD_SLUG)
+
+
+# ── Brukerens portal — portalregelen (§4.4, beslutning 21) ───────────────────
+#
+# Over sto installasjonens svar. Her står brukerens: hvilke portaler *denne
+# kontoen* kan stå i, og hvilken den står i nå. Middlewaren skriver valget i
+# sesjonen og legger det på brukerobjektet; `har_tilgang` leser det derfra.
+
+#: Navnet på attributtet middlewaren setter på `request.user`.
+BRUKER_ATTR = '_aktiv_portal'
+#: Nøkkelen i sesjonen.
+SESJON_NOKKEL = 'portal_id'
+
+
+def mulige_portaler(user):
+    """De aktive portalene kontoen kan stå i. Global admin: alle aktive."""
+    from core.auth_decorators import er_global_admin
+
+    aktive = Vaktportal.objects.filter(er_aktiv=True)
+    if not getattr(user, 'is_authenticated', False):
+        return aktive.none()
+    if er_global_admin(user):
+        return aktive.order_by('pk')
+    return aktive.filter(portaltilganger__bruker=user).order_by('pk').distinct()
+
+
+def brukerens_portal(user):
+    """Portalen kontoen står i, eller ``None``. Gjetter aldri.
+
+    Middlewaren har lagt den på brukerobjektet for hver forespørsel. Mangler
+    den — et brukerobjekt fra en test, en kommando eller et tjenestelag — er
+    svaret portalen kontoen *kan* stå i, hvis det er nøyaktig én. Det er
+    brukerens svar, ikke installasjonens: en konto med én portal har bare ett
+    sted å være, uansett hvor mange portaler som finnes.
+    """
+    if hasattr(user, BRUKER_ATTR):
+        return getattr(user, BRUKER_ATTR)
+    mulige = list(mulige_portaler(user)[:2])
+    return mulige[0] if len(mulige) == 1 else None

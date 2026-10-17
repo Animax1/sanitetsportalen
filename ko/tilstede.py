@@ -49,7 +49,11 @@ def _har_ko_tilgang_ider(bruker_ider):
             # skal kunne forberede modulen i kulissene.
             return set()
 
-    rader = ModulTilgang.objects.filter(modul_slug=SLUG, bruker_id__in=ider)
+    # Bare KO-rader i portalen sidebaren vises i (17. okt. 2026): en operatør
+    # i Landsskytter har ikke KO oppe i Brann.
+    from core.portal import gjeldende_portal
+    rader = ModulTilgang.objects.filter(modul_slug=SLUG, bruker_id__in=ider,
+                                        portaltilgang__portal=gjeldende_portal())
     # Samme sperre som `nivaa_for` (8. okt. 2026, FORSLAG_KO §5.2): en delt
     # konto når ikke KO, heller ikke med en rad fra før regelen.
     if not delt_konto_kan_bruke(SLUG):

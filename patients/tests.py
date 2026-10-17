@@ -22,7 +22,7 @@ from patients.services import (
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
 )
 from core.vakt import hent_aktiv_vakt, vakt_for_year
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang, gi_standardtilgang
 
 
 # ── Filtertester ──────────────────────────────────────────────────────────────
@@ -1982,7 +1982,7 @@ class JsModulLastingTests(TestCase):
             username='js_' + '_'.join(s for s, _ in tilganger),
             password='x', role='bruker', must_change_password=False)
         for slug, nivaa in tilganger:
-            ModulTilgang.objects.create(
+            gi_modultilgang(
                 bruker=bruker, modul_slug=slug, nivaa=nivaa)
         self.client.force_login(bruker)
         resp = self.client.get('/statistikk/')

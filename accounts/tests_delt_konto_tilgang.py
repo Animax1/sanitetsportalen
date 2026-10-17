@@ -25,6 +25,7 @@ from django.urls import reverse
 from accounts.models import CustomUser, ModulTilgang
 from core.auth_decorators import har_tilgang, nivaa_for
 from core.modules import get_all_modules
+from accounts.test_helpers import gi_modultilgang
 
 
 def _konto(navn, *, delt, role='bruker'):
@@ -35,8 +36,10 @@ def _konto(navn, *, delt, role='bruker'):
 
 def _rader_utenom_save(bruker, **nivaa_per_modul):
     """Som en importjobb, en migrasjon eller data fra før regelen."""
+    from accounts.test_helpers import medlemskap
+    tilgang = medlemskap(bruker)
     ModulTilgang.objects.bulk_create([
-        ModulTilgang(bruker=bruker, modul_slug=slug, nivaa=nivaa)
+        ModulTilgang(bruker=bruker, portaltilgang=tilgang, modul_slug=slug, nivaa=nivaa)
         for slug, nivaa in nivaa_per_modul.items()])
 
 
@@ -129,13 +132,13 @@ class DatalagetTests(TestCase):
     def test_save_nekter_en_delt_konto_andre_moduler(self):
         bil = _konto('bil5', delt=True)
         with self.assertRaises(ValidationError):
-            ModulTilgang.objects.create(bruker=bil, modul_slug='patients', nivaa='les')
+            gi_modultilgang(bruker=bil, modul_slug='patients', nivaa='les')
         self.assertFalse(ModulTilgang.objects.filter(bruker=bil, modul_slug='patients').exists())
-        ModulTilgang.objects.create(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
+        gi_modultilgang(bruker=bil, modul_slug='oppdrag', nivaa='skriv_handling')
 
     def test_save_lar_en_personlig_konto_vaere(self):
         person = _konto('lise', delt=False)
-        ModulTilgang.objects.create(bruker=person, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=person, modul_slug='patients', nivaa='les')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -181,7 +184,7 @@ class SkjemaeneTests(TestCase):
 
     def test_en_personlig_konto_med_pasienttilgang_kan_ikke_gjoeres_delt(self):
         person = _konto('nina', delt=False)
-        ModulTilgang.objects.create(bruker=person, modul_slug='patients', nivaa='les')
+        gi_modultilgang(bruker=person, modul_slug='patients', nivaa='les')
         svar = self._rediger(person, er_delt_konto='on', modul_patients='les')
         person.refresh_from_db()
         self.assertFalse(person.er_delt_konto)

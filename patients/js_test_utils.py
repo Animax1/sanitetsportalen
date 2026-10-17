@@ -147,7 +147,7 @@ def extract_function(source, name):
 #: En harness som henter `koNokkel` trenger hjelperen *og* en innlogget bruker — uten
 #: ID-en er nøkkelen `null`, og køen finnes ikke. Legg `INNLOGGET` i spec-en og sett
 #: `INNLOGGET_STUBB` foran harnessen.
-INNLOGGET = (PORTAL_UTILS_JS, ('brukerNokkel',))
+INNLOGGET = (PORTAL_UTILS_JS, ('brukerNokkel', 'sidensPortal'))
 INNLOGGET_STUBB = 'globalThis.PORTAL_BRUKER_ID = 7;\n'
 
 

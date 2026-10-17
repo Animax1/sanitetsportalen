@@ -25,6 +25,7 @@ from oppdrag.models import (
 )
 from oppdrag.statistikk import arkiv_stats, oppdrag_stats
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 AAR = 2098
 
@@ -522,7 +523,7 @@ class ArkivEndepunktTests(ArkivBasis):
     def _skriver(self):
         bruker = CustomUser.objects.create_user(
             username='skriver_arkiv', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
         return bruker
 

@@ -34,6 +34,7 @@ from patients.js_test_utils import (
     OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node,
 )
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 AAR = 2026
 NOTAT = 'Pasienten heter Kari, bor i Storgata 5'
@@ -65,7 +66,7 @@ class FristBasis(TestCase):
         self.bil2 = Enhet.objects.create(navn='Haugesund 57')
         self.operator = CustomUser.objects.create_user(
             username='ko_frist', password='x', must_change_password=False)
-        ModulTilgang.objects.create(bruker=self.operator, modul_slug='oppdrag', nivaa='skriv_full')
+        gi_modultilgang(bruker=self.operator, modul_slug='oppdrag', nivaa='skriv_full')
         self.klient = Client()
         self.klient.force_login(self.operator)
 

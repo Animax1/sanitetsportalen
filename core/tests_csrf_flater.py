@@ -38,6 +38,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 from accounts.models import CustomUser, ModulTilgang
 from oppdrag.models import Enhet, Lokasjon
 from core.models import AppSetting
+from accounts.test_helpers import gi_modultilgang
 
 
 def _maler():
@@ -163,7 +164,7 @@ class OppdragCsrfOppforselTests(TestCase):
         self.bruker = CustomUser.objects.create_user(
             username='sentralen', password='x', role='bruker',
             must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.bruker, modul_slug='oppdrag', nivaa='skriv_full')
 
     def _last(self):

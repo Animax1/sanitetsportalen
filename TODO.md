@@ -155,9 +155,12 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
       `Vakt.portal` er nullbar fordi backupfiler fra før portalene ikke har feltet: en
       gjenoppretting av en slik fil må fylle det inn (som `GAMLE_MODELLNAVN`) før kolonnen
       kan bli `NOT NULL`.
-- [ ] **Fase 2:** `Portaltilgang` (moderator/medlem), `ModulTilgang` på medlemskapet med `CASCADE`,
-      portalregelen (§4.4) og aktiv portal på brukerobjektet så de 56 `har_tilgang`-kallene står,
-      fanevakten (`X-Portal`, 409 ved bytte i en annen fane), portalen i offline-nøklene.
+- [ ] **Gjør `ModulTilgang.portaltilgang` påkrevd i basen** (etter fase 2, 17. okt. 2026). Den er
+      nullbar bare for release-vinduet og migrasjonen som fylte den; `save()` krever den alt.
+      Neste migrasjon på `accounts` kan sette `NOT NULL` når fase 2 har stått i prod.
+- [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
+      toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
+      i JS, og tas sammen med flatene i fase 5.
 - [ ] **Fase 3:** tilhørighet — `vaktliste.Korps` til `core` som felles katalog med typen
       `annet` (lege02), kontoens tilhørigheter, og admins utvalg per portal.
 - [ ] **Fase 4:** data per portal — `Mannskap.portal`, verdimengdene og de fem én-til-én-koblingene

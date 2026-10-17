@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
-from accounts.test_helpers import gi_standardtilgang
+from accounts.test_helpers import gi_modultilgang, gi_standardtilgang
 from core.tests_ratelimit import nok_til_a_bryte
 
 
@@ -369,7 +369,7 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_ingen_tilgang_sletter_raden(self):
         """Fravaer av rad *er* ingen tilgang - ingen 'ingen'-verdi lagres."""
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.target, modul_slug='patients', nivaa='les')
         self.client.post(self._detalj(), {
             'action': 'edit', 'role': 'bruker', 'is_active': 'on',
@@ -405,7 +405,7 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_uendret_matrise_gir_ingen_auditrader(self):
         from audit.models import AuditLog
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.target, modul_slug='patients', nivaa='les')
         self.client.post(self._detalj(), {
             'action': 'edit', 'role': 'bruker', 'is_active': 'on',
@@ -446,7 +446,7 @@ class ModulTilgangMatriseTests(TestCase):
         fjernet all modultilgang. Å trekke tilbake tilgang skal være et valg
         noen tar, ikke noe som skjer fordi et felt manglet.
         """
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.target, modul_slug='patients', nivaa='skriv_full')
         self.client.post(self._detalj(), {
             'action': 'edit', 'role': 'bruker', 'is_active': 'on',

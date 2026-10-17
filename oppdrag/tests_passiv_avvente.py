@@ -35,6 +35,7 @@ from .statistikk import passiv_timer_for
 from .models import (Enhet, Enhetshendelse, Enhetstype, Lokasjon, 
                      Vaktmodusperiode)
 from oppdrag.test_helpers import lag_oppdrag
+from accounts.test_helpers import gi_modultilgang
 
 AAR = 2026
 
@@ -61,7 +62,7 @@ class PassivBasis(TestCase):
 
         self.operator = CustomUser.objects.create_user(
             username='op_pv', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.operator, modul_slug='oppdrag', nivaa='skriv_full')
         self.klient = Client()
         self.klient.force_login(self.operator)
@@ -588,7 +589,7 @@ class FlaggeneKanKryssesAvTests(PassivBasis):
         self.dump = _json.dumps
         self.leder = CustomUser.objects.create_user(
             username='leder_pv', password='x', must_change_password=False)
-        ModulTilgang.objects.create(
+        gi_modultilgang(
             bruker=self.leder, modul_slug='oppdrag', nivaa='skriv_leder')
         self.lederklient = Client()
         self.lederklient.force_login(self.leder)

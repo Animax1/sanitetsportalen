@@ -17,6 +17,7 @@ import re
 from django.test import SimpleTestCase, TestCase
 
 from accounts.models import CustomUser, ModulTilgang
+from accounts.test_helpers import gi_modultilgang
 from oppdrag import tests_bilen_dobbelttrykk as bilen
 from patients.js_test_utils import (
     INNLOGGET, PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node,
@@ -131,7 +132,7 @@ class BrukerIdenSettesPaaSidenTests(TestCase):
     def test_vaktlista_faar_id_en_foer_koskriptet(self):
         bruker = CustomUser.objects.create_user(
             username='forer', password='pwd', role='bruker', must_change_password=False)
-        ModulTilgang.objects.create(bruker=bruker, modul_slug='vaktliste', nivaa='les_alle')
+        gi_modultilgang(bruker=bruker, modul_slug='vaktliste', nivaa='les_alle')
         self.client.force_login(bruker)
         html = self.client.get('/vaktliste/').content.decode()
         treff = re.search(r'window\.PORTAL_BRUKER_ID = (\d+);', html)

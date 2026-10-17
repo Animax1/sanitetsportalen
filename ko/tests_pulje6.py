@@ -18,6 +18,7 @@ from core.vakt import hent_aktiv_vakt
 from ko import services
 from ko.models import Ansvarsmerke, Logglinje
 from ko.tilstede import tilstede
+from accounts.test_helpers import gi_modultilgang_oppdater
 
 
 def _bruker(navn, **kwargs):
@@ -26,7 +27,7 @@ def _bruker(navn, **kwargs):
 
 
 def _gi(bruker, modul, nivaa):
-    ModulTilgang.objects.update_or_create(
+    gi_modultilgang_oppdater(
         bruker=bruker, modul_slug=modul, defaults={'nivaa': nivaa})
     return bruker
 

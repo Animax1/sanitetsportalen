@@ -32,6 +32,7 @@ from patients.js_test_utils import (
     run_node)
 
 from .tests_views import StemplingBasis, _bruker, _klient
+from accounts.test_helpers import gi_modultilgang
 
 KART_PAA = dict(KART_URL='https://kart.example.no', KART_HMAC_NOKKEL='k' * 64)
 
@@ -232,8 +233,8 @@ class EnhetskortetBaererTilstandenTests(StemplingBasis):
         """Kortet gater på `OPPDRAG_KART_KOBLING` — både /oppdrag/ og /ko/."""
         from accounts.models import ModulTilgang
         b = _bruker('sentral-pg', 'les')
-        ModulTilgang.objects.create(bruker=b, modul_slug='ko', nivaa='les')
-        ModulTilgang.objects.create(bruker=b, modul_slug='vaktliste', nivaa='les')
+        gi_modultilgang(bruker=b, modul_slug='ko', nivaa='les')
+        gi_modultilgang(bruker=b, modul_slug='vaktliste', nivaa='les')
         c = _klient(b)
         with override_settings(**KART_PAA):
             self.assertIn('window.OPPDRAG_KART_KOBLING = true;', c.get('/oppdrag/').content.decode())
