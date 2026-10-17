@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — «SSL connection has been closed unexpectedly» på `/api/varsler/ulest-antall/`: en gjenbrukt databasetilkobling som var kuttet  `#core/drift`
+
+E-postvarsel fra staging 20:54: `OperationalError: SSL connection has been closed unexpectedly`
+på bjellas polling, i sesjonsoppslaget i middlewaren — før viewet og før brukeren var kjent.
+**Ikke fase 4b** (den gikk ut 30 minutter før, og rørte verken bjella eller tilkoblingen).
+
+**Årsaken:** `conn_max_age=600` gjenbruker en tilkobling i opptil ti minutter, og uten
+`conn_health_checks` sjekker ikke Django at den lever før den brukes. Kuttes den i mellomtiden —
+Postgres starter på nytt, eller nettet mellom tjenestene slipper en ledig tilkobling — går den
+første spørringen i neste forespørsel rett i veggen. Bjella poller hvert 30. sekund, så det var den
+som traff. **Rettingen:** `conn_health_checks=True` i `myproject/settings.py`. Django prøver da en
+gjenbrukt tilkobling én gang per forespørsel og åpner en ny om den er død. Gjenbruken (og dermed
+sparte oppkoblinger) står.
+
+`GjenbruktTilkoblingSjekkesTests` i `myproject/tests_database_config.py` krever de to sammen.
+Mutant: flagget fjernet — drept.
+
 ## 2026-10-17 — Portaler fase 4b: førstehjelperne, helsepersonellet og lokasjonene per portal, «mine pasienter» per portal, og gjenopprettingen som ville stoppet i en tom base  `#core/tilgang` `#core/backup` `#oppdrag/sentralbord`
 
 Andre del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.12: «sted og person per portal, fag

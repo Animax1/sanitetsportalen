@@ -157,10 +157,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # ── Database ─────────────────────────────────────────────────────────────────
+# **`conn_health_checks` hører sammen med `conn_max_age`** (17. okt. 2026).
+# En tilkobling gjenbrukes i opptil ti minutter, og blir den kuttet i mellomtiden
+# — Postgres starter på nytt, Railways nett slipper en ledig tilkobling — fikk
+# neste forespørsel 500 med «SSL connection has been closed unexpectedly»: den
+# første spørringen (sesjonen, i middlewaren) gikk på en død tilkobling. Med
+# sjekken prøver Django tilkoblingen før gjenbruk i hver ny forespørsel, og
+# åpner en ny om den er borte. Prisen er én `SELECT 1` når tilkoblingen alt har
+# stått gjennom en forespørsel — ikke per spørring.
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
         conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 

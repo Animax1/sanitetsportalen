@@ -138,3 +138,17 @@ class KlientIpBakProxyStandardTests(SimpleTestCase):
         s = self._last_uten(RAILWAY_ENVIRONMENT='staging', KLIENTIP_BAK_PROXY='false',
                             DATABASE_URL='postgres://u:p@localhost/db')
         self.assertFalse(s.KLIENTIP_BAK_PROXY)
+
+
+class GjenbruktTilkoblingSjekkesTests(SimpleTestCase):
+    """«SSL connection has been closed unexpectedly» (17. okt. 2026, staging).
+
+    `conn_max_age` uten `conn_health_checks` gjenbruker en tilkobling serveren
+    har kuttet, og forespørselen får 500. De to står eller faller sammen.
+    """
+
+    def test_tilkoblingen_som_gjenbrukes_sjekkes_foerst(self):
+        from django.conf import settings
+        db = settings.DATABASES['default']
+        self.assertGreater(db['CONN_MAX_AGE'], 0, 'gjenbruk er grunnen til at sjekken trengs')
+        self.assertIs(db['CONN_HEALTH_CHECKS'], True)
