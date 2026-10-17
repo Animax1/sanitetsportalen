@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from django.db import transaction
 from django.http import JsonResponse
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
@@ -58,12 +59,24 @@ def drift_view(request, pk, tilstand):
     except Vaktliste.DoesNotExist:
         return json_feil('Vaktliste ikke funnet', status=404)
 
-    utsending = None
-    if tilstand == 'start' and vl.arkivert_at is not None:
+    if tilstand == 'stopp':
+        vl.status = choices.PLANLEGGING
+        vl.save(update_fields=['status', 'updated_at'])
+        return _svar(request, vl, None)
+
+    if vl.arkivert_at is not None:
         # Samme sperre motsatt vei (A6): en arkivert liste er ute av velgeren.
         return json_feil('Listen er arkivert. Hent den tilbake før den settes i drift.',
-                     status=409)
-    if tilstand == 'start':
+                         status=409)
+    with transaction.atomic():
+        # **Én vaktliste i drift per portal** (`vaktdrift.annen_i_drift`). Portalen
+        # låses først, så to trykk på to ulike lister ikke begge slipper gjennom.
+        vaktdrift.laas_portalen(vl)
+        annen = vaktdrift.annen_i_drift(vl)
+        if annen is not None:
+            return json_feil(
+                f'«{annen.vakt.navn}» står alt i drift. Det kan bare være én vaktliste '
+                f'i drift om gangen — ta den ut av drift først.', status=409)
         vl.status = choices.DRIFT
         # Tidspunktet settes kun ved åpning, og beholdes ved en senere
         # stenging: «i drift siden 08:04» skal fortsatt kunne leses etterpå.
@@ -73,16 +86,17 @@ def drift_view(request, pk, tilstand):
         vl.drift_automatisk = False
         vl.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
                                'drift_automatisk', 'updated_at'])
-        # **Reserven sendes ved vaktstart** (12. sep. 2026) når admin har
-        # slått det på og satt mottakere. Etter at drift er lagret, og aldri
-        # som en sperre: en e-posttjeneste som er nede skal ikke hindre at
-        # innsjekken åpner. `send_fil` kaster ikke; svaret bærer resultatet.
-        if fil.sendes_ved_drift() and fil.mottakere():
-            utsending = fil.send_fil(vl, bruker=request.user, utloest=Utsending.DRIFT)
-    else:
-        vl.status = choices.PLANLEGGING
-        vl.save(update_fields=['status', 'updated_at'])
+    # **Reserven sendes ved vaktstart** (12. sep. 2026) når admin har slått det
+    # på og satt mottakere. Etter at drift er lagret, og aldri som en sperre: en
+    # e-posttjeneste som er nede skal ikke hindre at innsjekken åpner.
+    # `send_fil` kaster ikke; svaret bærer resultatet.
+    utsending = None
+    if fil.sendes_ved_drift() and fil.mottakere():
+        utsending = fil.send_fil(vl, bruker=request.user, utloest=Utsending.DRIFT)
+    return _svar(request, vl, utsending)
 
+
+def _svar(request, vl, utsending):
     data = _vaktliste_til_dict(vl, request.user)
     data['utsending'] = fil.utsending_til_dict(utsending)
     return JsonResponse({'status': 'ok', 'data': data})

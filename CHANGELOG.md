@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Én vaktliste i drift per portal: «jeg kan ikke forflytte lag i tavlen», og portalvakten som skjulte grunnen  `#vaktliste/tilgang` `#core/tilgang`
+
+André: «Jeg kan ikke forflytte lag i tavlen på mobil eller pc.» Og så selv: «i /vaktliste så var det
+2 vaktlister i drift samtidig hvor den nyeste tok kontroll og lot meg ikke flytte på de i tavlen som
+var fra den andre vaktlisten». En annen tester hadde laget og satt en ny liste i drift. **Ikke en
+følge av portalfasene** — regelen «flere kan stå i drift, den sist satte vinner»
+(`vaktdrift.vaktliste_i_bruk`) var gammel. Lokalt, med én liste i drift, flyttet både klikk og dra
+for KO-bruker og global admin (Playwright mot PostgreSQL, bygg `2c42bc7`).
+
+**Regelen er nå én vaktliste i drift per portal** (André: «det er bare en vaktliste per portal som
+er tanken»). `vaktdrift.annen_i_drift(vl)` finner en annen liste i drift i samme portal (arkiverte
+teller ikke, som før). Den sperrer begge inngangene:
+- **Knappen** («Sett i drift», `drift_view`) svarer 409: «‹vakt› står alt i drift. Det kan bare være
+  én vaktliste i drift om gangen — ta den ut av drift først.»
+- **Klokka** (`sett_i_drift_ved_start`) venter og prøver neste minutt — den tar ikke over en liste
+  noen har satt i drift for hånd.
+
+Begge låser **portalraden** (`vaktdrift.laas_portalen`) før sjekken, så to trykk på to ulike lister
+ikke begge slipper gjennom. E-posten ved drift sendes fortsatt etter at drift er lagret, utenfor
+transaksjonen. **Lister som alt står i drift røres ikke** — står to i drift på staging nå, må den ene
+tas ut for hånd.
+
+**Og grunnen ble borte på veien.** Portalvakten (`core/portal_middleware.py`) svarte `{'error': …}`,
+mens KO, oppdrag og vaktlista leser `message` (`core.jsonkropp.json_feil`): en 403 eller 409 derfra
+ble på tavla til «Kunne ikke flytte.». Svarene bærer nå begge nøklene (`_json_feil()`).
+
+**Tester:** seks i `EnListeIDriftPerPortalTests` (avvist, etter stopp, samme liste igjen, arkivert,
+annen portal, klokka med motprøve) og `message` i `core/tests_portaltilgang.py`. **Mutasjoner: 5,
+alle drept** — sjekken i viewet, sjekken i klokka, portalfilteret, `exclude(pk)` og `message` i
+portalvakten. Låsen er ikke mutert: den viser seg bare ved to samtidige forespørsler.
+
 ## 2026-10-17 — «SSL connection has been closed unexpectedly» på `/api/varsler/ulest-antall/`: en gjenbrukt databasetilkobling som var kuttet  `#core/drift`
 
 E-postvarsel fra staging 20:54: `OperationalError: SSL connection has been closed unexpectedly`

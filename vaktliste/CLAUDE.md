@@ -353,8 +353,8 @@ begge veier og rører ingen stempler.
   former.
 - **Klokka setter lista i drift ved vaktas start; knappen er overstyringen** (30. sep.
   2026). Reglene: `vaktdrift.skal_settes_i_drift()` — én gang, bare lister planlagt i
-  forveien, aldri stenging. Går i `FilutsendingMiddleware` og i viewene; auditraden
-  skrives `uten_request()`, og `drift_automatisk` sier at det var klokka.
+  forveien, aldri stenging; `FilutsendingMiddleware` og viewene, `drift_automatisk`.
+  **Én liste i drift per portal** (17. okt.): `annen_i_drift()` stopper begge (409).
 - **«Sett i drift» bor i «Innstillinger»** (12. sep. 2026), i bolken for én liste,
   og tegnes av `tegnDriftknapp()` både ved lasting og når vinduet åpnes. Statusmerket
   i vaktlinja (`tegnStatus`, `.vl-status.vl-drift`/`.vl-planlegging`) sier formen med

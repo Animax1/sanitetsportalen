@@ -73,6 +73,8 @@ class PortalregelenTests(PortalBasis):
         svar = self._klient(b).get('/oppdrag/api/oppdrag/')
         self.assertEqual(svar.status_code, 409)
         self.assertTrue(svar.json()['velg_portal'])
+        # Begge nøklene: KO og oppdrag leser `message`, pasientsiden `error`.
+        self.assertEqual(svar.json()['message'], svar.json()['error'])
 
     def test_valget_gjelder_og_kan_byttes(self):
         b = _bruker('ola')
@@ -119,7 +121,9 @@ class PortalregelenTests(PortalBasis):
         svar = self._klient(b).get('/oppdrag/')
         self.assertEqual(svar.status_code, 403)
         self.assertContains(svar, 'ikke med i noen portal', status_code=403)
-        self.assertEqual(self._klient(b).get('/oppdrag/api/oppdrag/').status_code, 403)
+        api = self._klient(b).get('/oppdrag/api/oppdrag/')
+        self.assertEqual(api.status_code, 403)
+        self.assertIn('ikke med i noen portal', api.json()['message'])
 
     def test_stier_utenfor_portalen_virker_uten_valg(self):
         b = _bruker('ola')
@@ -183,6 +187,7 @@ class FanevaktenTests(PortalBasis):
         svar = self._ny_pasient(**{'X-Portal': 'standard'})
         self.assertEqual(svar.status_code, 409)
         self.assertTrue(svar.json()['portal_byttet'])
+        self.assertIn('Last siden på nytt', svar.json()['message'])
         self.assertFalse(Patient.objects.exists())
 
     def test_riktig_portal_i_hodet_skriver(self):

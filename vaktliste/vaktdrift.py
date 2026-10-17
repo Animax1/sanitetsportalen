@@ -78,6 +78,33 @@ def autodrift_tidspunkt(vl):
     return start if skal_settes_i_drift(vl, max(start, timezone.now())) else None
 
 
+def laas_portalen(vl) -> None:
+    """Lås portalraden til `vl` til transaksjonen er ferdig.
+
+    **Det er portalen som låses, ikke lista**: regelen under gjelder alle
+    listene i portalen, og to trykk på to *ulike* lister ville ellers begge
+    sett «ingen andre i drift» og begge gått inn. Kalles inne i en
+    `transaction.atomic()`.
+    """
+    from core.models import Vaktportal
+    if vl.vakt.portal_id is not None:
+        Vaktportal.objects.select_for_update().filter(pk=vl.vakt.portal_id).first()
+
+
+def annen_i_drift(vl):
+    """En **annen** vaktliste i drift i samme portal som `vl`, eller ``None``.
+
+    **Én vaktliste i drift per portal** (André, 17. okt. 2026: «det er bare en
+    vaktliste per portal som er tanken»). Med to i drift var tavla i `/ko/`
+    tvetydig: `vaktliste_i_bruk()` lot den sist satte vinne, så lagene fra den
+    andre sto på tavla uten å kunne flyttes — «jeg kan ikke forflytte lag i
+    tavlen». Sperren står ved inngangen (knappen og klokka), ikke i leserne.
+    """
+    return (lister_i_drift().filter(vakt__portal_id=vl.vakt.portal_id)
+            .exclude(pk=vl.pk).select_related('vakt')
+            .order_by('-satt_i_drift_at', '-pk').first())
+
+
 def sett_i_drift_ved_start(vl, naa=None) -> bool:
     """Sett én liste i drift hvis tiden er kommet. Returnerer True om klokka
     gjorde det — da er `vl` sin rad endret, og kalleren må lese den på nytt.
@@ -99,9 +126,14 @@ def sett_i_drift_ved_start(vl, naa=None) -> bool:
 
     naa = naa or timezone.now()
     with transaction.atomic():
+        laas_portalen(vl)
         laast = (Vaktliste.objects.select_for_update()
                  .select_related('vakt').filter(pk=vl.pk).first())
         if laast is None or not skal_settes_i_drift(laast, naa):
+            return False
+        # Står en annen alt i drift, venter klokka: den tar ikke over en liste
+        # noen har satt i drift for hånd, og prøver igjen neste minutt.
+        if annen_i_drift(laast) is not None:
             return False
         laast.status = choices.DRIFT
         laast.satt_i_drift_at = naa

@@ -165,7 +165,8 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
       og park (`Parklenke` bærer portalen). `SkjultSted` fikk veien gjennom lokasjonen i 4b.
 - [ ] **Fase 4d:** `Vakt.navn` unik per portal, `Notification.portal`, endringsnumrene med portal i
       nøkkelen, `AppSetting`-nøklene sortert i system og portal (§4.7), portalfilter i statistikk
-      og arkiv, og søk på tvers for innsyn og sletting (§4.5). `VENTER` i
+      og arkiv, og søk på tvers for innsyn og sletting (§4.5). `vaktdrift.lister_i_drift()` og
+      `vaktliste_i_bruk()` per portal — sperren ved «Sett i drift» er alt per portal (17. okt.). `VENTER` i
       `core/tests_portalisolasjon.py` er tom når 4d er levert.
 - [ ] **Fase 5:** flatene — «Ny portal», moduler og tak, moderatorens brukere og tilgang,
       «Avslutt vakt» til moderator, «Sist innlogget» og filtrene «Uten portal»/«Inaktiv 12 mnd»,

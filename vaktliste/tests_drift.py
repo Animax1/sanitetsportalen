@@ -24,7 +24,7 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 
 from . import choices, services
-from .models import Vaktpost
+from .models import Vaktliste, Vaktpost
 from .tests_tilgang import TilgangsBasis
 
 
@@ -252,3 +252,64 @@ class StemplingsreglerTests(SimpleTestCase):
             with self.subTest(handling=navn):
                 self.assertTrue(regel['nekt'].strip(),
                                 f'{navn} avviser uten forklaring')
+
+
+class EnListeIDriftPerPortalTests(TilgangsBasis):
+    """«Det er bare en vaktliste per portal som er tanken» (André, 17. okt. 2026).
+
+    To lister i drift gjorde tavla i `/ko/` tvetydig: den sist satte vant, og
+    lagene fra den andre sto der uten å kunne flyttes."""
+
+    def setUp(self):
+        super().setUp()
+        self.andre = services.opprett_planlagt_vakt('Andre vakta')
+
+    def _sett(self, vl, tilstand):
+        return self.c_vl.post(f'/vaktliste/api/vaktlister/{vl.pk}/drift/{tilstand}/')
+
+    def test_den_andre_avvises_mens_den_forste_er_i_drift(self):
+        self.assertEqual(200, self._sett(self.vl, 'start').status_code)
+        svar = self._sett(self.andre, 'start')
+        self.assertEqual(409, svar.status_code)
+        self.assertIn('Vakta', svar.json()['message'])
+        self.andre.refresh_from_db()
+        self.assertEqual(choices.PLANLEGGING, self.andre.status)
+
+    def test_etter_stopp_kan_den_andre(self):
+        self._sett(self.vl, 'start')
+        self._sett(self.vl, 'stopp')
+        self.assertEqual(200, self._sett(self.andre, 'start').status_code)
+
+    def test_samme_liste_igjen_er_ingen_konflikt(self):
+        self._sett(self.vl, 'start')
+        self.assertEqual(200, self._sett(self.vl, 'start').status_code)
+
+    def test_en_arkivert_liste_i_drift_teller_ikke(self):
+        self._sett(self.vl, 'start')
+        Vaktliste.objects.filter(pk=self.vl.pk).update(arkivert_at=timezone.now())
+        self.assertEqual(200, self._sett(self.andre, 'start').status_code)
+
+    def test_en_liste_i_en_annen_portal_teller_ikke(self):
+        from core.models import Vakt, Vaktportal
+        brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        Vakt.objects.filter(pk=self.andre.vakt_id).update(portal=brann)
+        self._sett(self.vl, 'start')
+        self.assertEqual(200, self._sett(self.andre, 'start').status_code)
+
+    def test_klokka_venter_mens_en_annen_er_i_drift(self):
+        from . import vaktdrift
+        naa = timezone.now()
+        auto = services.opprett_planlagt_vakt(
+            'Autovakta', startet=naa + timedelta(hours=1),
+            planlagt_slutt=naa + timedelta(hours=9))
+        Vaktliste.objects.filter(pk=auto.pk).update(
+            created_at=auto.vakt.startet - timedelta(hours=2))
+        auto.refresh_from_db()
+        etter_start = auto.vakt.startet + timedelta(minutes=1)
+        self._sett(self.vl, 'start')
+        self.assertFalse(vaktdrift.sett_i_drift_ved_start(auto, etter_start))
+        auto.refresh_from_db()
+        self.assertEqual(choices.PLANLEGGING, auto.status)
+        # Motprøve: når den andre er ute av drift, går klokka.
+        self._sett(self.vl, 'stopp')
+        self.assertTrue(vaktdrift.sett_i_drift_ved_start(auto, etter_start))

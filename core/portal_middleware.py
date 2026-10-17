@@ -50,6 +50,14 @@ UTENFOR_PORTAL = (
 SKRIVENDE = frozenset({'POST', 'PUT', 'PATCH', 'DELETE'})
 
 
+def _json_feil(melding: str, status: int, **ekstra) -> JsonResponse:
+    """Svaret begge klientfamiliene leser: `message` (`core.jsonkropp.json_feil`,
+    oppdrag, KO, vaktlista) og `error` (pasientsiden). Med bare `error` viste
+    tavla «Kunne ikke flytte.» og grunnen forsvant (17. okt. 2026)."""
+    return JsonResponse({'status': 'error', 'message': melding, 'error': melding, **ekstra},
+                        status=status)
+
+
 def _vil_ha_json(request) -> bool:
     return ('/api/' in request.path
             or 'application/json' in request.headers.get('Accept', '')
@@ -106,27 +114,21 @@ class PortalMiddleware:
                 melding = ('Kontoen din er ikke med i noen portal. '
                            'Be en administrator eller moderator om tilgang.')
                 if _vil_ha_json(request):
-                    return JsonResponse({'error': melding}, status=403)
+                    return _json_feil(melding, 403)
                 return render(request, 'core/ingen_portal.html', {'melding': melding},
                               status=403)
             if _vil_ha_json(request):
-                return JsonResponse({'error': 'Velg portal først.', 'velg_portal': True},
-                                    status=409)
+                return _json_feil('Velg portal først.', 409, velg_portal=True)
             return redirect(reverse('core:portal_velg') + '?' + urlencode(
                 {'neste': request.get_full_path()}))
 
         fanens = _fanens_portal(request, flere=len(mulige) > 1)
         if fanens is not None and fanens != portal.slug:
-            return JsonResponse({
-                'error': f'Du byttet til portalen «{portal.navn}» i en annen fane. '
-                         f'Last siden på nytt før du fortsetter.',
-                'portal_byttet': True,
-            }, status=409)
+            return _json_feil(f'Du byttet til portalen «{portal.navn}» i en annen fane. '
+                              f'Last siden på nytt før du fortsetter.', 409, portal_byttet=True)
         if fanens is None and request.method in SKRIVENDE and len(mulige) > 1:
-            return JsonResponse({
-                'error': 'Siden sa ikke hvilken portal den gjelder. Last den på nytt.',
-                'portal_byttet': True,
-            }, status=409)
+            return _json_feil('Siden sa ikke hvilken portal den gjelder. Last den på nytt.', 409,
+                              portal_byttet=True)
 
         setattr(user, BRUKER_ATTR, portal)
         request.portal = portal
