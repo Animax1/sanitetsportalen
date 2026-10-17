@@ -206,7 +206,7 @@ class GjenopprettKommandoTests(TestCase):
         klient.force_login(admin)
         for_ = AuditLog.objects.filter(field_name='restore').count()
         with self.miljo:
-            klient.post(f'/portal-admin/backup/patients/restore/{backup.pk}/',
+            klient.post(f'/admin/backup/patients/restore/{backup.pk}/',
                         data={'confirm_slug': 'patients'})
 
         rader = AuditLog.objects.filter(field_name='restore')

@@ -138,7 +138,7 @@ Bilenes posisjon ved stempling og lagenes sted sendes til kartet
 **Egen nøkkel per miljø** (B14): staging-portalen skal aldri kunne tegne i prod-kartet.
 Nøkkelen skal også i korpsets passordbehandler. Rotasjon: den gamle settes i
 `PORTAL_HMAC_NOKKEL_FORRIGE` i kartet, den nye i begge, og `_FORRIGE` tømmes etter en dag.
-Siste sending, og om den gikk, står på `/portal-admin/server-status/`.
+Siste sending, og om den gikk, står på `/admin/server-status/`.
 
 ## 3. Første deploy og verifisering
 
@@ -216,7 +216,7 @@ inneholder. Testsuiten svarer på om koden virker; denne på om innholdet gjør 
 ### Klokka er en tråd, ikke en cron-jobb
 
 Automatisk backup styres av `core.Backupplan` – tre moduser (`av`, `ved_endring`,
-`alltid`) og fritt intervall, satt per modul på `/portal-admin/backup/`.
+`alltid`) og fritt intervall, satt per modul på `/admin/backup/`.
 
 Klokka (`core/backup/klokke.py`) er en **tråd i web-prosessen**, fordi volumet bare kan
 henge på web-tjenesten. En cron-tjeneste som tok backup ville skrevet fila til sitt eget
@@ -251,7 +251,7 @@ kryptert søppel.
 
 Uten variablene er modulen **inert**: ingen feil, ingen forsøk. Staging og lokal utvikling
 har ingen offsite-backup, med vilje. Hvilke variabler som mangler står på
-`/portal-admin/backup/`.
+`/admin/backup/`.
 
 ### Oppbevaringstider håndheves av Scaleway, ikke av portalen
 
@@ -263,7 +263,7 @@ prefiksene:
 | `backups/` | 730 dager (modulfilene) |
 | `full/` | 90 dager (hele databasen) |
 
-Portalen leser reglene *tilbake* fra bucketen og viser avvik på `/portal-admin/backup/`.
+Portalen leser reglene *tilbake* fra bucketen og viser avvik på `/admin/backup/`.
 `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid som
 stille ble uendelig.
 
@@ -288,7 +288,7 @@ størrelse.
 feiler ikke. Begge manglet den i første oppsett.
 
 Begge rører bare databasen og trenger derfor ikke volumet. Siste kjøring vises på
-`/portal-admin/server-status/`, og «Aldri» betyr at jobben ikke har kjørt én eneste gang.
+`/admin/server-status/`, og «Aldri» betyr at jobben ikke har kjørt én eneste gang.
 
 Tørrkjør før første skarpe kjøring: `python manage.py kollaps_arkiv --dry-run`.
 
@@ -431,7 +431,7 @@ Oppdater `CSRF_TRUSTED_ORIGINS` med `https://` + domenet.
 mount path `/data`, og at `BACKUP_DIR=/data/backups`.
 
 ### Offsite-backup skjer ikke
-`/portal-admin/backup/` lister hvilke `OFFSITE_*`-variabler som mangler. Er ingen satt, er
+`/admin/backup/` lister hvilke `OFFSITE_*`-variabler som mangler. Er ingen satt, er
 modulen inert med vilje – det er normalt på staging.
 
 ### `Static files mangler (CSS/JS ikke lastet)`

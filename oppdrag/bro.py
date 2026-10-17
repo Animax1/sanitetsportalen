@@ -19,7 +19,7 @@ Derfor tre ting, hver for sin leser:
 
 - **En teller i `AppSetting`** (`oppdrag.bro.<navn>`: antall, første, siste,
   oppdraget) — overlever omstart og loggrotering, og vises på
-  `/portal-admin/server-status/` (`oppdrag/driftstatus.py`). Unntatt audit:
+  `/admin/server-status/` (`oppdrag/driftstatus.py`). Unntatt audit:
   det er maskinen som teller (`core.signals.NOKLER_UTEN_AUDIT`).
 - **En `warning` i loggen**, for tidspunktet og oppdraget om vi må grave.
 - **Et unntak under `manage.py test`** (`settings.OPPDRAG_BRO_KASTER`). En test

@@ -265,18 +265,18 @@ class PortalinnstillingeneTests(FilBasis):
         self.kropp = {'event_name': self.vl.vakt.navn, 'session_timeout_hours': '8'}
 
     def test_mottakere_og_bryter_lagres(self):
-        res = self.adm.post('/portal-admin/innstillinger/', {
+        res = self.adm.post('/admin/innstillinger/', {
             **self.kropp, 'vaktliste_fil_mottakere': 'x@example.org\n y@example.org '})
         self.assertEqual(res.status_code, 302, res.content)
         self.assertEqual(fil.mottakere(), ['x@example.org', 'y@example.org'])
         self.assertFalse(fil.sendes_ved_drift(), 'avkryssingen manglet: av')
-        self.adm.post('/portal-admin/innstillinger/', {
+        self.adm.post('/admin/innstillinger/', {
             **self.kropp, 'vaktliste_fil_mottakere': '', 'vaktliste_fil_ved_drift': '1'})
         self.assertEqual(fil.mottakere(), [])
         self.assertTrue(fil.sendes_ved_drift())
 
     def test_ugyldig_adresse_avvises_uten_aa_lagre_halve_skjemaet(self):
-        res = self.adm.post('/portal-admin/innstillinger/', {
+        res = self.adm.post('/admin/innstillinger/', {
             **self.kropp, 'session_timeout_hours': '5',
             'vaktliste_fil_mottakere': 'x@example.org\nikke en adresse'})
         self.assertEqual(res.status_code, 200)
@@ -285,7 +285,7 @@ class PortalinnstillingeneTests(FilBasis):
         self.assertEqual(AppSetting.get('session_timeout_hours', '8'), '8', 'timeouten heller ikke')
 
     def test_siden_viser_det_som_er_satt(self):
-        html = self.adm.get('/portal-admin/innstillinger/').content.decode()
+        html = self.adm.get('/admin/innstillinger/').content.decode()
         self.assertIn('vaktleder@example.org\nko@example.org', html)
         self.assertIn('id="vaktliste_fil_ved_drift"', html)
         self.assertIn('checked', html)
@@ -493,12 +493,12 @@ class IntervallInnstillingeneTests(FilBasis):
                       'vaktliste_fil_mottakere': 'x@example.org'}
 
     def test_intervall_og_bryter_lagres(self):
-        res = self.adm.post('/portal-admin/innstillinger/', {
+        res = self.adm.post('/admin/innstillinger/', {
             **self.kropp, 'vaktliste_fil_intervall_min': '5', 'vaktliste_fil_bare_endret': '1'})
         self.assertEqual(res.status_code, 302, res.content)
         self.assertEqual(fil.intervall_minutter(), 5)
         self.assertTrue(fil.bare_ved_endring())
-        res = self.adm.post('/portal-admin/innstillinger/', {**self.kropp, 'vaktliste_fil_intervall_min': ''})
+        res = self.adm.post('/admin/innstillinger/', {**self.kropp, 'vaktliste_fil_intervall_min': ''})
         self.assertEqual(res.status_code, 302)
         self.assertEqual(fil.intervall_minutter(), 0, 'tomt = av')
         self.assertFalse(fil.bare_ved_endring())
@@ -507,7 +507,7 @@ class IntervallInnstillingeneTests(FilBasis):
         AppSetting.set(fil.INTERVALL_NOKKEL, '5')
         for verdi in ('-1', 'fem', '9999'):
             with self.subTest(verdi=verdi):
-                res = self.adm.post('/portal-admin/innstillinger/', {
+                res = self.adm.post('/admin/innstillinger/', {
                     **self.kropp, 'session_timeout_hours': '3', 'vaktliste_fil_intervall_min': verdi})
                 self.assertEqual(res.status_code, 200)
                 self.assertEqual(fil.intervall_minutter(), 5)

@@ -29,7 +29,7 @@ systemhendelser løftes inn **kuratert, ikke automatisk**.
 | Lokasjoner, enhetstyper, problemstillinger opprettet/omdøpt/deaktivert | Oppsett, ikke situasjon (regel 1) |
 | Feltendringer på oppdraget — fritekst rettet, problemstilling byttet | `audit/` gjør dette på feltnivå. En logg som får en linje hver gang noen retter en skrivefeil, slutter å bli lest |
 | Innlogging, utlogging, sesjoner, MFA | Sikkerhet, ikke situasjon. Sidebaren svarer alt på hvem som har KO oppe |
-| Modul av/på, portalinnstillinger, backup, gjenoppretting | Drift. Står i `audit/` og på `/portal-admin/server-status/` |
+| Modul av/på, portalinnstillinger, backup, gjenoppretting | Drift. Står i `audit/` og på `/admin/server-status/` |
 | Pasientregistreringer | Krysser registergrensen (§9.7). Loggen skal ikke bli en del av pasientjournalen |
 | Vaktlistas stemplinger inn/ut | **Grensesaken, og svaret er «ikke nå».** «Lag 3 gikk av vakt» er ekte situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet loggen ved hvert vaktskifte. Tas opp i pulje 4, der lag-begrepet får et hjem — og da som ressursen, ikke som personen |
 

@@ -66,7 +66,7 @@ class HandlingeneGjennomViewetTests(TestCase):
             email='kari@example.com', fullt_navn='Kari Nordmann')
         self.c = Client()
         self.c.force_login(self.admin)
-        self.url = f'/portal-admin/brukere/{self.offer.pk}/'
+        self.url = f'/admin/brukere/{self.offer.pk}/'
 
     def test_to_konto(self):
         self.offer.is_active = False

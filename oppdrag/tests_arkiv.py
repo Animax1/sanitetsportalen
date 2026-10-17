@@ -529,7 +529,7 @@ class ArkivEndepunktTests(ArkivBasis):
 
     def test_arkivering_skjer_ved_avslutning_ikke_her(self):
         """POST — «arkiver den aktive vakta» — er slettet 28. sep. 2026: «Avslutt
-        vakt» på /portal-admin/vakt/ arkiverer oppdragene med resten."""
+        vakt» på /admin/vakt/ arkiverer oppdragene med resten."""
         self._full_vakt()
         resp = self._klient(self.admin).post(
             '/oppdrag/api/arkiv/', data=json.dumps({}), content_type='application/json')

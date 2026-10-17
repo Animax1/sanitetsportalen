@@ -30,7 +30,7 @@ UNNTAK = {
     'api_arkiv_full_stats_gammel_sti':
         'ren videresending til /statistikk/api/kilde/patients/, som er gatet',
     'legacy_server_status_redirect':
-        'ren videresending til /portal-admin/server-status/, som er admin-gatet',
+        'ren videresending til /admin/server-status/, som er admin-gatet',
     # Service workeren for offline drift (13. sep. 2026): serverer én statisk
     # JS-fil uten data. Uten innlogging med vilje — en utgått sesjon skal
     # ikke gi en worker som er innloggingssiden.

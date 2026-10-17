@@ -135,7 +135,7 @@ class CsvFormelTests(TestCase):
         AuditLog.objects.create(table_name='patients_patient', record_id=1, action='UPDATE',
                                 field_name='arsak', old_value='=cmd|calc', new_value='Kari')
         c = Client(); c.force_login(adm)
-        tekst = c.get('/portal-admin/auditlog/eksport.csv').content.decode('utf-8-sig')
+        tekst = c.get('/admin/auditlog/eksport.csv').content.decode('utf-8-sig')
         self.assertIn("'=cmd|calc", tekst)
         self.assertNotIn(';=cmd|calc', tekst)
 

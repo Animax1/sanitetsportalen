@@ -150,7 +150,7 @@ def _modul_er_aktiv(user, modul_slug):
     skal kunne forberede en modul i kulissene før den slås på for andre
     (André, 27. sep. 2026). Den gamle begrunnelsen, «ellers kan man
     deaktivere seg selv ut av å kunne reaktivere», holdt ikke — bryteren på
-    `/portal-admin/moduler/` er `admin_required`, ikke modulgatet. Menyen
+    `/admin/moduler/` er `admin_required`, ikke modulgatet. Menyen
     skjuler modulen også for admin; adressen virker.
     """
     cache = getattr(user, _MODUL_CACHE, None)

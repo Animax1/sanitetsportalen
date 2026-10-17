@@ -172,7 +172,7 @@ class VelgVaktTests(SimpleTestCase):
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class VakteneFraAdressenTests(SimpleTestCase):
-    """`/statistikk/?vakt=<nøkkel>` — lenkene fra /portal-admin/vakt/."""
+    """`/statistikk/?vakt=<nøkkel>` — lenkene fra /admin/vakt/."""
 
     def setUp(self):
         self.harness = build_harness(HARNESS)

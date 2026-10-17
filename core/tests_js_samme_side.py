@@ -13,7 +13,7 @@ from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser
 
-SIDER = ('/pasienter/', '/portal-admin/server-status/')
+SIDER = ('/pasienter/', '/admin/server-status/')
 
 
 def _skript(html):

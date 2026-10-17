@@ -1,4 +1,4 @@
-/* Server-status — /portal-admin/server-status/ (26. sep. 2026, G1).
+/* Server-status — /admin/server-status/ (26. sep. 2026, G1).
  *
  * Sto som 531 linjer inline-JS i `templates/patients/admin_status.html`, der
  * ingen XSS-skanner, polling-regel eller node-test så den. Nå en fil som de

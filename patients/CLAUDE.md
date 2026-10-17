@@ -38,7 +38,7 @@ håndhever begge deler.
 
 Knappen, «Tidligere vakter» og gjenåpningen sto under pasientsidens Innstillinger fordi
 pasientregistreringen var den eneste modulen da vakta ble innført. De flyttet til
-**`/portal-admin/vakt/`** 28. sep. 2026 (`core/views_vakt.py`), sammen med vaktas navn fra
+**`/admin/vakt/`** 28. sep. 2026 (`core/views_vakt.py`), sammen med vaktas navn fra
 portalinnstillingene; arbeidet gjøres av `core/vaktslutt.py`. **Pasientene arkiveres alltid
 før de slettes** (`patients/vaktslutt.py`) — før den dagen slettet knappen dem etter bare en
 backup. «Lagre som arkiv» er slettet; pasientarkivene (rader, signatur, sletting) står igjen

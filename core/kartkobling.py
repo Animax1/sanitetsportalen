@@ -17,7 +17,7 @@ Fem regler:
   bil som stempler mens kartet er nede ikke venter `TIMEOUT_S` per trykk.
   Ikke etter et 4xx — det er et raskt nei, se `_raskt_avslag`.
 - **Portalen lagrer ingenting** (B9). Ingen tabell, ingen auditrad. Siste
-  utfall ligger i cachen for statuskortet på `/portal-admin/server-status/` —
+  utfall ligger i cachen for statuskortet på `/admin/server-status/` —
   i `AppSetting` ville det gitt en auditrad per stempling.
 - **Vet ingenting om transaksjoner.** Kallstedene pakker kallet i
   `transaction.on_commit`, så en stempling som rulles tilbake aldri sendes.
@@ -74,7 +74,7 @@ POSISJON_MAKS_FRAM = timedelta(minutes=5)
 
 #: «Delt posisjon vises i kartet» (André, 7. okt. 2026): hvor lenge en posisjon bil eller lag har
 #: delt med «Send posisjon», står under «OBS: Posisjon delt» i kartet. **Én felles innstilling**
-#: for bil og lag, på `/portal-admin/innstillinger/` i kortet «Kartet» (`core/kart_innstillinger.py`).
+#: for bil og lag, på `/admin/innstillinger/` i kortet «Kartet» (`core/kart_innstillinger.py`).
 DELT_VARIGHET_NOKKEL = 'kart_delt_posisjon_min'
 DELT_VARIGHET_STANDARD = 15
 DELT_VARIGHET_MIN = 1
@@ -203,7 +203,7 @@ def siste_utfall() -> dict | None:
 
 
 def status() -> dict:
-    """Til kortet på `/portal-admin/server-status/`. Aldri nøkkelen."""
+    """Til kortet på `/admin/server-status/`. Aldri nøkkelen."""
     return {
         'konfigurert': er_konfigurert(),
         'vert': urlsplit(getattr(settings, 'KART_URL', '')).netloc,

@@ -423,10 +423,10 @@ class PortalDashboardViewTests(TestCase):
         # Ingen «Dashboard» (André, 22. sep. 2026): merkenavnet er veien hjem.
         self.assertNotIn('Dashboard', nav)
         self.assertIn('title="Til forsiden"', header)
-        self.assertNotIn('/portal-admin/', nav, 'admin-lenkene står i avatar-menyen')
+        self.assertNotIn('/admin/', nav, 'admin-lenkene står i avatar-menyen')
         avatar = header[header.index('<div class="user-info">'):]
-        for lenke in ('/portal-admin/brukere/', '/portal-admin/server-status/',
-                      '/portal-admin/innloggingslogg/', '/portal-admin/backup/'):
+        for lenke in ('/admin/brukere/', '/admin/server-status/',
+                      '/admin/innloggingslogg/', '/admin/backup/'):
             self.assertIn(lenke, avatar)
         # Og footeren står igjen: den bærer byggnummeret.
         self.assertIn('class="portal-footer"', html)
@@ -445,22 +445,22 @@ class LegacyRedirectTests(TestCase):
     bokmerker, lenker og e-post-referanser må fortsatt fungere via 301.
     """
 
-    def test_admin_server_status_redirectes(self):
-        """/admin/server-status/ → 301 → /portal-admin/server-status/"""
-        resp = self.client.get('/admin/server-status/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(
-            resp['Location'],
-            '/portal-admin/server-status/',
-        )
+    def test_portal_admin_sender_til_admin(self):
+        """Fase 0 (17. okt. 2026): `/portal-admin/` ble `/admin/`. Stien og
+        spørrestrengen følger med — bokmerker og lagrede varsler peker dit."""
+        for gammel, ny in (('/portal-admin/server-status/', '/admin/server-status/'),
+                           ('/portal-admin/server-status/json/', '/admin/server-status/json/'),
+                           ('/portal-admin/brukere/?side=2', '/admin/brukere/?side=2'),
+                           ('/portal-admin/', '/admin/')):
+            with self.subTest(gammel=gammel):
+                resp = self.client.get(gammel)
+                self.assertEqual(resp.status_code, 301)
+                self.assertEqual(resp['Location'], ny)
 
-    def test_admin_server_status_subpath_redirectes(self):
-        resp = self.client.get('/admin/server-status/json/')
-        self.assertEqual(resp.status_code, 301)
-        self.assertEqual(
-            resp['Location'],
-            '/portal-admin/server-status/json/',
-        )
+    def test_omdirigeringen_sender_aldri_ut_av_portalen(self):
+        resp = self.client.get('/portal-admin//evil.example/')
+        self.assertTrue(resp['Location'].startswith('/admin/'))
+        self.assertFalse(resp['Location'].startswith('//'))
 
     def test_django_admin_paavirkes_ikke(self):
         """/django-admin/ skal IKKE bli redirected (det er Django-admin selv)."""
@@ -550,11 +550,11 @@ class PasientAppPaaNyURLTests(TestCase):
         self.assertEqual(r('api_patients_list'), '/pasienter/api/patients/')
 
     def test_url_navn_for_admin_status_loeses_riktig(self):
-        """reverse('portaladmin:admin_server_status') skal gi /portal-admin/server-status/."""
+        """reverse('portaladmin:admin_server_status') skal gi /admin/server-status/."""
         from django.urls import reverse as r
         self.assertEqual(
             r('portaladmin:admin_server_status'),
-            '/portal-admin/server-status/',
+            '/admin/server-status/',
         )
 
     def test_pasient_index_har_synlig_portal_knapp(self):
@@ -595,14 +595,14 @@ class AdminNavPortalLenkeTests(TestCase):
 
     def test_brukere_har_dashboard_lenke(self):
         """Brukere-siden bruker base_portal.html og har veien hjem i headeren."""
-        resp = self.client.get('/portal-admin/brukere/')
+        resp = self.client.get('/admin/brukere/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'title="Til forsiden"')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
     def test_server_status_har_dashboard_lenke(self):
         """Server-status-siden bruker base_portal.html og har veien hjem i headeren."""
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'title="Til forsiden"')
         self.assertNotContains(resp, '>Pasientliste</a>')
@@ -963,7 +963,7 @@ class CustomUserPermissionFlagsTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class ModuleAdminUITests(TestCase):
-    """Tester for /portal-admin/moduler/ og /portal-admin/moduler/<slug>/.
+    """Tester for /admin/moduler/ og /admin/moduler/<slug>/.
 
     Dekker tilgangskontroll, listevisning, redigering og kjernemodul-vern.
     """
@@ -985,21 +985,21 @@ class ModuleAdminUITests(TestCase):
         self.client = Client()
 
     def test_modulliste_kun_admin(self):
-        """GET /portal-admin/moduler/ skal kreve admin."""
+        """GET /admin/moduler/ skal kreve admin."""
         # Uautentisert → redirect/forbidden
-        resp = self.client.get('/portal-admin/moduler/')
+        resp = self.client.get('/admin/moduler/')
         self.assertIn(resp.status_code, (302, 403))
 
         # Read-only → forbidden eller redirect
         self.client.force_login(self.read_only)
-        resp = self.client.get('/portal-admin/moduler/')
+        resp = self.client.get('/admin/moduler/')
         self.assertIn(resp.status_code, (302, 403))
 
     def test_modulliste_admin_ser_moduler(self):
         """Admin skal se modul-listen og alle registrerte moduler."""
         from core.modules import get_all_modules
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/moduler/')
+        resp = self.client.get('/admin/moduler/')
         self.assertEqual(resp.status_code, 200)
         # Skal vise minst kjernemodulene
         for modul in get_all_modules():
@@ -1008,7 +1008,7 @@ class ModuleAdminUITests(TestCase):
     def test_modulliste_url_loeses(self):
         self.assertEqual(
             reverse('portaladmin:module_admin_list'),
-            '/portal-admin/moduler/',
+            '/admin/moduler/',
         )
 
     def test_redigering_av_modul_lagrer(self):
@@ -1066,16 +1066,16 @@ class ModuleAdminUITests(TestCase):
     def test_modulliste_lenker_til_redigering(self):
         from core.models import ModuleSettings
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/moduler/')
+        resp = self.client.get('/admin/moduler/')
         # Minst én rediger-lenke skal finnes
         first = ModuleSettings.objects.first()
         if first:
-            self.assertContains(resp, f'/portal-admin/moduler/{first.slug}/')
+            self.assertContains(resp, f'/admin/moduler/{first.slug}/')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class AuditLogListViewTests(TestCase):
-    """Tester for /portal-admin/auditlog/ med filter, pagination og CSV-eksport."""
+    """Tester for /admin/auditlog/ med filter, pagination og CSV-eksport."""
 
     def setUp(self):
         from audit.models import AuditLog
@@ -1106,30 +1106,30 @@ class AuditLogListViewTests(TestCase):
         self.client = Client()
 
     def test_auditlog_kun_admin(self):
-        resp = self.client.get('/portal-admin/auditlog/')
+        resp = self.client.get('/admin/auditlog/')
         self.assertIn(resp.status_code, (302, 403))
 
         self.client.force_login(self.read_only)
-        resp = self.client.get('/portal-admin/auditlog/')
+        resp = self.client.get('/admin/auditlog/')
         self.assertIn(resp.status_code, (302, 403))
 
     def test_auditlog_admin_ser_alle_rader(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/')
+        resp = self.client.get('/admin/auditlog/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'patients_patient')
         self.assertContains(resp, 'accounts_customuser')
 
     def test_auditlog_filter_app_label(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/?app_label=accounts')
+        resp = self.client.get('/admin/auditlog/?app_label=accounts')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'accounts_customuser')
         self.assertNotContains(resp, 'patients_patient')
 
     def test_auditlog_filter_action(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/?action=CREATE')
+        resp = self.client.get('/admin/auditlog/?action=CREATE')
         self.assertEqual(resp.status_code, 200)
         # Bare CREATE-rader skal være med — UPDATE skal ikke
         # (Vi sjekker antall via paginator-context)
@@ -1139,7 +1139,7 @@ class AuditLogListViewTests(TestCase):
 
     def test_auditlog_filter_user(self):
         self.client.force_login(self.admin)
-        resp = self.client.get(f'/portal-admin/auditlog/?user={self.admin.id}')
+        resp = self.client.get(f'/admin/auditlog/?user={self.admin.id}')
         self.assertEqual(resp.status_code, 200)
         page_obj = resp.context['page_obj']
         for row in page_obj.object_list:
@@ -1147,7 +1147,7 @@ class AuditLogListViewTests(TestCase):
 
     def test_auditlog_filter_q_fritekst(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/?q=inntid')
+        resp = self.client.get('/admin/auditlog/?q=inntid')
         self.assertEqual(resp.status_code, 200)
         page_obj = resp.context['page_obj']
         # Skal kun finne rad med field_name='inntid'
@@ -1157,7 +1157,7 @@ class AuditLogListViewTests(TestCase):
     def test_auditlog_filter_ugyldig_user_id_ignoreres(self):
         """Ugyldig user-param skal ikke krasje viewet."""
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/?user=ikke-tall')
+        resp = self.client.get('/admin/auditlog/?user=ikke-tall')
         self.assertEqual(resp.status_code, 200)
 
     def test_auditlog_pagination_50_per_side(self):
@@ -1170,14 +1170,14 @@ class AuditLogListViewTests(TestCase):
                 action='CREATE', user=self.admin, app_label='patients',
             )
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/')
+        resp = self.client.get('/admin/auditlog/')
         self.assertEqual(resp.status_code, 200)
         page_obj = resp.context['page_obj']
         self.assertEqual(len(page_obj.object_list), 50)
 
     def test_csv_eksport_returnerer_csv(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        resp = self.client.get('/admin/auditlog/eksport.csv')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('text/csv', resp['Content-Type'])
         body = resp.content.decode('utf-8-sig')
@@ -1190,18 +1190,18 @@ class AuditLogListViewTests(TestCase):
     def test_csv_eksport_har_bom(self):
         """UTF-8 BOM for Excel-kompatibilitet."""
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        resp = self.client.get('/admin/auditlog/eksport.csv')
         self.assertTrue(resp.content.startswith(b'\xef\xbb\xbf'))
 
     def test_csv_eksport_filename_attachment(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        resp = self.client.get('/admin/auditlog/eksport.csv')
         self.assertIn('attachment', resp['Content-Disposition'])
         self.assertIn('auditlog_', resp['Content-Disposition'])
 
     def test_csv_eksport_kun_admin(self):
         self.client.force_login(self.read_only)
-        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        resp = self.client.get('/admin/auditlog/eksport.csv')
         self.assertIn(resp.status_code, (302, 403))
 
 
@@ -1377,11 +1377,11 @@ class NavMenuFase3bTests(TestCase):
     def test_admin_lenker_i_nav_for_admin(self):
         self.client.force_login(self.admin)
         resp = self.client.get('/')
-        self.assertContains(resp, '/portal-admin/moduler/')
-        self.assertContains(resp, '/portal-admin/auditlog/')
+        self.assertContains(resp, '/admin/moduler/')
+        self.assertContains(resp, '/admin/auditlog/')
 
     def test_admin_lenker_skjult_for_read_only(self):
         self.client.force_login(self.read_only)
         resp = self.client.get('/')
-        self.assertNotContains(resp, '/portal-admin/moduler/')
-        self.assertNotContains(resp, '/portal-admin/auditlog/')
+        self.assertNotContains(resp, '/admin/moduler/')
+        self.assertNotContains(resp, '/admin/auditlog/')

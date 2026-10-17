@@ -98,10 +98,10 @@ class GjennomEndepunkteneTests(TestCase):
     def test_avslutt_vakt_i_kappløp_sletter_ingenting(self):
         from patients.models import Patient
         Patient.objects.create(pasientnummer=1, vakt=self.vakt)
-        # `/portal-admin/vakt/avslutt/` siden 28. sep. 2026 — et skjema som
+        # `/admin/vakt/avslutt/` siden 28. sep. 2026 — et skjema som
         # videresender, så feilen står i meldingene.
         with _sjekken_sier_ledig(), patch.dict(os.environ, {'BACKUP_DIR': self._mappe()}):
-            res = self.c.post('/portal-admin/vakt/avslutt/',
+            res = self.c.post('/admin/vakt/avslutt/',
                               {'bekreft': 'ja', 'ny_vakt_navn': 'Tatt'}, follow=True)
         self.assertIn('finnes allerede', ' '.join(str(m) for m in res.context['messages']))
         self.assertTrue(Patient.objects.filter(vakt=self.vakt).exists(), 'ingen pasienter slettet')

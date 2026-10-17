@@ -4,7 +4,7 @@
     python manage.py hent_offsite backup-patients-auto-20260913-101500-123456.json.gz
 
 Henter, dekrypterer med OFFSITE_BACKUP_KEY, og legger fila i BACKUP_DIR med
-en `Backup`-rad, så den dukker opp under /portal-admin/backup/ og kan
+en `Backup`-rad, så den dukker opp under /admin/backup/ og kan
 gjenopprettes derfra — eller med `restore_backup`. Rører ikke basen ellers.
 
 Kjøres i containeren (`railway ssh`) eller lokalt med de samme variablene.
@@ -51,4 +51,4 @@ class Command(BaseCommand):
             raise CommandError(f'Henting feilet: {exc.__class__.__name__}: {exc}') from exc
         self.stdout.write(self.style.SUCCESS(
             f'Hentet og dekryptert {backup.filename} ({backup.size_bytes} bytes) til {sti}. '
-            f'Gjenopprett fra /portal-admin/backup/{backup.module_slug}/.'))
+            f'Gjenopprett fra /admin/backup/{backup.module_slug}/.'))

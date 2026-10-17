@@ -244,29 +244,29 @@ class AdminStatusTilgangTests(TestCase):
         gi_standardtilgang(self.read_only, 'leser')
 
     def test_uinnlogget_omdirigeres_til_login(self):
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 302)
         self.assertIn('/accounts/login/', resp.url)
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 403)
 
     def test_read_only_nektes(self):
         self.client.force_login(self.read_only)
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 403)
 
     def test_admin_har_tilgang_html(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Server-status')
 
     def test_admin_har_tilgang_json(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/json/')
+        resp = self.client.get('/admin/server-status/json/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['Content-Type'], 'application/json')
         data = resp.json()
@@ -330,7 +330,7 @@ class LastBackupInfoTests(TestCase):
         from core.models import Backup
         Backup.objects.create(filename='end2end.json.gz', kind='auto', size_bytes=999)
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/json/')
+        resp = self.client.get('/admin/server-status/json/')
         self.assertEqual(resp.status_code, 200)
         backup = resp.json().get('last_backup', {})
         self.assertTrue(backup.get('found'))
@@ -362,7 +362,7 @@ class MetricsMiddlewareIntegrationTests(TestCase):
         metrics_store.reset()
 
         # Kun kall server-status – skal IKKE telles
-        self.client.get('/portal-admin/server-status/json/')
+        self.client.get('/admin/server-status/json/')
 
         snap = metrics_store.snapshot(window_seconds=60)
         self.assertEqual(snap['count'], 0)
@@ -395,12 +395,12 @@ class AdminSessionsListTests(TestCase):
         gi_standardtilgang(self.read_only, 'leser')
 
     def test_uinnlogget_nektes(self):
-        resp = self.client.get('/portal-admin/server-status/sessions/')
+        resp = self.client.get('/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 302)
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.get('/portal-admin/server-status/sessions/')
+        resp = self.client.get('/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 403)
 
     def test_status_side_inneholder_csrf_token_holder(self):
@@ -409,7 +409,7 @@ class AdminSessionsListTests(TestCase):
         X-CSRFToken-header (cookien er HttpOnly), og POST-handlinger som
         utlogging gir 403 Forbidden."""
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/')
+        resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8')
         self.assertIn('id="csrf-token-holder"', body,
@@ -425,7 +425,7 @@ class AdminSessionsListTests(TestCase):
         c3.login(username='leser', password='testpass123')
 
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/sessions/')
+        resp = self.client.get('/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         usernames = {s['username'] for s in data['sessions']}
@@ -449,7 +449,7 @@ class AdminSessionsListTests(TestCase):
         c2.get('/accounts/login/')  # initierer en anonym sesjon
 
         self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/sessions/')
+        resp = self.client.get('/admin/server-status/sessions/')
         data = resp.json()
         # Sesjoner i listen skal alle ha brukernavn (ingen anonyme)
         for s in data['sessions']:
@@ -479,7 +479,7 @@ class AdminSessionKillTests(TestCase):
 
     def _kill(self, session_key):
         from core.sesjoner import sesjonsreferanse
-        return self.client.post('/portal-admin/server-status/sessions/kill/',
+        return self.client.post('/admin/server-status/sessions/kill/',
                                 {'ref': sesjonsreferanse(session_key)})
 
     def test_raa_sesjonsnokkel_virker_ikke_som_haandtak(self):
@@ -487,23 +487,23 @@ class AdminSessionKillTests(TestCase):
         lead_key = self._get_session_key('lederen', 'testpass123')
         self.client.force_login(self.admin)
         for felt in ('ref', 'session_key'):
-            resp = self.client.post('/portal-admin/server-status/sessions/kill/', {felt: lead_key})
+            resp = self.client.post('/admin/server-status/sessions/kill/', {felt: lead_key})
             self.assertIn(resp.status_code, (400, 404), felt)
         self.assertTrue(Session.objects.filter(session_key=lead_key).exists())
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/', {'ref': 'x'})
+        resp = self.client.post('/admin/server-status/sessions/kill/', {'ref': 'x'})
         self.assertEqual(resp.status_code, 403)
 
     def test_mangler_session_key_gir_400(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/', {})
+        resp = self.client.post('/admin/server-status/sessions/kill/', {})
         self.assertEqual(resp.status_code, 400)
 
     def test_ukjent_session_key_gir_404(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill/',
+        resp = self.client.post('/admin/server-status/sessions/kill/',
                                 {'ref': 'finnesikke'})
         self.assertEqual(resp.status_code, 404)
 
@@ -576,13 +576,13 @@ class AdminSessionKillAllTests(TestCase):
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill-all/',
+        resp = self.client.post('/admin/server-status/sessions/kill-all/',
                                 {'confirm': 'YES'})
         self.assertEqual(resp.status_code, 403)
 
     def test_mangler_bekreftelse_gir_400(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/sessions/kill-all/', {})
+        resp = self.client.post('/admin/server-status/sessions/kill-all/', {})
         self.assertEqual(resp.status_code, 400)
 
     def test_logger_ut_alle_unntatt_admin(self):
@@ -595,7 +595,7 @@ class AdminSessionKillAllTests(TestCase):
         self.client.force_login(self.admin)
         my_key = self.client.session.session_key
 
-        resp = self.client.post('/portal-admin/server-status/sessions/kill-all/',
+        resp = self.client.post('/admin/server-status/sessions/kill-all/',
                                 {'confirm': 'YES'})
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -611,7 +611,7 @@ class AdminSessionKillAllTests(TestCase):
         c2 = Client(); c2.login(username='lederen', password='testpass123')
         self.client.force_login(self.admin)
         AuditLog.objects.all().delete()
-        self.client.post('/portal-admin/server-status/sessions/kill-all/',
+        self.client.post('/admin/server-status/sessions/kill-all/',
                          {'confirm': 'YES'})
         log = AuditLog.objects.filter(field_name='force_logout').first()
         self.assertIsNotNone(log)
@@ -844,6 +844,6 @@ class MigrasjonsradTests(TestCase):
         admin = CustomUser.objects.create_user(
             username='mig_admin', password='x', role='admin', must_change_password=False)
         self.client.force_login(admin)
-        svar = self.client.get('/portal-admin/server-status/json/').json()
+        svar = self.client.get('/admin/server-status/json/').json()
         self.assertIn({'nokkel': 'Migrasjoner', 'verdi': 'alle kjørt', 'ok': True},
                       svar['konfig']['rader'])

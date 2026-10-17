@@ -39,7 +39,7 @@ endret seg» umulig å skille fra «jobben er død».
 **Registeret er fasit for hvilke moduler som finnes, ikke plantabellen.** En
 modul uten plan får en med standardverdier første gang klokka ser handleren.
 Leste vi tabellen direkte, var en nyregistrert modul uten backup til noen
-tilfeldigvis åpnet `/portal-admin/backup/` — og for et arkiv betyr manglende
+tilfeldigvis åpnet `/admin/backup/` — og for et arkiv betyr manglende
 backup at kollapsen nekter å kjøre, altså en feil som først viser seg to år
 senere.
 
@@ -55,7 +55,7 @@ sin egen `register_handlers()` som tar **både** portalfila og den hele.
 kaller `offsite.meld_ny_backup(backup, path)` etter at fila er skrevet — inert
 uten `OFFSITE_S3_BUCKET`/nøklene/`OFFSITE_BACKUP_KEY`, og **kaster aldri**:
 volumet er første nett, og feilen står i `OffsiteKopi.feil` og på
-`/portal-admin/backup/`. Fila **komprimeres først, krypteres så** — chiffertekst
+`/admin/backup/`. Fila **komprimeres først, krypteres så** — chiffertekst
 lar seg ikke komprimere. AES-256-GCM, format `SPBK2`+nonce+chiffer med
 objektnavnet i AAD (`SPBK1` leses fortsatt). **To prefikser, ett per
 oppbevaringstid:** `backups/` for modulfilene (730 dager) og `full/` for den
@@ -65,7 +65,7 @@ av Scaleway, ikke av oss** — nøkkelen har ikke sletterett, og `enforce_cap` r
 bare volumet — så `offsite.livssyklus()` leser reglene *tilbake* fra bucketen og
 `_avvik()` sammenligner dem med `FORVENTET_DAGER` på **nøyaktig** prefiks;
 `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid
-som stille ble uendelig. Avviket står på `/portal-admin/backup/`; funksjonen
+som stille ble uendelig. Avviket står på `/admin/backup/`; funksjonen
 kaster aldri og cacher i fem minutter. **Prefikset leses av `_prefiks()`, som kjenner tre
 former**, og feilteksten bærer koden Scaleway svarte — hvorfor står i `core/offsite.py`. `hent_offsite --list`
 / `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med

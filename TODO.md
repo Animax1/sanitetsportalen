@@ -94,7 +94,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   første. Kolonnen er nødutgangen til modellen har vært i ekte bruk.
                   **Forarbeidet er levert 14. okt.:** ingen test går gjennom broene, og
                   i drift telles de (`oppdrag/bro.py`). **Før G6b:** se på
-                  `/portal-admin/server-status/` at «Broer i oppdrag (G6b)» står
+                  `/admin/server-status/` at «Broer i oppdrag (G6b)» står
                   «Aldri brukt» etter vakta. Står det et tall, er det et funn — G6b venter.
                   **G6c, i en senere `main`-push enn G6b:** `DROP COLUMN`, og
                   `Statusmelding.oppdragsenhet` NOT NULL (med `SET CONSTRAINTS ALL
@@ -147,8 +147,6 @@ Besluttet 17. okt. 2026, ikke påbegynt. Andre i organisasjonen skal kunne kjør
 global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for seg, og
 **portal nummer to opprettes ikke i prod før fase 4 er levert** (notatet §6).
 
-- [ ] **Fase 0:** `/portal-admin/` → `/admin/`, med 301 fra den gamle stien. Tas rett før fase 5,
-      så de nye administrasjonssidene får riktig sti fra starten.
 - [ ] **Rydd pekeren og gjør `Vakt.portal` påkrevd** (etter fase 1, 17. okt. 2026).
       `AppSetting['aktiv_vakt_id']` leses ikke lenger, men står for en eventuell
       tilbakerulling — slett den i en migrasjon når fase 1 har stått i prod en stund.
@@ -165,7 +163,7 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
       «Avslutt vakt» til moderator, «Sist innlogget» og filtrene «Uten portal»/«Inaktiv 12 mnd»,
       portalvelgeren, og forslaget «mannskap fra de siste 24 månedene» ved ny vakt. Også:
       **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn);
-      kortene på `/portal-admin/innstillinger/` delt i portalens og systemets (§4.7); og at et
+      kortene på `/admin/innstillinger/` delt i portalens og systemets (§4.7); og at et
       varsel fra en annen portal bytter portal når det åpnes.
 - [ ] **Fase 6:** kartet, i begge repoer — portalens slug og vakt-ID i meldingen, `Gruppe.portal`
       i stedet for `viser_portalen`, `steder_for()` per portal, gruppevelgeren.
@@ -180,7 +178,7 @@ Pulje 1 (kontoovertakelse), 2 (det som blokkerte `main`), 3 (backup og offsite) 
 gjennomfører angrepet, og mutasjoner på nivået i `CLAUDE.md`. Puljene gjøres ferdig før
 `staging` går til `main` (André: «vi har tid til å gjøre oss ferdig med disse puljene først»).
 
-- [ ] **Bekreft at standardplanen for modulene står på «Ved endring»** på `/portal-admin/backup/`.
+- [ ] **Bekreft at standardplanen for modulene står på «Ved endring»** på `/admin/backup/`.
       Modulfilene i prod sto stille fra 16. sep. 2026, og KO, Lag og backlog hadde aldri hatt en
       fil — klokka lager den første fila for en modul uansett, så planen sto trolig på «Av».
       1. okt. fikk alle ni en fil (manuelt og av klokka). Står den fortsatt på «Av», blir det
@@ -204,7 +202,7 @@ og slås sammen til «Sensitivt» først når radene slettes etter 24 måneder. 
       oppdrag fra arkivradene før kollapsen, for KO og Lag fra radene før `purge_old_logs`
       tar dem. Bemanning bærer ingen helseopplysninger. Arkivet tar vare på hvilke
       problemstillinger som var merket da det ble laget, så et navnebytte ikke glipper.
-- [ ] **MULIGHET: arkivenes rader og signatur også på `/portal-admin/vakt/`.** Siden viser
+- [ ] **MULIGHET: arkivenes rader og signatur også på `/admin/vakt/`.** Siden viser
       arkivene, lenker til tallene og sletter dem (28. sep. 2026), men radene og
       signatursjekken står fortsatt i pasientmodulens og oppdragsmodulens egne vinduer. Å samle
       dem krever en visning gjennom `core.arkiv`-registeret, ikke to modul-API-er kalt fra `core`.
@@ -570,7 +568,7 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       ikke sikkert det er verdt det — en fil med dårligere begrunnelser er ikke en forbedring.
 
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
-      pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene
+      pasientregistrene (3.1), `/admin/` samlet i én URL-fil (3.2), skimene
       (3.3), `core/views.py` delt (3.7). 3.5 (`VaktArkiv`) skal **ikke** ryddes —
       signaturen. 3.6 og 3.8 tas underveis, ikke som egne runder.
 

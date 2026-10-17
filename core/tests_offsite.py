@@ -146,7 +146,7 @@ class OpplastingTests(_MedBackupDir):
 
     @override_settings(OFFSITE_S3_SECRET_KEY='SCWxxxxHEMMELIGxxxx9999')
     def test_feilen_som_lagres_bærer_ingen_nøkler(self):
-        """`OffsiteKopi.feil` vises på /portal-admin/backup/, og ble lagret
+        """`OffsiteKopi.feil` vises på /admin/backup/, og ble lagret
         uvasket til 26. sep. 2026 (E6) — bare livssykluskortet vasket sin."""
         self.s3.feil = ConnectionError(
             'https://ak:SCWxxxxHEMMELIGxxxx9999@s3.fr-par.scw.cloud nede, '
@@ -168,7 +168,7 @@ class OpplastingTests(_MedBackupDir):
                                              must_change_password=False)
         c = Client(); c.force_login(adm)
         with override_settings(SECURE_SSL_REDIRECT=False):
-            html = c.get('/portal-admin/backup/').content.decode()
+            html = c.get('/admin/backup/').content.decode()
         self.assertIn('Offsite-kopi (Scaleway)', html)
         self.assertIn('sanitet-backup', html)
         self.assertIn('1 fil lastet opp', html)
@@ -617,7 +617,7 @@ class OppsettfeilGjennomInngangeneTests(TestCase):
                                              must_change_password=False)
         c = Client(); c.force_login(adm)
         with override_settings(SECURE_SSL_REDIRECT=False):
-            html = c.get('/portal-admin/backup/').content.decode()
+            html = c.get('/admin/backup/').content.decode()
         self.assertIn('id="offsite-oppsettfeil"', html)
         self.assertIn('egen adresse', html)
 

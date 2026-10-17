@@ -61,7 +61,7 @@ def _log_user_admin_action(request, target_user, action, field_name=None,
 
     Frysing og sletting av kontoer er ikke pasientdata, så ``patients.signals``
     fanger dem ikke opp. Vi skriver raden eksplisitt her slik at handlingen blir
-    synlig i ``/portal-admin/auditlog/``.
+    synlig i ``/admin/auditlog/``.
 
     ``record_id`` er en ren integer uten FK, så raden overlever at brukeren
     slettes — hvilket er hele poenget for DELETE-tilfellet.

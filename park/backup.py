@@ -2,7 +2,7 @@
 
 Registrert i **samme commit som modellen** (se `backlog/backup.py` for hvorfor).
 En backup, ikke et arkiv: park følger arkiveringen når den flytter til
-`/portal-admin/` (`TODO.md`), som KO.
+`/admin/` (`TODO.md`), som KO.
 
 **Rekkefølgen:** `Registrering.vakt` peker på `core.Vakt` med et heltall, så
 portalfila må være lastet først. Pekerne til vaktlistas ressurs og

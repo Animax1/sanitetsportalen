@@ -108,7 +108,7 @@ modulfilene der):
 > kompromittert portal kan ikke slette sikkerhetskopiene.
 >
 > **Fristene håndheves av Scaleway, ikke av portalen.** Portalen leser reglene tilbake fra
-> bucketen og viser avvik på `/portal-admin/backup/`. Prefikset må skrives nøyaktig:
+> bucketen og viser avvik på `/admin/backup/`. Prefikset må skrives nøyaktig:
 > `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid som
 > stille ble uendelig.
 >
@@ -769,7 +769,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > `Oppdrag.fritekst`.
 >
 > **Fristen er en `AppSetting` (`ko.logg_dager`), ikke en miljøvariabel.** Endringer
-> auditlogges, verdien er synlig på `/portal-admin/innstillinger/`, og web- og
+> auditlogges, verdien er synlig på `/admin/innstillinger/`, og web- og
 > cron-tjenesten leser den samme raden. En miljøvariabel ville gitt en oppbevaringstid som
 > kan endres uten spor og settes ulikt på to tjenester.
 
@@ -818,7 +818,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > slette sikkerhetskopiene. Konsekvensen er at fristen bare finnes ett sted, i bucketens
 > oppsett, og at en feilskrevet regel er en oppbevaringstid som stille blir uendelig.
 > Portalen leser derfor reglene *tilbake* fra Scaleway og viser avvik på
-> `/portal-admin/backup/`.
+> `/admin/backup/`.
 >
 > *Historikk:* dokumentet oppga tidligere «72 timer, deretter automatisk slettet»
 > (`RETENTION_HOURS`), som aldri stemte med implementasjonen, og deretter

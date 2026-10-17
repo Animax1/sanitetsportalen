@@ -1,4 +1,4 @@
-"""Alt under `/portal-admin/`, på ett sted (14. sep. 2026).
+"""Alt under `/admin/`, på ett sted (14. sep. 2026).
 
 Rutene lå spredt på tre filer — `myproject/urls.py` (server-status),
 `core/urls.py` (innstillinger, moduler, auditlogg, backup) og

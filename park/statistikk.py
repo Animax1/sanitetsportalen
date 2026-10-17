@@ -12,7 +12,7 @@ den som leser tallene ser at det er ryddet i dem.
 **Gaten er `park: les`** (B17), ikke KO: ledelsen får fanen, operatørene ikke.
 `statistikk/views.py` komponerer tilgangen; handleren sier bare hvilket nivå.
 
-Ingen arkiv ennå — park følger arkiveringen når den flytter til `/portal-admin/`.
+Ingen arkiv ennå — park følger arkiveringen når den flytter til `/admin/`.
 """
 from __future__ import annotations
 

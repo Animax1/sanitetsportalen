@@ -52,7 +52,7 @@ gjennomgang av §2 og §10 på en liten skjerm.
 - [ ] **Uten oppdragstilgang står loggen.** `test-ko-les` → hendelsesloggen og loggstrømmen
       virker; oppdragsflata er erstattet av «Krever tilgang til oppdragsmodulen», ikke av
       en tom kolonne.
-- [ ] **Modulen slått av** (`/portal-admin/moduler/` → KO av) gir 403 for alle andre enn
+- [ ] **Modulen slått av** (`/admin/moduler/` → KO av) gir 403 for alle andre enn
       global admin. Slå den på igjen.
 - [ ] **Vaktnavnet i hodet** er den aktive vakta.
 
@@ -97,7 +97,7 @@ gjennomgang av §2 og §10 på en liten skjerm.
       skriver etterpå, og i sidebaren. Prøv med `test-ko-les` → **hun får lov**; merket er
       `les`-nivå.
 - [ ] **Chat er av som standard.** Avkryssingen «uformell» finnes ikke. Slå på
-      `ko.chat_tillatt` under `/portal-admin/innstillinger/` → avkryssingen kommer. Slå av
+      `ko.chat_tillatt` under `/admin/innstillinger/` → avkryssingen kommer. Slå av
       igjen → linjene som alt er skrevet **står fortsatt**, bare nye stoppes.
 - [ ] **XSS.** Loggfør `</script><img src=x onerror=alert(1)>` → teksten står som tekst,
       ingen dialog, ingen `[object Object]` i strømmen.

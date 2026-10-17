@@ -212,7 +212,7 @@ Angre-nøkkelen er `idempotency_key`: en UUID bare telefonen som sendte raden kj
 `angre` krever lenken **og** nøkkelen **og** at `registrert_at` er innenfor fristen. En
 annen telefon med samme lenke kan ikke angre noe den ikke sendte selv.
 
-Fristen er en `AppSetting`, satt av admin på `/portal-admin/innstillinger/` gjennom
+Fristen er en `AppSetting`, satt av admin på `/admin/innstillinger/` gjennom
 `park/portalinnstillinger.py` — registeret finnes (`core/portalinnstillinger.py`).
 
 ### 4.5 Rate-limit og CSRF
@@ -266,7 +266,7 @@ stedene, og hvert merke peker hit.
 
 | Valg | Nå | Alternativet | Hvordan byttes det |
 |---|---|---|---|
-| **`park-ko-posisjon`** — forhåndsvalg fra KO-tavla (B19) | **På** | Bare siste registrering og telefonens minne. Siden viser da bare lister, ingen posisjoner | **Bryter på `/portal-admin/innstillinger/`**, uten deploy. Av = endepunktet svarer aldri med KO-kilden, og registeret spørres ikke |
+| **`park-ko-posisjon`** — forhåndsvalg fra KO-tavla (B19) | **På** | Bare siste registrering og telefonens minne. Siden viser da bare lister, ingen posisjoner | **Bryter på `/admin/innstillinger/`**, uten deploy. Av = endepunktet svarer aldri med KO-kilden, og registeret spørres ikke |
 | `park-delt-lenke` — én lenke for alle lagene (B3) | Én lenke | Én lenke per lag: sikker identitet, fjernes per lag, men flere lenker å dele ut (første utkast, §4.1 der) | Modellen tåler det: `Parklenke` får en nullbar `ressurs`. Kode, ikke bryter |
 | `park-lenke-en-gang` — lenken vises bare når den lages (B5) | Én gang | Lagret lesbart (kryptert), kan vises igjen — men en lekket base er da en lekket lenke | Kode + migrasjon. Frarådes |
 | `park-uten-innlogging` — hele siden | Uten | Delt konto per lag, som bilene. Fjerner alle hullene over, men lagene må logge inn og kontoene forvaltes | Egen modul i praksis. Frarådes med mindre en lenke faktisk misbrukes |
@@ -336,7 +336,7 @@ har plassert hvert lag er mer enn siden trenger, selv om de som har lenken er f�
 |---|---|
 | Modul | `park/module.py`, `nivaaer = ('les', 'skriv_leder')` (B2) |
 | Backup | `park/backup.py`. `ressurs`, `lokasjon` og brukerpekerne strippes; navnene er frosset. Plass i `GJENOPPRETTINGSREKKEFOLGE` etter `vaktliste` |
-| Arkiv | Ikke i første omgang. Park følger arkiveringen når den flytter til `/portal-admin/` (`TODO.md`), som KO |
+| Arkiv | Ikke i første omgang. Park følger arkiveringen når den flytter til `/admin/` (`TODO.md`), som KO |
 | Statistikk | `park/statistikk.py`, fanen **«Lag»** (B12): per problemstilling, utfall, sted, lag, time. Summerer `antall`. Overskriften sier «kontakter», ikke «pasienter» (`FORSLAG_KO.md` §8). Gates på `park: les` — ingen endring i rammeverket (§7) |
 | Audit | Lenke laget og fjernet, verdimengdene, og sletting (B20). Registreringene selv logges ikke — de er dataene, ikke en endring av dem |
 | Personvern | Ny rad i `PERSONVERN_DOKUMENTASJON.md` A.6: tid, sted, problemstilling, antall — ingen identifikator |

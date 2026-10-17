@@ -128,7 +128,7 @@ class IDriftTellesBroeneTests(_Basis):
         c.force_login(admin)
 
         def broer():
-            res = c.get('/portal-admin/server-status/json/', secure=True)
+            res = c.get('/admin/server-status/json/', secure=True)
             self.assertEqual(res.status_code, 200)
             return res.json()['vaktbilde']['oppdrag']['broer']
 

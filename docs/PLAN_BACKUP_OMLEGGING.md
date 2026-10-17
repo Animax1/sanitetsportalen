@@ -25,7 +25,7 @@ Målt på koden:
 |---|---|
 | Ta backup av alt | Fire runder: oversikt → modulside → «Kjør backup» → tilbake, én gang per modul. Ingen knapp tar alle |
 | Gjenopprette en modul | Fem steg: oversikt → modulside → finn fila i en liste på 200 → gjenopprettingsside → skriv modul-slugen → send |
-| Gjenopprette fra kommandolinja | **Finnes ikke.** `hent_offsite` henter og dekrypterer fila, men skriver «gjenopprett fra /portal-admin/backup/». Siste halvdel av veien er kun nettleser |
+| Gjenopprette fra kommandolinja | **Finnes ikke.** `hent_offsite` henter og dekrypterer fila, men skriver «gjenopprett fra /admin/backup/». Siste halvdel av veien er kun nettleser |
 | Endre intervall | Én side per modul, og intervallet er et nedtrekk med sju faste valg. Hvert 10. minutt finnes ikke, og «hver tredje dag» finnes ikke |
 | Se om det virker | «Sist kjørt» sier når det sist ble *skrevet en fil*. Sto innholdet stille, står tidspunktet stille — og det ser likt ut som en jobb som har stoppet |
 
@@ -44,7 +44,7 @@ Tre følger av det:
   dekningen følger når folk er innlogget. Under vakt er det godt nok; mellom vaktene tas
   det ingenting — og en hel databasebackup som skal gå hver 24. time, ville ikke gått.
 - `CRON_JOBBER` i `core/kommando.py` lister `db_backup`, så
-  `/portal-admin/server-status/` viser **«Aldri»** for en jobb som aldri kommer til å
+  `/admin/server-status/` viser **«Aldri»** for en jobb som aldri kommer til å
   kjøre. Et varsel som alltid står rødt lærer deg å ikke se på dashbordet.
 - `CLAUDE.md` påstår at tre jobber kjøres av Railway Cron. Det er feil, og rettes.
 
@@ -293,7 +293,7 @@ og det er et bedre signal enn en grønn hake i et dashbord:
 
 - `sist_sjekket_at` oppdateres ved hvert tikk, uansett modus (§2.1).
 - **Vakthund:** er `sist_sjekket_at` for en plan eldre enn tre ganger intervallet, står det
-  rødt på `/portal-admin/backup/` og på `/portal-admin/server-status/`, og det opprettes et
+  rødt på `/admin/backup/` og på `/admin/server-status/`, og det opprettes et
   `Notification` til global admin. Deduplisert, så det kommer ett varsel og ikke ett i
   minuttet.
 
@@ -309,7 +309,7 @@ tikk eller to.
 
 ### 4.1 Én side, ikke N
 
-`/portal-admin/backup/` blir én side. Modulsidene og gjenopprettingssiden legges ned.
+`/admin/backup/` blir én side. Modulsidene og gjenopprettingssiden legges ned.
 
 ```
 ┌─ Hel database ──────────────────────────────────────────────┐
@@ -529,7 +529,7 @@ aws s3api get-bucket-lifecycle-configuration \
   --endpoint-url https://s3.nl-ams.scw.cloud --bucket sanitetsportalen
 ```
 
-Svaret skal vise nøyaktig de tre reglene. **Og kortet på `/portal-admin/backup/` gjør det
+Svaret skal vise nøyaktig de tre reglene. **Og kortet på `/admin/backup/` gjør det
 samme kallet** og viser «`backups/` 730 dager · `full/` 90 dager». Da slipper vi å tro på
 et dokument — bucketen svarer selv. Lesingen skal være dekket av
 `ObjectStorageBucketsRead`; svarer Scaleway 403 likevel, viser kortet «ukjent» framfor å
@@ -544,7 +544,7 @@ eneste beviset vi får før den tid.
 **Svar på spørsmålet ditt:** du husker halvparten riktig. Det som finnes i dag er
 `hent_offsite`, som henter fila ned fra Scaleway, dekrypterer den og legger den i
 `BACKUP_DIR` med en `Backup`-rad — men den **rører ikke databasen**, og siste linje i
-utskriften er «gjenopprett fra /portal-admin/backup/». Selve gjenopprettingen finnes bare
+utskriften er «gjenopprett fra /admin/backup/». Selve gjenopprettingen finnes bare
 i nettleseren. (`import_offline_data` er noe annet: pasientimport fra den gamle appens
 SQLite-fil.)
 
@@ -620,7 +620,7 @@ den fra portalen.
 
 - **«Sist sjekket» ved siden av «siste fil»** (§2.1) — skiller stille fra stoppet.
 - **«Verste tilfelle nå»** (§2.5) — målt mot siste vellykkede offsite-kopi.
-- **`/portal-admin/server-status/`** får en egen linje for **backup-klokka** — sist tikk,
+- **`/admin/server-status/`** får en egen linje for **backup-klokka** — sist tikk,
   og rødt når vakthunden slår ut. Den står *ikke* blant cron-jobbene, for den er ikke en
   cron-jobb lenger; lista der blir `purge_old_logs` og `kollaps_arkiv`, som i Railway.
 - **`python manage.py verifiser_backup`** — ny kommando, og den viktigste i planen. Den

@@ -165,7 +165,7 @@ stoppet. Et varsel om at klokka er død, sendt av klokka, kommer aldri fram.
 
 | App | Rolle | Ansvar |
 |---|---|---|
-| `core` | Rammeverk | Modulregisteret, `Vakt` (portalens scope), `AppSetting`, `Backup`, `Backupplan`, `ModuleSettings`. All backup- og arkivlogikk. Adminflaten under `/portal-admin/`. CSP, metrikker, helsesjekk, server-status |
+| `core` | Rammeverk | Modulregisteret, `Vakt` (portalens scope), `AppSetting`, `Backup`, `Backupplan`, `ModuleSettings`. All backup- og arkivlogikk. Adminflaten under `/admin/`. CSP, metrikker, helsesjekk, server-status |
 | `accounts` | Rammeverk | `CustomUser`, `ModulTilgang`, innloggingsflyt med MFA, brukeradmin, rate-limiting, `LoginEvent` |
 | `audit` | Rammeverk | `AuditLog`, `RequestAuditMiddleware`, `purge_old_logs`, `check_ssl` |
 | `patients` | Modul | `Patient`, `Forstehjelper`, `Helsepersonell`, `VaktArkiv`, `ArkivertPasient`. JSON-API delt i fire view-moduler |
@@ -185,7 +185,7 @@ krever endringer i `core`.
 | `core/backup/` | Hva som skal med i backupfila | `<app>/backup.py` |
 | `core/arkiv/` | Hva som går inn i arkivets SHA-payload | `<app>/arkiv.py` |
 | `core/stats.py` | Tall til `/statistikk/` | `<app>/statistikk.py` |
-| `core/driftstatus.py` | Tall til `/portal-admin/server-status/` | `<app>/driftstatus.py` |
+| `core/driftstatus.py` | Tall til `/admin/server-status/` | `<app>/driftstatus.py` |
 | `core/portalinnstillinger.py` | Modulens felter i portalinnstillingene | `<app>/portalinnstillinger.py` |
 | `core/kontokobling.py` | Modulens kort i brukeradmin | `<app>/kontokobling.py` |
 
@@ -416,7 +416,7 @@ seg» umulig å skille fra «jobben er død».
 **Registeret er fasit for hvilke moduler som finnes, ikke plantabellen.** En modul uten
 plan får en med standardverdier første gang klokka ser handleren. Leste vi tabellen
 direkte, ville en nyregistrert modul stått uten backup til noen tilfeldigvis åpnet
-`/portal-admin/backup/` — og for et arkiv betyr manglende backup at kollapsen nekter å
+`/admin/backup/` — og for et arkiv betyr manglende backup at kollapsen nekter å
 kjøre, altså en feil som først viser seg to år senere.
 
 ### 4.9 `audit.AuditLog`
@@ -448,7 +448,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **217 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **218 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 33 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, «Send posisjon», verdimengder |
 | `/vaktliste/` | 38 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/portal-admin/` | 27 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/admin/` | 27 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
 | `/ko/` | 45 | `ko/urls.py` | Sida, utskriften med service workeren for kopien uten nett, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
@@ -491,8 +491,9 @@ etter en omorganisering:
 
 | Gammel sti | Går til |
 |---|---|
-| `/accounts/users/`, `/accounts/users/ny/`, `/accounts/users/<pk>/` | `/portal-admin/brukere/…` |
-| `/admin/server-status/…` og `/pasienter/admin/server-status/…` | `/portal-admin/server-status/…` |
+| `/accounts/users/`, `/accounts/users/ny/`, `/accounts/users/<pk>/` | `/admin/brukere/…` |
+| `/portal-admin/…` (adminflaten til 17. okt. 2026) | `/admin/…`, med stien og spørrestrengen |
+| `/pasienter/admin/server-status/…` | `/admin/server-status/…` |
 | `/pasienter/api/full-stats/` og arkivvarianten | `/statistikk/api/kilde/patients/…` |
 | `/statistikk/api/full-stats/` (uten kilde) | `/statistikk/api/kilde/patients/full-stats/` |
 | `/api/…` (rot) | `legacy_root_redirect` |
@@ -589,7 +590,7 @@ fått innsyn i arkiverte vakter uten at noen bestemte det.
 Cachet 60 sekunder, med ETag/304. Cache-nøkkelen bærer **både slug og vakt-ID** — delte
 de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
-### 5.5 Adminflaten (`/portal-admin/`)
+### 5.5 Adminflaten (`/admin/`)
 
 27 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
@@ -1003,7 +1004,7 @@ scannet en håndskrevet liste over tre apper fram til 14. sep. 2026, og ville ik
 `create_backup` kaller `offsite.meld_ny_backup(backup, path)` etter at fila er skrevet.
 Funksjonen er **inert** uten `OFFSITE_S3_BUCKET`, nøklene og `OFFSITE_BACKUP_KEY`, og
 **kaster aldri**: volumet er første nett, og feilen står i `OffsiteKopi.feil` og på
-`/portal-admin/backup/`.
+`/admin/backup/`.
 
 **Komprimeres først, krypteres så.** Rekkefølgen er ikke vilkårlig — chiffertekst lar seg
 ikke komprimere, mens gzip på dumpdata-JSON gir 5–15 % av rå størrelse. AES-256-GCM,
@@ -1059,8 +1060,8 @@ registrerer en handler og kaller `core.backup.create_backup(slug=...)`.
 Observability-laget er et lett, selvstendig rammeverk for teknisk telemetri. Det skal gi administrator svar på «hvordan har tjenesten det akkurat nå?» uten å logge pasientdata og uten å vedlikeholde ekstra infrastruktur (Prometheus, Grafana, Sentry osv.). Komponentene er:
 
 - `RequestMetricsMiddleware` – samler per-request-telemetri i en in-memory ringbuffer.
-- `/portal-admin/server-status/` – HTML-dashbord for administratoren.
-- `/portal-admin/server-status/json/` – tilsvarende snapshot i JSON for automatisering og overvåkning.
+- `/admin/server-status/` – HTML-dashbord for administratoren.
+- `/admin/server-status/json/` – tilsvarende snapshot i JSON for automatisering og overvåkning.
 
 Alle komponenter er isolert til `patients`-appen og har ingen eksterne avhengigheter.
 
@@ -1089,11 +1090,11 @@ Fordi bufferen har 500 samples, vil 5-minutters-vinduet holde en realistisk over
 
 ### 8A.3 Admin server-status-dashbord
 
-**URL:** `/portal-admin/server-status/`
+**URL:** `/admin/server-status/`
 
 **Tilgang:** Global admin (`@admin_required`). Alle andre får 403, også de med
 `skriv_leder` på en modul — dashbordet viser tall på tvers av alle moduler.
-`core/tests_sikkerhet_runde2.py` går gjennom hele `/portal-admin/`-prefikset med anonym
+`core/tests_sikkerhet_runde2.py` går gjennom hele `/admin/`-prefikset med anonym
 og vanlig bruker.
 
 Dashbordet viser følgende paneler:
@@ -1121,7 +1122,7 @@ del som er nede tar ikke ned siden.
 
 ### 8A.4 JSON-endepunkt
 
-**URL:** `/portal-admin/server-status/json/`
+**URL:** `/admin/server-status/json/`
 
 Returnerer nøyaktig samme data som HTML-dashbordet, men i maskinlesbart JSON-format. Tiltenkt bruk:
 
@@ -1133,7 +1134,7 @@ Endepunktet krever fortsatt global admin og innlogget sesjon – det er **ikke**
 
 ### 8A.5 Feature-flag-systemet — fjernet
 
-Flagget `feature.live_stats_enabled` og endepunktet `/portal-admin/server-status/flag/`
+Flagget `feature.live_stats_enabled` og endepunktet `/admin/server-status/flag/`
 ble fjernet 13. sep. 2026. Funksjonen det skulle styre ble aldri bygget, og et kort for et
 flagg uten funksjon var støy på dashbordet. Trengs en bryter senere, er `AppSetting`
 fortsatt stedet — se portalinnstillingene for mønsteret.
@@ -1407,7 +1408,7 @@ Gunicorn-workere restartes etter `WEB_MAX_REQUESTS` requests (default 1000) plus
 
 ### 8D.6 Verifisering på admin-dashbord
 
-Admin-dashbordet (`/portal-admin/server-status/`) viser i Worker-config-kortet:
+Admin-dashbordet (`/admin/server-status/`) viser i Worker-config-kortet:
 - `WEB_WORKERS` og `WEB_THREADS` (env-verdier eller defaults)
 - Antall faktiske Gunicorn-prosesser observert via `psutil`
 - PID for nåværende worker
@@ -1487,7 +1488,7 @@ For at admin-dashbordet skal vise riktige tall når 2+ workere kjører parallelt
 
 ### 8E.5 Diagnostikk
 
-Når du åpner admin-dashbordet (`/portal-admin/server-status/`):
+Når du åpner admin-dashbordet (`/admin/server-status/`):
 
 - **Cache-backend-kortet** viser `redis` eller `locmem` med latency — dette er kilde-modusen.
 - **Metrikk-kortene** viser ny `source`-felt: `'redis'` betyr aggregering på tvers av alle workere, `'local'` betyr bare denne workeren (ev. fordi Redis er tom enda).
@@ -1614,7 +1615,7 @@ kildemodulen.*
 
 Fanenavigasjonen er implementert med `data-tab`-attributter og delegert event-lytting (ingen URLer endres).
 
-Portalmenyen viser **Server-status** (`/portal-admin/server-status/`) kun for global
+Portalmenyen viser **Server-status** (`/admin/server-status/`) kun for global
 admin, betinget i malen slik at lenken ikke finnes i DOMen for andre.
 
 **Django-admin rutes kun under `DEBUG`** (S1). Flaten er et utviklerverktøy, ikke en
@@ -1773,7 +1774,7 @@ Se kapittel 8 for hvordan systemet er bygget. Til daglig drift:
 
 | Oppgave | Hvor |
 |---|---|
-| Se status, endre plan per modul, kjøre manuelt | `/portal-admin/backup/` (global admin) |
+| Se status, endre plan per modul, kjøre manuelt | `/admin/backup/` (global admin) |
 | Kjøre fra kommandolinja | `python manage.py backup_kjor` |
 | Kontrollere at filene faktisk er gjenopprettbare | `python manage.py verifiser_backup` |
 | Hente en fil fra Scaleway | `python manage.py hent_offsite --list` / `hent_offsite <fil>` |
@@ -1799,13 +1800,13 @@ python manage.py purge_old_logs --notification-days 7  # egendefinert for varsle
 python manage.py purge_old_logs --dry-run             # forhåndsvis uten å slette
 ```
 
-Siste kjøring vises på `/portal-admin/server-status/`. **«Aldri» betyr at jobben ikke har
+Siste kjøring vises på `/admin/server-status/`. **«Aldri» betyr at jobben ikke har
 kjørt én eneste gang** — det er forskjellen mellom «ingenting å slette» og «jobben er
 død», og den var umulig å se før tidsstemplene kom 13. sep. 2026.
 
 ### 13.3 Nullstille MFA for bruker som har mistet telefonen
 
-1. Global admin → `/portal-admin/brukere/`
+1. Global admin → `/admin/brukere/`
 2. Åpne brukeren, klikk **«Nullstill MFA»** (vises kun når brukeren har MFA aktivt)
 3. Bekreft
 
@@ -1818,7 +1819,7 @@ Brukeren tvinges gjennom MFA-oppsett ved neste innlogging.
 *Dette erstattet «nullstill aktivt år» (§3.4 i vakt-notatet). Navnet betyr noe: «nullstill
 år» ville slettet for mye den dagen ett år rommer flere vakter.*
 
-**Administrasjon → Vakt** (`/portal-admin/vakt/`, 28. sep. 2026 — flyttet fra
+**Administrasjon → Vakt** (`/admin/vakt/`, 28. sep. 2026 — flyttet fra
 pasientsiden, fordi den gjelder hele portalen). **Global admin.** Siden viser først hva som
 skjer: hvor mange rader som arkiveres og tømmes per modul, hvilke statistikkfaner som
 fryses, og hva som **sperrer** — et oppdrag som står på tavla. Så, i `core/vaktslutt.py`:
@@ -1997,7 +1998,7 @@ Det finnes ingen IP-whitelist eller nettverkssegmentering på applikasjonsnivå.
 
 Restrisikoen — at jobben stopper uten at noen oppdager det — er **dempet siden
 13. sep. 2026**: hver kjøring skriver `AppSetting['cron.<navn>']` med tid, utfall og
-melding, og `/portal-admin/server-status/` viser det. **«Aldri» betyr at jobben ikke har
+melding, og `/admin/server-status/` viser det. **«Aldri» betyr at jobben ikke har
 kjørt én eneste gang**, og det er forskjellen mellom «ingenting å slette» og «jobben er
 død». Verifiseringen står fortsatt i den årlige revisjonssjekklisten
 (`PERSONVERN_DOKUMENTASJON.md` C.4), men nå kan den gjøres med et blikk.
@@ -2079,7 +2080,7 @@ eller LocMem, aldri `DatabaseCache` — `createcachetable` er derfor ikke svaret
 
 **Løsning:**
 1. Sjekk Railway-loggene for feilmeldingen; feilvarselet på e-post har tracebacken.
-2. Sjekk databasekortet på `/portal-admin/server-status/` og `/healthz/`.
+2. Sjekk databasekortet på `/admin/server-status/` og `/healthz/`.
 
 ### 16.2 Brukere eller data forsvinner
 
@@ -2106,7 +2107,7 @@ eller LocMem, aldri `DatabaseCache` — `createcachetable` er derfor ikke svaret
 
 **Symptom:** Bruker kan ikke logge inn fordi de har mistet telefonen eller slettet authenticator-appen.
 
-**Løsning:** Følg prosedyren i seksjon 13.3 (admin nullstiller MFA via `/portal-admin/brukere/<pk>/`).
+**Løsning:** Følg prosedyren i seksjon 13.3 (admin nullstiller MFA via `/admin/brukere/<pk>/`).
 
 ### 16.5 "CSRF verification failed"
 
@@ -2175,7 +2176,7 @@ tegnet var en linje i konsollen — mens bilen ikke pep.
 **Vanlig årsak:** `OFFSITE_*`-variablene mangler. Modulen er da **inert med vilje** —
 ingen feil, ingen forsøk. Det er normalt på staging.
 
-**Løsning:** `/portal-admin/backup/` lister nøyaktig hvilke variabler som mangler. Feilet
+**Løsning:** `/admin/backup/` lister nøyaktig hvilke variabler som mangler. Feilet
 opplastingen i stedet, står feilen samme sted, i `OffsiteKopi.feil`.
 
 ### 16.12 Cron-jobben gjør ingenting, og feiler ikke
@@ -2240,15 +2241,15 @@ serveres på `/`. Tre ekstra apper bygger ut admin-funksjonalitet:
   - `portal_dashboard_view` på `/`
   - `profile_view` på `/min-profil/`
 - `core.views_admin` (14. sep. 2026 — `core/views_portal.py` / `views_admin.py` / `views_backup.py` / `views_varsler.py` var 830 linjer og 24 views):
-  - `portal_settings_view` på `/portal-admin/innstillinger/`
+  - `portal_settings_view` på `/admin/innstillinger/`
   - `module_admin_list_view` / `module_admin_edit_view` på
-    `/portal-admin/moduler/[<slug>/]`
+    `/admin/moduler/[<slug>/]`
   - `audit_log_list_view` / `audit_log_csv_export_view` på
-    `/portal-admin/auditlog/[eksport.csv]`
-- `core.views_backup` — backup-admin på `/portal-admin/backup/...`
+    `/admin/auditlog/[eksport.csv]`
+- `core.views_backup` — backup-admin på `/admin/backup/...`
 - `core.views_varsler` — varsler på `/varsler/...`
 
-Alle rutene under `/portal-admin/` er samlet i `core/urls_admin.py` med
+Alle rutene under `/admin/` er samlet i `core/urls_admin.py` med
 navnerommet `portaladmin` (14. sep. 2026, gjeldspunkt 3.2). De lå i tre filer,
 med to ulike navnerom for samme flate.
 
@@ -2329,16 +2330,16 @@ Patient → Forstehjelper → Helsepersonell → AppSetting (FK-trygg).
 
 ### Admin-UI
 
-Under `/portal-admin/backup/`:
+Under `/admin/backup/`:
 
 | URL | Funksjon |
 | --- | --- |
-| `/portal-admin/backup/` | Oversikt over moduler + status |
-| `/portal-admin/backup/<slug>/` | Rediger config + se backup-liste |
-| `/portal-admin/backup/<slug>/run/` | Start manuell backup (POST) |
-| `/portal-admin/backup/<slug>/restore/<pk>/` | Restore med slug-bekreftelse |
-| `/portal-admin/backup/<slug>/last-ned/<pk>/` | Last ned `.json.gz` |
-| `/portal-admin/backup/<slug>/slett/<pk>/` | Slett enkelt-backup (POST) |
+| `/admin/backup/` | Oversikt over moduler + status |
+| `/admin/backup/<slug>/` | Rediger config + se backup-liste |
+| `/admin/backup/<slug>/run/` | Start manuell backup (POST) |
+| `/admin/backup/<slug>/restore/<pk>/` | Restore med slug-bekreftelse |
+| `/admin/backup/<slug>/last-ned/<pk>/` | Last ned `.json.gz` |
+| `/admin/backup/<slug>/slett/<pk>/` | Slett enkelt-backup (POST) |
 
 Alle admin-only via `@admin_required`. Restore-flyt logges i
 `AuditLog` med `table_name='<slug>_backup_restore'`,

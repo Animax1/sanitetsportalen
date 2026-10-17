@@ -16,7 +16,7 @@ Ett Django-prosjekt (`myproject`) med sju apper. Tanken er **rammeverk pluss mod
 
 | App | Rolle |
 |---|---|
-| `core` | Rammeverket: modulregisteret, tilgangsdekoratørene, og tre registre modulene melder seg inn i — backup, arkiv og statistikk. `Vakt` (scopet alt henger på), varsler, offsite, rate-limiting, idempotens, de fleste sidene under `/portal-admin/` |
+| `core` | Rammeverket: modulregisteret, tilgangsdekoratørene, og tre registre modulene melder seg inn i — backup, arkiv og statistikk. `Vakt` (scopet alt henger på), varsler, offsite, rate-limiting, idempotens, de fleste sidene under `/admin/` |
 | `accounts` | Kontoene: innlogging, MFA, passord, brukeradmin og `ModulTilgang` — hele tilgangsmekanismen |
 | `audit` | Loggen, skrevet av signaler |
 | `patients`, `oppdrag`, `vaktliste` | De tre modulene. Hver deklarerer `module.py` og melder inn handlerne sine fra `apps.ready()` |
@@ -76,7 +76,7 @@ Størrelse: en kveld for flyttingen, en til for navnetabellen og testene. Gjøre
 | # | Hva | Hvor | Hvorfor det er gjeld | Fiks |
 |---|---|---|---|---|
 | 3.1 | Brukeradmin kjenner én modul ved navn | `accounts/forms.py:599, 611` importerer `Forstehjelper` og `Helsepersonell` | `accounts` → `patients`. Kobling av konto til registerperson er modulens sak, ikke kontoens | La pasientmodulen eie koblingen (som `Mannskap.user` i vaktlista), eller gå gjennom en krok i `core.modules` |
-| 3.2 | `/portal-admin/` er fordelt på fire filer | `myproject/urls.py` (13), `core/urls.py` (15), `accounts/urls.py` (10), `patients/urls.py` (4) | Ingen finner alle adminsidene ett sted; `PortalAdminRuteneErStengtTests` måtte skrives over `urlpatterns` for å være sikker | Én `core/urls_admin.py`, inkludert fra prosjektet. Faller delvis ut av §2 |
+| 3.2 | `/admin/` er fordelt på fire filer | `myproject/urls.py` (13), `core/urls.py` (15), `accounts/urls.py` (10), `patients/urls.py` (4) | Ingen finner alle adminsidene ett sted; `PortalAdminRuteneErStengtTests` måtte skrives over `urlpatterns` for å være sikker | Én `core/urls_admin.py`, inkludert fra prosjektet. Faller delvis ut av §2 |
 | 3.3 | To bakoverkompatible skim | `accounts/decorators.py`, `patients/backup_service.py` | Beholdes bare fordi tester verifiserer dem | Slett skim og tester i samme commit |
 | 3.4 | `Lydvarsel` er med i oppdragsdumpen, men ikke i `restore_models` | `oppdrag/backup.py` | Gjenoppretting lar rader som ikke finnes i fila stå igjen; de andre modellene slettes først | Legg den i lista |
 | 3.5 | `VaktArkiv` gjentar feltene i `AbstractArkiv` | `patients/models.py` | **Bevisst**: `year_snapshot` og `arrangement_navn` inngår i signaturen til hvert arkiv i prod. Ikke rør | Ingen. Står her så ingen «rydder» den |

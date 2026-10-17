@@ -120,7 +120,7 @@ async function deleteHelsepersonell(id) {
 
 // ════════════════════════════════════════════════════════
 // AVSLUTT VAKT, TIDLIGERE VAKTER og gjenåpning bodde her til 28. sep. 2026.
-// De er portalens og står på /portal-admin/vakt/ (core/views_vakt.py),
+// De er portalens og står på /admin/vakt/ (core/views_vakt.py),
 // serverrendret — uten JS.
 // ════════════════════════════════════════════════════════
 

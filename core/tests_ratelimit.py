@@ -306,7 +306,7 @@ class RateLimitEndepunktTests(TestCase):
     def test_auditlog_eksport_strupes(self):
         c = self._klient(self.admin)
         statuser = _statuser(
-            lambda: c.get('/portal-admin/auditlog/eksport.csv'),
+            lambda: c.get('/admin/auditlog/eksport.csv'),
             nok_til_a_bryte(10),   # rate='10/m'
         )
         self.assertEqual(statuser[0], 200)

@@ -5,13 +5,13 @@ Grunnen er at appen har to typer flater som hører hjemme på hver sin sti:
 
 - **Innlogging, utlogging og passordbytte** ligger under ``/accounts/``. De
   brukes av alle innloggede og er ikke administrasjon.
-- **Brukeradministrasjon og innloggingslogg** ligger under ``/portal-admin/``,
+- **Brukeradministrasjon og innloggingslogg** ligger under ``/admin/``,
   sammen med moduler, revisjonslogg, backup og server-status.
 
 Samlingen under ett prefiks er ikke kosmetikk. ``MustChangePasswordMiddleware``
 matcher stier med ``startswith``, og framtidige regler (rate-limiting,
 ekstra rollesjekk) vil naturlig skrives på samme form. Lå brukeradministrasjonen
-fortsatt under ``/accounts/``, ville en regel for ``/portal-admin/*`` stille
+fortsatt under ``/accounts/``, ville en regel for ``/admin/*`` stille
 gått utenom nettopp den flaten som oppretter kontoer og deler ut admin-rollen.
 
 URL-*navnene* er uendret (``portaladmin:user_list`` osv.) slik at maler og tester
@@ -47,14 +47,14 @@ urlpatterns = [
     # Bokmerker og lenker i eldre dokumentasjon skal fortsatt virke.
     path(
         'accounts/users/',
-        RedirectView.as_view(url='/portal-admin/brukere/', permanent=True),
+        RedirectView.as_view(url='/admin/brukere/', permanent=True),
     ),
     path(
         'accounts/users/ny/',
-        RedirectView.as_view(url='/portal-admin/brukere/ny/', permanent=True),
+        RedirectView.as_view(url='/admin/brukere/ny/', permanent=True),
     ),
     path(
         'accounts/users/<int:pk>/',
-        RedirectView.as_view(url='/portal-admin/brukere/%(pk)s/', permanent=True),
+        RedirectView.as_view(url='/admin/brukere/%(pk)s/', permanent=True),
     ),
 ]

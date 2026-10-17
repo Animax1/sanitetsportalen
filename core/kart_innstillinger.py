@@ -1,4 +1,4 @@
-"""Kortet «Kartet» på `/portal-admin/innstillinger/` (André, 7. okt. 2026).
+"""Kortet «Kartet» på `/admin/innstillinger/` (André, 7. okt. 2026).
 
 Ett felt: **«Delt posisjon vises i kartet»** — hvor lenge en posisjon bil eller lag har delt med
 «Send posisjon» står under «OBS: Posisjon delt» i kart.sanitet.net. Felles for bil og lag, så det

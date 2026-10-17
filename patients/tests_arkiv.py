@@ -312,7 +312,7 @@ class ArkivSlettTests(ArkivTestMixin, TestCase):
         # Arkivet lages der det lages nå: av «Avslutt vakt» (28. sep. 2026).
         with tempfile.TemporaryDirectory() as mappe, \
                 mock.patch.dict(os.environ, {'BACKUP_DIR': mappe}):
-            self.admin_client.post('/portal-admin/vakt/avslutt/',
+            self.admin_client.post('/admin/vakt/avslutt/',
                                    {'bekreft': 'ja', 'ny_vakt_navn': 'Etter loggprøven'})
         ny_pk = VaktArkiv.objects.filter(vakt=self.vakt).exclude(pk=self.arkiv.pk).get().pk
         self._slett_arkiv(ny_pk)

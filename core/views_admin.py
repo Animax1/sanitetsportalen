@@ -40,7 +40,7 @@ def portal_settings_view(request):
     """Sesjonstimeout og modulenes egne innstillinger.
 
     Arrangementsnavnet sto her til 28. sep. 2026. Det *er* vaktas navn, og
-    flyttet til ``/portal-admin/vakt/`` (André: «Innstillinger er spesifikke
+    flyttet til ``/admin/vakt/`` (André: «Innstillinger er spesifikke
     funksjoner. /vakt er overordnet for denne vakten.»). Begge lå opprinnelig
     under ``/pasienter/`` fordi pasientmodulen var den eneste som fantes.
 
@@ -299,7 +299,7 @@ def audit_log_csv_export_view(request):
         )
         # Bevar GET-parametre i redirect
         qs_string = request.GET.urlencode()
-        url = '/portal-admin/auditlog/'
+        url = '/admin/auditlog/'
         if qs_string:
             url = f'{url}?{qs_string}'
         return redirect(url)
@@ -362,3 +362,20 @@ def api_flyttet(request) -> HttpResponse:
     return JsonResponse({
         'error': 'Adressen er flyttet. Pasientmodulens API ligger under /pasienter/api/.',
     }, status=410)
+
+
+def gammel_portaladmin(request, rest=''):
+    """`/portal-admin/<rest>` → `/admin/<rest>`, 301 (fase 0, 17. okt. 2026).
+
+    Resten av stien og spørrestrengen følger med, så bokmerker, lenker i
+    e-post og varsler som ble lagret med den gamle stien (`Notification.url`)
+    fortsatt lander riktig. Målet er alltid under `/admin/` — stien kan ikke
+    sende noen ut av portalen. Uten innlogging: adminflaten sender videre til
+    innloggingen selv, og en omdirigering avslører ingenting den gamle stien
+    ikke alt gjorde.
+    """
+    from django.http import HttpResponsePermanentRedirect
+    maal = '/admin/' + rest.lstrip('/')
+    if request.META.get('QUERY_STRING'):
+        maal += '?' + request.META['QUERY_STRING']
+    return HttpResponsePermanentRedirect(maal)

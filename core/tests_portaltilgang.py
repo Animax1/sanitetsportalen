@@ -208,9 +208,9 @@ class FanevaktenTests(PortalBasis):
         admin = _bruker('sjef', role='admin')
         c = self._klient(admin)
         c.post('/portal/', {'portal': 'brann'})
-        feil = c.post('/portal-admin/vakt/navn/', {'navn': 'Kamp 7', '_portal': 'standard'})
+        feil = c.post('/admin/vakt/navn/', {'navn': 'Kamp 7', '_portal': 'standard'})
         self.assertEqual(feil.status_code, 409)
-        riktig = c.post('/portal-admin/vakt/navn/', {'navn': 'Kamp 7', '_portal': 'brann'})
+        riktig = c.post('/admin/vakt/navn/', {'navn': 'Kamp 7', '_portal': 'brann'})
         self.assertEqual(riktig.status_code, 302)
         from core.vakt import hent_aktiv_vakt
         self.assertEqual(hent_aktiv_vakt(self.brann).navn, 'Kamp 7')

@@ -47,16 +47,16 @@ class VaktGjenaapnetUnderSlettingenTests(_MedAdmin):
         andre.force_login(self.admin)
 
         def gjenaapne_imens(*a, **k):
-            andre.post(f'/portal-admin/vakt/{self.gammel.pk}/gjenaapne/')
+            andre.post(f'/admin/vakt/{self.gammel.pk}/gjenaapne/')
 
         with mock.patch('core.backup.create_backup', side_effect=gjenaapne_imens):
-            self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
+            self.c.post(f'/admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
         self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists())
         self.assertEqual(hent_aktiv_vakt().pk, self.gammel.pk)
 
     def test_en_tidligere_vakt_slettes_fortsatt(self):
         """Motprøven."""
-        self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
+        self.c.post(f'/admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
         self.assertFalse(Vakt.objects.filter(pk=self.gammel.pk).exists())
 
 
@@ -65,7 +65,7 @@ class BackupenFeilerForSlettingenTests(_MedAdmin):
 
     def test_vaktslettingen_gir_melding_og_ikke_500(self):
         with mock.patch('core.backup.create_backup', side_effect=OSError('disken er full')):
-            svar = self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/slett/',
+            svar = self.c.post(f'/admin/vakt/{self.gammel.pk}/slett/',
                                {'navn': 'Gammel'}, follow=True)
         self.assertEqual(svar.status_code, 200)
         self.assertContains(svar, 'Backupen før slettingen feilet')
@@ -109,12 +109,12 @@ class TredjeGjennomgangTests(_MedAdmin):
             return ekte(*args, **kwargs)
 
         with mock.patch('core.views_vakt.laas_aktiv_vakt', side_effect=slettet_mens_vi_ventet):
-            svar = self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/gjenaapne/', follow=True)
+            svar = self.c.post(f'/admin/vakt/{self.gammel.pk}/gjenaapne/', follow=True)
         self.assertEqual(svar.status_code, 200)
         self.assertContains(svar, 'ble slettet før den rakk å gjenåpnes')
         self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
 
     def test_oppryddingen_etter_backupen_stopper_ikke_slettingen(self):
         with mock.patch('core.backup.rydd_pre_slett', side_effect=OSError('les-feil')):
-            self.c.post(f'/portal-admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
+            self.c.post(f'/admin/vakt/{self.gammel.pk}/slett/', {'navn': 'Gammel'})
         self.assertFalse(Vakt.objects.filter(pk=self.gammel.pk).exists())

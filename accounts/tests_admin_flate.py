@@ -1,8 +1,8 @@
-"""Tester for S1/S2: én innloggingsflate, og admin samlet under /portal-admin/.
+"""Tester for S1/S2: én innloggingsflate, og admin samlet under /admin/.
 
 - S1: `/django-admin/` er av i produksjon, og portalen dekker det den ble brukt til
 - S2: superbrukere arver `must_change_password=True`
-- URL-konsolidering: brukeradmin ligger under /portal-admin/, gamle stier redirecter
+- URL-konsolidering: brukeradmin ligger under /admin/, gamle stier redirecter
 
 Kjør med: python manage.py test accounts.tests_admin_flate
 """
@@ -71,7 +71,7 @@ class SuperuserPasswordChangeTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class BrukeradminUrlFlyttingTests(TestCase):
-    """Brukeradmin ligger under /portal-admin/, gamle stier redirecter."""
+    """Brukeradmin ligger under /admin/, gamle stier redirecter."""
 
     def setUp(self):
         self.client = Client()
@@ -83,36 +83,36 @@ class BrukeradminUrlFlyttingTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_ny_sti_svarer(self):
-        resp = self.client.get('/portal-admin/brukere/')
+        resp = self.client.get('/admin/brukere/')
         self.assertEqual(resp.status_code, 200)
 
     def test_url_navn_peker_paa_ny_sti(self):
         """Malene bruker {% url %}, så navnet må gi den nye stien."""
-        self.assertEqual(reverse('portaladmin:user_list'), '/portal-admin/brukere/')
-        self.assertEqual(reverse('portaladmin:user_create'), '/portal-admin/brukere/ny/')
+        self.assertEqual(reverse('portaladmin:user_list'), '/admin/brukere/')
+        self.assertEqual(reverse('portaladmin:user_create'), '/admin/brukere/ny/')
         self.assertEqual(
             reverse('portaladmin:user_detail', kwargs={'pk': 7}),
-            '/portal-admin/brukere/7/',
+            '/admin/brukere/7/',
         )
         self.assertEqual(
             reverse('portaladmin:user_delete', kwargs={'pk': 7}),
-            '/portal-admin/brukere/7/slett/',
+            '/admin/brukere/7/slett/',
         )
 
     def test_gammel_liste_redirecter_permanent(self):
         resp = self.client.get('/accounts/users/')
         self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], '/portal-admin/brukere/')
+        self.assertEqual(resp['Location'], '/admin/brukere/')
 
     def test_gammel_ny_bruker_redirecter(self):
         resp = self.client.get('/accounts/users/ny/')
         self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], '/portal-admin/brukere/ny/')
+        self.assertEqual(resp['Location'], '/admin/brukere/ny/')
 
     def test_gammel_detalj_redirecter_med_pk(self):
         resp = self.client.get(f'/accounts/users/{self.admin.pk}/')
         self.assertEqual(resp.status_code, 301)
-        self.assertEqual(resp['Location'], f'/portal-admin/brukere/{self.admin.pk}/')
+        self.assertEqual(resp['Location'], f'/admin/brukere/{self.admin.pk}/')
 
     def test_innlogging_ligger_fortsatt_under_accounts(self):
         """Innlogging er ikke en admin-flate og skal ikke flyttes."""

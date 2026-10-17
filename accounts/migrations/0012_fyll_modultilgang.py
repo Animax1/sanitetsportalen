@@ -62,7 +62,7 @@ def fyll(apps, schema_editor):
         print()
         print('!! ADVARSEL: kontoer med ukjent rolle fikk INGEN modultilgang.')
         print('   De er stengt ute av alle moduler til nivaa settes i matrisen')
-        print('   paa /portal-admin/brukere/.')
+        print('   paa /admin/brukere/.')
         for navn, rolle in ukjente:
             print(f'     {navn} (role={rolle!r})')
         print()

@@ -95,19 +95,19 @@ class ServerSideSynlighetTests(TestCase):
 
     def test_ikke_admin_far_ingen_adminkort(self):
         html = self._html('ss_ikke_admin', 'skriv_full')
-        # «Avslutt vakt» og «Lagre som arkiv» flyttet til /portal-admin/vakt/
+        # «Avslutt vakt» og «Lagre som arkiv» flyttet til /admin/vakt/
         # 28. sep. 2026; lenken dit er adminkortet som står igjen her.
-        for markor in ('/portal-admin/vakt/', 'loadArkivListe',
-                       'addForstehjelper', '/portal-admin/innstillinger/'):
+        for markor in ('/admin/vakt/', 'loadArkivListe',
+                       'addForstehjelper', '/admin/innstillinger/'):
             with self.subTest(markor=markor):
                 self.assertNotIn(markor, html)
 
     def test_admin_far_adminkortene(self):
         html = self._html('ss_admin', None, rolle='admin')
-        # «Avslutt vakt» og «Lagre som arkiv» flyttet til /portal-admin/vakt/
+        # «Avslutt vakt» og «Lagre som arkiv» flyttet til /admin/vakt/
         # 28. sep. 2026; lenken dit er adminkortet som står igjen her.
-        for markor in ('/portal-admin/vakt/', 'loadArkivListe',
-                       'addForstehjelper', '/portal-admin/innstillinger/'):
+        for markor in ('/admin/vakt/', 'loadArkivListe',
+                       'addForstehjelper', '/admin/innstillinger/'):
             with self.subTest(markor=markor):
                 self.assertIn(markor, html)
 
@@ -118,4 +118,4 @@ class ServerSideSynlighetTests(TestCase):
         utviklerverktøy.
         """
         html = self._html('ss_url', 'skriv_full')
-        self.assertNotIn('/portal-admin/', html)
+        self.assertNotIn('/admin/', html)

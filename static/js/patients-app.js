@@ -30,7 +30,7 @@ document.addEventListener('input', (e) => {
 
 
 
-// Leser kun. Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1),
+// Leser kun. Skrivingen flyttet til /admin/innstillinger/ (§4.1),
 // og redigeringsfeltet som lå i innstillingsfanen fulgte med.
 async function loadSettings() {
   const s = await (await apiFetch('/pasienter/api/settings/')).json();

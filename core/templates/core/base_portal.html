@@ -293,28 +293,28 @@
           {# Admin-lenkene bodde også i en egen menyrad til 22. sep. 2026 — fire av dem sto begge steder. #}
           <li><hr class="dropdown-divider"></li>
           <li><h6 class="dropdown-header">Administrasjon</h6></li>
-          <li><a class="dropdown-item{% if '/portal-admin/vakt' in request.path %} active{% endif %}" href="{% url 'portaladmin:vakt' %}">
+          <li><a class="dropdown-item{% if '/admin/vakt' in request.path %} active{% endif %}" href="{% url 'portaladmin:vakt' %}">
             <i class="bi bi-flag me-2"></i>Vakt
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/brukere' in request.path %} active{% endif %}" href="{% url 'portaladmin:user_list' %}">
+          <li><a class="dropdown-item{% if '/admin/brukere' in request.path %} active{% endif %}" href="{% url 'portaladmin:user_list' %}">
             <i class="bi bi-people me-2"></i>Brukere
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/server-status' in request.path %} active{% endif %}" href="{% url 'portaladmin:admin_server_status' %}">
+          <li><a class="dropdown-item{% if '/admin/server-status' in request.path %} active{% endif %}" href="{% url 'portaladmin:admin_server_status' %}">
             <i class="bi bi-speedometer2 me-2"></i>Server-status
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/moduler' in request.path %} active{% endif %}" href="{% url 'portaladmin:module_admin_list' %}">
+          <li><a class="dropdown-item{% if '/admin/moduler' in request.path %} active{% endif %}" href="{% url 'portaladmin:module_admin_list' %}">
             <i class="bi bi-toggles me-2"></i>Moduler
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/innstillinger' in request.path %} active{% endif %}" href="{% url 'portaladmin:portal_settings' %}">
+          <li><a class="dropdown-item{% if '/admin/innstillinger' in request.path %} active{% endif %}" href="{% url 'portaladmin:portal_settings' %}">
             <i class="bi bi-sliders me-2"></i>Innstillinger
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/auditlog' in request.path %} active{% endif %}" href="{% url 'portaladmin:audit_log_list' %}">
+          <li><a class="dropdown-item{% if '/admin/auditlog' in request.path %} active{% endif %}" href="{% url 'portaladmin:audit_log_list' %}">
             <i class="bi bi-journal-text me-2"></i>Revisjonslogg
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/innloggingslogg' in request.path %} active{% endif %}" href="{% url 'portaladmin:login_event_list' %}">
+          <li><a class="dropdown-item{% if '/admin/innloggingslogg' in request.path %} active{% endif %}" href="{% url 'portaladmin:login_event_list' %}">
             <i class="bi bi-box-arrow-in-right me-2"></i>Innloggingslogg
           </a></li>
-          <li><a class="dropdown-item{% if '/portal-admin/backup' in request.path %} active{% endif %}" href="{% url 'portaladmin:backup_admin' %}">
+          <li><a class="dropdown-item{% if '/admin/backup' in request.path %} active{% endif %}" href="{% url 'portaladmin:backup_admin' %}">
             <i class="bi bi-cloud-arrow-up me-2"></i>Backup
           </a></li>
           {% endif %}

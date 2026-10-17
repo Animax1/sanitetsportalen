@@ -294,7 +294,7 @@ plass, og hvem som får **fylle** den.*
       lesbar uten portalens CSS.
 - [ ] **Innholdet**: navn, rolle, tider, korps, telefon og ISSI. **Ikke** e-post, notat
       eller merknad.
-- [ ] **Send til mottakerne** (satt under `/portal-admin/innstillinger/`) → utsendingen står
+- [ ] **Send til mottakerne** (satt under `/admin/innstillinger/`) → utsendingen står
       i lista, med resultat.
 - [ ] **E-post nede stenger ikke innsjekken**: sett en ugyldig mottaker og sett lista i
       drift → drift lagres, og feilen står på utsendingen.

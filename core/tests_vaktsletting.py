@@ -275,7 +275,7 @@ class SlettVaktTests(SlettingBasis):
 class SlettSidenTests(SlettingBasis):
 
     def _url(self, vakt):
-        return f'/portal-admin/vakt/{vakt.pk}/slett/'
+        return f'/admin/vakt/{vakt.pk}/slett/'
 
     def test_siden_viser_hva_som_forsvinner(self):
         svar = self.c.get(self._url(self.gammel))
@@ -311,7 +311,7 @@ class SlettSidenTests(SlettingBasis):
         self.assertTrue(Vakt.objects.filter(pk=self.gammel.pk).exists())
 
     def test_vaktsiden_lenker_til_slettingen(self):
-        self.assertContains(self.c.get('/portal-admin/vakt/'), self._url(self.gammel))
+        self.assertContains(self.c.get('/admin/vakt/'), self._url(self.gammel))
 
 
 class SlettArkivTests(SlettingBasis):
@@ -323,7 +323,7 @@ class SlettArkivTests(SlettingBasis):
         return VaktArkiv.objects.get(vakt=self.gammel)
 
     def _url(self, arkiv, slug='patients'):
-        return f'/portal-admin/vakt/arkiv/{slug}/{arkiv.pk}/slett/'
+        return f'/admin/vakt/arkiv/{slug}/{arkiv.pk}/slett/'
 
     def test_sletter_og_logger(self):
         from patients.models import ArkivertPasient, VaktArkiv
@@ -389,7 +389,7 @@ class SlettArkivTests(SlettingBasis):
         ukjent = max(OppdragArkiv.objects.values_list('pk', flat=True)) + 100
         self.assertEqual(self.c.post(self._url(arkiv, 'finnesikke'),
                                      {'tittel': arkiv.tittel}).status_code, 404)
-        self.assertEqual(self.c.post(f'/portal-admin/vakt/arkiv/oppdrag/{ukjent}/slett/',
+        self.assertEqual(self.c.post(f'/admin/vakt/arkiv/oppdrag/{ukjent}/slett/',
                                      {'tittel': arkiv.tittel}).status_code, 404)
         self._arkiv()
 

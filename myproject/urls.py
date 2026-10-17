@@ -6,7 +6,7 @@ Struktur (fra Fase 2):
 - /pasienter/        → patients-appen (alle gamle /api/... og /admin/server-status/...)
 - /statistikk/       → statistikk-appen (samlet statistikk på tvers av moduler)
 - /accounts/         → innlogging og passordbytte
-- /portal-admin/     → all administrasjon (brukere, moduler, logger, backup, status)
+- /admin/     → all administrasjon (brukere, moduler, logger, backup, status)
 - /healthz/          → health-check (ingen auth, brukes av Railway)
 - /robots.txt        → crawler-sperre (ingen auth)
 - /personvern/       → personvernerklæringen (ingen auth)
@@ -14,12 +14,13 @@ Struktur (fra Fase 2):
 """
 from django.conf import settings
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path, re_path
 
 from core.manifest import manifest_view
 from core.personvern import personvern_view
 from core.robots import robots_txt
 from core.health import healthz
+from core.views_admin import gammel_portaladmin
 
 urlpatterns = [
     # Health-endepunkt (forbedring #2) — INGEN auth, brukes av Railway
@@ -39,12 +40,15 @@ urlpatterns = [
     path('personvern/', personvern_view, name='personvern'),
 
     # Kontoer og administrasjon. Modulen mountes på root fordi den betjener
-    # både /accounts/ (innlogging) og /portal-admin/ (brukeradmin) — se
+    # både /accounts/ (innlogging) og /admin/ (brukeradmin) — se
     # docstringen i accounts/urls.py.
     path('', include('accounts.urls')),
 
-    # Server-status admin (global URL, ingen namespace)
-    path('portal-admin/', include('core.urls_admin')),
+    # Adminflaten. Het `/portal-admin/` til 17. okt. 2026 (fase 0 i
+    # `docs/BESLUTNING_PORTALER.md`); den gamle stien sender hit med 301, med
+    # resten av stien og spørrestrengen, så bokmerker og varsler fortsatt virker.
+    path('admin/', include('core.urls_admin')),
+    re_path(r'^portal-admin/(?P<rest>.*)$', gammel_portaladmin, name='gammel_portaladmin'),
 
     # Pasientregistrering (fra Fase 2 mountet under /pasienter/)
     # OBS: må stå FØR core fordi core inneholder legacy-redirects som ellers
@@ -91,12 +95,12 @@ urlpatterns = [
 #
 # I produksjon finnes det derfor kun én vei inn, og den er sikret. Portalen
 # dekker det admin faktisk trenger:
-#   /portal-admin/brukere/           brukeradministrasjon
-#   /portal-admin/innloggingslogg/   LoginEvent
-#   /portal-admin/auditlog/          AuditLog
-#   /portal-admin/moduler/           ModuleSettings
-#   /portal-admin/backup/            Backup
-#   /portal-admin/server-status/     drift
+#   /admin/brukere/           brukeradministrasjon
+#   /admin/innloggingslogg/   LoginEvent
+#   /admin/auditlog/          AuditLog
+#   /admin/moduler/           ModuleSettings
+#   /admin/backup/            Backup
+#   /admin/server-status/     drift
 # AppSetting redigeres med `python manage.py appsetting` (nødoperasjon).
 #
 # Lokalt (DEBUG) beholdes flaten som utviklerverktøy. Offline-modusen som

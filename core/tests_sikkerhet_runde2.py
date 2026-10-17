@@ -111,9 +111,9 @@ def _ruter_under(prefiks):
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PortalAdminRuteneErStengtTests(TestCase):
     """L14: dekoratørtesten dekket bare modulprefiksene. Her går vi gjennom
-    `/portal-admin/`, `/varsler/`, `/api/varsler/` og `/min-profil/` og krever
+    `/admin/`, `/varsler/`, `/api/varsler/` og `/min-profil/` og krever
     at anonym får omdirigering eller 403, og at en vanlig bruker får 403 på
-    alt under `/portal-admin/`. Rutene finnes fra `urlpatterns`, så en ny
+    alt under `/admin/`. Rutene finnes fra `urlpatterns`, så en ny
     rute uten dekoratør fanges."""
 
     def setUp(self):
@@ -126,13 +126,13 @@ class PortalAdminRuteneErStengtTests(TestCase):
         return '/' + re.sub(r'<(?:\w+:)?(\w+)>', lambda m: 'patients' if m.group(1) == 'slug' else ('1' if 'pk' in m.group(1) else 'x'), monster)
 
     def test_admin_required_har_markoer(self):
-        for full, navn, cb in _ruter_under('portal-admin/'):
+        for full, navn, cb in _ruter_under('admin/'):
             self.assertTrue(getattr(cb, '_admin_required', False) or getattr(cb, '_modul_kreves', None),
                             f'{full} ({navn}) mangler @admin_required')
 
     def test_anonym_slipper_ikke_inn(self):
         c = Client()
-        ruter = [r for r in _ruter_under('portal-admin/') + _ruter_under('varsler/')
+        ruter = [r for r in _ruter_under('admin/') + _ruter_under('varsler/')
                  + _ruter_under('api/varsler/') + _ruter_under('min-profil/')]
         self.assertGreaterEqual(len(ruter), 20)
         for full, navn, cb in ruter:
@@ -143,6 +143,6 @@ class PortalAdminRuteneErStengtTests(TestCase):
 
     def test_vanlig_bruker_faar_403_under_portal_admin(self):
         c = Client(); c.force_login(self.bruker)
-        for full, navn, cb in _ruter_under('portal-admin/'):
+        for full, navn, cb in _ruter_under('admin/'):
             res = c.get(self._sti(full))
             self.assertIn(res.status_code, (403, 405), f'{full} ({navn}) → {res.status_code}')

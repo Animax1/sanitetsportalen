@@ -57,7 +57,7 @@ def lesbar_dbfeil(jobb, navn=None):
             noe feilet: en cron-jobb som feiler halvveis er noe annet enn en
             som aldri kom i gang.
         navn: jobbens navn for `registrer_kjoring` (13. sep. 2026) — siste
-            kjøring, ok/feil, vises på /portal-admin/server-status/. Ingen
+            kjøring, ok/feil, vises på /admin/server-status/. Ingen
             har en bruker som ser cron-loggen, og en jobb som stille har
             sluttet å kjøre er den feilen man ellers oppdager for sent.
     """
@@ -80,7 +80,7 @@ def lesbar_dbfeil(jobb, navn=None):
 
 
 #: Jobbene Railway Cron faktisk kjører. Dashbordet på
-#: `/portal-admin/server-status/` viser «Aldri» for en jobb som står her uten
+#: `/admin/server-status/` viser «Aldri» for en jobb som står her uten
 #: å være satt opp — og et varsel som alltid står rødt lærer deg å ikke se på
 #: dashbordet.
 #:

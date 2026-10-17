@@ -107,7 +107,7 @@
 
   /* ── HTML-escaping ───────────────────────────────────────────────────── */
   // Egen kopi, ikke escapeHtml(): fila lastes av base_portal, og sidene
-  // under /portal-admin/ laster ikke portal-utils.js. Må gi samme svar som
+  // under /admin/ laster ikke portal-utils.js. Må gi samme svar som
   // den — core/tests_js_escaping.py. Manglet `'` til 26. sep. 2026 (E5).
   function esc(str) {
     return String(str ?? '')

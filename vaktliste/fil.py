@@ -13,7 +13,7 @@ vakta». Se `docs/BESLUTNING_VAKTLISTE.md` §13.
 
 Mottakerne og bryteren for automatisk utsending ligger i `AppSetting`
 (`MOTTAKERE_NOKKEL`, `VED_DRIFT_NOKKEL`) og settes under
-`/portal-admin/innstillinger/`.
+`/admin/innstillinger/`.
 """
 from __future__ import annotations
 

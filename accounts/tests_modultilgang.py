@@ -175,8 +175,8 @@ class GlobalAdminTests(TestCase):
             slug='patients', defaults={'enabled': False})
         admin = _bruker('ga3', 'admin')
         self.client.force_login(admin)
-        self.assertEqual(self.client.get('/portal-admin/moduler/patients/').status_code, 200)
-        svar = self.client.post('/portal-admin/moduler/patients/', {'enabled': 'on', 'note': ''})
+        self.assertEqual(self.client.get('/admin/moduler/patients/').status_code, 200)
+        svar = self.client.post('/admin/moduler/patients/', {'enabled': 'on', 'note': ''})
         self.assertEqual(svar.status_code, 302)
         self.assertTrue(ModuleSettings.objects.get(slug='patients').enabled)
 

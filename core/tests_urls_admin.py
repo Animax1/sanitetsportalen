@@ -1,4 +1,4 @@
-"""Adminflaten: hele kartet under `/portal-admin/`, låst til literale verdier.
+"""Adminflaten: hele kartet under `/admin/`, låst til literale verdier.
 
 Rutene lå spredt på `myproject/urls.py`, `core/urls.py` og `accounts/urls.py`
 fram til 14. sep. 2026, og ble samlet i `core/urls_admin.py` (gjeldspunkt 3.2).
@@ -15,6 +15,8 @@ en skråstrek ser lik ut.
 """
 from __future__ import annotations
 
+import re
+
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import get_resolver
 
@@ -23,33 +25,33 @@ from django.urls import get_resolver
 #: tok den med seg.
 KARTET = {
     # Vakta (28. sep. 2026): flyttet fra `/pasienter/api/avslutt-vakt/` m.fl.
-    'portal-admin/vakt/': 'vakt',
-    'portal-admin/vakt/navn/': 'vakt_navn',
-    'portal-admin/vakt/avslutt/': 'vakt_avslutt',
-    'portal-admin/vakt/<int:pk>/gjenaapne/': 'vakt_gjenaapne',
-    'portal-admin/vakt/<int:pk>/slett/': 'vakt_slett',
-    'portal-admin/vakt/arkiv/<slug:slug>/<int:pk>/slett/': 'vakt_arkiv_slett',
-    'portal-admin/auditlog/': 'audit_log_list',
-    'portal-admin/auditlog/eksport.csv': 'audit_log_csv_export',
-    'portal-admin/backup/': 'backup_admin',
-    'portal-admin/backup/<slug:slug>/restore/<int:pk>/': 'backup_admin_restore',
-    'portal-admin/backup/<slug:slug>/slett/<int:pk>/': 'backup_admin_delete',
-    'portal-admin/backup/kjor/': 'backup_admin_run_alle',
-    'portal-admin/backup/kjor/<slug:slug>/': 'backup_admin_run',
-    'portal-admin/backup/plan/<slug:slug>/': 'backup_admin_plan',
-    'portal-admin/brukere/': 'user_list',
-    'portal-admin/brukere/<int:pk>/': 'user_detail',
-    'portal-admin/brukere/<int:pk>/slett/': 'user_delete',
-    'portal-admin/brukere/ny/': 'user_create',
-    'portal-admin/innloggingslogg/': 'login_event_list',
-    'portal-admin/innstillinger/': 'portal_settings',
-    'portal-admin/moduler/': 'module_admin_list',
-    'portal-admin/moduler/<slug:slug>/': 'module_admin_edit',
-    'portal-admin/server-status/': 'admin_server_status',
-    'portal-admin/server-status/json/': 'admin_server_status_json',
-    'portal-admin/server-status/sessions/': 'admin_sessions_list',
-    'portal-admin/server-status/sessions/kill-all/': 'admin_session_kill_all',
-    'portal-admin/server-status/sessions/kill/': 'admin_session_kill',
+    'admin/vakt/': 'vakt',
+    'admin/vakt/navn/': 'vakt_navn',
+    'admin/vakt/avslutt/': 'vakt_avslutt',
+    'admin/vakt/<int:pk>/gjenaapne/': 'vakt_gjenaapne',
+    'admin/vakt/<int:pk>/slett/': 'vakt_slett',
+    'admin/vakt/arkiv/<slug:slug>/<int:pk>/slett/': 'vakt_arkiv_slett',
+    'admin/auditlog/': 'audit_log_list',
+    'admin/auditlog/eksport.csv': 'audit_log_csv_export',
+    'admin/backup/': 'backup_admin',
+    'admin/backup/<slug:slug>/restore/<int:pk>/': 'backup_admin_restore',
+    'admin/backup/<slug:slug>/slett/<int:pk>/': 'backup_admin_delete',
+    'admin/backup/kjor/': 'backup_admin_run_alle',
+    'admin/backup/kjor/<slug:slug>/': 'backup_admin_run',
+    'admin/backup/plan/<slug:slug>/': 'backup_admin_plan',
+    'admin/brukere/': 'user_list',
+    'admin/brukere/<int:pk>/': 'user_detail',
+    'admin/brukere/<int:pk>/slett/': 'user_delete',
+    'admin/brukere/ny/': 'user_create',
+    'admin/innloggingslogg/': 'login_event_list',
+    'admin/innstillinger/': 'portal_settings',
+    'admin/moduler/': 'module_admin_list',
+    'admin/moduler/<slug:slug>/': 'module_admin_edit',
+    'admin/server-status/': 'admin_server_status',
+    'admin/server-status/json/': 'admin_server_status_json',
+    'admin/server-status/sessions/': 'admin_sessions_list',
+    'admin/server-status/sessions/kill-all/': 'admin_session_kill_all',
+    'admin/server-status/sessions/kill/': 'admin_session_kill',
 }
 
 
@@ -68,7 +70,7 @@ class PortalAdminKartetTests(SimpleTestCase):
 
     def test_stiene_og_navnene_er_uendret(self) -> None:
         funnet = {sti: navn for sti, navn in _alle_ruter()
-                  if sti.startswith('portal-admin/')}
+                  if sti.startswith('admin/')}
         self.assertEqual(funnet, KARTET)
 
     def test_hele_flaten_har_ett_navnerom(self) -> None:
@@ -96,7 +98,7 @@ class PortalAdminKartetTests(SimpleTestCase):
         igjen — og neste som leter finner bare halvparten."""
         from core import urls_admin
 
-        i_fila = {'portal-admin/' + str(p.pattern) for p in urls_admin.urlpatterns}
+        i_fila = {'admin/' + str(p.pattern) for p in urls_admin.urlpatterns}
         self.assertEqual(i_fila, set(KARTET))
 
     def test_ingen_andre_filer_ruter_under_portal_admin(self) -> None:
@@ -105,24 +107,27 @@ class PortalAdminKartetTests(SimpleTestCase):
         from django.conf import settings
 
         funn = []
-        for navn in ('myproject/urls.py', 'core/urls.py', 'accounts/urls.py',
-                     'patients/urls.py'):
+        # Filene som mountes på rota. `patients/urls.py` står under `/pasienter/`,
+        # så `admin/server-status/` der er `/pasienter/admin/…`, ikke flaten.
+        for navn in ('myproject/urls.py', 'core/urls.py', 'accounts/urls.py'):
             tekst = Path(settings.BASE_DIR, navn).read_text(encoding='utf-8')
             for linje in tekst.split('\n'):
                 ren = linje.strip()
-                if ren.startswith(('path(', 're_path(')) and 'portal-admin/' in ren:
+                # Stien må *begynne* med `admin/` — `portal-admin/` er
+                # omdirigeringen fra den gamle stien, ikke en rute under flaten.
+                if ren.startswith(('path(', 're_path(')) and re.search(r"\(\s*r?'\^?admin/", ren):
                     # `include`-linja i prosjektet er selve samlingen.
                     if 'core.urls_admin' in ren:
                         continue
                     funn.append(f'{navn}: {ren}')
         self.assertEqual(funn, [], (
-            'Ruter under /portal-admin/ utenfor `core/urls_admin.py`:\n  '
+            'Ruter under /admin/ utenfor `core/urls_admin.py`:\n  '
             + '\n  '.join(funn)))
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class AdminsideneRendrerTests(TestCase):
-    """Hver GET-side under `/portal-admin/` skal svare 200 for en global admin.
+    """Hver GET-side under `/admin/` skal svare 200 for en global admin.
 
     `PortalAdminKartetTests` sier at ruta *finnes*; denne sier at siden
     *virker*. Det er to ulike spørsmål, og samlingen 14. sep. 2026 viste

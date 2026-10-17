@@ -670,7 +670,7 @@ class BackupplanTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class BackupAdminViewTests(TestCase):
-    """Tester for /portal-admin/backup/-views (admin-only + restore-flyt)."""
+    """Tester for /admin/backup/-views (admin-only + restore-flyt)."""
 
     def setUp(self) -> None:
         _restore_patients_handler()
@@ -689,14 +689,14 @@ class BackupAdminViewTests(TestCase):
     def test_overview_requires_admin(self) -> None:
         client = Client()
         client.force_login(self.lead)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         # admin_required → redirect til dashboard for ikke-admin.
         self.assertIn(resp.status_code, (302, 403))
 
     def test_overview_renders_for_admin(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'patients')
 
@@ -705,7 +705,7 @@ class BackupAdminViewTests(TestCase):
         rundene for å ta backup av alt som var tungvint."""
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         for slug in ('patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv'):
             with self.subTest(slug=slug):
                 self.assertContains(resp, slug)
@@ -715,7 +715,7 @@ class BackupAdminViewTests(TestCase):
         seks skjemaer på én side delt feltnavn og overskrevet hverandre."""
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         for felt in ('modus', 'intervall_verdi', 'intervall_enhet', 'behold'):
             with self.subTest(felt=felt):
                 self.assertContains(resp, f'name="patients-{felt}"')
@@ -724,7 +724,7 @@ class BackupAdminViewTests(TestCase):
     def test_plan_view_lagrer_egen_plan(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/plan/patients/', data={
+        resp = client.post('/admin/backup/plan/patients/', data={
             'patients-folger_standard': '',       # egen plan
             'patients-modus': 'av',
             'patients-intervall_verdi': '30',
@@ -741,7 +741,7 @@ class BackupAdminViewTests(TestCase):
     def test_plan_view_lagrer_standardplanen(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/plan/standard/', data={
+        resp = client.post('/admin/backup/plan/standard/', data={
             'standard-modus': 'alltid',
             'standard-intervall_verdi': '2',
             'standard-intervall_enhet': 'time',
@@ -756,7 +756,7 @@ class BackupAdminViewTests(TestCase):
     def test_plan_view_avviser_ugyldig_intervall(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        client.post('/portal-admin/backup/plan/patients/', data={
+        client.post('/admin/backup/plan/patients/', data={
             'patients-folger_standard': '', 'patients-modus': 'ved_endring',
             'patients-intervall_verdi': '0', 'patients-intervall_enhet': 'minutt',
             'patients-behold': '25',
@@ -768,7 +768,7 @@ class BackupAdminViewTests(TestCase):
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            resp = client.post('/portal-admin/backup/kjor/patients/')
+            resp = client.post('/admin/backup/kjor/patients/')
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(
             Backup.objects.filter(module_slug='patients', kind=KIND_MANUAL).exists(),
@@ -782,7 +782,7 @@ class BackupAdminViewTests(TestCase):
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            resp = client.post('/portal-admin/backup/kjor/')
+            resp = client.post('/admin/backup/kjor/')
         self.assertEqual(resp.status_code, 302)
         for handler in all_handlers():
             with self.subTest(slug=handler.slug):
@@ -798,7 +798,7 @@ class BackupAdminViewTests(TestCase):
 
             # Feil slug → form-feil, ingen restore.
             resp_wrong = client.post(
-                f'/portal-admin/backup/patients/restore/{backup.pk}/',
+                f'/admin/backup/patients/restore/{backup.pk}/',
                 data={'confirm_slug': 'feil'},
             )
             self.assertEqual(resp_wrong.status_code, 200)
@@ -806,7 +806,7 @@ class BackupAdminViewTests(TestCase):
 
             # Riktig slug → restore + redirect.
             resp_ok = client.post(
-                f'/portal-admin/backup/patients/restore/{backup.pk}/',
+                f'/admin/backup/patients/restore/{backup.pk}/',
                 data={'confirm_slug': 'patients'},
             )
         self.assertEqual(resp_ok.status_code, 302)
@@ -818,7 +818,7 @@ class BackupAdminViewTests(TestCase):
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
             client.post(
-                f'/portal-admin/backup/patients/restore/{backup.pk}/',
+                f'/admin/backup/patients/restore/{backup.pk}/',
                 data={'confirm_slug': 'patients'},
             )
 
@@ -835,7 +835,7 @@ class BackupAdminViewTests(TestCase):
         """Manuell backup skal være admin-only, som resten av flaten."""
         client = Client()
         client.force_login(self.lead)
-        resp = client.post('/portal-admin/backup/kjor/patients/')
+        resp = client.post('/admin/backup/kjor/patients/')
         self.assertIn(resp.status_code, (302, 403))
 
     def test_restore_view_requires_admin(self) -> None:
@@ -845,7 +845,7 @@ class BackupAdminViewTests(TestCase):
         client = Client()
         client.force_login(self.lead)
         resp = client.post(
-            f'/portal-admin/backup/patients/restore/{backup.pk}/',
+            f'/admin/backup/patients/restore/{backup.pk}/',
             data={'confirm_slug': 'patients'},
         )
         self.assertIn(resp.status_code, (302, 403))
@@ -860,10 +860,10 @@ class BackupAdminViewTests(TestCase):
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
-            resp = client.get(f'/portal-admin/backup/patients/last-ned/{backup.pk}/')
+            resp = client.get(f'/admin/backup/patients/last-ned/{backup.pk}/')
         self.assertEqual(resp.status_code, 404)
 
-        siden = client.get('/portal-admin/backup/')
+        siden = client.get('/admin/backup/')
         self.assertNotContains(siden, 'last-ned')
 
     def test_delete_view_removes_backup(self) -> None:
@@ -875,7 +875,7 @@ class BackupAdminViewTests(TestCase):
             path = self.backup_dir / backup.filename
             self.assertTrue(path.exists())
 
-            resp = client.post(f'/portal-admin/backup/patients/slett/{backup.pk}/',
+            resp = client.post(f'/admin/backup/patients/slett/{backup.pk}/',
                                {'bekreft': 'ja'})
 
         self.assertEqual(resp.status_code, 302)
@@ -892,7 +892,7 @@ class BackupAdminViewTests(TestCase):
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
-            resp = client.post(f'/portal-admin/backup/patients/slett/{backup.pk}/')
+            resp = client.post(f'/admin/backup/patients/slett/{backup.pk}/')
             self.assertTrue((self.backup_dir / backup.filename).exists())
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(Backup.objects.filter(pk=backup.pk).exists())
@@ -900,9 +900,9 @@ class BackupAdminViewTests(TestCase):
     def test_ukjent_modul_omdirigerer_med_feil(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/kjor/finnes-ikke/')
+        resp = client.post('/admin/backup/kjor/finnes-ikke/')
         self.assertEqual(resp.status_code, 302)
-        resp = client.post('/portal-admin/backup/plan/finnes-ikke/', data={})
+        resp = client.post('/admin/backup/plan/finnes-ikke/', data={})
         self.assertEqual(resp.status_code, 302)
 
     def test_bekreftelsen_sier_hvor_mange_rader_som_slettes(self) -> None:
@@ -912,7 +912,7 @@ class BackupAdminViewTests(TestCase):
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
-        resp = client.get(f'/portal-admin/backup/patients/restore/{backup.pk}/')
+        resp = client.get(f'/admin/backup/patients/restore/{backup.pk}/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Dette slettes og erstattes')
 
@@ -928,7 +928,7 @@ class BackupAdminViewTests(TestCase):
 
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         self.assertContains(resp, 'Backup-klokka svarer ikke')
 
     def test_lagre_paa_en_plan_som_har_staatt_av_gir_ikke_alarm(self) -> None:
@@ -943,13 +943,13 @@ class BackupAdminViewTests(TestCase):
         Backupplan.objects.filter(slug='arkiv').update(modus='av')
         client = Client()
         client.force_login(self.admin)
-        client.post('/portal-admin/backup/plan/arkiv/', data={
+        client.post('/admin/backup/plan/arkiv/', data={
             'arkiv-folger_standard': 'on', 'arkiv-modus': 'av',
             'arkiv-intervall_verdi': plan.intervall_verdi,
             'arkiv-intervall_enhet': plan.intervall_enhet,
             'arkiv-behold': plan.behold,
         })
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         self.assertNotContains(resp, 'Backup-klokka svarer ikke')
 
     def test_av_med_haken_paa_sier_fra(self) -> None:
@@ -957,7 +957,7 @@ class BackupAdminViewTests(TestCase):
         Backupplan.standardplanen()
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/plan/patients/', data={
+        resp = client.post('/admin/backup/plan/patients/', data={
             'patients-folger_standard': 'on', 'patients-modus': 'av',
             'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
             'patients-behold': '50',
@@ -972,7 +972,7 @@ class BackupAdminViewTests(TestCase):
         Backupplan.standardplanen()
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/plan/patients/', data={
+        resp = client.post('/admin/backup/plan/patients/', data={
             'patients-folger_standard': '', 'patients-modus': 'av',
             'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
             'patients-behold': '50',
@@ -986,7 +986,7 @@ class BackupAdminViewTests(TestCase):
         Backupplan.standardplanen()
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/plan/patients/', data={
+        resp = client.post('/admin/backup/plan/patients/', data={
             'patients-folger_standard': 'on', 'patients-modus': 'ved_endring',
             'patients-intervall_verdi': '10', 'patients-intervall_enhet': 'minutt',
             'patients-behold': '50',
@@ -1522,11 +1522,11 @@ class KlokkeAvGjelderReservenettetTests(TestCase):
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_KLOKKE': 'av'}):
-            resp = client.get('/portal-admin/backup/')
+            resp = client.get('/admin/backup/')
         self.assertContains(resp, 'Backup-klokka er slått av')
         self.assertNotContains(resp, 'Backup-klokka svarer ikke')
         os.environ.pop('BACKUP_KLOKKE', None)
-        resp = client.get('/portal-admin/backup/')
+        resp = client.get('/admin/backup/')
         self.assertContains(resp, 'Backup-klokka svarer ikke', msg_prefix='kontroll')
         self.assertNotContains(resp, 'Backup-klokka er slått av')
 

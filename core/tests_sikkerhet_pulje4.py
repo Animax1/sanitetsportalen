@@ -26,7 +26,7 @@ class AuditeksportenTests(TestCase):
                                 field_name='+SUM(A1)', old_value='a', new_value='b', user=gammel)
         c = Client()
         c.force_login(admin)
-        tekst = c.get('/portal-admin/auditlog/eksport.csv').content.decode('utf-8-sig')
+        tekst = c.get('/admin/auditlog/eksport.csv').content.decode('utf-8-sig')
         self.assertIn("'=HYPERLINK", tekst)
         self.assertIn("'+SUM(A1)", tekst)
         self.assertNotIn(';=HYPERLINK', tekst)

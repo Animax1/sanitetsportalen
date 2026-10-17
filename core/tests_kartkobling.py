@@ -289,7 +289,7 @@ class LesPosisjonTests(SimpleTestCase):
 
 class DeltVarighetTests(TestCase):
     """«Delt posisjon vises i kartet» (André, 7. okt. 2026): én felles innstilling
-    for bil og lag, i kortet «Kartet» på `/portal-admin/innstillinger/`."""
+    for bil og lag, i kortet «Kartet» på `/admin/innstillinger/`."""
 
     def setUp(self):
         from core.kart_innstillinger import KartInnstillinger

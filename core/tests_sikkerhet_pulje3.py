@@ -306,7 +306,7 @@ class BackupplanSetterSporTests(TestCase):
         data = {f'patients-{k}': v for k, v in {
             'folger_standard': '', 'modus': Backupplan.MODUS_AV, 'intervall_verdi': '1',
             'intervall_enhet': Backupplan.ENHET_TIME, 'behold': '50'}.items()}
-        self.c.post('/portal-admin/backup/plan/patients/', data)
+        self.c.post('/admin/backup/plan/patients/', data)
         plan.refresh_from_db()
         self.assertEqual(plan.modus, Backupplan.MODUS_AV)
         felt = set(AuditLog.objects.filter(table_name='core_backupplan', record_id=plan.pk)
@@ -338,7 +338,7 @@ class FeiltekstVaskesTests(TestCase):
         feil = RuntimeError(f'kunne ikke: postgres://u:pw@db/x {KONFIG["OFFSITE_S3_SECRET_KEY"]}x'
                             f' {KONFIG["OFFSITE_BACKUP_KEY"]}')
         with patch('core.backup.create_backup', side_effect=feil):
-            svar = self.c.post('/portal-admin/backup/kjor/patients/', follow=True)
+            svar = self.c.post('/admin/backup/kjor/patients/', follow=True)
         tekst = ' '.join(str(m) for m in svar.context['messages'])
         self.assertIn('Feilet', tekst)
         self.assertNotIn(':pw@', tekst)

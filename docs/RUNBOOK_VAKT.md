@@ -13,7 +13,7 @@ gjelder portalen der ikke annet står.
 
 ## 1. Første ting før vakten starter
 
-1. **Admin-dashbord åpent i egen fane**: [https://portal.sanitet.net/portal-admin/server-status/](https://portal.sanitet.net/portal-admin/server-status/)
+1. **Admin-dashbord åpent i egen fane**: [https://portal.sanitet.net/admin/server-status/](https://portal.sanitet.net/admin/server-status/)
 2. **Railway-dashbord åpent i egen fane**: [https://railway.app](https://railway.app) → ditt prosjekt → Variables
 3. **Denne runbooken tilgjengelig** (skriv ut eller hold på annen skjerm)
 4. Sjekk at dashbordet oppdaterer seg (grønn pulserende prikk, "Oppdaterer hvert 10. sek")
@@ -84,7 +84,7 @@ Railway → prod-miljøet → **web**-tjenesten → **Variables** → slett `BAC
 sett den til noe annet enn `av` — bare `av` slår den av, uansett store og små bokstaver).
 Endringen redeployer tjenesten.
 
-**Kontroll:** `/portal-admin/backup/` skal ikke lenger si at klokka er slått av, og innen
+**Kontroll:** `/admin/backup/` skal ikke lenger si at klokka er slått av, og innen
 planens intervall skal «Siste backup» være fersk (§1 punkt 5). **Ikke hopp over steget:**
 står klokka av, er det ingen automatisk backup under vakta. `pre_reset`-backupen ved «Avslutt
 vakt» tas uansett (`core/vaktslutt.py`), men alt som skjer fram dit, er bare dekket av backupen
@@ -128,7 +128,7 @@ Hvis Redis-tjenesten ikke finnes:
 
 Når ny deploy er live (sjekk Deployments → siste "Active"):
 
-1. Åpne `https://portal.sanitet.net/portal-admin/server-status/`
+1. Åpne `https://portal.sanitet.net/admin/server-status/`
 2. **Cache-backend-kort** skal vise:
    - Backend: `redis`
    - Status: healthy
@@ -475,7 +475,7 @@ eller angrer.
 **Ingen løkke:** `/statistikk/`, `/backlog/`, portalinnstillingene og brukeradministrasjonen
 henter bare når siden lastes eller noen trykker.
 
-**Admin: `/portal-admin/server-status/`** — hele dashbordet hvert **10 s**
+**Admin: `/admin/server-status/`** — hele dashbordet hvert **10 s**
 (`static/js/portal-status.js` · `refresh`). Lukk den når den ikke trengs: ingen
 annen side spør oftere med full henting. Står fana i bakgrunnen, spør den ikke
 (`naarSynlig`, 26. sep. 2026) — det gjelder sikkerhetsnettene i KO og sentralbordet også.
@@ -771,7 +771,7 @@ Tjenesten starter på nytt av seg selv når variablene lagres.
 
 ### Kontroll etter oppsett, og før hver vakt
 
-1. Åpne `/portal-admin/backup/`. Kortet **«Offsite-kopi (Scaleway)»** øverst skal si
+1. Åpne `/admin/backup/`. Kortet **«Offsite-kopi (Scaleway)»** øverst skal si
    «Aktiv» med bucketnavnet. Sier det «Ikke konfigurert», står det hvilke variabler
    som mangler.
 2. Ta en manuell backup av én modul fra samme side. Last siden på nytt: kortet skal
@@ -807,7 +807,7 @@ railway ssh --service web -- python manage.py hent_offsite <filnavnet fra lista>
 Den første lister filene i bucketen, nyeste først — både modulfilene under `backups/`
 og de hele under `full/`. Den andre henter fila, dekrypterer den med
 `OFFSITE_BACKUP_KEY`, og legger den i backup-mappa på volumet med en rad, så den dukker
-opp på `/portal-admin/backup/`. Kommandoen rører ikke basen.
+opp på `/admin/backup/`. Kommandoen rører ikke basen.
 
 Svarer den «Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY», er nøkkelen i Railway en
 annen enn den fila ble kryptert med. Sjekk mot passordbehandleren. **Fra 29. sep. 2026 kan
@@ -825,7 +825,7 @@ lese filene — men kunne flytte og gi dem nytt navn.
 | «… har ingen brukere, så den er ikke en hel database» | En fil med navnet `backup-full-…` uten brukere. Gjenopprettet som hel base ville den tømt alle tabellene |
 
 En fil i det gamle formatet (`SPBK1`, lastet opp før 29. sep.) får «SPBK1: navnet er ikke
-autentisert» i notatet på `/portal-admin/backup/`. Den gjenopprettes som før; sperrene
+autentisert» i notatet på `/admin/backup/`. Den gjenopprettes som før; sperrene
 over er det som holder for den.
 
 ### Er backupen ekte? (`verifiser_backup`)
@@ -931,7 +931,7 @@ Sammenlign **byggnummeret i footeren** nederst på siden med commit-en du sist p
 Stemmer de, og begynte feilen ved den deployen, er det den. Står footeren på forrige bygg,
 er problemet et annet — gå til §8 eller §2.
 
-`/portal-admin/server-status/` viser samme bygg, sammen med minne og tregeste stier.
+`/admin/server-status/` viser samme bygg, sammen med minne og tregeste stier.
 
 ### Steg 2: Rull tilbake i Railway
 
@@ -1065,13 +1065,13 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 ### 10a. Avlesning og bevaring
 
 1. Gå gjennom admin-dashbord – noter peak P95, peak RPS, peak memory og antall samtidige sesjoner
-2. Sjekk at kortet «Offsite-kopi (Scaleway)» på `/portal-admin/backup/` viser en
+2. Sjekk at kortet «Offsite-kopi (Scaleway)» på `/admin/backup/` viser en
    opplasting fra i dag uten feil (§8b). Fila på Railway Volume er da alt utenfor Railway
 3. Verifiser at ingen 5xx-feil ligger uten forklaring (admin-dashbord → Metrikk-kort → errors_5xx)
 4. **Les av databasen** (§8a steg 3 og 4) og send tallene til Claude — **før**
    avslutningen under, som tømmer pasientene og oppdragene: da står ikke radene i
    tallene lenger. (Statistikkfanene fryses av avslutningen og kan leses etterpå.)
-5. **Avslutt vakta: Administrasjon → Vakt** (`/portal-admin/vakt/`, global admin).
+5. **Avslutt vakta: Administrasjon → Vakt** (`/admin/vakt/`, global admin).
    Siden viser først hva som arkiveres og tømmes, hvilke statistikkfaner som fryses,
    og hva som **sperrer** — et oppdrag som står på tavla må i historikken først.
    Skriv navnet på den nye vakta, kryss av og trykk «Avslutt vakt og start ny».
@@ -1128,7 +1128,7 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 
 1. **Pause alle monitorene i Better Stack**, staging-monitorene også (§1e). Står de på,
    holder de tjenestene våkne, og serverless sparer ingenting.
-2. **Sjekk at det finnes en backup tatt etter at vakta ble avsluttet** — `/portal-admin/backup/`.
+2. **Sjekk at det finnes en backup tatt etter at vakta ble avsluttet** — `/admin/backup/`.
    Den er det som dekker tiden fram til neste vakt.
 3. Railway → prod → **web**-tjenesten (portalen) → **Variables** → `BACKUP_KLOKKE` = `av`.
    Klokka spør databasen hvert minutt og holder ellers portalen våken (§1b).
@@ -1197,12 +1197,12 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 
 | Ressurs | Lenke/handling |
 |---|---|
-| Admin server-status | `https://portal.sanitet.net/portal-admin/server-status/` (staging: `testportal.sanitet.net`) |
+| Admin server-status | `https://portal.sanitet.net/admin/server-status/` (staging: `testportal.sanitet.net`) |
 | Railway-dashbord | [https://railway.app](https://railway.app) |
 | Railway Volume backups | Railway → Volumes → Browse |
-| Offsite-backup (Scaleway) | `/portal-admin/backup/` (kortet øverst) · konsollen: console.scaleway.com → Object Storage · §8b |
-| Brukeradmin | `https://portal.sanitet.net/portal-admin/brukere/` |
-| Innloggingslogg | `https://portal.sanitet.net/portal-admin/innloggingslogg/` |
+| Offsite-backup (Scaleway) | `/admin/backup/` (kortet øverst) · konsollen: console.scaleway.com → Object Storage · §8b |
+| Brukeradmin | `https://portal.sanitet.net/admin/brukere/` |
+| Innloggingslogg | `https://portal.sanitet.net/admin/innloggingslogg/` |
 | Reserve | `docs/TEKNISK_DOKUMENTASJON.md` §11 |
 | Deploy-guide | `DEPLOY_GUIDE.md` i repoet |
 | Kartet (prod) | `https://kart.sanitet.net` · helsesjekk `https://kart.sanitet.net/healthz` (uten skråstrek til slutt) |
@@ -1224,7 +1224,7 @@ skjer via to kilder:
 2. Filtrer på tid eller søkeord (`ERROR`, `Traceback`, `500`)
 3. Stack-traces fra ubehandlede exceptions vises her i full lengde
 
-### Admin-dashbord (/portal-admin/server-status/)
+### Admin-dashbord (/admin/server-status/)
 
 1. **Feilresponser** – antall 4xx/5xx siste 5 min
 2. **Tregeste stier** – hvilken side som drar P95 opp
@@ -1235,7 +1235,7 @@ skjer via to kilder:
 6. **Vaktbildet** – oppdrag som venter på ressurs, og siste vaktlistefil
 7. **Cron-jobber** og **Offsite** – gult/rødt her er noe som har sluttet å virke i det
    stille; se §8b
-8. **Audit-loggen** (`/portal-admin/auditlog/`) – hver feilet handling på pasient/bruker logges
+8. **Audit-loggen** (`/admin/auditlog/`) – hver feilet handling på pasient/bruker logges
 
 ### Vakt-prosedyre når en bruker rapporterer feil
 

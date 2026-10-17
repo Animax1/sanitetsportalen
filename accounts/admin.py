@@ -2,7 +2,7 @@
 
 Django-admin rutes bare under `DEBUG` (S1), så dette er et utviklerverktøy for
 å *se* kontoene lokalt. **Endringer skjer i portalens brukeradministrasjon**
-(`/portal-admin/brukere/`), der sperrene og auditsporet er.
+(`/admin/brukere/`), der sperrene og auditsporet er.
 
 Fram til 26. sep. 2026 (B4) kunne panelet opprette og endre kontoer med egne
 skjemaer som skrev `role` og `is_superuser` rett inn — altså lage en superbruker

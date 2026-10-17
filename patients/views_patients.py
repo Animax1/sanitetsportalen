@@ -118,7 +118,7 @@ SETTINGS_READ_WHITELIST = frozenset({
 def settings_view(request):
     """Les appinnstillingene pasientsiden trenger.
 
-    **Kun GET.** Skrivingen flyttet til `/portal-admin/innstillinger/` (§4.1):
+    **Kun GET.** Skrivingen flyttet til `/admin/innstillinger/` (§4.1):
     `event_name` er en portalinnstilling, ikke en pasientinnstilling, og et
     endepunkt under `/pasienter/` som krever global admin sier at
     modulgrensen ikke betyr noe.
@@ -455,5 +455,5 @@ def patient_detail_view(request, pk):
 
 
 # «Avslutt vakt», «Tidligere vakter» og gjenåpningen sto her til 28. sep. 2026.
-# De er portalens, ikke pasientenes, og bor nå på `/portal-admin/vakt/`
+# De er portalens, ikke pasientenes, og bor nå på `/admin/vakt/`
 # (`core/views_vakt.py`); arbeidet gjøres av `core/vaktslutt.py`.

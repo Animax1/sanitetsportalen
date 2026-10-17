@@ -1,6 +1,6 @@
 """Register for moduler som bidrar med tall til driftsdashbordet.
 
-`/portal-admin/server-status/` viser to ting som ikke er portalens egne:
+`/admin/server-status/` viser to ting som ikke er portalens egne:
 hvilke vaktlister som er i drift og når fila sist gikk ut (vaktlista), og hvor
 mange oppdrag som står på tavla (oppdrag). Fram til 14. sep. 2026 hentet
 `core/admin_status.py` dem ved å importere modulene direkte.

@@ -1,7 +1,7 @@
 """«Avslutt vakt» arkiverer og tømmer alle modulene i ett (steg 2, 28. sep. 2026).
 
 `core/vaktslutt.py`, prøvd gjennom det ekte endepunktet
-`/portal-admin/vakt/avslutt/` (flyttet fra pasientmodulen 28. sep. 2026). Det som skal holde:
+`/admin/vakt/avslutt/` (flyttet fra pasientmodulen 28. sep. 2026). Det som skal holde:
 
 - Pasientene **arkiveres** før de slettes — hullet var at de bare ble slettet.
 - Oppdragene arkiveres og tømmes med resten, og Bemanning er frosset med
@@ -30,7 +30,7 @@ from patients.models import ArkivertPasient, Patient, VaktArkiv
 from patients.test_helpers import sett_aktiv_vakt
 from oppdrag.test_helpers import lag_oppdrag
 
-URL = '/portal-admin/vakt/avslutt/'
+URL = '/admin/vakt/avslutt/'
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -179,7 +179,7 @@ class AvsluttVaktTests(TestCase):
     def test_oversikten_viser_antall_faner_og_sperrer(self):
         self._pasienter(2)
         self._oppdrag(paa_tavla=True)
-        data = self.c.get('/portal-admin/vakt/').context['oversikt']
+        data = self.c.get('/admin/vakt/').context['oversikt']
         antall = {m['slug']: m['antall'] for m in data['moduler']}
         self.assertEqual(antall, {'patients': 2, 'oppdrag': 1})
         self.assertEqual(len(data['sperrer']), 1)

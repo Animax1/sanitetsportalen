@@ -75,7 +75,7 @@ def arkiv_liste_view(request):
     """Arkivene. Global admin.
 
     POST — «arkiver den aktive vakta» — er slettet 28. sep. 2026: «Avslutt vakt»
-    på `/portal-admin/vakt/` arkiverer oppdragene med resten
+    på `/admin/vakt/` arkiverer oppdragene med resten
     (`oppdrag/vaktslutt.py`), med samme sperre mot oppdrag på tavla.
     """
     if not er_global_admin(request.user):

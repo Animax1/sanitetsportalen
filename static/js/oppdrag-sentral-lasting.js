@@ -248,7 +248,7 @@ async function lastArkiv() {
 
 
 // `arkiverVakt()` er slettet 28. sep. 2026: «Avslutt vakt» på
-// /portal-admin/vakt/ arkiverer oppdragene med resten (oppdrag/vaktslutt.py).
+// /admin/vakt/ arkiverer oppdragene med resten (oppdrag/vaktslutt.py).
 
 
 function visArkivStatistikk(id) {

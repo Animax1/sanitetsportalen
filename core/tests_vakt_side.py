@@ -1,4 +1,4 @@
-"""`/portal-admin/vakt/` — vakta på ett sted (28. sep. 2026, `core/views_vakt.py`).
+"""`/admin/vakt/` — vakta på ett sted (28. sep. 2026, `core/views_vakt.py`).
 
 André: «Innstillinger er spesifikke funksjoner. /vakt er overordnet for denne
 vakten.» Avslutningen, gjenåpningen og navnet flyttet hit fra pasientmodulen og
@@ -31,13 +31,13 @@ from patients.models import Patient, VaktArkiv
 from patients.test_helpers import sett_aktiv_vakt
 from oppdrag.test_helpers import lag_oppdrag
 
-SIDE = '/portal-admin/vakt/'
-AVSLUTT = '/portal-admin/vakt/avslutt/'
-NAVN = '/portal-admin/vakt/navn/'
+SIDE = '/admin/vakt/'
+AVSLUTT = '/admin/vakt/avslutt/'
+NAVN = '/admin/vakt/navn/'
 
 
 def _gjenaapne(pk):
-    return f'/portal-admin/vakt/{pk}/gjenaapne/'
+    return f'/admin/vakt/{pk}/gjenaapne/'
 
 
 def _meldinger(svar):
@@ -95,7 +95,7 @@ class TilgangTests(VaktsideBasis):
         self.assertEqual(hent_aktiv_vakt().pk, self.vakt.pk)
 
     def test_menyen_har_lenken_for_admin(self):
-        self.assertContains(self.c.get('/'), 'href="/portal-admin/vakt/"')
+        self.assertContains(self.c.get('/'), 'href="/admin/vakt/"')
 
 
 class AvsluttPortTests(VaktsideBasis):

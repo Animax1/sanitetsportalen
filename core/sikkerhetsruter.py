@@ -46,11 +46,11 @@ AAPNE = {
 #: Gamle adresser som sender videre. Skal aldri svare 200 — men 301 til en
 #: annen side enn innloggingen er riktig her.
 OMDIRIGERER = {
-    '^admin/server-status/(?P<rest>.*)$': 'gammel server-status-adresse',
+    '^portal-admin/(?P<rest>.*)$': 'adminflaten het /portal-admin/ til 17. okt. 2026 (fase 0)',
     'pasienter/^admin/server-status/(?P<rest>.*)$': 'gammel server-status-adresse',
-    'accounts/users/': 'brukeradmin flyttet til /portal-admin/brukere/',
-    'accounts/users/ny/': 'brukeradmin flyttet til /portal-admin/brukere/',
-    'accounts/users/<int:pk>/': 'brukeradmin flyttet til /portal-admin/brukere/',
+    'accounts/users/': 'brukeradmin flyttet til /admin/brukere/',
+    'accounts/users/ny/': 'brukeradmin flyttet til /admin/brukere/',
+    'accounts/users/<int:pk>/': 'brukeradmin flyttet til /admin/brukere/',
     'pasienter/api/full-stats/': 'statistikken flyttet til /statistikk/ (fase 6)',
     'pasienter/api/innstillinger/arkiv/<int:pk>/full-stats/': 'statistikken flyttet til /statistikk/',
     'statistikk/api/full-stats/': 'til kilderegisteret, /statistikk/api/kilde/<slug>/',

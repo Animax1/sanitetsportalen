@@ -9,7 +9,7 @@
 
 **Denne veien fantes ikke før.** `hent_offsite` henter og dekrypterer fila, men
 rører ikke databasen — siste linje den skriver er «gjenopprett fra
-/portal-admin/backup/». Og i en tom base, som er akkurat der man er når man
+/admin/backup/». Og i en tom base, som er akkurat der man er når man
 trenger den, finnes det ingen å logge inn som. Katastrofeveien gikk altså
 gjennom en nettleser som ikke hadde noen bruker.
 

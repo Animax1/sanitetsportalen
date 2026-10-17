@@ -54,9 +54,9 @@ OMDIRIGERER = _RUTER['omdirigerer']
 FINNES_IKKE = ['/django-admin/', '/admin/', '/.env', '/.git/config', '/static/', '/backups/',
                '/manage.py', '/myproject/settings.py', '/wp-login.php']
 
-ADMIN_SIDER = ['/portal-admin/server-status/', '/portal-admin/brukere/', '/portal-admin/backup/',
-               '/portal-admin/auditlog/', '/portal-admin/innstillinger/', '/portal-admin/moduler/',
-               '/portal-admin/server-status/json/']
+ADMIN_SIDER = ['/admin/server-status/', '/admin/brukere/', '/admin/backup/',
+               '/admin/auditlog/', '/admin/innstillinger/', '/admin/moduler/',
+               '/admin/server-status/json/']
 
 
 class Rapport:
@@ -333,7 +333,7 @@ def test_roller(base, r, admin, leser, enhet):
             r.sjekk(st == 403, f'leser: POST nytt korps → {st}', f'leser: POST nytt korps → {st} (forventet 403)')
             st, h, html = kl.kall('/oppdrag/api/lokasjoner/', 'POST', json_data={'navn': 'Test'}, csrf=True)
             r.sjekk(st == 403, f'leser: POST ny lokasjon → {st}', f'leser: POST ny lokasjon → {st} (forventet 403)')
-            st, h, html = kl.kall('/portal-admin/brukere/1/', 'POST', data={'role': 'admin'}, csrf=True)
+            st, h, html = kl.kall('/admin/brukere/1/', 'POST', data={'role': 'admin'}, csrf=True)
             r.sjekk(st in (403, 405), f'leser: POST endre bruker → {st}', f'leser: POST endre bruker → {st} (forventet 403)')
             for sti in ('/pasienter/api/patients/', '/oppdrag/api/oppdrag/', '/vaktliste/api/vaktlister/'):
                 st, h, _ = kl.kall(sti)
@@ -368,7 +368,7 @@ def test_roller(base, r, admin, leser, enhet):
             for sti in ADMIN_SIDER:
                 st, h, _ = ka.kall(sti)
                 r.sjekk(st == 200, f'admin: GET {sti} → {st}', f'admin: GET {sti} → {st} (forventet 200)')
-            st, h, html = ka.kall('/portal-admin/server-status/json/')
+            st, h, html = ka.kall('/admin/server-status/json/')
             try:
                 d = json.loads(html)
                 rader = {x['nokkel']: x for x in d.get('konfig', {}).get('rader', [])}
@@ -376,9 +376,9 @@ def test_roller(base, r, admin, leser, enhet):
                     (r.ok if rad['ok'] else r.feil)(f'konfigsjekk: {n} = {rad["verdi"]}')
             except Exception as e:   # noqa: BLE001
                 r.info(f'admin: kunne ikke lese konfigsjekken ({e})')
-            st, h, html = ka.kall('/portal-admin/backup/patients/last-ned/999999/')
+            st, h, html = ka.kall('/admin/backup/patients/last-ned/999999/')
             r.sjekk(st == 404, f'admin: nedlasting av ukjent backup → {st}', f'admin: nedlasting av ukjent backup → {st}')
-            st, h, html = ka.kall('/portal-admin/auditlog/eksport.csv?q=%3Dcmd%7C')
+            st, h, html = ka.kall('/admin/auditlog/eksport.csv?q=%3Dcmd%7C')
             r.sjekk(st == 200, f'admin: audit-eksport svarer {st}')
     if not (admin or leser or enhet):
         r.hopp('Ingen kontoer oppgitt — rollegrensene er ikke testet (bruk --admin/--leser/--enhet)')

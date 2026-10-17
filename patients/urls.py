@@ -8,7 +8,7 @@ urlpatterns = [
     path('', views_patients.index_view, name='index'),
 
     # Innstillinger — kun lesing. Skriving flyttet til
-    # /portal-admin/innstillinger/ (§4.1).
+    # /admin/innstillinger/ (§4.1).
     path('api/settings/', views_patients.settings_view, name='api_settings'),
 
     # Pasienter
@@ -22,7 +22,7 @@ urlpatterns = [
     path('api/helsepersonell/<int:pk>/', views_registre.helsepersonell_detail_view, name='api_helsepersonell_detail'),
 
     # «Avslutt vakt», «Tidligere vakter» og gjenåpningen flyttet til
-    # `/portal-admin/vakt/` 28. sep. 2026 — de er portalens, ikke pasientenes.
+    # `/admin/vakt/` 28. sep. 2026 — de er portalens, ikke pasientenes.
     # Ingen redirect: eneste konsument var admin-JS-en, som følger med.
 
     # Statistikk. Ingenting ligger igjen her.
@@ -55,12 +55,12 @@ urlpatterns = [
              f'/statistikk/api/kilde/patients/arkiv/{pk}/full-stats/'),
          name='api_arkiv_full_stats_flyttet'),
 
-    # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /portal-admin/server-status/...
+    # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /admin/server-status/...
     re_path(r'^admin/server-status/(?P<rest>.*)$',
-            lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True),
+            lambda req, rest='': redirect(f'/admin/server-status/{rest}', permanent=True),
             name='legacy_server_status_redirect'),
 
     # Backup / Restore (kun admin)
     # Backup-endepunktene er fjernet (august 2026). Backup administreres samlet
-    # på /portal-admin/backup/, med eget intervall og egen oppbevaring per modul.
+    # på /admin/backup/, med eget intervall og egen oppbevaring per modul.
 ]

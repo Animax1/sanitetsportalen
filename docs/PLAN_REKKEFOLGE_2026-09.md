@@ -89,7 +89,7 @@ som laster en fil i gammel form. Sjekk samtidig om audit-loggen lagrer
 
 Ta med i samme runde, fordi man er i filene uansett: `patients/backup_service.py` og
 `RETENTION_HOURS` (3.3), `BackupConfig`/`db_backup` (løst punkt i TODO — de er samme
-sak), og `/portal-admin/` samlet i én URL-fil (3.2, faller ut av seg selv når
+sak), og `/admin/` samlet i én URL-fil (3.2, faller ut av seg selv når
 server-status flytter). `core/views.py` deles (3.7) når man først flytter ting inn i
 den. 3.1 (brukeradmin kjenner pasientregistrene) er en annen retning på gjelden og tas
 for seg, ikke her.

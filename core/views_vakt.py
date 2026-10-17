@@ -1,4 +1,4 @@
-"""`/portal-admin/vakt/` — alt om vakta på ett sted (28. sep. 2026).
+"""`/admin/vakt/` — alt om vakta på ett sted (28. sep. 2026).
 
 André: «Innstillinger er spesifikke funksjoner. /vakt er overordnet for denne
 vakten.» Fram til nå lå vakta på tre steder: navnet i portalinnstillingene,
@@ -12,7 +12,7 @@ lastes, skjemaene poster og videresender (PRG), og bekreftelsen er
 `data-confirm` fra `ui-actions.js`, som backupsiden. Malen escaper selv, så det
 finnes ingen mal-strenger å skanne.
 
-**Alt er global admin** (`admin_required`), som resten av `/portal-admin/`. Arbeidet
+**Alt er global admin** (`admin_required`), som resten av `/admin/`. Arbeidet
 gjøres av `core/vaktslutt.py`; denne fila kjenner ingen modul ved navn.
 """
 from __future__ import annotations

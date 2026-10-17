@@ -3,7 +3,7 @@
 Inneholder:
 - Portal-dashboard på ``/`` (Fase 2)
 - Min profil på ``/min-profil/`` (Fase 3b)
-- Admin-UI for moduler og auditlogg på ``/portal-admin/...`` (Fase 3b)
+- Admin-UI for moduler og auditlogg på ``/admin/...`` (Fase 3b)
 - Legacy-redirects fra gamle root-URL-er til /pasienter/-prefiks (Fase 2)
 
 Legacy-redirects gjelder kun URL-er som tidligere ble servert direkte fra root
@@ -11,7 +11,6 @@ Legacy-redirects gjelder kun URL-er som tidligere ble servert direkte fra root
 `/django-admin/`, `/accounts/...` er IKKE påvirket — de håndteres uendret av
 myproject/urls.py.
 """
-from django.shortcuts import redirect
 from django.urls import path, re_path
 
 from . import views_admin, views_portal, views_portalvalg, views_varsler
@@ -31,7 +30,7 @@ urlpatterns = [
     path('portal/', views_portalvalg.velg_view, name='portal_velg'),
 
     # ── Admin-UI ────────────────────────────────────────────────────────────
-    # Rutene under /portal-admin/ flyttet til `core/urls_admin.py` 14. sep.
+    # Rutene under /admin/ flyttet til `core/urls_admin.py` 14. sep.
     # 2026, og inkluderes derfra i `myproject/urls.py`. Se gjeldspunkt 3.2.
 
     # ── Fase 5: Varsler ─────────────────────────────────────────────────────
@@ -85,10 +84,7 @@ urlpatterns = [
     # `views_admin.api_flyttet` (26. sep. 2026, D4).
     re_path(r'^api/.*$', views_admin.api_flyttet, name='api_flyttet'),
 
-    # /admin/server-status/<alt> → /portal-admin/server-status/<alt>
-    re_path(
-        r'^admin/server-status/(?P<rest>.*)$',
-        lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True),
-        name='legacy_admin_server_status',
-    ),
+    # `/admin/server-status/` var en gammel sti hit, med en 301 til
+    # `/portal-admin/server-status/`. Fra 17. okt. 2026 *er* `/admin/` adminflaten
+    # (`myproject/urls.py`), og den gamle `/portal-admin/` sender dit.
 ]

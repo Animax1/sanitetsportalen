@@ -81,7 +81,7 @@ class ProvenKjorerMotBasenTests(TestCase):
                                                must_change_password=False)
         gi_standardtilgang(admin, 'admin')
         self.client.force_login(admin)
-        res = self.client.get('/portal-admin/server-status/json/', secure=True)
+        res = self.client.get('/admin/server-status/json/', secure=True)
         self.assertEqual(res.status_code, 200, res.content[:200])
         self.assertIn(res.json()['db_health']['sortering']['vurdering'],
                       {'norsk', 'kodepunkt', 'blandet'})

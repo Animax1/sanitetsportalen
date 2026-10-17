@@ -100,7 +100,7 @@ class AktivVaktLaasesTests(TestCase):
 
     def test_gjenaapning_slaar_av_den_aktive(self):
         gammel = self._vakt('Gammel')
-        self.c.post(f'/portal-admin/vakt/{gammel.pk}/gjenaapne/')
+        self.c.post(f'/admin/vakt/{gammel.pk}/gjenaapne/')
         self.assertEqual(hent_aktiv_vakt().pk, gammel.pk)
         self.assertEqual(list(Vakt.objects.filter(er_aktiv=True)), [gammel])
         self.vakt.refresh_from_db()
@@ -110,13 +110,13 @@ class AktivVaktLaasesTests(TestCase):
         """En vakt fra en backup tatt før portalene skal ikke forsvinne fra lista —
         den må kunne gjenåpnes for å tas inn."""
         uten = self._vakt('Fra gammel backup', portal=None)
-        svar = self.c.get('/portal-admin/vakt/')
+        svar = self.c.get('/admin/vakt/')
         self.assertIn(uten.pk, [t['vakt'].pk for t in svar.context['tidligere']])
         self.assertNotIn(self.vakt.pk, [t['vakt'].pk for t in svar.context['tidligere']])
 
     def test_gjenaapning_tar_en_vakt_uten_portal_inn(self):
         uten = self._vakt('Fra gammel backup', portal=None)
-        self.c.post(f'/portal-admin/vakt/{uten.pk}/gjenaapne/')
+        self.c.post(f'/admin/vakt/{uten.pk}/gjenaapne/')
         uten.refresh_from_db()
         self.assertEqual(uten.portal, self.vakt.portal)
         self.assertEqual(hent_aktiv_vakt().pk, uten.pk)

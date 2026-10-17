@@ -557,8 +557,8 @@ class RequestMetricsMiddleware:
 
     _SKIP_PREFIXES = ('/static/', '/media/')
     _SKIP_EXACT = (
-        '/portal-admin/server-status/',
-        '/portal-admin/server-status/json/',
+        '/admin/server-status/',
+        '/admin/server-status/json/',
         '/healthz/',  # #2: hyppige health-checks skal ikke støye metrikkene
         # Endringsnumrene (24. sep. 2026): spurt om hvert 2,5 sekund fra hver
         # fane. Målt med, ville de trukket P95 ned og beredskapstrinnet vist

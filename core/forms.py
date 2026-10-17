@@ -13,7 +13,7 @@ from core.models import ModuleSettings
 class ModuleSettingsForm(forms.ModelForm):
     """Skjema for å redigere én ``ModuleSettings``-rad.
 
-    Brukes på ``/portal-admin/moduler/<slug>/``. ``slug`` redigeres ikke —
+    Brukes på ``/admin/moduler/<slug>/``. ``slug`` redigeres ikke —
     den bindes til en spesifikk modul i registret og endres aldri etter
     første ``ensure_defaults_exist()``.
 

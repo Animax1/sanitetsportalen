@@ -107,7 +107,7 @@ merke peker til `docs/FORSLAG_PARK.md` §4.7, der alternativet står.
 
 | Merke | Hva | Byttes |
 |---|---|---|
-| `park-ko-posisjon` | Forhåndsvalg fra KO-tavla viser hvor KO har plassert hvert lag | **Bryter** på `/portal-admin/innstillinger/` (`park/portalinnstillinger.py`); på uten rad |
+| `park-ko-posisjon` | Forhåndsvalg fra KO-tavla viser hvor KO har plassert hvert lag | **Bryter** på `/admin/innstillinger/` (`park/portalinnstillinger.py`); på uten rad |
 | `park-lenke-en-gang` | Bare hashen lagres, lenken vises én gang | Kode + migrasjon |
 
 ## Målingen (B21)

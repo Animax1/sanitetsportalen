@@ -295,7 +295,7 @@ orden») ble gjort for hånd, og holder bare til neste endepunkt.
 **`ModuleSettings.enabled=False` stenger URL-en med 403.** Global admin slipper fortsatt
 inn, slik at en modul kan forberedes i kulissene før den slås på for andre (André, 27. sep.
 2026). Begrunnelsen som sto her — «ellers kan man deaktivere seg selv ut av å kunne
-reaktivere» — holdt ikke: bryteren på `/portal-admin/moduler/` er ikke modulgatet.
+reaktivere» — holdt ikke: bryteren på `/admin/moduler/` er ikke modulgatet.
 
 ## 7. Modellendringer
 

@@ -13,7 +13,7 @@ Tre regler:
   endringer ikke skriver noe). Ingen egen klokke, ingen egen cron.
 - **Kaster aldri.** En bucket som ikke svarer skal ikke stoppe backupen på
   volumet, som er det første sikkerhetsnettet. Feilen skrives i
-  `OffsiteKopi.feil` og logges; oversikten på /portal-admin/backup/ viser den.
+  `OffsiteKopi.feil` og logges; oversikten på /admin/backup/ viser den.
 - **Inert uten variablene.** Uten `OFFSITE_S3_BUCKET` og `OFFSITE_BACKUP_KEY`
   gjør `meld_ny_backup` ingenting — staging og lokal utvikling har ingen
   offsite-backup, med vilje.
@@ -66,7 +66,7 @@ SUFFIKS = '.enc'
 #: Under dette er nøkkelen en passfrase, og en bucket med helseopplysninger lar
 #: seg knekke offline — `_avledet_nokkel` er én runde SHA-256. En hard sjekk i
 #: `settings.py` kunne stoppet deployen på en nøkkel ingen vet lengden på, så det
-#: vises som et avvik på /portal-admin/backup/ i stedet. Å bytte nøkkel gjør de
+#: vises som et avvik på /admin/backup/ i stedet. Å bytte nøkkel gjør de
 #: gamle filene uleselige med den nye: den gamle må da ligge i passordbehandleren
 #: i 730 dager.
 NOKKEL_MINSTE_LENGDE = 32
@@ -120,7 +120,7 @@ def oppsettfeil() -> str:
     Det er den verste formen for feil: det ser ut som det virker, og det som
     ikke virker er det man først trenger den dagen Railway er borte. Derfor
     nekter `_klient()` å lage en klient så lenge dette ikke er tomt, og feilen
-    havner i `OffsiteKopi.feil`, på `/portal-admin/backup/` og i konfigsjekken.
+    havner i `OffsiteKopi.feil`, på `/admin/backup/` og i konfigsjekken.
     """
     from urllib.parse import urlsplit
     k = konfig()
@@ -360,7 +360,7 @@ def _slug_fra_filnavn(filnavn: str) -> str:
 # uendelig.
 
 #: Det beslutningen sier (`docs/BACKUP.md` §1). Avvik fra dette vises på
-#: `/portal-admin/backup/`, for en dokumentert frist som ikke er reell er det
+#: `/admin/backup/`, for en dokumentert frist som ikke er reell er det
 #: alvorligste avviket vi kan ha.
 FORVENTET_DAGER = {PREFIKS: 730, PREFIKS_FULL: 90}
 

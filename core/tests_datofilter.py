@@ -41,8 +41,8 @@ class SideneTaalerUgyldigDatoTests(TestCase):
         self.client.force_login(admin)
 
     def test_ingen_500(self):
-        for url in ('/portal-admin/auditlog/', '/portal-admin/auditlog/eksport.csv',
-                    '/portal-admin/innloggingslogg/'):
+        for url in ('/admin/auditlog/', '/admin/auditlog/eksport.csv',
+                    '/admin/innloggingslogg/'):
             for felt in ('date_from', 'date_to'):
                 for raa in UGYLDIGE:
                     with self.subTest(url=url, felt=felt, raa=raa):
@@ -52,7 +52,7 @@ class SideneTaalerUgyldigDatoTests(TestCase):
         """En sperre som ignorerer alt, ville også vært grønn over."""
         from audit.models import AuditLog
         AuditLog.objects.create(table_name='t', record_id=1, action='UPDATE')
-        res = self.client.get('/portal-admin/auditlog/', {'date_from': '2999-01-01'})
+        res = self.client.get('/admin/auditlog/', {'date_from': '2999-01-01'})
         self.assertEqual(res.context['page_obj'].paginator.count, 0)
-        res = self.client.get('/portal-admin/auditlog/', {'date_from': '2000-01-01'})
+        res = self.client.get('/admin/auditlog/', {'date_from': '2000-01-01'})
         self.assertEqual(res.context['page_obj'].paginator.count, 1)

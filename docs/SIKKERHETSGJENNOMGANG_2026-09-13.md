@@ -199,7 +199,7 @@ sårbarheter — for dagens oppløsning. **Fiks:** `pip-compile --generate-hashe
 - **L12.** Sesjonen glir uten absolutt tak (`SESSION_SAVE_EVERY_REQUEST`).
 - **L13.** Rate-limiting mangler på en rekke skrivende/tunge endepunkter bak `skriv_*`/admin
   (verdimengder, ressurs/vaktpost-PUT, backup run/restore, arkiv-statistikk, brukeradmin).
-- **L14.** Dekoratørtesten dekker ikke `/portal-admin/`, `/varsler/` og `/min-profil/`;
+- **L14.** Dekoratørtesten dekker ikke `/admin/`, `/varsler/` og `/min-profil/`;
   `admin_required` setter ingen markør.
 - **L15.** Sletting i vaktlistas registre krever ikke `confirm` (korps/kompetanse/gruppe/rolle).
 - **L16.** Tabulator-formattere i `patients-table.js:8, 22, 30` setter inn rå strenger;

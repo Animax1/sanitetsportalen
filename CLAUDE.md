@@ -266,7 +266,7 @@ Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal
 **Global admin får toppen av stigen** fra `nivaa_for` (13. sep. 2026 — var `skriv_full`,
 og da måtte hvert `skriv_leder`-kallsted huske `er_global_admin(...) or`).
 `admin_required` setter `_admin_required` på viewet, og `core/tests_sikkerhet_runde2.py`
-går gjennom alt under `/portal-admin/`, `/varsler/` og `/min-profil/` med anonym og
+går gjennom alt under `/admin/`, `/varsler/` og `/min-profil/` med anonym og
 vanlig bruker — dekoratørtesten dekket bare modulprefiksene.
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin (kulissene).
 
@@ -428,7 +428,7 @@ pasientregistrering** (og `oppdrag.services` per oppdrag) — uten unntaket får
 auditrad per pasient, `next_patient_nr_vakt_7: 41 → 42`, blandet inn mellom de ekte
 pasientradene på nøyaktig de vaktene der loggen betyr mest. `cron.*` er med i lista også,
 men den er den *svake* grunnen: fem rader i måneden, og de vises bedre på
-`/portal-admin/server-status/`.
+`/admin/server-status/`.
 
 Regelen står i `nokkel_logges()` — **logg det et menneske har bestemt, ikke det maskinen
 har talt** — som egen funksjon og ikke en `if` inne i mottakeren, så den lar seg prøve.
@@ -554,9 +554,9 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 
 | Register | Hva modulen melder inn | Fra |
 |---|---|---|
-| `core/driftstatus.py` | Tall til `/portal-admin/server-status/` (`vaktbilde`, `epost`) | `<app>/driftstatus.py` |
-| `core/portalinnstillinger.py` | Felter på `/portal-admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
-| `core/kontokobling.py` | Kort på `/portal-admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
+| `core/driftstatus.py` | Tall til `/admin/server-status/` (`vaktbilde`, `epost`) | `<app>/driftstatus.py` |
+| `core/portalinnstillinger.py` | Felter på `/admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
+| `core/kontokobling.py` | Kort på `/admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
 | `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
 | `core/endringer.py` | Endringsnummer — `registrer`, `endret`; fanen: `folgEndringer()` | `<app>/endringer.py` |
 | `core/ressursplassering.py` | Hvor en ressurs står nå — `aapen_plassering()`; park spør, KO svarer | `<app>/ressursplassering.py` |
@@ -635,7 +635,7 @@ feiler de etter en refaktorering, er det refaktoreringen som er feil.
 
 ### Avslutt vakt (core/vaktslutt.py, core/vaktstatistikk.py)
 
-**Ett trykk på `/portal-admin/vakt/` avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
+**Ett trykk på `/admin/vakt/` avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
 hver statistikkfane (`core.VaktStatistikk`), arkiver og tøm, åpne ny vakt. Frosne tall
 regnes aldri ut på nytt — tell opp `statistikk_versjon` når formen endres.
 
@@ -958,7 +958,7 @@ feiler bare cron-jobbene mens websiden går videre som før.
 **Hver jobb registrerer sin siste kjøring** (13. sep. 2026): `lesbar_dbfeil(..., navn='db_backup')`
 skriver `AppSetting['cron.<navn>']` med tid, ok/feil og melding, både når det
 gikk og når det ikke gikk — `core.kommando.registrer_kjoring()` kaster aldri.
-`/portal-admin/server-status/` leser `siste_kjoringer()` og viser «Aldri» til
+`/admin/server-status/` leser `siste_kjoringer()` og viser «Aldri» til
 jobben har kjørt én gang. En ny cron-jobb skal ha navnet sitt i `CRON_JOBBER`
 og sende det inn, ellers finnes den ikke for dashbordet.
 
@@ -985,7 +985,7 @@ i sesjonen (`SISTE_INTERAKSJON`). Ingen ny trafikk og ingen ny tabell.
 
 ### Server-status (core/admin_status.py)
 
-`/portal-admin/server-status/` polles hvert 10. sekund fra `…/json/`, og
+`/admin/server-status/` polles hvert 10. sekund fra `…/json/`, og
 `_build_status_payload()` er én dict med én innhenter per kort. **Hver
 innhenter fanger sine egne feil og legger dem i svaret** — et dashbord som
 selv gir 500 når databasen er treg, er borte akkurat når man trenger det.

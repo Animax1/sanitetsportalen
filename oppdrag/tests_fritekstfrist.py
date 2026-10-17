@@ -286,7 +286,7 @@ class InnstillingenTests(TestCase):
             username='adm_frist', password='x', role='admin', must_change_password=False)
         klient = Client()
         klient.force_login(admin)
-        svar = klient.get('/portal-admin/innstillinger/')
+        svar = klient.get('/admin/innstillinger/')
         self.assertContains(svar, 'name="oppdrag_fritekst_dager"')
         self.assertContains(svar, 'value="3"')
 

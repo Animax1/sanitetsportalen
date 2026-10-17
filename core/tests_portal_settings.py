@@ -37,7 +37,7 @@ class PortalInnstillingerTests(TestCase):
         self.assertContains(resp, 'name="session_timeout_hours"')
         # Vaktas navn flyttet til Vakt-siden 28. sep. 2026; her står en lenke.
         self.assertNotContains(resp, 'name="event_name"')
-        self.assertContains(resp, 'href="/portal-admin/vakt/"')
+        self.assertContains(resp, 'href="/admin/vakt/"')
 
     def test_ikke_admin_far_403(self):
         """Skriv_full på pasientmodulen gir ikke portalinnstillinger."""

@@ -315,7 +315,7 @@ def varsle_stoppet_klokke() -> int:
                 message=(f'Disse planene er ikke vurdert på lenge: {slugger}. '
                          'Backup tas nå av reservenettet i stedet, som bare '
                          'virker så lenge portalen får trafikk.'),
-                url='/portal-admin/backup/',
+                url='/admin/backup/',
                 level='critical',
             ) is not None:
                 antall += 1

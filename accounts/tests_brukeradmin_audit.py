@@ -41,7 +41,7 @@ class BrukeradminSetterSporTests(TestCase):
         self.c.force_login(self.admin)
 
     def _post(self, **data):
-        return self.c.post(f'/portal-admin/brukere/{self.offer.pk}/', data)
+        return self.c.post(f'/admin/brukere/{self.offer.pk}/', data)
 
     def _rader(self, felt):
         return list(AuditLog.objects.filter(record_id=self.offer.pk, field_name=felt))

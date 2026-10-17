@@ -38,12 +38,12 @@ def _alle_ruter() -> list[str]:
                 yield '/' + sti.lstrip('^').replace('\\', '')
 
     return sorted({s for s in gaa(get_resolver())
-                   if not s.startswith(('/admin/', '/django-admin/'))})
+                   if not s.startswith('/django-admin/')})
 
 
 def ruter_per_prefiks() -> dict[str, int]:
     """{'/pasienter/': 17, ...} — og `'andre'` for alt som ikke har et av dem."""
-    kjente = ('/pasienter/', '/oppdrag/', '/vaktliste/', '/portal-admin/',
+    kjente = ('/pasienter/', '/oppdrag/', '/vaktliste/', '/admin/',
               '/accounts/', '/statistikk/', '/ko/', '/backlog/')
     ut = {p: 0 for p in kjente}
     ut['andre'] = 0

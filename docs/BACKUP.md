@@ -80,10 +80,10 @@ Rekkefølgen er bindende, fordi backupen speiler hvor modellene bor.
 
 1. Ny Postgres i Railway, `DATABASE_URL` pekt dit, `python manage.py migrate`.
 2. `hent_offsite --list`, hent den nyeste hele fila, `hent_offsite <filnavn>`.
-3. Gjenopprett den fra `/portal-admin/backup/` — eller, hvis den hele fila mangler:
+3. Gjenopprett den fra `/admin/backup/` — eller, hvis den hele fila mangler:
    modulfilene i rekkefølgen i §3 punkt 6, deretter `create_admin` og kontoene for hånd.
 4. `python manage.py purge_old_logs` og `python manage.py kollaps_arkiv` med en gang.
-5. Sjekk `/portal-admin/server-status/`: konfigsjekk grønn, siste backup, offsite.
+5. Sjekk `/admin/server-status/`: konfigsjekk grønn, siste backup, offsite.
 6. Alle logger inn på nytt; MFA-trust-cookies er ugyldige etter passordbytte, ikke etter
    gjenoppretting — men si det likevel.
 

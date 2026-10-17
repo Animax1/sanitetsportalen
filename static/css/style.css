@@ -803,7 +803,7 @@
   /* Bootstraps .form-text er #6c757d, laget for lys bakgrunn. Mot --app-bg
      (#0f172a) blir hjelpeteksten under skjemafelter tilnærmet uleselig.
      Rammet passordreglene på /accounts/change-password/ og begge
-     hjelpetekstene på /portal-admin/backup/<modul>/. Samme verdi som
+     hjelpetekstene på /admin/backup/<modul>/. Samme verdi som
      .text-muted, så all sekundærtekst i portalen har én farge. */
   .form-text {
     color: var(--text-muted) !important;

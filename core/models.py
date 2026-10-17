@@ -783,7 +783,7 @@ class OffsiteKopi(models.Model):
 
     Raden er sporet: hvilken fil, hvor den ligger i bucketen, hvor stor den
     ble kryptert, når den gikk — og `feil` når den ikke gikk. Et mislykket
-    forsøk får også en rad; oversikten på /portal-admin/backup/ viser den
+    forsøk får også en rad; oversikten på /admin/backup/ viser den
     siste feilen, for en offsite-backup som stille har sluttet å virke er
     den feilen man oppdager den dagen Railway er borte.
     """

@@ -64,7 +64,7 @@ class SidenLasterSkriptetTests(TestCase):
         c = Client()
         c.force_login(admin)
         with override_settings(SECURE_SSL_REDIRECT=False):
-            html = c.get('/portal-admin/server-status/').content.decode()
+            html = c.get('/admin/server-status/').content.decode()
         for attr, navn in (('json', 'admin_server_status_json'), ('sessions', 'admin_sessions_list'),
                            ('kill', 'admin_session_kill'), ('kill-all', 'admin_session_kill_all')):
             self.assertIn(f'data-url-{attr}="{reverse("portaladmin:" + navn)}"', html)

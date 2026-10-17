@@ -212,8 +212,8 @@ class StatusmeldingenTests(TestCase):
                                                must_change_password=False)
         klient = Client()
         klient.force_login(admin)
-        self.assertContains(klient.get('/portal-admin/innstillinger/'), 'name="statusmelding_tekst"')
-        svar = klient.post('/portal-admin/innstillinger/', {
+        self.assertContains(klient.get('/admin/innstillinger/'), 'name="statusmelding_tekst"')
+        svar = klient.post('/admin/innstillinger/', {
             'session_timeout_hours': '8', 'statusmelding_tekst': 'Vakt pågår',
             'statusmelding_farge': 'gronn', 'statusmelding_til': ''})
         self.assertEqual(svar.status_code, 302)
@@ -339,7 +339,7 @@ class BjellemerketFoerPollingenTests(TestCase):
             notify(bruker, module_slug='core', kind=f'prove{i}', title=f'Prøve {i}')
         c = Client()
         c.force_login(bruker)
-        tekst = c.get('/portal-admin/vakt/').content.decode()
+        tekst = c.get('/admin/vakt/').content.decode()
         return re.search(r'<span id="notification-badge"\s+class="([^"]*)"', tekst).group(1)
 
     def test_null_uleste_er_skjult(self):

@@ -24,7 +24,7 @@ class VaktlisteConfig(AppConfig):
         register_statistikk_handlers()
 
         # Driftsdashbordet (14. sep. 2026). Uten registreringen viser
-        # `/portal-admin/server-status/` ingen vaktlister i drift og ingen
+        # `/admin/server-status/` ingen vaktlister i drift og ingen
         # siste utsending — og `core` skal ikke kjenne modulen ved navn for
         # å hente dem. Se `core/driftstatus.py`.
         from .driftstatus import register_handlers as register_driftstatus

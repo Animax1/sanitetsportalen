@@ -117,7 +117,7 @@ class KortetTests(_Basis):
     def setUp(self):
         super().setUp()
         self.per = _bruker('per', 'skriv_handling')
-        self.sti = f'/portal-admin/brukere/{self.per.pk}/'
+        self.sti = f'/admin/brukere/{self.per.pk}/'
 
     def _sett(self, klient, korps):
         return klient.post(self.sti, {'action': 'sett_vaktliste_korps',
@@ -213,7 +213,7 @@ class RegelenTests(_Basis):
     def test_kortet_nekter_et_annet_korps_enn_mannskapsraden(self):
         Kontokorps.objects.filter(user=self.per).delete()
         Mannskap.objects.filter(navn='Kari Karmøy').update(user=self.per)
-        svar = self.c.post(f'/portal-admin/brukere/{self.per.pk}/',
+        svar = self.c.post(f'/admin/brukere/{self.per.pk}/',
                            {'action': 'sett_vaktliste_korps', 'korps': self.hgsd.pk})
         self.assertEqual(svar.status_code, 200)
         html = svar.content.decode()

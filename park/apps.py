@@ -17,7 +17,7 @@ class ParkConfig(AppConfig):
         # Lagringstiden (28. sep. 2026). Uten registreringen gjør
         # `purge_old_logs` ingenting med radene — og jobben er fortsatt grønn.
         opprydding.register_handlers()
-        # Angrefristen og KO-bryteren på /portal-admin/innstillinger/ (pulje 2).
+        # Angrefristen og KO-bryteren på /admin/innstillinger/ (pulje 2).
         portalinnstillinger.register_handlers()
         # Fanen «Lag» i /statistikk/ (pulje 3). Uten registreringen finnes
         # ikke kilden, og ingen ser tallene.

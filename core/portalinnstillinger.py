@@ -1,6 +1,6 @@
 """Register for moduler som har innstillinger på portalinnstillingssiden.
 
-`/portal-admin/innstillinger/` eier portalens egne felter — vaktas navn og
+`/admin/innstillinger/` eier portalens egne felter — vaktas navn og
 sesjonstimeouten. Vaktlista la til fire til (mottakere, «send ved drift»,
 intervall, «bare hvis endret»), og fram til 14. sep. 2026 gjorde den det ved
 at *viewet* importerte `vaktliste.fil`: validering, lagring og malmarkup for én
@@ -19,7 +19,7 @@ Samme retningsproblem som driftsdashbordet hadde, og samme svar. Se
 **Alt valideres før noe lagres.** Det er ikke en detalj: timeouten og hver
 moduls verdier skrives hver for seg, og ingen transaksjon binder dem. (Vaktas
 navn sto her og ble skrevet på `Vakt` til 28. sep. 2026; det står nå på
-`/portal-admin/vakt/`.) Rekkefølgen i viewet er det eneste som hindrer at en avvist
+`/admin/vakt/`.) Rekkefølgen i viewet er det eneste som hindrer at en avvist
 innsending lagrer halve skjemaet, og `valider()`/`lagre()` er delt i to
 nettopp for at en handler ikke skal kunne skrive noe før de andre har sagt ja.
 `core/tests_portal_settings.py` og `vaktliste/tests_fil.py` håndhever det fra

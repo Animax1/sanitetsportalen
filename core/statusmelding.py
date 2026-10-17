@@ -74,7 +74,7 @@ def aktiv(naa=None) -> dict | None:
 
 
 class StatusmeldingInnstillinger(BasePortalinnstillingHandler):
-    """Kortet «Statusmelding i toppmenyen» på `/portal-admin/innstillinger/`."""
+    """Kortet «Statusmelding i toppmenyen» på `/admin/innstillinger/`."""
 
     slug = 'statusmelding'
     order = 1   # først: den gjelder hele portalen

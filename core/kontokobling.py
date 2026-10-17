@@ -1,6 +1,6 @@
 """Register for moduler som kobler en portalkonto til sine egne rader.
 
-Brukersiden under `/portal-admin/brukere/<pk>/` har et kort «Pasientregistrering»
+Brukersiden under `/admin/brukere/<pk>/` har et kort «Pasientregistrering»
 der admin velger om kontoen er førstehjelper, helsepersonell eller ingen av
 delene. Fram til 14. sep. 2026 lå det i `accounts/forms.py`, som en direkte
 import av `patients.models` — altså **kontoappen som kjente én modul ved navn**

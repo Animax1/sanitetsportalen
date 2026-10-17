@@ -291,8 +291,8 @@ class BackupResetIntegrationTests(TestCase):
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             c = Client()
             c.force_login(self.admin)
-            # `/portal-admin/vakt/avslutt/` siden 28. sep. 2026.
-            resp = c.post('/portal-admin/vakt/avslutt/',
+            # `/admin/vakt/avslutt/` siden 28. sep. 2026.
+            resp = c.post('/admin/vakt/avslutt/',
                           {'bekreft': 'ja', 'ny_vakt_navn': 'Neste vakt'})
 
         self.assertEqual(resp.status_code, 302)

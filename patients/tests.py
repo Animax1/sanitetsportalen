@@ -395,7 +395,7 @@ class LeadViewTests(TestCase):
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
-# «Avslutt vakt» og gjenåpningen flyttet til /portal-admin/vakt/ 28. sep. 2026.
+# «Avslutt vakt» og gjenåpningen flyttet til /admin/vakt/ 28. sep. 2026.
 # Testene står i `core/tests_vakt_side.py` og `core/tests_vaktslutt.py`.
 
 
@@ -1465,7 +1465,7 @@ class SettingsWhitelistTests(TestCase):
         self.assertEqual(data.get('active_year'), str(hent_aktiv_vakt().year))
 
     def test_put_finnes_ikke_lenger(self):
-        """Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1).
+        """Skrivingen flyttet til /admin/innstillinger/ (§4.1).
 
         Whitelisten for PUT er borte sammen med metoden. Lese-whitelisten står
         igjen og er fortsatt vernet av testene over — den er den som avgjør hva
@@ -1555,14 +1555,14 @@ class HeaderArrangementNavnTests(TestCase):
         resp = self.client.get('/pasienter/')
         self.assertNotContains(resp, 'id="setting-event-name"')
         # Lenken rendres kun for global admin — kortet er server-side gatet.
-        self.assertNotContains(resp, '/portal-admin/innstillinger/')
+        self.assertNotContains(resp, '/admin/innstillinger/')
 
         admin = CustomUser.objects.create_user(
             username='arr_admin', password='x', role='admin',
             must_change_password=False)
         c = Client()
         c.force_login(admin)
-        self.assertContains(c.get('/pasienter/'), '/portal-admin/innstillinger/')
+        self.assertContains(c.get('/pasienter/'), '/admin/innstillinger/')
 
     def test_navnet_escapes_i_templaten(self):
         """Vaktnavnet er fritekst fra vaktstart-skjemaet."""

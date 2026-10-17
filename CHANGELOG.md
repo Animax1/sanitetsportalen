@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Fase 0: adminflaten heter `/admin/`, og `/portal-admin/` sender dit med 301  `#core/grensesnitt`
+
+**Synlig endring:** adressen til brukere, moduler, backup, server-status, vakt og innstillinger
+er `/admin/…` (beslutning 3 i `docs/BESLUTNING_PORTALER.md`). Tatt rett før fase 5, så de nye sidene
+får riktig sti fra starten.
+
+**Den gamle stien virker:** `/portal-admin/<resten>` gir 301 til `/admin/<resten>`, med
+spørrestrengen (`core.views_admin.gammel_portaladmin`). Bokmerker, lenker i e-post og varsler som
+er lagret med den gamle stien (`Notification.url`) lander riktig. Målet er alltid under `/admin/`,
+også for `/portal-admin//noe.annet/`.
+
+**Tre ting en søk-og-erstatt ikke skal gjøre, og som ble rettet for hånd:**
+- **`core/urls.py` hadde en gammel 301 *fra* `/admin/server-status/` *til*
+  `/portal-admin/server-status/`.** Den er fjernet; ellers ville `/admin/server-status/` sendt til
+  seg selv.
+- **`core/tallfasit.py` utelot `/admin/` fra rutetellingen** — for Djangos gamle admin, som sto der
+  en gang. Etter flyttingen ville alle adminsidene forsvunnet stille fra tallene i dokumentene. Nå
+  utelates bare `/django-admin/`. Nøkkelen heter `ruter_admin`.
+- **Notatet beskriver flyttingen** («`/portal-admin/` → `/admin/`»), og der står den gamle stien.
+  Det samme gjør `CHANGELOG.md` og `docs/archived/`, som er historikk.
+
+`PortalAdminKartetTests` så etter `admin/` hvor som helst på linja, og ville tatt omdirigeringen og
+pasientmodulens `/pasienter/admin/server-status/` for ruter under flaten. Den ser nå etter stier som
+*begynner* med `admin/`, i filene som mountes på rota.
+
+**Djangos egen admin står på `/django-admin/`**, og bare under `DEBUG` — som før.
+
 ## 2026-10-17 — Portaler fase 4d-3: vaktlistas oppslag på ID går gjennom portalen, og statistikk og arkiv viser portalens historikk — fase 4 er ferdig  `#core/tilgang` `#vaktliste/tilgang` `#statistikk/oppdragsfanen`
 
 Siste pulje av fase 4. **Med én portal: ingen synlig endring.**

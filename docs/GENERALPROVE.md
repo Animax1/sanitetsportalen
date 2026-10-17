@@ -46,9 +46,9 @@ annet.
 - Bilene er koblet til sine enheter, står **på vakt**, og har en enhetstype.
 - Lokasjoner, problemstillinger (også en som bærer antall, som «Transport») og
   lydvarselets terskler er satt opp i «Valglister».
-- **Ta manuelle backuper** på `/portal-admin/backup/` før dere begynner (modulene dere
+- **Ta manuelle backuper** på `/admin/backup/` før dere begynner (modulene dere
   bruker, eller den hele), så staging kan settes tilbake etterpå.
-- `/portal-admin/server-status/` er grønn: konfig, offsite og databasen.
+- `/admin/server-status/` er grønn: konfig, offsite og databasen.
 - **Staging står i vakt-modus** (`docs/RUNBOOK_VAKT.md` §1: 2 workers × 4 tråder, Redis).
   Kortet «Responstid» skal si «Samlet fra 2 workers». Ellers måler §8 et annet oppsett enn
   det som kjører på vakta, og tallene kan ikke føres inn i runbooken.
@@ -161,7 +161,7 @@ sekundet i 48 timer. Se «Skalering mot 2027» i `TODO.md`.
       **10 bilskjermer** på `/oppdrag/`. Gjenbruk PC-er og telefoner, flere faner i hver
       nettleser teller — pollene går uansett. La dem stå **én time** mens resten av prøven
       pågår, synlige (en skjult fane poller ikke).
-- [ ] Admin holder `/portal-admin/server-status/` oppe: beredskapstrinnet, P95, feil (5xx),
+- [ ] Admin holder `/admin/server-status/` oppe: beredskapstrinnet, P95, feil (5xx),
       databasen og sesjonene, med hvem som faktisk er aktiv.
 - [ ] **Les av og noter, midt i timen og på slutten:**
       - P95 og forespørsler/s («Responstid siste 5 min»), og trinnet. Forventet: grønt,
@@ -192,14 +192,14 @@ sekundet i 48 timer. Se «Skalering mot 2027» i `TODO.md`.
       flere biler har vært på samme oppdrag. Sjekk at begge ser riktige ut, og at
       responstiden er per bil.
 - [ ] **Avslutt vakta i pasientregistreringen** («Avslutt vakt»). Den tar backup først.
-- [ ] `/portal-admin/backup/`: backupene er skrevet, og **offsite står grønt**.
+- [ ] `/admin/backup/`: backupene er skrevet, og **offsite står grønt**.
 - [ ] **Server-status → «Broer i oppdrag (G6b)» står fortsatt «Aldri brukt»** (14. okt.
       2026, `oppdrag/bro.py`). Prøven kjører de samme veiene som vakta, så et tall her er
       et funn: noter tidspunktet som står, og hva som ble prøvd da — det sier hvilken vei
       som fortsatt går gjennom en bro. **Les av før gjenopprettingen under**, som kan
       nullstille telleren.
 - [ ] Til slutt, om staging skal tilbake til utgangspunktet: gjenopprett fra backupene i
-      §0 på `/portal-admin/backup/`.
+      §0 på `/admin/backup/`.
 
 ---
 

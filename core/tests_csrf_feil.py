@@ -50,7 +50,7 @@ class CsrfFeilTests(TestCase):
         medlemskap(bruker)
         c = Client()
         c.force_login(bruker)
-        svar = c.get('/portal-admin/server-status/')
+        svar = c.get('/admin/server-status/')
         self.assertEqual(svar.status_code, 403)
         self.assertIn('Ingen tilgang', svar.content.decode())
         self.assertNotIn(MELDING, svar.content.decode())

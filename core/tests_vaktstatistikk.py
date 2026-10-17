@@ -108,7 +108,7 @@ class AvsluttVaktFryserTests(TestCase):
         self.c.force_login(self.admin)
 
     def _avslutt(self, navn='Neste vakt'):
-        return self.c.post('/portal-admin/vakt/avslutt/',
+        return self.c.post('/admin/vakt/avslutt/',
                            {'bekreft': 'ja', 'ny_vakt_navn': navn})
 
     def test_tallene_er_fra_for_slettingen(self):

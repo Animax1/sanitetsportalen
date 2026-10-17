@@ -79,7 +79,7 @@ class HalvferdigMfaOppsettTests(TestCase):
         angriper, enhet = _til_oppsett(self.bruker)
 
         _, admin = _admin()
-        admin.post(f'/portal-admin/brukere/{self.bruker.pk}/', {'action': 'reset_password'})
+        admin.post(f'/admin/brukere/{self.bruker.pk}/', {'action': 'reset_password'})
 
         angriper.post(LOGIN, {'totp_code': _kode(enhet)})
         self.assertFalse(_innlogget(angriper),
@@ -204,7 +204,7 @@ class HalvferdigMfaOppsettTests(TestCase):
     def test_nullstill_mfa_i_adminflaten_tar_de_halvinnloggede(self):
         angriper, _ = _til_oppsett(self.bruker)
         _, admin = _admin()
-        admin.post(f'/portal-admin/brukere/{self.bruker.pk}/', {'action': 'reset_mfa'})
+        admin.post(f'/admin/brukere/{self.bruker.pk}/', {'action': 'reset_mfa'})
         self.assertFalse(Session.objects.filter(
             session_key=angriper.session.session_key).exists())
 
@@ -408,7 +408,7 @@ class DeltKontoLaasesPerIpTests(TestCase):
     def test_laas_opp_i_adminflaten_aapner_ogsaa_maskinlaasen(self):
         self._feil(self.bil, '10.0.0.66', 5)
         _, admin = _admin()
-        admin.post(f'/portal-admin/brukere/{self.bil.pk}/', {'action': 'unlock'})
+        admin.post(f'/admin/brukere/{self.bil.pk}/', {'action': 'unlock'})
         c, _ = self._prov(self.bil, PASSORD, '10.0.0.66')
         self.assertTrue(_innlogget(c))
 
@@ -465,7 +465,7 @@ class NullstillMfaKommandoTests(TestCase):
         with patch('accounts.mfa.nullstill_mfa', wraps=__import__(
                 'accounts.mfa', fromlist=['nullstill_mfa']).nullstill_mfa) as tjeneste:
             _, admin = _admin()
-            admin.post(f'/portal-admin/brukere/{self.bruker.pk}/', {'action': 'reset_mfa'})
+            admin.post(f'/admin/brukere/{self.bruker.pk}/', {'action': 'reset_mfa'})
             self._kjor(self.bruker.username, '--ja')
         self.assertEqual(tjeneste.call_count, 2)
 

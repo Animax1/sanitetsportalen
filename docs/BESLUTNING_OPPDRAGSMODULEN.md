@@ -567,7 +567,7 @@ aldri flyttet ut av pasientmodulen: **opprettelsen** (`arkiver_aktiv_vakt()` i
 `patients/services.py`; handler-kontrakten har ingen `opprett_arkiv`) og **knappen**, som
 ligger i admin-kortene på `/pasienter/`.
 
-En vakt er ikke en pasientting. Knappen hører hjemme i `/portal-admin/`, ved siden av
+En vakt er ikke en pasientting. Knappen hører hjemme i `/admin/`, ved siden av
 innstillingene som flyttet dit i §4.1. Men én knapp som lager to *urelaterte* arkivrader er
 verre enn to knapper — da tror man de hører sammen. Sammenslåingen krever derfor en rad i
 `core` som grupperer dem:

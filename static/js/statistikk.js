@@ -386,7 +386,7 @@ async function lastVaktvalg() {
     sel.appendChild(valg);
   });
   sel.addEventListener('change', () => velgVakt(sel.value));
-  // `?vakt=<nøkkel>` fra lenkene på /portal-admin/vakt/ velger vakta med en gang.
+  // `?vakt=<nøkkel>` fra lenkene på /admin/vakt/ velger vakta med en gang.
   const fraAdressen = new URLSearchParams(window.location.search).get('vakt');
   if (fraAdressen && vaktvalg.some(v => v.nokkel === fraAdressen)) {
     sel.value = fraAdressen;
