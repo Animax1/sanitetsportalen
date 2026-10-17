@@ -388,6 +388,13 @@ class Notification(models.Model):
         related_name='notifications',
         verbose_name='Mottaker',
     )
+    # Portalen varselet gjelder (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+    # §4.14). Bjella står utenfor portalene — kontoen er global — så varselet
+    # må selv si hvor det hører til. Tom for varsler fra før portalene fantes.
+    portal = models.ForeignKey(
+        'core.Vaktportal', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='+', verbose_name='Portal',
+    )
     module_slug = models.CharField(
         max_length=64,
         db_index=True,
@@ -661,11 +668,10 @@ class Vakt(models.Model):
 
     navn = models.CharField(
         max_length=255,
-        unique=True,
         verbose_name='Vaktnavn',
         help_text='Fritekst, satt ved vaktstart: «Landsskytterstevnet 2026». '
-                  'Unikt — to vakter med samme navn lar seg ikke skille i '
-                  'statistikken. Trengs navnet igjen, legg på en dato.',
+                  'Unikt i portalen — to vakter med samme navn lar seg ikke skille '
+                  'i statistikken. Trengs navnet igjen, legg på en dato.',
     )
     # Utledet, men lagret: sesongstatistikken grupperer på år, og å regne det
     # ut fra `startet` i hver spørring ville gjort en billig gruppering dyr.
@@ -698,6 +704,10 @@ class Vakt(models.Model):
             models.UniqueConstraint(
                 fields=['portal'], condition=models.Q(er_aktiv=True),
                 name='en_aktiv_vakt_per_portal'),
+            # **Navnet er unikt per portal** (17. okt. 2026, §4.12), så Brann og
+            # Standard kan ha hver sin «Kamp 7». Var unikt for hele installasjonen
+            # — og da kunne `vakt_for_year()` aldri lage «2026» i portal nummer to.
+            models.UniqueConstraint(fields=['portal', 'navn'], name='vaktnavn_unikt_per_portal'),
         ]
 
     def __str__(self):

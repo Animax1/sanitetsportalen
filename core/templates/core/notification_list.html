@@ -50,6 +50,7 @@
             <div class="small text-muted" style="font-weight:normal;">{{ n.message }}</div>
             <div class="small text-muted mt-1" style="font-weight:normal;font-size:0.74rem;">
               {{ n.created_at|date:"d.m.Y H:i" }}
+              {% if vis_portal and n.portal %}· {{ n.portal.navn }}{% endif %}
               {% if n.module_slug %}· modul: {{ n.module_slug }}{% endif %}
             </div>
           </div>

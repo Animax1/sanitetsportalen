@@ -27,5 +27,5 @@ def register_handlers() -> None:
     endringer.registrer(OPPDRAG, oppdrag_gate)
 
 
-def oppdrag_endret() -> None:
-    endringer.endret(OPPDRAG)
+def oppdrag_endret(*, alle: bool = False) -> None:
+    endringer.endret(OPPDRAG, alle=alle)

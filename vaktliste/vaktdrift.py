@@ -164,7 +164,7 @@ def sett_forfalte_i_drift(naa=None) -> list:
             if skal_settes_i_drift(vl, naa) and sett_i_drift_ved_start(vl, naa)]
 
 
-def lister_i_drift():
+def lister_i_drift(portal=None):
     """Vaktlistene som står i drift — **og ikke er arkivert**.
 
     **Én spørring, fire lesere** (26. sep. 2026, A6): `vaktliste_i_bruk()`,
@@ -174,7 +174,10 @@ def lister_i_drift():
     telefonnumre. Sperra i viewet hindrer nye; dette tar dem som finnes.
     """
     from .models import Vaktliste
-    return Vaktliste.objects.filter(status=choices.DRIFT, arkivert_at__isnull=True)
+    qs = Vaktliste.objects.filter(status=choices.DRIFT, arkivert_at__isnull=True)
+    # `portal` for leserne som svarer i én portal (`vaktliste_i_bruk`, `besetning`).
+    # Fila på e-post og driftstatus går over alle, og kaller uten.
+    return qs if portal is None else qs.filter(vakt__portal=portal)
 
 
 def vaktliste_i_bruk():
@@ -197,8 +200,9 @@ def vaktliste_i_bruk():
     deler prioriteringen og ikke spørringen, og et forsøk på å slå dem sammen
     (17. sep. 2026) brøt nettopp den forskjellen uten at noen test ble rød.
 
-    **Flere lister kan stå i drift samtidig** — ingenting hindrer det, og
-    `driftstatus.py` regner med det. Da vinner den som sist ble satt i drift.
+    **Høyst én liste i drift per portal** fra 17. okt. 2026 (`annen_i_drift`),
+    og lista hentes i portalen. Lister satt i drift før sperren kom kan likevel
+    stå to — da vinner den som sist ble satt i drift.
     Rekkefølgen er oppgitt og ikke overlatt til basen: et ressursbilde som
     bytter innhold mellom to pollinger er verre enn ett som viser feil liste,
     fordi det siste lar seg se.
@@ -211,13 +215,14 @@ def vaktliste_i_bruk():
     from core.vakt import hent_aktiv_vakt
     from .models import Vaktliste
 
-    i_drift = (lister_i_drift()
+    # **I portalen** (17. okt. 2026): Branns tavle skal aldri vise Standards liste.
+    vakt = hent_aktiv_vakt()
+    i_drift = (lister_i_drift(vakt.portal)
                .select_related('vakt')
                .order_by('-satt_i_drift_at', '-pk').first())
     if i_drift is not None:
         return i_drift
-    return (Vaktliste.objects.filter(vakt=hent_aktiv_vakt())
-            .select_related('vakt').first())
+    return Vaktliste.objects.filter(vakt=vakt).select_related('vakt').first()
 
 
 def besetning(enhet_id, naa=None):
@@ -260,7 +265,7 @@ def besetning(enhet_id, naa=None):
                   .select_related('vaktliste__vakt'))
     # Samme utvalg og samme rekkefølge som `vaktliste_i_bruk()` (A6): står to
     # lister i drift, skal sentralbordet og KO vise samme liste for samme bil.
-    ressurs = (kandidater.filter(vaktliste__in=lister_i_drift())
+    ressurs = (kandidater.filter(vaktliste__in=lister_i_drift(vakt.portal))
                .order_by('-vaktliste__satt_i_drift_at', '-vaktliste__pk').first()
                or (kandidater.filter(vaktliste__vakt=vakt).first() if vakt else None))
     if ressurs is None:
@@ -434,8 +439,9 @@ def koblet_i_annen_vakt(enhet_id):
     `exclude()` på den aktive vakta: har den en ressurs for enheten, kom vi
     aldri hit. Nyeste vakt først, fordi det er den man planla sist.
     """
+    from core.portal import gjeldende_portal
     ressurs = (Ressurs.objects
-               .filter(enhet_id=enhet_id)
+               .filter(enhet_id=enhet_id, vaktliste__vakt__portal=gjeldende_portal())
                .select_related('vaktliste__vakt')
                .order_by('-vaktliste__vakt__startet')
                .first())

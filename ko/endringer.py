@@ -37,8 +37,8 @@ def register_handlers() -> None:
     endringer.registrer(LOGG, logg_gate)
 
 
-def tavla_endret() -> None:
-    endringer.endret(TAVLE)
+def tavla_endret(*, alle: bool = False) -> None:
+    endringer.endret(TAVLE, alle=alle)
 
 
 def loggen_endret() -> None:

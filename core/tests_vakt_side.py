@@ -145,7 +145,8 @@ class NavnTests(VaktsideBasis):
         self.assertEqual(self.vakt.navn, 'Landsskytterstevnet')
 
     def test_tomt_og_opptatt_navn_avvises(self):
-        Vakt.objects.create(navn='Opptatt', year=2025, startet=timezone.now(), er_aktiv=False)
+        Vakt.objects.create(navn='Opptatt', year=2025, startet=timezone.now(), er_aktiv=False,
+                            portal=self.vakt.portal)
         for navn in ('', 'Opptatt'):
             self.c.post(NAVN, {'navn': navn})
             self.vakt.refresh_from_db()

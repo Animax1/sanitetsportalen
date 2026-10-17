@@ -128,7 +128,7 @@ def vakt_navn_view(request):
     navn = (request.POST.get('navn') or '').strip()
     if not navn:
         messages.error(request, 'Vakten må ha et navn.')
-    elif Vakt.objects.filter(navn=navn).exclude(pk=vakt.pk).exists():
+    elif Vakt.objects.filter(portal=vakt.portal, navn=navn).exclude(pk=vakt.pk).exists():
         messages.error(request, vaktnavn_opptatt_melding(navn))
     else:
         vakt.navn = navn
@@ -155,11 +155,11 @@ def vakt_avslutt_view(request):
         return redirect('portaladmin:vakt')
     # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
     # `opprett_vakt` i orkestratoren — denne sjekken er et kappløp.
-    if Vakt.objects.filter(navn=nytt_navn).exists():
+    vakt = hent_aktiv_vakt()
+    if Vakt.objects.filter(portal=vakt.portal, navn=nytt_navn).exists():
         messages.error(request, vaktnavn_opptatt_melding(nytt_navn))
         return redirect('portaladmin:vakt')
 
-    vakt = hent_aktiv_vakt()
     try:
         svar = vaktslutt.avslutt(vakt, ny_vakt_navn=nytt_navn, bruker=request.user,
                                  request=request)

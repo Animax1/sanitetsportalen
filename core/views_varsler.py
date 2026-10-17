@@ -18,6 +18,13 @@ from core.url_safety import safe_redirect_url
 # Fase 5: Varsler (notifications)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+def _flere_portaler(user) -> bool:
+    """Bjella står utenfor portalene (`UTENFOR_PORTAL`), så varslene fra alle
+    portalene kontoen er med i, står i samme liste — og må si hvor de hører til."""
+    from core.portal import mulige_portaler
+    return mulige_portaler(user).count() > 1
+
 @login_required
 @require_GET
 def notification_unread_count_view(request):
@@ -47,13 +54,15 @@ def notification_list_view(request):
     til varselets URL.
     """
     from core.models import Notification
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+    qs = (Notification.objects.filter(user=request.user).select_related('portal')
+          .order_by('-created_at'))
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
     unread_total = Notification.objects.filter(user=request.user, is_read=False).count()
     return render(request, 'core/notification_list.html', {
         'page_obj': page_obj,
         'unread_total': unread_total,
+        'vis_portal': _flere_portaler(request.user),
     })
 
 
@@ -107,8 +116,10 @@ def notification_api_list_view(request):
     """
     from django.http import JsonResponse
     from core.models import Notification
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
+    qs = (Notification.objects.filter(user=request.user).select_related('portal')
+          .order_by('-created_at')[:10])
     unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+    flere = _flere_portaler(request.user)
     return JsonResponse({
         'notifications': [
             {
@@ -117,6 +128,8 @@ def notification_api_list_view(request):
                 'message': n.message,
                 'url': n.url,
                 'module_slug': n.module_slug,
+                # Portalnavnet bare når kontoen har flere — med én er det støy.
+                'portal': n.portal.navn if flere and n.portal else '',
                 'level': n.level,
                 'is_read': n.is_read,
                 'created_at': n.created_at.isoformat(),

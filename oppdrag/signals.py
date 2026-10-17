@@ -194,5 +194,6 @@ def oppdrag_post_delete(sender, instance, **kwargs):
 @receiver(post_save, sender=Lokasjon)
 @ikke_under_loaddata
 def oppdrag_endret(sender, instance=None, **kwargs):
-    """Noe sentralbordets lister viser, er endret."""
-    oppdrag_endringer.oppdrag_endret()
+    """Noe sentralbordets lister viser, er endret. Bilene og typene er globale
+    (`docs/BESLUTNING_PORTALER.md` §4.6), så en endring i dem gjelder alle portaler."""
+    oppdrag_endringer.oppdrag_endret(alle=sender in (Enhet, Enhetstype))

@@ -45,6 +45,7 @@ def notify(
     message: str = '',
     url: str = '',
     level: str = Notification.LEVEL_INFO,
+    portal=None,
 ) -> Notification | None:
     """Opprett et nytt varsel hvis ikke duplikat finnes siste 24 timer.
 
@@ -59,6 +60,9 @@ def notify(
         message      — detaljtekst
         url          — relativ URL for klikk (valgfritt)
         level        — 'info' | 'warning' | 'critical' (default info)
+        portal       — portalen varselet gjelder. Uten: portalen forespørselen
+                       står i, ellers mottakerens eneste. **Gjettes aldri**:
+                       har mottakeren flere og ingen er gitt, sendes ingenting.
 
     Sikkerhet:
         - Anonyme brukere får aldri varsler.
@@ -99,7 +103,21 @@ def notify(
         )
         return None
 
-    if not har_tilgang(user, module_slug, 'les'):
+    # **Tilgangen sjekkes i portalen hendelsen skjedde i** (17. okt. 2026), ikke
+    # i mottakerens: hun står ikke i noen forespørsel, og med flere portaler
+    # ville svaret vært «ingen» — varselet hadde forsvunnet i stillhet.
+    # Global admin står utenfor portalene og har tilgang uansett — backupvarslene
+    # og backlog går til henne uten at noen portal er involvert.
+    from core.auth_decorators import er_global_admin  # noqa: WPS433
+    from core.portal import aktiv_kontekst, brukerens_portal  # noqa: WPS433
+    portal = portal or aktiv_kontekst() or brukerens_portal(user)
+    if portal is None and not er_global_admin(user):
+        logger.warning(
+            'notify: vet ikke hvilken portal kind=%s gjelder for user=%s — '
+            'varselet ble ikke opprettet. Oppgi `portal`.', kind, user.pk)
+        return None
+
+    if not har_tilgang(user, module_slug, 'les', portal=portal):
         logger.debug(
             'notify: hopper over user=%s kind=%s — mangler lesetilgang til %s',
             user.pk, kind, module_slug,
@@ -112,6 +130,7 @@ def notify(
     cutoff = timezone.now() - DEDUP_WINDOW
     existing = Notification.objects.filter(
         user=user,
+        portal=portal,
         kind=kind,
         message=message,
         created_at__gte=cutoff,
@@ -125,6 +144,7 @@ def notify(
 
     return Notification.objects.create(
         user=user,
+        portal=portal,
         module_slug=module_slug,
         kind=kind,
         level=level,

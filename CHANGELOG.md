@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4d-1: vaktnavnet unikt per portal, varslene med portal, endringsnumrene per portal, og lista i drift slått opp i portalen  `#core/tilgang` `#core/vakt` `#vaktliste/tilgang`
+
+Første pulje av fase 4d i `docs/BESLUTNING_PORTALER.md` (§4.12, §4.14). **Med én portal: ingen
+synlig endring.** `VENTER` i `core/tests_portalisolasjon.py` er tom: hver modell har en vei til en
+portal, eller står i `GLOBALE` med en grunn.
+
+**Vaktnavnet er unikt per portal** (`core/0022`), så Brann og Standard kan ha hver sin «Kamp 7».
+Det rettet også en feil som ville vist seg den dagen portal nummer to fikk sin første vakt:
+`vakt_for_year()` kaller vakta «2026», og med navnet unikt for hele installasjonen stoppet den på
+Standards «2026» — og oppslaget etterpå ville krasjet. «Gi vakta nytt navn» og «Avslutt vakt»
+sjekker navnet i portalen.
+
+**Varslene har portal** (`core/0021`, `Notification.portal`). Bjella står utenfor portalene, så
+varselet må selv si hvor det hører til. Navnet vises i bjella og på `/varsler/` **bare når kontoen
+har flere portaler**.
+
+**Funnet underveis: varsler ville forsvunnet i stillhet.** `notify()` sjekket mottakerens
+lesetilgang i *mottakerens* portal. Hun står ikke i noen forespørsel, og med flere portaler var
+svaret «ingen» — tildelingsvarselet ble aldri laget. Nå sjekkes tilgangen i portalen hendelsen
+skjedde i (`har_tilgang(..., portal=)`):
+- oppgitt portal,
+- ellers portalen forespørselen står i,
+- ellers mottakerens eneste.
+
+Gjettes aldri: uten portal og med flere sendes ingenting, og det logges. Global admin varsles uten
+portal (backupklokka, backlog). Dedupliseringen gjelder innen portalen.
+
+**Endringsnumrene er per portal** (`core/endringer.py`). Tallet fanen får er `<felles>.<portal>`:
+- En endring i en forespørsel øker portalens ledd. Branns faner henter ikke lenger ved hver
+  skriving i Standard.
+- En endring uten portal (klokka, en kommando) eller i en global tabell (`alle=True`) øker det
+  felles leddet, så alle henter. **Bilene og enhetstypene er globale** (§4.6): en endring på en bil
+  gir nytt tall i alle portalene, i både sentralbordet og tavla.
+
+**Lista i drift slås opp i portalen.** `vaktliste_i_bruk()`, `besetning()` og
+`koblet_i_annen_vakt()` leter bare i portalens lister. Fila på e-post og driftstatus går fortsatt
+over alle.
+
+**Tester: 16 i `Fase4dTests`.** Fire tester i `core` laget en «opptatt» vakt uten portal; i drift
+har hver vakt en, så de fikk portalen — ellers var navnet ledig av feil grunn.
+**Mutasjoner: 20, alle drept til slutt.** To overlevde første runde:
+- Sperren for «ingen portal» fanges også av tilgangssjekken. Testen krever nå advarselen i loggen,
+  som er det som skiller.
+- Dedupliseringen per portal manglet test.
+
 ## 2026-10-17 — Portaler fase 4c: KOs ansvarsområder, artister og kjennetegn per portal, ansvarsmerket per portal, og parklenken som bærer portalen inn på /lag/r/  `#core/tilgang` `#ko/planleggeren` `#park/modulen`
 
 Tredje del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.12, §4.13). **Med én portal: ingen synlig

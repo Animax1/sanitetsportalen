@@ -142,7 +142,7 @@
         <div class="notif-item-body">
           <div class="notif-item-title">${esc(n.title)}</div>
           ${n.message ? `<div class="notif-item-msg">${esc(n.message)}</div>` : ''}
-          <div class="notif-item-time">${timeLabel(n.created_at)}</div>
+          <div class="notif-item-time">${timeLabel(n.created_at)}${n.portal ? ' · ' + esc(n.portal) : ''}</div>
         </div>
         ${!n.is_read ? '<div class="notif-dot" aria-hidden="true"></div>' : ''}
       </div>`).join('');

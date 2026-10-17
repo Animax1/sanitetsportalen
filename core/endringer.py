@@ -33,6 +33,13 @@ og modulene melder inn sine områder — samme idiom som `core/driftstatus.py` o
 - **Aldri et unntak ut.** En cache som er nede skal ikke stoppe en stempling
   eller en flytting. Uten tall henter fanene på sikkerhetsnettet, som før.
 
+**Per portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.14). Uten portalen
+i nøkkelen hentet hver Brann-fane på nytt ved hver skriving i Landsskytter. Tallet
+fanen får er to ledd, `<felles>.<portal>`: en endring i en forespørsel øker
+portalens ledd, og en endring **uten** portal — klokka, en kommando, en global
+tabell som bilene (`alle=True`) — øker det felles, så alle portalene henter. Å
+hente én gang for mye koster en 200; å la være koster et bilde som står feil.
+
 Tallet ligger i cachen: **Redis på vakt**, delt mellom workerne. Mellom vakter
 er det én worker, og lokal cache holder. To workers uten Redis ville gitt hver
 prosess sitt tall — fanene ville hentet for ofte, men aldri stått feil — og
@@ -73,9 +80,13 @@ def _ny_start() -> int:
     return int(time.time() * 1000)
 
 
-def _ok(navn: str) -> None:
+def _nokkel(navn: str, portal_id=None) -> str:
+    return NOKKEL.format(navn) if portal_id is None else f'{NOKKEL.format(navn)}:p{portal_id}'
+
+
+def _ok(nokkel: str) -> None:
     try:
-        cache.incr(NOKKEL.format(navn))
+        cache.incr(nokkel)
     except ValueError:
         # Nøkkelen finnes ikke (første gang, eller cachen er tømt). Ingenting å
         # gjøre: `versjon()` setter en ny start neste gang tallet leses, og den
@@ -83,21 +94,34 @@ def _ok(navn: str) -> None:
         # til mutasjonstestingen viste at den ikke endret noe.)
         pass
     except Exception:   # noqa: BLE001 — se modulens docstring
-        logger.warning('endringer: kunne ikke øke %s', navn, exc_info=True)
+        logger.warning('endringer: kunne ikke øke %s', nokkel, exc_info=True)
 
 
-def endret(navn: str) -> None:
+def endret(navn: str, *, alle: bool = False) -> None:
     """Området er endret. Tallet øker når transaksjonen er commitet —
-    utenfor en transaksjon med en gang."""
+    utenfor en transaksjon med en gang.
+
+    I portalen konteksten står i; uten kontekst, eller med `alle`, for alle."""
     try:
-        transaction.on_commit(lambda: _ok(navn))
+        from core.portal import aktiv_kontekst
+        portal = None if alle else aktiv_kontekst()
+        nokkel = _nokkel(navn, getattr(portal, 'pk', None))
+        transaction.on_commit(lambda: _ok(nokkel))
     except Exception:   # noqa: BLE001
         logger.warning('endringer: kunne ikke melde %s', navn, exc_info=True)
 
 
-def versjon(navn: str) -> str:
-    """Tallet for området, som tekst. Finnes det ikke, settes det."""
-    nokkel = NOKKEL.format(navn)
+def versjon(navn: str, portal=None) -> str:
+    """Tallet for området, som tekst: det felles leddet, og portalens når den
+    er oppgitt. Et tomt ledd betyr at cachen ikke svarte."""
+    felles = _ett_ledd(_nokkel(navn))
+    if portal is None:
+        return felles
+    return f'{felles}.{_ett_ledd(_nokkel(navn, portal.pk))}'
+
+
+def _ett_ledd(nokkel: str) -> str:
+    """Ett tall fra cachen, som tekst. Finnes det ikke, settes det."""
     try:
         verdi = cache.get(nokkel)
         if verdi is None:
@@ -105,7 +129,7 @@ def versjon(navn: str) -> str:
             verdi = cache.get(nokkel)
         return '' if verdi is None else str(verdi)
     except Exception:   # noqa: BLE001
-        logger.warning('endringer: kunne ikke lese %s', navn, exc_info=True)
+        logger.warning('endringer: kunne ikke lese %s', nokkel, exc_info=True)
         return ''
 
 
@@ -123,5 +147,5 @@ def versjoner(request, navn: list[str]) -> dict[str, str]:
         except Exception:   # noqa: BLE001 — en gate som feiler, stenger
             logger.warning('endringer: gaten for %s feilet', n, exc_info=True)
             continue
-        ut[n] = versjon(n)
+        ut[n] = versjon(n, getattr(request, 'portal', None))
     return ut

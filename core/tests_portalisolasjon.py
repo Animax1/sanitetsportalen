@@ -58,7 +58,6 @@ GLOBALE = {
 
 #: Får portal i resten av fase 4. **Skal bare krympe.**
 VENTER = {
-    'core.Notification': '4d — varslene får portal (§4.14)',
 }
 
 
@@ -862,3 +861,230 @@ class KoOgParkTests(TestCase):
                                content_type='application/json',
                                data={'etter': timezone.now().isoformat()})
             self.assertEqual(svar.status_code, ventet, svar.content)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class Fase4dTests(TestCase):
+    """Fase 4d-1: vaktnavnet, varslene, endringsnumrene og lista i drift per portal."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        from django.db import transaction
+        from django.utils import timezone
+
+        from core.models import Vaktportal
+        from core.portal import aktiver_portal, eneste_portal
+        from core.vakt import gjor_aktiv, opprett_vakt
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        with aktiver_portal(self.brann):
+            self.vakt_b = opprett_vakt('Kamp 7', year=2026, startet=timezone.now())
+        with transaction.atomic():
+            gjor_aktiv(self.vakt_b)
+
+    # ── Vaktnavnet ──
+
+    def test_samme_vaktnavn_i_to_portaler(self):
+        from django.utils import timezone
+
+        from core.vakt import VaktnavnOpptatt, opprett_vakt
+        opprett_vakt('Kamp 7', year=2026, startet=timezone.now(), portal=self.standard)
+        with self.assertRaises(VaktnavnOpptatt):
+            opprett_vakt('Kamp 7', year=2026, startet=timezone.now(), portal=self.brann)
+
+    def test_aarets_vakt_lages_i_portal_nummer_to(self):
+        """`vakt_for_year` kaller vakta «2026» i hver portal — før 4d stoppet den
+        andre på det globale unikhetskravet."""
+        from core.vakt import vakt_for_year
+        a = vakt_for_year(2030, self.standard)
+        b = vakt_for_year(2030, self.brann)
+        self.assertEqual((a.navn, b.navn), ('2030', '2030'))
+        self.assertNotEqual(a.pk, b.pk)
+
+    def test_nytt_navn_sjekkes_i_portalen(self):
+        from django.utils import timezone
+
+        from accounts.models import CustomUser
+        from core.models import Vakt
+        from core.vakt import opprett_vakt
+        opprett_vakt('Vinter', year=2026, startet=timezone.now(), portal=self.standard)
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        c = Client()
+        c.force_login(sjef)
+        c.post('/portal/', {'portal': 'brann'})
+        c.post('/portal-admin/vakt/navn/', {'navn': 'Vinter', '_portal': 'brann'})
+        self.vakt_b.refresh_from_db()
+        self.assertEqual(self.vakt_b.navn, 'Vinter', 'Standards «Vinter» er ikke i veien')
+        Vakt.objects.filter(pk=self.vakt_b.pk).update(navn='Kamp 7')
+        opprett_vakt('Sommer', year=2026, startet=timezone.now(), portal=self.brann)
+        c.post('/portal-admin/vakt/navn/', {'navn': 'Sommer', '_portal': 'brann'})
+        self.vakt_b.refresh_from_db()
+        self.assertEqual(self.vakt_b.navn, 'Kamp 7', 'Branns egen «Sommer» er i veien')
+
+    # ── Varslene ──
+
+    def _kari(self):
+        from accounts.models import CustomUser
+        from accounts.test_helpers import gi_modultilgang, medlemskap
+        kari = CustomUser.objects.create_user(username='kari', password='x',
+                                              must_change_password=False)
+        gi_modultilgang(bruker=kari, modul_slug='patients', nivaa='les', portal=self.brann)
+        medlemskap(kari, self.standard)   # med i to, tilgang i den ene
+        return kari
+
+    def _varsle(self, kari, **kw):
+        from core.notifications import notify
+        return notify(kari, module_slug='patients', kind='x', title='T', message='M', **kw)
+
+    def test_varselet_sjekker_tilgangen_i_portalen_det_gjelder(self):
+        from core.portal import aktiver_portal
+        kari = self._kari()
+        with aktiver_portal(self.standard):
+            self.assertIsNone(self._varsle(kari), 'ingen pasienttilgang i Standard')
+        with aktiver_portal(self.brann):
+            varsel = self._varsle(kari)
+        self.assertIsNotNone(varsel, 'tilgang i Brann, selv om hun har to portaler')
+        self.assertEqual(varsel.portal, self.brann)
+
+    def test_uten_portal_og_med_flere_sendes_ingenting(self):
+        """Og det sier fra — et varsel som forsvinner skal sette spor i loggen."""
+        kari = self._kari()
+        with self.assertLogs('core.notifications', level='WARNING') as logg:
+            self.assertIsNone(self._varsle(kari))
+        self.assertIn('vet ikke hvilken portal', ' '.join(logg.output))
+
+    def test_samme_varsel_i_to_portaler_er_to_varsler(self):
+        """Dedupliseringen gjelder innen portalen: «pasient #4» i Brann og i
+        Standard er to pasienter."""
+        from accounts.test_helpers import gi_modultilgang
+        kari = self._kari()
+        gi_modultilgang(bruker=kari, modul_slug='patients', nivaa='les', portal=self.standard)
+        self.assertIsNotNone(self._varsle(kari, portal=self.brann))
+        self.assertIsNotNone(self._varsle(kari, portal=self.standard))
+        self.assertIsNone(self._varsle(kari, portal=self.brann), 'innen portalen dedupliseres det')
+
+    def test_oppgitt_portal_vinner(self):
+        varsel = self._varsle(self._kari(), portal=self.brann)
+        self.assertEqual(varsel.portal, self.brann)
+
+    def test_admin_varsles_uten_portal(self):
+        from accounts.models import CustomUser
+        from core.notifications import notify
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin')
+        varsel = notify(sjef, module_slug='core', kind='backup', title='T', message='M')
+        self.assertIsNotNone(varsel)
+        self.assertIsNone(varsel.portal)
+
+    def test_bjella_viser_portalnavnet_bare_med_flere_portaler(self):
+        kari = self._kari()
+        self._varsle(kari, portal=self.brann)
+        c = Client()
+        c.force_login(kari)
+        self.assertEqual(c.get('/api/varsler/').json()['notifications'][0]['portal'], 'Brann')
+        from accounts.models import Portaltilgang
+        Portaltilgang.objects.filter(bruker=kari, portal=self.standard).delete()
+        self.assertEqual(c.get('/api/varsler/').json()['notifications'][0]['portal'], '')
+
+    # ── Endringsnumrene ──
+
+    def test_endringen_i_en_portal_rorer_ikke_den_andres_tall(self):
+        from core import endringer
+        from core.portal import aktiver_portal
+        for_s, for_b = (endringer.versjon('oppdrag', p) for p in (self.standard, self.brann))
+        with aktiver_portal(self.brann), self.captureOnCommitCallbacks(execute=True):
+            endringer.endret('oppdrag')
+        self.assertEqual(endringer.versjon('oppdrag', self.standard), for_s)
+        self.assertNotEqual(endringer.versjon('oppdrag', self.brann), for_b)
+
+    def _begge(self):
+        from core import endringer
+        return tuple(endringer.versjon('oppdrag', p) for p in (self.standard, self.brann))
+
+    def test_uten_portal_endres_alle(self):
+        """Klokka og kommandoene har ingen portal: da henter alle."""
+        from core import endringer
+        for_ = self._begge()
+        with self.captureOnCommitCallbacks(execute=True):
+            endringer.endret('oppdrag')
+        self.assertTrue(all(etter != f for etter, f in zip(self._begge(), for_)))
+
+    def test_med_alle_endres_alle_ogsaa_i_en_portal(self):
+        from core import endringer
+        from core.portal import aktiver_portal
+        for_ = self._begge()
+        with aktiver_portal(self.brann), self.captureOnCommitCallbacks(execute=True):
+            endringer.endret('oppdrag', alle=True)
+        self.assertTrue(all(etter != f for etter, f in zip(self._begge(), for_)))
+
+    def test_en_bil_gjelder_alle_portaler(self):
+        """Bilene er globale (§4.6): en endring på en bil i Brann skal få
+        Standards sentralbord og tavle til å hente også."""
+        from core import endringer
+        from core.portal import aktiver_portal
+        from oppdrag.models import Enhet
+        bil = Enhet.objects.create(navn='Haugesund 56')
+        for_s = {n: endringer.versjon(n, self.standard) for n in ('oppdrag', 'tavle')}
+        with aktiver_portal(self.brann), self.captureOnCommitCallbacks(execute=True):
+            bil.navn = 'Haugesund 57'
+            bil.save()
+        for navn, for_ in for_s.items():
+            self.assertNotEqual(endringer.versjon(navn, self.standard), for_, navn)
+
+    def test_endepunktet_svarer_med_portalens_tall(self):
+        from core import endringer
+        from core.portal import aktiver_portal
+        from accounts.test_helpers import gi_modultilgang
+        from accounts.models import CustomUser
+        ola = CustomUser.objects.create_user(username='ola', password='x', must_change_password=False)
+        gi_modultilgang(bruker=ola, modul_slug='oppdrag', nivaa='les', portal=self.brann)
+        c = Client()
+        c.force_login(ola)
+        for_ = c.get('/api/endringer/?omrader=oppdrag').json()['oppdrag']
+        with aktiver_portal(self.standard), self.captureOnCommitCallbacks(execute=True):
+            endringer.endret('oppdrag')
+        self.assertEqual(c.get('/api/endringer/?omrader=oppdrag').json()['oppdrag'], for_)
+        with aktiver_portal(self.brann), self.captureOnCommitCallbacks(execute=True):
+            endringer.endret('oppdrag')
+        self.assertNotEqual(c.get('/api/endringer/?omrader=oppdrag').json()['oppdrag'], for_)
+
+    # ── Lista i drift ──
+
+    def test_lista_i_bruk_er_portalens(self):
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from core.vakt import opprett_vakt
+        from vaktliste import choices, vaktdrift
+        from vaktliste.models import Vaktliste
+        i_brann = Vaktliste.objects.create(vakt=self.vakt_b)
+        vakt_s = opprett_vakt('Standardvakt', year=2026, startet=timezone.now(),
+                              portal=self.standard)
+        Vaktliste.objects.create(vakt=vakt_s, status=choices.DRIFT,
+                                 satt_i_drift_at=timezone.now())
+        with aktiver_portal(self.brann):
+            self.assertEqual(vaktdrift.vaktliste_i_bruk(), i_brann)
+
+    def test_besetningen_leter_i_portalens_lister(self):
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from core.vakt import opprett_vakt
+        from oppdrag.models import Enhet
+        from vaktliste import choices, vaktdrift
+        from vaktliste.models import Vaktliste
+        from vaktliste.test_helpers import lag_ressurs
+        bil = Enhet.objects.create(navn='Haugesund 56')
+        vakt_s = opprett_vakt('Standardvakt', year=2026, startet=timezone.now(),
+                              portal=self.standard)
+        vl = Vaktliste.objects.create(vakt=vakt_s, status=choices.DRIFT,
+                                      satt_i_drift_at=timezone.now())
+        lag_ressurs(vaktliste=vl, navn='Bil', enhet=bil)
+        with aktiver_portal(self.brann):
+            self.assertIsNone(vaktdrift.besetning(bil.pk))
+            self.assertIsNone(vaktdrift.koblet_i_annen_vakt(bil.pk))
+        with aktiver_portal(self.standard):
+            self.assertEqual(vaktdrift.koblet_i_annen_vakt(bil.pk), 'Standardvakt')

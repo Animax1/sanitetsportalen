@@ -372,8 +372,8 @@ def vaktmodus_satt(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Lokasjon)
 @ikke_under_loaddata
 def tavla_endret(sender, instance=None, **kwargs):
-    """Noe tavla viser, er endret."""
-    ko_endringer.tavla_endret()
+    """Noe tavla viser, er endret. Bilene er globale — se `oppdrag/signals.py`."""
+    ko_endringer.tavla_endret(alle=sender is Enhet)
 
 
 @receiver(post_save, sender=AppSetting)

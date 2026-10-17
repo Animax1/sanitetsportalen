@@ -107,12 +107,22 @@ def tom_tilgangscache(user):
             delattr(user, navn)
 
 
-def _tilganger(user):
+def _tilganger(user, portal=None):
     """{modul_slug: nivaa} for brukeren, hentet én gang per brukerobjekt.
 
     Nav-menyen kaller `is_visible_for` én gang per registrert modul. Uten
     cachen ville hver sidevisning gjort én spørring per modul.
+
+    **`portal` spør om en bestemt portal** (17. okt. 2026), forbi cachen: et
+    varsel til Kari om noe i Brann skal sjekke tilgangen hennes *i Brann*,
+    ikke i portalen hun står i — og har hun flere, står hun ingen steder
+    utenfor en forespørsel (`notify`).
     """
+    if portal is not None:
+        from accounts.models import ModulTilgang  # noqa: WPS433
+        return dict(ModulTilgang.objects
+                    .filter(portaltilgang__bruker=user, portaltilgang__portal=portal)
+                    .values_list('modul_slug', 'nivaa'))
     cache = getattr(user, _TILGANG_CACHE, None)
     if cache is None:
         from accounts.models import ModulTilgang  # noqa: WPS433
@@ -157,11 +167,11 @@ def _modul_er_aktiv(user, modul_slug):
     return modul_slug in aktive
 
 
-def nivaa_for(user, modul_slug):
+def nivaa_for(user, modul_slug, *, portal=None):
     """Brukerens nivå på modulen, eller `None` for ingen tilgang.
 
     Global admin får høyeste nivå på alt. En deaktivert modul gir `None` for
-    alle andre.
+    alle andre. `portal` spør om en bestemt portal (`_tilganger`).
     """
     if not getattr(user, 'is_authenticated', False):
         return None
@@ -181,10 +191,10 @@ def nivaa_for(user, modul_slug):
             return None
     if not _modul_er_aktiv(user, modul_slug):
         return None
-    return _tilganger(user).get(modul_slug)
+    return _tilganger(user, portal).get(modul_slug)
 
 
-def har_tilgang(user, modul_slug, nivaa='les'):
+def har_tilgang(user, modul_slug, nivaa='les', *, portal=None):
     """True hvis brukeren har `nivaa` eller høyere på modulen.
 
     Ukjent nivånavn gir False, ikke True — en skrivefeil i en dekoratør skal
@@ -193,7 +203,7 @@ def har_tilgang(user, modul_slug, nivaa='les'):
     kravet = NIVAA_HIERARKI.get(nivaa)
     if kravet is None:
         return False
-    har = nivaa_for(user, modul_slug)
+    har = nivaa_for(user, modul_slug, portal=portal)
     if har is None:
         return False
     return NIVAA_HIERARKI.get(har, -1) >= kravet

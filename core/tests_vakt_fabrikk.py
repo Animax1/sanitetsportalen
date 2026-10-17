@@ -19,6 +19,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser
 from core.models import Vakt
+from core.portal import eneste_portal
 from core.vakt import VaktnavnOpptatt, hent_aktiv_vakt, opprett_vakt, vakt_for_year
 from django.utils import timezone
 
@@ -48,7 +49,8 @@ class FabrikkenTests(TestCase):
         self.assertEqual((vakt.navn, vakt.year), ('2031', 2031))
 
     def test_vakt_for_year_sier_fra_naar_navnet_er_et_annet_aars(self):
-        Vakt.objects.create(navn='2032', year=2029, startet=timezone.now())
+        # I portalen: navnet er unikt per portal, og i drift har hver vakt en.
+        Vakt.objects.create(navn='2032', year=2029, startet=timezone.now(), portal=eneste_portal())
         with self.assertRaises(VaktnavnOpptatt):
             vakt_for_year(2032)
 
@@ -69,7 +71,7 @@ class GjennomEndepunkteneTests(TestCase):
             username='fabrikk_adm', password='x', role='admin', must_change_password=False)
         self.c = Client()
         self.c.force_login(self.admin)
-        Vakt.objects.create(navn='Tatt', year=2026, startet=timezone.now())
+        Vakt.objects.create(navn='Tatt', year=2026, startet=timezone.now(), portal=self.vakt.portal)
 
     def _mappe(self):
         mappe = tempfile.TemporaryDirectory()
