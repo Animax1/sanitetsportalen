@@ -2,10 +2,11 @@
 from django.conf import settings
 from django.db import models, transaction
 
+from core.models import PortalEid
 from core.sortering import Norsk
 
 
-class Forstehjelper(models.Model):
+class Forstehjelper(PortalEid):
     """Førstehjelper som kan knyttes til pasienter.
 
     Inaktive forstehjelpere vises ikke i dropdown, men beholdes som FK
@@ -17,8 +18,11 @@ class Forstehjelper(models.Model):
     historiske pasienter selv om brukeren slettes.
     """
 
-    name = models.CharField(max_length=120, unique=True, verbose_name='Navn')
-    user = models.OneToOneField(
+    # Unikt per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12) —
+    # personnavn, og to portaler kan ha hver sin «Kari Nordmann».
+    name = models.CharField(max_length=120, verbose_name='Navn')
+    # Per portal (beslutning 24): én konto kan være førstehjelper i hver portal.
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
@@ -36,6 +40,11 @@ class Forstehjelper(models.Model):
     class Meta:
         verbose_name = 'Førstehjelper'
         verbose_name_plural = 'Forstehjelpere'
+        constraints = [
+            models.UniqueConstraint(fields=['portal', 'name'], name='forstehjelper_unik_i_portal'),
+            models.UniqueConstraint(fields=['portal', 'user'], condition=models.Q(user__isnull=False),
+                                    name='forstehjelper_en_per_konto_i_portal'),
+        ]
         ordering = ['-is_active', Norsk('name')]
 
     def __str__(self):
@@ -43,7 +52,7 @@ class Forstehjelper(models.Model):
         return f'{self.name}{suffix}'
 
 
-class Helsepersonell(models.Model):
+class Helsepersonell(PortalEid):
     """Helsepersonell som kan knyttes til pasienter.
 
     Samme mønster som ``Forstehjelper`` (het ``Behandler`` til migrasjon 0011) –
@@ -54,8 +63,11 @@ class Helsepersonell(models.Model):
     docstringen på ``Forstehjelper`` for detaljer.
     """
 
-    name = models.CharField(max_length=120, unique=True, verbose_name='Navn')
-    user = models.OneToOneField(
+    # Unikt per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12) —
+    # personnavn, og to portaler kan ha hver sin «Kari Nordmann».
+    name = models.CharField(max_length=120, verbose_name='Navn')
+    # Per portal (beslutning 24): én konto kan være førstehjelper i hver portal.
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
@@ -74,6 +86,11 @@ class Helsepersonell(models.Model):
         verbose_name = 'Helsepersonell'
         verbose_name_plural = 'Helsepersonell'
         ordering = ['-is_active', Norsk('name')]
+        constraints = [
+            models.UniqueConstraint(fields=['portal', 'name'], name='helsepersonell_unik_i_portal'),
+            models.UniqueConstraint(fields=['portal', 'user'], condition=models.Q(user__isnull=False),
+                                    name='helsepersonell_en_per_konto_i_portal'),
+        ]
 
     def __str__(self):
         suffix = '' if self.is_active else ' (inaktiv)'

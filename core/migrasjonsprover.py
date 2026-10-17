@@ -461,6 +461,43 @@ def _sjekk_mannskap_portal(c):
         assert alle and alle == i_standard, f'{tabell}: {i_standard} av {alle} i Standard'
 
 
+# ── patients.0021 og oppdrag.0037 (hjelperne og lokasjonene i «Standard») ─────
+# Rene dataskritt, uten skjema etter — prøvene finnes fordi en tom base ikke har
+# noen rader å flytte, og ville gått grønt om `filter(portal__isnull=True)` bommet.
+
+def _seed_hjelperne_portal(c):
+    konto = _ny_konto(c, 'ola')
+    c.execute("""INSERT INTO patients_forstehjelper (name, user_id, is_active, created_at)
+                 VALUES ('Ola', %s, true, now()), ('Uten konto', NULL, false, now())""",
+              [konto])
+    c.execute("""INSERT INTO patients_helsepersonell (name, user_id, is_active, created_at)
+                 VALUES ('Lege 1', NULL, true, now())""")
+
+
+def _sjekk_hjelperne_portal(c):
+    c.execute("SELECT id FROM core_vaktportal WHERE slug = 'standard'")
+    standard = c.fetchone()[0]
+    for tabell in ('patients_forstehjelper', 'patients_helsepersonell'):
+        c.execute(f"SELECT count(*), count(*) FILTER (WHERE portal_id = %s) FROM {tabell}",
+                  [standard])
+        alle, i_standard = c.fetchone()
+        assert alle and alle == i_standard, f'{tabell}: {i_standard} av {alle} i Standard'
+
+
+def _seed_lokasjon_portal(c):
+    c.execute("""INSERT INTO oppdrag_lokasjon (navn, er_aktiv, rekkefolge, created_at, updated_at)
+                 VALUES ('Scene 1', true, 0, now(), now()), ('Gammel', false, 1, now(), now())""")
+
+
+def _sjekk_lokasjon_portal(c):
+    c.execute("SELECT id FROM core_vaktportal WHERE slug = 'standard'")
+    standard = c.fetchone()[0]
+    c.execute("""SELECT count(*), count(*) FILTER (WHERE portal_id = %s)
+                 FROM oppdrag_lokasjon""", [standard])
+    alle, i_standard = c.fetchone()
+    assert alle >= 2 and alle == i_standard, f'{i_standard} av {alle} i Standard'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -505,6 +542,20 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Mannskapet og kontoenes korps går til «Standard»',
             seed=_seed_mannskap_portal,
             sjekk=_sjekk_mannskap_portal,
+        ),
+        Migrasjonsprove(
+            migrasjon='patients.0021_hjelperne_i_standard',
+            foregaaende='0020_hjelperne_per_portal',
+            beskrivelse='Førstehjelperne og helsepersonellet går til «Standard»',
+            seed=_seed_hjelperne_portal,
+            sjekk=_sjekk_hjelperne_portal,
+        ),
+        Migrasjonsprove(
+            migrasjon='oppdrag.0037_lokasjoner_i_standard',
+            foregaaende='0036_lokasjon_per_portal',
+            beskrivelse='Lokasjonene går til «Standard»',
+            seed=_seed_lokasjon_portal,
+            sjekk=_sjekk_lokasjon_portal,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',

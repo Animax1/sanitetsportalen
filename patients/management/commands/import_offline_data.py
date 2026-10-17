@@ -105,8 +105,8 @@ class Command(BaseCommand):
         normalized = self._validate_choice_fields(rows, opts['force'])
 
         # Forbered navnemapping
-        forstehjelper_cache = {b.name: b for b in Forstehjelper.objects.all()}
-        hp_cache = {h.name: h for h in Helsepersonell.objects.all()}
+        forstehjelper_cache = {b.name: b for b in Forstehjelper.objects.i_portal(portal)}
+        hp_cache = {h.name: h for h in Helsepersonell.objects.i_portal(portal)}
 
         new_forstehjelpere = 0
         new_hp = 0
@@ -127,7 +127,7 @@ class Command(BaseCommand):
                     if row['behandler_name']:
                         name = row['behandler_name']
                         if name not in forstehjelper_cache:
-                            forstehjelper_cache[name] = Forstehjelper.objects.create(name=name)
+                            forstehjelper_cache[name] = Forstehjelper.objects.create(name=name, portal=portal)
                             new_forstehjelpere += 1
                         forstehjelper_obj = forstehjelper_cache[name]
 
@@ -136,7 +136,7 @@ class Command(BaseCommand):
                     if row['helsepersonell_name']:
                         name = row['helsepersonell_name']
                         if name not in hp_cache:
-                            hp_cache[name] = Helsepersonell.objects.create(name=name)
+                            hp_cache[name] = Helsepersonell.objects.create(name=name, portal=portal)
                             new_hp += 1
                         hp_obj = hp_cache[name]
 

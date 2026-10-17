@@ -696,7 +696,7 @@ def lagre_oppsett(*, skjulte_ider, fulgte_ider) -> None:
         if not isinstance(liste, list) or not all(isinstance(i, int) for i in liste):
             raise Ugyldig('Send lokasjonene som lister med tall.')
         ider |= set(liste)
-    if Lokasjon.objects.filter(pk__in=ider).count() != len(ider):
+    if Lokasjon.objects.i_portal().filter(pk__in=ider).count() != len(ider):
         raise Ugyldig('Listen inneholder ukjente lokasjoner — hent den på nytt.')
     AppSetting.set(SKJULTE_NOKKEL, json.dumps(sorted(set(skjulte_ider))))
     AppSetting.set(FULGTE_NOKKEL, json.dumps(sorted(set(fulgte_ider))))
@@ -741,7 +741,7 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         'vakt_start': _iso(vakt.startet),
         'fulgte': fulgte(),
         'rader': [{'id': l.pk, 'navn': l.navn}
-                  for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))
+                  for l in Lokasjon.objects.i_portal().filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))
                   if l.pk not in ute],
         # KOs egne og vaktlistas, se `effektive_pauser`. `kilde` er «ko»,
         # «vaktliste» eller «endret» (i drift).

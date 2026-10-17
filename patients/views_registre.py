@@ -52,7 +52,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             server» og ETag sier «hvis samme, send 304».
         """
         if request.method == 'GET':
-            rader = list(model.objects.all().order_by('-is_active', Norsk('name')))
+            rader = list(model.objects.i_portal().all().order_by('-is_active', Norsk('name')))
             data = [{'id': r.id, 'name': r.name, 'is_active': r.is_active} for r in rader]
 
             # ETag som SHA-256-hash av (id, name, is_active)-tupler. sha256
@@ -78,11 +78,11 @@ def _navneliste_views(model, etikett, etikett_bestemt):
         if not name:
             return JsonResponse({'error': 'Navn er påkrevd'}, status=400)
 
-        if model.objects.filter(name=name).exists():
+        if model.objects.i_portal().filter(name=name).exists():
             return JsonResponse(
                 {'error': f'{etikett} "{name}" finnes allerede'}, status=400)
 
-        rad = model.objects.create(name=name, is_active=True)
+        rad = model.objects.create(name=name, is_active=True)   # portalen settes av `save()`
         return JsonResponse(
             {'id': rad.id, 'name': rad.name, 'is_active': rad.is_active}, status=201)
 
@@ -95,7 +95,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         try:
-            rad = model.objects.get(pk=pk)
+            rad = model.objects.i_portal().get(pk=pk)
         except model.DoesNotExist:
             return JsonResponse({'error': f'{etikett} ikke funnet'}, status=404)
 

@@ -156,7 +156,7 @@ def steder():
     """
     from oppdrag.models import Lokasjon
 
-    return Lokasjon.objects.filter(er_aktiv=True, park_skjult__isnull=True)
+    return Lokasjon.objects.i_portal().filter(er_aktiv=True, park_skjult__isnull=True)
 
 
 def alle_steder_med_synlighet() -> list[dict]:
@@ -164,7 +164,7 @@ def alle_steder_med_synlighet() -> list[dict]:
     from oppdrag.models import Lokasjon
 
     return [{'id': lok.pk, 'navn': lok.navn, 'skjult': lok.skjult}
-            for lok in Lokasjon.objects.filter(er_aktiv=True).annotate(
+            for lok in Lokasjon.objects.i_portal().filter(er_aktiv=True).annotate(
                 skjult=models.Exists(SkjultSted.objects.filter(lokasjon=models.OuterRef('pk'))))]
 
 

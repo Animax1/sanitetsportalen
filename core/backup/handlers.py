@@ -67,6 +67,18 @@ class BaseBackupHandler:
     #: listen feiler hele fila i en tom base, med DeserializationError.
     uten_konto_droppes: ClassVar[list[str]] = []
 
+    #: Modeller som er med i dumpen, men **ikke tømmes** før ``loaddata``
+    #: (17. okt. 2026). ``loaddata`` oppdaterer dem på primærnøkkelen i stedet.
+    #: Format: ``'app_label.Modell'``.
+    #:
+    #: For rader andre moduler peker på med ``PROTECT``, og som finnes i en
+    #: nymigrert base før noen fil er lastet: portalen og tilhørighetene.
+    #: Pasientmodulens hjelpere peker på portalen, og migrasjonen lager dem —
+    #: så en tømming ville stoppet nettopp gjenopprettingen i en tom base.
+    #: Prisen er at en rad laget *etter* fila blir stående. Den er ufarlig her:
+    #: en portal eller et korps til, ikke data som later som de er gjenopprettet.
+    beholdes: ClassVar[list[str]] = []
+
     def collect_apps(self) -> list[str]:
         """Returner apps til dumpdata. Default: self.apps."""
         if not self.apps:
@@ -95,7 +107,9 @@ class BaseBackupHandler:
         """
         if self.restore_models:
             return list(self.restore_models)
-        return utled_restore_models(self.collect_apps(), self.collect_exclude())
+        beholdes = {m.lower() for m in self.beholdes}
+        return [m for m in utled_restore_models(self.collect_apps(), self.collect_exclude())
+                if m.lower() not in beholdes]
 
     def inspect_restore_payload(self, objects: list[dict]) -> list[str]:
         """Se over fixturen før den lastes. Returner en liste med advarsler.

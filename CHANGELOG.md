@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-17 — Portaler fase 4b: førstehjelperne, helsepersonellet og lokasjonene per portal, «mine pasienter» per portal, og gjenopprettingen som ville stoppet i en tom base  `#core/tilgang` `#core/backup` `#oppdrag/sentralbord`
+
+Andre del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.12: «sted og person per portal, fag
+globalt»). **Med én portal: ingen synlig endring.**
+
+**`patients.Forstehjelper`, `patients.Helsepersonell` og `oppdrag.Lokasjon` er `PortalEid`.**
+Navnet er unikt per portal i stedet for globalt — «Ola» kan finnes i både Standard og Brann, og
+«Scene 1» likeså. `Forstehjelper.user` og `Helsepersonell.user` gikk fra én-til-én til unike per
+(portal, konto), som mannskapet i 4a. Migrasjonene `patients/0020`–`0021` og
+`oppdrag/0036`–`0037`, begge med prøve i `core/migrasjonsprover.py` (ni prøver, alle grønne; en
+mutant som snudde `portal__isnull` i `0021` ble fanget av prøven).
+
+**«Mine pasienter» leser raden i portalen.** Malen leste `user.forstehjelper_profil.id` — en
+én-til-én som ikke finnes lenger. `index_view` sender `mitt_forstehjelper_id` og
+`mitt_helsepersonell_id`, slått opp i portalen.
+
+**Hvert oppslag går gjennom `i_portal()`:** registrene på pasientsiden (liste, ny, endre), pasientens
+førstehjelper og helsepersonell (`_hent_person`), kontokoblingen på brukersiden (rører bare
+portalens rader), `import_offline_data`, oppdragets lokasjon (ny og endret), KO-hendelsens lokasjon,
+tavlas rader, oppsett, plassering og planlagte plassering, programmets steder og poster,
+kopieringen av programmet, og parkens steder. **Valglistene går gjennom `Verdiliste.qs()`** —
+lista, navnesjekken, oppslaget, «sist i lista» og omsorteringen — så `core/verdilister.py` gir
+portalens rader for enhver tabell som er `PortalEid`, og alle andre som før.
+`manage.py lokasjon` har fått `--portal`.
+
+**Funnet underveis: gjenopprettingen av portalfila ville stoppet i en tom base.** `restore_backup`
+tømmer hver modell i fila før `loaddata`, og portalen er nå `PROTECT`-pekt på av hjelperne — som en
+nymigrert base alt har («Behandler 1–10»). Fem tester i `core` ble røde av nettopp det, og det er
+katastrofeveien. **`BaseBackupHandler.beholdes`** er det navngitte unntaket: portalfila tømmer ikke
+`Vaktportal` og `Tilhorighet`, `loaddata` oppdaterer dem på primærnøkkel. Prisen er at en portal
+laget *etter* fila blir stående; den er ufarlig, fordi det er et navn og ikke data som later som de
+er gjenopprettet. `SlettelistaDekkerDumpenTests` godtar lista, og en ny test krever at bare
+portalfila har en. Står i `core/backup/CLAUDE.md`.
+
+**Vakten fra §6.1 krympet:** `Forstehjelper`, `Helsepersonell`, `Lokasjon` og `park.SkjultSted`
+(veien går gjennom lokasjonen) er ute av `VENTER`; seks står igjen til 4c–4d.
+
+**Tester: 25 nye i `HjelperneOgStedeneTests`**, ett kallsted per test, hver avvisning med en
+motprøve med portalens egen rad. **Mutasjoner: 31 + 1 på migrasjonsprøven.** Ni overlevde første
+runde:
+- Fem i kontokoblingen. Testen gikk bare gjennom den ene `update`; nå har visningen, frakoblingen og
+  oppslaget på brukernavnet hver sin.
+- «Mitt helsepersonell», som manglet test. Med rader i begge portaler avgjorde databasens
+  rekkefølge svaret, så testen kobler først bare i Standard og krever `None` i Brann.
+- `i_portal().create()` er identisk med `create()`, fordi `save()` setter portalen. Linja er
+  forenklet.
+- To i `kopier_program` overlever med vilje: `lagre_post` slår stedet opp i portalen igjen og
+  avviser det. Testen med motprøve står, så det er den sperren som er dekket.
+
 ## 2026-10-17 — Portaler fase 4a: mannskapet per portal (Brann ser bare sitt eget), én konto kan være mannskap i hver portal, og vakten som krever en vei til portalen for hver modell  `#core/tilgang` `#vaktliste/tilgang`
 
 Første del av fase 4 i `docs/BESLUTNING_PORTALER.md` (§4.5, §4.12, §6.1). André: «Brann-portalen

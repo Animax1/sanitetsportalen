@@ -42,7 +42,7 @@ def _lokasjon_fra(data):
     if raa in (None, '', 0):
         return None, None
     try:
-        return Lokasjon.objects.get(pk=int(raa)), None
+        return Lokasjon.objects.i_portal().get(pk=int(raa)), None
     except (Lokasjon.DoesNotExist, ValueError, TypeError):
         return None, 'Ukjent lokasjon.'
 

@@ -85,7 +85,7 @@ def tavle_plasser_view(request):
     lokasjon = None
     if not data.get('pause'):
         try:
-            lokasjon = Lokasjon.objects.get(pk=int(data.get('lokasjon_id')))
+            lokasjon = Lokasjon.objects.i_portal().get(pk=int(data.get('lokasjon_id')))
         except (Lokasjon.DoesNotExist, TypeError, ValueError):
             return json_feil('Ukjent lokasjon.', 404)
     try:
@@ -203,7 +203,7 @@ def tavle_pauser_view(request):
     lokasjon = None
     if data.get('lokasjon_id') not in (None, ''):
         from oppdrag.models import Lokasjon
-        lokasjon = Lokasjon.objects.filter(pk=_heltall_eller_none(data.get('lokasjon_id'))).first()
+        lokasjon = Lokasjon.objects.i_portal().filter(pk=_heltall_eller_none(data.get('lokasjon_id'))).first()
         if lokasjon is None:
             return json_feil('Ukjent lokasjon.', 404)
     try:
@@ -322,7 +322,7 @@ def tavle_oppsett_view(request):
     return JsonResponse({'status': 'ok', 'data': {
         'lokasjoner': [{
             'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
-        } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
+        } for l in Lokasjon.objects.i_portal().filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'andel_bak': tavle.andel_bak(),
         'steg_min': tavle.steg_min(),
     }})

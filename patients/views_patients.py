@@ -59,7 +59,7 @@ def _hent_person(modell, raa):
     if raa in (None, ''):
         return None, None
     try:
-        return modell.objects.get(pk=int(raa)), None
+        return modell.objects.i_portal().get(pk=int(raa)), None
     except (modell.DoesNotExist, ValueError, TypeError):
         return None, f'Ukjent {_PERSONNAVN[modell.__name__]}. Last siden på nytt og velg igjen.'
 
@@ -77,6 +77,13 @@ def index_view(request):
         # Nøkkelen heter fortsatt event_name utad; malen og loadSettings()
         # leser den, og de skal ikke bry seg om hvor verdien bor.
         'event_name': hent_aktiv_vakt().navn,
+        # «Mine pasienter»: førstehjelper- og helsepersonellraden kontoen har
+        # **i portalen** (17. okt. 2026) — én per portal, så malen kan ikke
+        # lenger lese den rett av brukeren.
+        'mitt_forstehjelper_id': Forstehjelper.objects.i_portal().filter(
+            user=request.user).values_list('pk', flat=True).first(),
+        'mitt_helsepersonell_id': Helsepersonell.objects.i_portal().filter(
+            user=request.user).values_list('pk', flat=True).first(),
         # §7.4: grensesnittet må gate på det samme som endepunktene gjør.
         # Gjorde det ikke det, viste vi «Ny pasient» til en bruker med bare
         # `les` — hen fikk opp skjemaet, fylte det ut, og møtte 403 på lagre.

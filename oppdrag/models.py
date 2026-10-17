@@ -22,7 +22,7 @@ from django.db import models
 from django.utils import timezone
 
 from core.arkiv import AbstractArkiv
-from core.models import BaseTimeStampedModel
+from core.models import BaseTimeStampedModel, PortalEid
 from core.sortering import Norsk
 
 from . import choices
@@ -292,7 +292,7 @@ class Lydvarsel(BaseTimeStampedModel):
         return f'{self.hastegrad}: {self.forste_sekunder}/{self.gjenta_sekunder} s'
 
 
-class Lokasjon(BaseTimeStampedModel):
+class Lokasjon(BaseTimeStampedModel, PortalEid):
     """Et sted på arrangementet. Vedlikeholdes av admin.
 
     Egen tabell framfor en tuple i ``choices.py``: problemstilling og
@@ -306,7 +306,9 @@ class Lokasjon(BaseTimeStampedModel):
     feltet som må unntas verdilogging.
     """
 
-    navn = models.CharField(max_length=120, unique=True, verbose_name='Lokasjon')
+    # Unik per portal (17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.12):
+    # Branns «Hovedpost» og Landsskytters er ikke samme sted.
+    navn = models.CharField(max_length=120, verbose_name='Lokasjon')
     er_aktiv = models.BooleanField(
         default=True,
         verbose_name='Aktiv',
@@ -323,6 +325,9 @@ class Lokasjon(BaseTimeStampedModel):
         verbose_name = 'Lokasjon'
         verbose_name_plural = 'Lokasjoner'
         ordering = ['rekkefolge', Norsk('navn')]
+        constraints = [
+            models.UniqueConstraint(fields=['portal', 'navn'], name='lokasjon_unik_i_portal'),
+        ]
 
     def __str__(self) -> str:
         return self.navn

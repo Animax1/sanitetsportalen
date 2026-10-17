@@ -1715,12 +1715,22 @@ class SlettelistaDekkerDumpenTests(TestCase):
                 )
                 i_dumpen = {o['model'].lower() for o in json.loads(buf.getvalue())}
                 i_lista = {m.lower() for m in handler.get_restore_models()}
+                # `beholdes` er det navngitte unntaket: oppdateres på
+                # primærnøkkel i stedet for å tømmes. Står modellen der, er det
+                # et valg med begrunnelse, ikke en glemt rad.
+                beholdes = {m.lower() for m in handler.beholdes}
                 self.assertEqual(
-                    i_dumpen - i_lista, set(),
+                    i_dumpen - i_lista - beholdes, set(),
                     f'{handler.slug}: disse modellene dumpes, men tømmes ikke '
                     f'før loaddata — radene blir stående igjen etter en '
                     f'gjenoppretting.',
                 )
+
+    def test_bare_portalfila_beholder_noe(self) -> None:
+        """Unntaket skal ikke bli en vei rundt regelen over. Vokser lista, skal
+        det skje her, med en begrunnelse ved siden av."""
+        beholder = {h.slug: sorted(h.beholdes) for h in all_handlers() if h.beholdes}
+        self.assertEqual(beholder, {'portal': ['core.Tilhorighet', 'core.Vaktportal']})
 
     def test_lydvarsel_er_dekket(self) -> None:
         """Gjeldspunkt 3.4, navngitt: den ene modellen den håndskrevne lista

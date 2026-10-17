@@ -40,9 +40,9 @@ class PasientRolleForm(forms.Form):
         from patients.models import Forstehjelper, Helsepersonell
         self.user = user
         if not args and 'data' not in kwargs:
-            if Forstehjelper.objects.filter(user=user).exists():
+            if Forstehjelper.objects.i_portal().filter(user=user).exists():
                 self.fields['pasient_rolle'].initial = 'forstehjelper'
-            elif Helsepersonell.objects.filter(user=user).exists():
+            elif Helsepersonell.objects.i_portal().filter(user=user).exists():
                 self.fields['pasient_rolle'].initial = 'helsepersonell'
             else:
                 self.fields['pasient_rolle'].initial = 'ingen'
@@ -53,18 +53,18 @@ class PasientRolleForm(forms.Form):
         rolle = self.cleaned_data['pasient_rolle']
         user = self.user
         with transaction.atomic():
-            Forstehjelper.objects.filter(user=user).update(user=None)
-            Helsepersonell.objects.filter(user=user).update(user=None)
+            Forstehjelper.objects.i_portal().filter(user=user).update(user=None)
+            Helsepersonell.objects.i_portal().filter(user=user).update(user=None)
             if rolle == 'forstehjelper':
                 f = (
-                    Forstehjelper.objects.filter(name=user.username).first()
+                    Forstehjelper.objects.i_portal().filter(name=user.username).first()
                     or Forstehjelper(name=user.username)
                 )
                 f.user = user
                 f.save()
             elif rolle == 'helsepersonell':
                 h = (
-                    Helsepersonell.objects.filter(name=user.username).first()
+                    Helsepersonell.objects.i_portal().filter(name=user.username).first()
                     or Helsepersonell(name=user.username)
                 )
                 h.user = user

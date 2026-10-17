@@ -506,7 +506,7 @@ def oppdrag_liste_view(request):
     if feil:
         return JsonResponse({'status': 'error', 'message': feil}, status=400)
     try:
-        lokasjon = Lokasjon.objects.get(pk=data.get('lokasjon_id'), er_aktiv=True)
+        lokasjon = Lokasjon.objects.i_portal().get(pk=data.get('lokasjon_id'), er_aktiv=True)
     except (Lokasjon.DoesNotExist, ValueError, TypeError):
         return JsonResponse(
             {'status': 'error', 'message': 'Ukjent eller inaktiv lokasjon.'}, status=400)
@@ -786,7 +786,7 @@ def oppdrag_detalj_view(request, pk):
         endret.append('fritekst')
     if 'lokasjon_id' in data:
         try:
-            oppdrag.lokasjon = Lokasjon.objects.get(pk=data['lokasjon_id'])
+            oppdrag.lokasjon = Lokasjon.objects.i_portal().get(pk=data['lokasjon_id'])
         except (Lokasjon.DoesNotExist, ValueError, TypeError):
             return JsonResponse(
                 {'status': 'error', 'message': 'Ukjent lokasjon.'}, status=400)

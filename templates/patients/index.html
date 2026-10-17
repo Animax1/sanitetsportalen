@@ -27,8 +27,8 @@
     patients: "{{ modul_nivaa }}",
     admin: {{ er_global_admin|yesno:"true,false" }}
   };
-  window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
-  window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};
+  window.MY_FORSTEHJELPER_ID  = {{ mitt_forstehjelper_id|default:'null' }};
+  window.MY_HELSEPERSONELL_ID = {{ mitt_helsepersonell_id|default:'null' }};
   // Hvem som er logget inn: «Logg ut» ser etter usendte stemplinger i
   // offline-køene, som er per bruker (`ui-actions.js`, L17).
   window.PORTAL_BRUKER_ID = {{ request.user.pk }};

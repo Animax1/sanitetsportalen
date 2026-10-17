@@ -199,7 +199,7 @@ def lagre_post(vakt, data: dict, *, fra, til, bruker, post=None, naa=None) -> Pr
         raise Ugyldig('En programpost kan ikke vare mer enn et døgn.')
 
     lokasjon_id = _heltall(data.get('lokasjon_id'), 'Sted')
-    lokasjon = Lokasjon.objects.filter(pk=lokasjon_id).first()
+    lokasjon = Lokasjon.objects.i_portal().filter(pk=lokasjon_id).first()
     if lokasjon is None:
         raise Ugyldig('Ukjent sted.')
     if not lokasjon.er_aktiv and (post is None or post.lokasjon_id != lokasjon.pk):
@@ -315,7 +315,7 @@ def program_data(vakt) -> dict:
         # Stedene her og ikke fra sentralbordet: planleggeren skal virke for
         # den som har KO uten oppdragstilgang, og stedsnavnene er ikke oppdrag.
         'steder': [{'id': l.pk, 'navn': l.navn}
-                   for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
+                   for l in Lokasjon.objects.i_portal().filter(er_aktiv=True).order_by('rekkefolge', Norsk('navn'))],
         'konserttyper': [{'id': t.pk, 'navn': t.navn, 'er_aktiv': t.er_aktiv}
                          for t in Konserttype.objects.all()],
         'kjennetegn': [{'id': k.pk, 'navn': k.navn, 'er_aktiv': k.er_aktiv}
@@ -556,8 +556,8 @@ def kopier_program(fra_vakt, til_vakt, *, forste_dogn, bruker, naa=None) -> dict
     skift = timedelta(days=(forste_dogn - _dogn_dato(kilde[0].fra)).days)
     kopiert, hoppet_over = 0, []
     for post in kilde:
-        lokasjon = (Lokasjon.objects.filter(pk=post.lokasjon_id, er_aktiv=True).first()
-                    or Lokasjon.objects.filter(navn=post.lokasjon_navn, er_aktiv=True).first())
+        lokasjon = (Lokasjon.objects.i_portal().filter(pk=post.lokasjon_id, er_aktiv=True).first()
+                    or Lokasjon.objects.i_portal().filter(navn=post.lokasjon_navn, er_aktiv=True).first())
         if lokasjon is None:
             hoppet_over.append(f'{post.navn} — stedet «{post.lokasjon_navn}» finnes ikke lenger')
             continue

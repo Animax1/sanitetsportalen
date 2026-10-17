@@ -54,8 +54,16 @@ class Verdiliste:
     def maks(self) -> int | None:
         return self.model._meta.get_field('navn').max_length
 
+    def qs(self):
+        """Radene lista gjelder. **Portalens, når tabellen hører til én**
+        (`core.models.PortalEid`, 17. okt. 2026): lista, oppslaget, navnesjekken
+        og omsorteringen går alle gjennom her, så en lokasjon fra Landsskytter
+        verken vises, endres eller sorteres fra Brann."""
+        objekter = self.model.objects
+        return objekter.i_portal() if hasattr(objekter, 'i_portal') else objekter.all()
+
     def rader(self):
-        return list(self.model.objects.all())
+        return list(self.qs())
 
     def i_bruk(self, rad) -> int:
         return 0
@@ -82,7 +90,7 @@ class Verdiliste:
             return f'Navnet er for langt (maks {self.maks} tegn).'
         if self.er_fast(rad) and navn != rad.navn:
             return f'«{rad.navn}» er fast og kan ikke få nytt navn.'
-        if self.model.objects.filter(navn__iexact=navn).exclude(pk=rad.pk).exists():
+        if self.qs().filter(navn__iexact=navn).exclude(pk=rad.pk).exists():
             return f'«{navn}» finnes allerede.'
         return None
 
@@ -148,7 +156,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
             return json_feil(nekt, 403)
         rad = liste.model()
         # Sist i lista: den som legger til, flytter etterpå om hun vil.
-        siste = (liste.model.objects.order_by('-rekkefolge')
+        siste = (liste.qs().order_by('-rekkefolge')
                  .values_list('rekkefolge', flat=True).first())
         rad.rekkefolge = (siste or 0) + 10
         feil = liste.sett_felter(rad, json_body(request), ny=True)
@@ -163,7 +171,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
     def detalj_view(request, pk):
         if not kan_lede(request.user):
             return json_feil(nekt, 403)
-        rad = liste.model.objects.filter(pk=pk).first()
+        rad = liste.qs().filter(pk=pk).first()
         if rad is None:
             return json_feil('Ikke funnet', 404)
         data = json_body(request)
@@ -201,7 +209,7 @@ def lag_views(*, modul: str, liste: Verdiliste, slug: str, kan_lede, nekt: str,
         ider = json_body(request).get('ider')
         if not isinstance(ider, list) or not all(isinstance(i, int) for i in ider):
             return json_feil('Send `ider` som en liste med tall.')
-        rader = {r.pk: r for r in liste.model.objects.filter(pk__in=ider)}
+        rader = {r.pk: r for r in liste.qs().filter(pk__in=ider)}
         if len(rader) != len(set(ider)):
             return json_feil('Listen inneholder ukjente rader — hent den på nytt.')
         felter = ['rekkefolge'] + (

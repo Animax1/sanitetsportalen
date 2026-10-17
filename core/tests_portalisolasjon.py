@@ -58,15 +58,11 @@ GLOBALE = {
 
 #: Får portal i resten av fase 4. **Skal bare krympe.**
 VENTER = {
-    'patients.Forstehjelper': '4b — personnavn (§4.12)',
-    'patients.Helsepersonell': '4b — personnavn (§4.12)',
-    'oppdrag.Lokasjon': '4b — et sted (§4.12)',
     'ko.Ansvarsomraade': '4c — satt opp per arrangement',
     'ko.Ansvarsmerke': '4c — henger på medlemskapet (beslutning 24)',
     'ko.Konserttype': '4c — artistene er per arrangement',
     'ko.Kjennetegn': '4c — satt opp per arrangement',
     'park.Parklenke': '4c — lenken må bære portalen (§4.13)',
-    'park.SkjultSted': '4c — følger lokasjonen',
     'core.Notification': '4d — varslene får portal (§4.14)',
 }
 
@@ -317,3 +313,313 @@ class VaktlistasKallstederTests(VaktlistaHolderPortaleneAdskiltTests):
         with aktiver_portal(self.standard):
             rad = next(r for r in _kontoer() if r['id'] == self.kari.pk)
         self.assertEqual(rad['mannskap_id'], self.i_standard.pk)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class HjelperneOgStedeneTests(TestCase):
+    """Fase 4b: personnavn og steder er per portal (§4.12).
+
+    Ett kallsted per test, og hver avvisning har en motprøve med portalens egen
+    rad — ellers kan 400 komme av noe annet i kroppen, og mutanten som fjerner
+    `i_portal()` går grønn (tre slike i fase 4a)."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        from django.db import transaction
+        from django.utils import timezone
+
+        from accounts.models import CustomUser
+        from accounts.test_helpers import gi_modultilgang
+        from core.models import Vaktportal
+        from core.portal import aktiver_portal, eneste_portal
+        from core.vakt import gjor_aktiv, opprett_vakt
+        from oppdrag.models import Lokasjon
+        from patients.models import Forstehjelper, Helsepersonell
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.standard = eneste_portal()
+        self.brann = Vaktportal.objects.create(navn='Brann', slug='brann')
+        self.kari = CustomUser.objects.create_user(username='kari', password='x',
+                                                   must_change_password=False)
+        with aktiver_portal(self.standard):
+            self.fh_s = Forstehjelper.objects.create(name='Ola', user=self.kari)
+            self.hp_s = Helsepersonell.objects.create(name='Lege S')
+            self.sted_s = Lokasjon.objects.create(navn='Scene S')
+        with aktiver_portal(self.brann):
+            self.fh_b = Forstehjelper.objects.create(name='Ola', user=self.kari)
+            self.hp_b = Helsepersonell.objects.create(name='Lege B')
+            self.sted_b = Lokasjon.objects.create(navn='Scene B')
+            self.vakt = opprett_vakt('Brannvakt', year=2026, startet=timezone.now())
+        with transaction.atomic():
+            gjor_aktiv(self.vakt)
+        for slug, nivaa in (('patients', 'skriv_full'), ('oppdrag', 'skriv_leder'),
+                            ('ko', 'skriv_leder')):
+            gi_modultilgang(bruker=self.kari, modul_slug=slug, nivaa=nivaa, portal=self.brann)
+        self.c = Client()
+        self.c.force_login(self.kari)
+
+    # ── Pasientregistreringen ──
+
+    def test_registeret_er_portalens(self):
+        navn = [r['name'] for r in self.c.get('/pasienter/api/helsepersonell/').json()]
+        self.assertEqual(navn, ['Lege B'])
+
+    def _admin(self):
+        """Registeret skrives av global admin; hun står i Brann etter et valg."""
+        from accounts.models import CustomUser
+        sjef = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                              must_change_password=False)
+        c = Client(headers={'X-Portal': 'brann'})
+        c.force_login(sjef)
+        c.post('/portal/', {'portal': 'brann'})
+        return c
+
+    def test_en_rad_fra_en_annen_portal_kan_ikke_endres(self):
+        self.c = self._admin()
+        svar = self.c.put(f'/pasienter/api/helsepersonell/{self.hp_s.pk}/',
+                          content_type='application/json', data={'name': 'Kapret'})
+        self.assertEqual(svar.status_code, 404)
+        svar = self.c.put(f'/pasienter/api/helsepersonell/{self.hp_b.pk}/',
+                          content_type='application/json', data={'name': 'Lege B2'})
+        self.assertEqual(svar.status_code, 200, svar.content)
+
+    def test_samme_navn_i_en_annen_portal_er_lov(self):
+        from patients.models import Helsepersonell
+        self.c = self._admin()
+        svar = self.c.post('/pasienter/api/helsepersonell/', content_type='application/json',
+                           data={'name': 'Lege S'})
+        self.assertEqual(svar.status_code, 201, svar.content)
+        self.assertEqual(Helsepersonell.objects.get(pk=svar.json()['id']).portal, self.brann)
+        svar = self.c.post('/pasienter/api/helsepersonell/', content_type='application/json',
+                           data={'name': 'Lege B'})
+        self.assertEqual(svar.status_code, 400)
+
+    def _pasient(self, **data):
+        import json
+        data = {'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00', **data}
+        return self.c.post('/pasienter/api/patients/', data=json.dumps(data),
+                           content_type='application/json')
+
+    def test_pasienten_faar_ikke_en_forstehjelper_fra_en_annen_portal(self):
+        self.assertEqual(self._pasient(forstehjelper=self.fh_s.pk).status_code, 400)
+        self.assertEqual(self._pasient(forstehjelper=self.fh_b.pk).status_code, 201)
+
+    def test_mine_pasienter_er_raden_i_portalen(self):
+        svar = self.c.get('/pasienter/')
+        self.assertEqual(svar.status_code, 200)
+        self.assertEqual(svar.context['mitt_forstehjelper_id'], self.fh_b.pk)
+
+    def test_kontokoblingen_roerer_bare_portalen(self):
+        from core.portal import aktiver_portal
+        from patients.kontokobling import PasientRolleForm
+        with aktiver_portal(self.brann):
+            skjema = PasientRolleForm(self.kari, data={'pasient_rolle': 'helsepersonell'})
+            self.assertTrue(skjema.is_valid(), skjema.errors)
+            skjema.save()
+        self.fh_s.refresh_from_db()
+        self.fh_b.refresh_from_db()
+        self.assertEqual(self.fh_s.user, self.kari, 'Standard skal stå urørt')
+        self.assertIsNone(self.fh_b.user)
+        with aktiver_portal(self.standard):
+            self.assertEqual(PasientRolleForm(self.kari).fields['pasient_rolle'].initial,
+                             'forstehjelper')
+
+    def test_mitt_helsepersonell_er_raden_i_portalen(self):
+        """Koblet bare i Standard: i Brann er hun ingen. (Med rader i begge avgjorde
+        databasens rekkefølge utfallet, og mutanten overlevde.)"""
+        self.hp_s.user = self.kari
+        self.hp_s.save()
+        self.assertIsNone(self.c.get('/pasienter/').context['mitt_helsepersonell_id'])
+        self.hp_b.user = self.kari
+        self.hp_b.save()
+        self.assertEqual(self.c.get('/pasienter/').context['mitt_helsepersonell_id'], self.hp_b.pk)
+
+    # Kontokoblingen: én test per oppslag (mutantene 15–20 overlevde første runde —
+    # testen over gikk bare gjennom den ene `update`).
+
+    def _rolle_i(self, portal):
+        from core.portal import aktiver_portal
+        from patients.kontokobling import PasientRolleForm
+        with aktiver_portal(portal):
+            return PasientRolleForm(self.kari).fields['pasient_rolle'].initial
+
+    def _lagre_i(self, portal, rolle):
+        from core.portal import aktiver_portal
+        from patients.kontokobling import PasientRolleForm
+        with aktiver_portal(portal):
+            skjema = PasientRolleForm(self.kari, data={'pasient_rolle': rolle})
+            self.assertTrue(skjema.is_valid(), skjema.errors)
+            skjema.save()
+
+    def test_rollen_som_vises_er_portalens(self):
+        self.fh_b.user = None
+        self.fh_b.save()
+        self.hp_b.user = self.kari
+        self.hp_b.save()
+        self.assertEqual(self._rolle_i(self.brann), 'helsepersonell')
+
+    def test_helsepersonell_i_en_annen_portal_gir_ingen_rolle_her(self):
+        self.fh_s.user = None
+        self.fh_s.save()
+        self.fh_b.user = None
+        self.fh_b.save()
+        self.hp_s.user = self.kari
+        self.hp_s.save()
+        self.assertEqual(self._rolle_i(self.brann), 'ingen')
+
+    def test_helsepersonell_i_en_annen_portal_kobles_ikke_fra(self):
+        self.hp_s.user = self.kari
+        self.hp_s.save()
+        self._lagre_i(self.brann, 'forstehjelper')
+        self.hp_s.refresh_from_db()
+        self.assertEqual(self.hp_s.user, self.kari)
+
+    def test_raden_med_brukernavnet_hentes_i_portalen(self):
+        from patients.models import Forstehjelper, Helsepersonell
+        from core.portal import aktiver_portal
+        with aktiver_portal(self.standard):
+            fh = Forstehjelper.objects.create(name='kari')
+            hp = Helsepersonell.objects.create(name='kari')
+        for rolle, rad in (('forstehjelper', fh), ('helsepersonell', hp)):
+            with self.subTest(rolle=rolle):
+                self._lagre_i(self.brann, rolle)
+                rad.refresh_from_db()
+                self.assertIsNone(rad.user, 'Standards rad skal ikke tas')
+                modell = type(rad)
+                self.assertEqual(modell.objects.get(portal=self.brann, user=self.kari).name, 'kari')
+
+    # ── Lokasjonene ──
+
+    def test_valglista_er_portalens(self):
+        data = self.c.get('/oppdrag/api/lokasjoner/').json()['data']
+        self.assertEqual([r['navn'] for r in data], ['Scene B'])
+
+    def test_en_lokasjon_fra_en_annen_portal_kan_ikke_endres(self):
+        svar = self.c.put(f'/oppdrag/api/lokasjoner/{self.sted_s.pk}/',
+                          content_type='application/json', data={'navn': 'Kapret'})
+        self.assertEqual(svar.status_code, 404)
+
+    def test_samme_stedsnavn_i_en_annen_portal_er_lov(self):
+        svar = self.c.post('/oppdrag/api/lokasjoner/', content_type='application/json',
+                           data={'navn': 'Scene S'})
+        self.assertIn(svar.status_code, (200, 201), svar.content)
+        svar = self.c.post('/oppdrag/api/lokasjoner/', content_type='application/json',
+                           data={'navn': 'Scene B'})
+        self.assertEqual(svar.status_code, 400)
+
+    def test_omsorteringen_tar_ikke_en_annen_portals_rad(self):
+        svar = self.c.put('/oppdrag/api/lokasjoner/rekkefolge/', content_type='application/json',
+                          data={'ider': [self.sted_b.pk, self.sted_s.pk]})
+        self.assertEqual(svar.status_code, 400)
+
+    def _oppdrag(self, sted):
+        return self.c.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data={'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+                                 'lokasjon_id': sted.pk, 'enhet_ider': []})
+
+    def test_oppdraget_faar_ikke_en_lokasjon_fra_en_annen_portal(self):
+        self.assertEqual(self._oppdrag(self.sted_s).status_code, 400)
+        self.assertEqual(self._oppdrag(self.sted_b).status_code, 200)
+
+    def test_oppdraget_flyttes_ikke_til_en_annen_portals_lokasjon(self):
+        oppdrag_id = self._oppdrag(self.sted_b).json()['data']['id']
+        svar = self.c.put(f'/oppdrag/api/oppdrag/{oppdrag_id}/', content_type='application/json',
+                          data={'lokasjon_id': self.sted_s.pk})
+        self.assertEqual(svar.status_code, 400)
+
+    def test_ko_hendelsens_lokasjon(self):
+        from core.portal import aktiver_portal
+        from ko.views_hendelser import _lokasjon_fra
+        with aktiver_portal(self.brann):
+            self.assertEqual(_lokasjon_fra({'lokasjon_id': self.sted_s.pk}),
+                             (None, 'Ukjent lokasjon.'))
+            self.assertEqual(_lokasjon_fra({'lokasjon_id': self.sted_b.pk}), (self.sted_b, None))
+
+    def test_ko_tavlas_rader_og_oppsett(self):
+        from core.portal import aktiver_portal
+        from ko import tavle
+        from ko.services import Ugyldig
+        with aktiver_portal(self.brann):
+            rader = [r['navn'] for r in tavle.tavle_data(self.vakt)['rader']]
+            self.assertEqual(rader, ['Scene B'])
+            with self.assertRaises(Ugyldig):
+                tavle.lagre_oppsett(skjulte_ider=[self.sted_s.pk], fulgte_ider=[])
+            tavle.lagre_oppsett(skjulte_ider=[self.sted_b.pk], fulgte_ider=[])
+
+    def test_ko_tavlas_innstillinger(self):
+        data = self.c.get('/ko/api/tavle/oppsett/').json()['data']
+        self.assertEqual([r['navn'] for r in data['lokasjoner']], ['Scene B'])
+
+    def _tavlekall(self, sti, kropp):
+        from types import SimpleNamespace
+        from unittest import mock
+        fake = SimpleNamespace(pk=1)
+        with mock.patch('ko.views_tavle._tavle_gate', return_value=None), \
+                mock.patch('ko.views_tavle._tavle_ressurs', return_value=fake), \
+                mock.patch('ko.tavle.plasser', return_value=fake), \
+                mock.patch('ko.tavle.planlegg_pause', return_value=fake), \
+                mock.patch('ko.views_tavle._tavle_tid', return_value=None):
+            return self.c.post(sti, content_type='application/json', data=kropp)
+
+    def test_ko_plassering_paa_en_annen_portals_lokasjon(self):
+        sti = '/ko/api/tavle/plasser/'
+        self.assertEqual(self._tavlekall(sti, {'lokasjon_id': self.sted_s.pk}).status_code, 404)
+        self.assertEqual(self._tavlekall(sti, {'lokasjon_id': self.sted_b.pk}).status_code, 200)
+
+    def test_ko_planlagt_plassering_paa_en_annen_portals_lokasjon(self):
+        sti = '/ko/api/tavle/pauser/'
+        self.assertEqual(self._tavlekall(sti, {'lokasjon_id': self.sted_s.pk}).status_code, 404)
+        self.assertEqual(self._tavlekall(sti, {'lokasjon_id': self.sted_b.pk}).status_code, 200)
+
+    def test_ko_programmets_steder(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from ko import program
+        from ko.services import Ugyldig
+        fra = timezone.now() + timedelta(hours=1)
+        with aktiver_portal(self.brann):
+            self.assertEqual([s['navn'] for s in program.program_data(self.vakt)['steder']],
+                             ['Scene B'])
+            with self.assertRaisesMessage(Ugyldig, 'Ukjent sted'):
+                program.lagre_post(self.vakt, {'navn': 'X', 'lokasjon_id': self.sted_s.pk},
+                                   fra=fra, til=fra + timedelta(hours=1), bruker=self.kari)
+            program.lagre_post(self.vakt, {'navn': 'X', 'lokasjon_id': self.sted_b.pk},
+                               fra=fra, til=fra + timedelta(hours=1), bruker=self.kari)
+
+    def test_ko_kopierer_ikke_til_en_annen_portals_sted(self):
+        """Stedet finnes på id, ellers på navnet — begge i portalen (mutantene 3 og 4)."""
+        from datetime import date, timedelta
+
+        from django.utils import timezone
+
+        from core.portal import aktiver_portal
+        from core.vakt import opprett_vakt
+        from ko import program
+        from ko.models import Programpost
+        with aktiver_portal(self.brann):
+            fjor = opprett_vakt('Fjorår', year=2025, startet=timezone.now() - timedelta(days=365))
+        fra = timezone.now() - timedelta(days=365)
+        Programpost.objects.create(vakt=fjor, lokasjon=self.sted_s, lokasjon_navn='Scene S',
+                                   navn='Band', fra=fra, til=fra + timedelta(hours=1))
+        with aktiver_portal(self.brann):
+            svar = program.kopier_program(fjor, self.vakt, bruker=self.kari,
+                                          forste_dogn=date.today() + timedelta(days=1))
+        self.assertEqual(svar['kopiert'], 0, svar)
+        # Motprøve: med portalens eget sted går den samme konserten gjennom.
+        Programpost.objects.filter(vakt=fjor).update(lokasjon=self.sted_b, lokasjon_navn='Scene B')
+        with aktiver_portal(self.brann):
+            svar = program.kopier_program(fjor, self.vakt, bruker=self.kari,
+                                          forste_dogn=date.today() + timedelta(days=1))
+        self.assertEqual(svar['kopiert'], 1, svar)
+
+    def test_park_stedene(self):
+        from core.portal import aktiver_portal
+        from park import services
+        with aktiver_portal(self.brann):
+            self.assertEqual([s.navn for s in services.steder()], ['Scene B'])
+            self.assertEqual([s['navn'] for s in services.alle_steder_med_synlighet()],
+                             ['Scene B'])

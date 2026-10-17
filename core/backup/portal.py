@@ -68,6 +68,11 @@ class PortalBackupHandler(BaseBackupHandler):
     #: står i audit-loggen; hva som er på og av, er det denne fila skal bære.
     #:
     #: `VaktStatistikk.frosset_av` av samme grunn; navnet er frosset ved siden av.
+    #: Oppdateres på primærnøkkel, tømmes ikke — se `BaseBackupHandler.beholdes`.
+    #: `patients.Forstehjelper.portal` er `PROTECT`, og en nymigrert base har
+    #: alt «Behandler 1–10» i Standard-portalen.
+    beholdes = ['core.Vaktportal', 'core.Tilhorighet']
+
     strip_fields = {'core.ModuleSettings': ['updated_by'],
                     'core.VaktStatistikk': ['frosset_av']}
 

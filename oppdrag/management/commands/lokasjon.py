@@ -14,9 +14,16 @@ Bruk::
     python manage.py lokasjon --deaktiver "Hovedscene"
     python manage.py lokasjon --aktiver "Hovedscene"
     python manage.py lokasjon --gi-nytt-navn "Hovedscene" "Scene 1"
+    python manage.py lokasjon --list --portal brann
+
+**Lokasjonene er per portal** (17. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+§4.12). En kommando har ingen forespørsel å hente portalen fra, så den oppgis med
+`--portal` — eller er den eneste.
 """
 from django.core.management.base import BaseCommand, CommandError
 
+from core.models import Vaktportal
+from core.portal import UklarPortal, aktiver_portal, gjeldende_portal
 from oppdrag.models import Lokasjon
 
 
@@ -37,8 +44,19 @@ class Command(BaseCommand):
                             help='Endre navnet på en lokasjon.')
         parser.add_argument('--rekkefolge', type=int, default=None,
                             help='Sorteringsnøkkel. Lavere kommer først.')
+        parser.add_argument('--portal', default=None,
+                            help='Portalens kortnavn. Kan utelates når det bare finnes én.')
 
     def handle(self, *args, **opts):
+        try:
+            portal = (Vaktportal.objects.get(slug=opts['portal']) if opts['portal']
+                      else gjeldende_portal())
+        except (Vaktportal.DoesNotExist, UklarPortal) as feil:
+            raise CommandError(f'Oppgi en gyldig --portal: {feil}') from None
+        with aktiver_portal(portal):
+            return self._utfor(opts)
+
+    def _utfor(self, opts):
         if opts['list']:
             return self._list()
         if opts['legg_til']:
@@ -52,12 +70,12 @@ class Command(BaseCommand):
 
     def _hent(self, navn):
         try:
-            return Lokasjon.objects.get(navn=navn.strip())
+            return Lokasjon.objects.i_portal().get(navn=navn.strip())
         except Lokasjon.DoesNotExist:
             raise CommandError(f'Ingen lokasjon heter «{navn}».')
 
     def _list(self):
-        rader = list(Lokasjon.objects.all())
+        rader = list(Lokasjon.objects.i_portal().all())
         if not rader:
             self.stdout.write(self.style.WARNING(
                 'Ingen lokasjoner. Legg til med --legg-til "Navn".'))
@@ -72,9 +90,9 @@ class Command(BaseCommand):
         navn = navn.strip()
         if not navn:
             raise CommandError('Navnet kan ikke være tomt.')
-        if Lokasjon.objects.filter(navn=navn).exists():
+        if Lokasjon.objects.i_portal().filter(navn=navn).exists():
             raise CommandError(f'«{navn}» finnes allerede.')
-        lok = Lokasjon.objects.create(
+        lok = Lokasjon.objects.i_portal().create(
             navn=navn,
             **({'rekkefolge': rekkefolge} if rekkefolge is not None else {}),
         )
@@ -105,7 +123,7 @@ class Command(BaseCommand):
         til = til.strip()
         if not til:
             raise CommandError('Det nye navnet kan ikke være tomt.')
-        if Lokasjon.objects.filter(navn=til).exclude(pk=lok.pk).exists():
+        if Lokasjon.objects.i_portal().filter(navn=til).exclude(pk=lok.pk).exists():
             raise CommandError(f'«{til}» finnes allerede.')
         gammelt = lok.navn
         lok.navn = til

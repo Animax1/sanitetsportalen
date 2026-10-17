@@ -55,7 +55,16 @@ class GjeldendePortalTests(TestCase):
             gjeldende_portal()
 
     def test_tom_tabell_lager_standard(self):
-        """En fersk installasjon — eller en `TransactionTestCase` som har tømt tabellen."""
+        """En fersk installasjon — eller en `TransactionTestCase` som har tømt tabellen.
+
+        Modulenes portaleide rader (hjelperne fra migrasjonen) peker på portalen
+        med `PROTECT`, så de må ut først. Lest av modellene, ikke navngitt: en
+        test i `core` skal ikke kjenne modulene."""
+        from django.apps import apps
+        for modell in apps.get_models():
+            for felt in modell._meta.fields:
+                if felt.is_relation and felt.related_model is Vaktportal:
+                    modell._base_manager.filter(**{f'{felt.name}__isnull': False}).delete()
         Vaktportal.objects.all().delete()
         self.assertEqual(gjeldende_portal().slug, STANDARD_SLUG)
         self.assertEqual(Vaktportal.objects.count(), 1)

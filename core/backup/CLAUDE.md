@@ -87,3 +87,10 @@ Kommandoen kaller `gjenopprett`, ikke `restore_backup`: da er det veien man
 faktisk ville brukt som er prøvd, ikke en nabo til den. S3 mockes i
 `core/tests_offsite.py` ved å bytte ut `_klient`. Nøkkelen skal også ligge i en
 passordbehandler — uten den er bucketen uleselig, og det er meningen.
+
+**`beholdes` er det ene unntaket fra «det som dumpes, tømmes»** (17. okt. 2026):
+portalfila tømmer ikke `Vaktportal` og `Tilhorighet`, men lar `loaddata` oppdatere
+dem på primærnøkkelen. Modulenes rader peker på portalen med `PROTECT`, og en
+nymigrert base har alt hjelperne fra migrasjonen — en tømming ville stoppet
+gjenopprettingen nettopp i den tomme basen. `SlettelistaDekkerDumpenTests` godtar
+lista og krever at bare portalfila har en.

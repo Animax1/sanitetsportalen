@@ -161,10 +161,8 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
       toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
       i JS, og tas sammen med flatene i fase 5.
-- [ ] **Fase 4b:** `Forstehjelper`, `Helsepersonell` (og `user` unik per portal, «mine pasienter»)
-      og `oppdrag.Lokasjon` per portal, med `core.models.PortalEid` som vaktlista i 4a.
 - [ ] **Fase 4c:** KO (`Ansvarsomraade`, `Ansvarsmerke` på medlemskapet, `Konserttype`, `Kjennetegn`)
-      og park (`Parklenke` bærer portalen, `SkjultSted` følger lokasjonen).
+      og park (`Parklenke` bærer portalen). `SkjultSted` fikk veien gjennom lokasjonen i 4b.
 - [ ] **Fase 4d:** `Vakt.navn` unik per portal, `Notification.portal`, endringsnumrene med portal i
       nøkkelen, `AppSetting`-nøklene sortert i system og portal (§4.7), portalfilter i statistikk
       og arkiv, og søk på tvers for innsyn og sletting (§4.5). `VENTER` i
