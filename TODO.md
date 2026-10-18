@@ -639,7 +639,11 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
 **F8 (PgBouncer) er avklart som ikke aktuell** og står ikke som oppgave: ved 4 workers ×
 4 tråder bruker appen 16 forbindelser mot Railway Postgres' grense på ~100, og
 `conn_max_age=600` demper ytterligere. Flaskehalsen var spørringer og båndbredde, ikke
-forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
+forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer. Gjennomgått
+på nytt 17. okt. 2026 med samme svar: PgBouncer gjør veien *inn* til databasen billigere,
+ikke arbeidet den gjør der inne — og det som koster på vakt er spørringene per poll
+(«Skalering mot 2027»). Blir tilkoblingstallet problemet en dag, er Djangos egen pool
+med psycopg 3 det lettere alternativet, uten en ny tjeneste — eget punkt samme sted.
 
 
 ## Ideer / backlog
@@ -937,27 +941,103 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 
 - [ ] **Vurder: sesjonsskrivingen ved hvert poll — databasen er den første flaskehalsen,
       ikke gunicorn** (André, 4. okt. 2026: «usikkerhet igjen på om vi har nailet planen
-      for skalering»; gjennomgang av lasten på en 48-timers vakt). Sesjonene ligger i
-      databasen (ingen `SESSION_ENGINE` er satt), og `SESSION_SAVE_EVERY_REQUEST=True`
-      gjør at **hvert** `/api/endringer/`-kall hvert 2,5 s skriver en rad til
-      `django_session` — i tillegg til sesjonsoppslag, brukeroppslag,
-      `session_timeout_hours` og én `ModulTilgang`-spørring per område i gaten. Pollet
-      runbooken §3c kaller «et lite tall» er fire til seks spørringer, én av dem en
-      skriving. Med ~20 KO- og sentralbordfaner er det ~8 sesjonsskrivinger i sekundet i
-      48 timer, over en million radversjoner på én liten tabell. Postgres tåler det, men
-      runbooken §2 sier selv at flere workers ikke hjelper når basen er treg — og dette er
-      der den blir det først. Web-laget har stor margin (~10 forespørsler/s i ro mot 2 × 4).
+      for skalering»; gjennomgang av lasten på en 48-timers vakt. Talt opp lag for lag
+      17. okt. 2026, på spørsmålet «konkret hva kan vi gjøre for å hjelpe med databasen»).
+      Sesjonene ligger i databasen (ingen `SESSION_ENGINE` er satt), og
+      `SESSION_SAVE_EVERY_REQUEST=True` gjør at **hvert** `/api/endringer/`-kall hvert
+      2,5 s skriver en rad til `django_session`. Ett poll er **sju lesinger og én
+      skriving** mot Postgres: `SELECT 1` fra `conn_health_checks`, sesjonsraden, brukeren,
+      `session_timeout_hours` (`AppSetting.get`, én spørring hver gang), kontoens portaler
+      (`PortalMiddleware`), aktive moduler og tilgangsradene (begge cachet per brukerobjekt,
+      så **én** `ModulTilgang`-spørring uansett antall områder — notatet fra 4. okt. sa én
+      per område), og `UPDATE django_session`. **Skrivingen er den som koster:** Postgres
+      skriver aldri over en rad, den lager en ny versjon og lar den gamle ligge til
+      autovacuum, og `expire_date` er indeksert, så hver oppdatering går i indeksen også.
+      Med ~20 KO- og sentralbordfaner er det ~8 sesjonsskrivinger i sekundet i 48 timer,
+      over en million radversjoner på én liten tabell. Runbooken §2 sier selv at flere
+      workers ikke hjelper når basen er treg — de styrer hvor mange som kan *vente*
+      samtidig, ikke hvor fort det ventes på svarer — og dette er der den blir det først.
+      Redis (vakt-modus) tar endringsnummeret og cachen, men **ikke sesjonene**.
+      Web-laget har stor margin (~10 forespørsler/s i ro mot 2 × 4).
       - **Mål før du velger** — generalprøven §8 (`docs/GENERALPROVE.md`): døde rader på
         `django_session`, tilkoblinger og svartid med det reelle antallet faner åpne i en
         time. Er tallene friske der, er dette en forbedring og ikke en forutsetning.
-      - **To veier, og `cached_db` alene er ikke nok:** `cached_db` fjerner lesingene (på
-        Redis, altså vakt-modus), men `SESSION_SAVE_EVERY_REQUEST` skriver fortsatt til
-        basen ved hver lagring. Den som fjerner skrivingen er å **ikke røre sesjonen på
-        pollforespørsler** — la utløpet fornyes av sidelastinger og handlinger, ikke av
-        tallet. `BrukerAktivitetMiddleware` har alt 60 s oppløsning av akkurat den grunnen;
-        `DynamicSessionTimeoutMiddleware` kaller `set_expiry` ved hver forespørsel og
-        markerer dermed sesjonen endret, så den må med i vurderingen.
-      - Ikke før vakta om målingen er grønn: fastfrysingen gjelder.
+      - **Tiltak 1, hovedtiltaket: forny sesjonen sjeldnere, ikke ved hvert poll.** Slå av
+        `SESSION_SAVE_EVERY_REQUEST` og flytt fornyelsen inn i egen middleware — Django
+        lagrer da bare når noe i sesjonen er endret. `DynamicSessionTimeoutMiddleware` må
+        skrives om uansett: `set_expiry` markerer sesjonen endret ved hvert kall.
+        `BrukerAktivitetMiddleware` har alt 60 s oppløsning av akkurat den grunnen. To
+        regler er mulige, og valget tas når punktet tas opp: *strupe* — forny utløpet bare
+        når det er over ti minutter siden sist; ingen endret oppførsel, skrivingene per
+        fane går fra 1 440 i timen til 6, anbefalt først. *Bare mennesker* — forny bare på
+        handlinger, eller når pollet bærer `X-Portal-Inaktiv` under ett minutt; da er
+        «8 timer» åtte timer uten at noen rørte fana, men headeren teller ikke
+        musebevegelser, så en operatør som bare *ser* på skjermen i åtte timer blir logget
+        ut. `cached_db` alene er ikke nok — `SESSION_SAVE_EVERY_REQUEST` skriver til basen
+        uansett backend.
+      - **Tiltak 2: `SESSION_ENGINE = cached_db`.** Fjerner sesjonslesingen når Redis er
+        på; databasen er fortsatt sannheten, så en tømt Redis mister ingenting, og i
+        lavkostnad-modus med én worker og LocMemCache virker det like godt. Én linje i
+        settings.
+      - **Tiltak 3: cache `session_timeout_hours`** med ett minutts TTL — én spørring per
+        forespørsel i hele portalen for et tall admin endrer kanskje én gang i året. Samme
+        mønster som `core/stats_cache.py`.
+      - **Tiltak 4: autovacuum-terskel per tabell på `django_session`** (`ALTER TABLE …
+        SET (autovacuum_vacuum_scale_factor …)`, én `RunSQL`-migrasjon) — *etter* tiltak 1,
+        ikke i stedet for: med skrivingen på plass er det å moppe gulvet mens krana står på.
+      - **Tiltak 5, det eneste før generalprøven: tell spørringer per sti.** «Tregeste
+        stier» viser P95, ikke antall spørringer; tallene over er talt for hånd gjennom
+        koden. Et tellefelt i metrikkene (`core/middleware.py`), eller `pg_stat_statements`
+        om Railway lar oss slå den på. Det er målingen de fire andre avgjøres på.
+      - **Etter 1–3:** fem lesinger og ~0 skrivinger per poll — ~0,03 skrivinger/s med 20
+        faner mot ~8 i dag. Portaloppslaget i `PortalMiddleware` kunne også caches, men det
+        er en sikkerhetssjekk: fjernes kontoen fra portalen, skal det virke med én gang.
+        Står til målingen sier noe annet.
+      - Ikke før vakta om målingen er grønn: fastfrysingen gjelder. Men tiltak 1–3 er små
+        nok til å ligge ferdig på en gren, testet på staging, *før* generalprøven — da er
+        målingen «skal vi slå sammen det som ligger der», ikke «skal vi bygge noe».
+
+- [ ] **Se på: én fane poller på vegne av alle i samme nettleser** (André, 17. okt. 2026:
+      «noe å se på, ikke nødvendigvis implementere»). En KO-operatør med to skjermer har to
+      faner som spør `/api/endringer/` om det samme hvert 2,5 s, og KO har alt en kanal
+      mellom vinduene (`koMeldTilstede`, `KO_FOLGER_PULS_MS` i `ko-hendelser.js`). Med en
+      leder valgt per nettleser (`BroadcastChannel`, eller en lås i `localStorage`) spør
+      én fane og deler svaret, og KOs poll halveres. Det løser ikke databaseproblemet over
+      — det deler det på to — og det er klientkode med egne feilmoder: lederen som lukkes
+      eller sovner på mobil, en følger som aldri får svar, to nettlesere på samme PC som
+      ikke ser hverandre. Vurder først etter tiltak 1–3 over, og bare om målingen sier at
+      antall faner er det som teller.
+
+- [ ] **Vurder: psycopg 3 i stedet for psycopg2, med Djangos innebygde tilkoblingspool**
+      (17. okt. 2026, «hva har vi å hente på psycopg 3?»). Gir ingen fart — begge går
+      gjennom libpq, og det som koster er spørringene, ikke driveren — men tre ting:
+      (1) `OPTIONS['pool']` erstatter `conn_max_age=600`. I dag holder hver tråd sin egen
+      tilkobling i ti minutter uansett last (~12 i vakt-modus); med poolen låner tråden for
+      forespørselen, og tallet følger lasten med et tak du setter. Det er det lettere
+      alternativet til PgBouncer (F8 over), uten en ny tjeneste. Poolen og `conn_max_age`
+      kan ikke stå sammen — Django nekter å starte. Standard i `psycopg_pool` åpner fire per
+      prosess fra start, så sett `min_size`/`max_size` selv; backupklokka låner fra samme
+      pool hvert minutt, så ikke sett taket til to. (2) psycopg2 vedlikeholdes, men får
+      ingen nye funksjoner. (3) `kart-sanitet` kjører alt `psycopg[binary]` 3.3 på samme
+      Django 5.2 — én driver å kjenne. **Kostnaden er liten,** gjennomgått 17. okt.:
+      `requirements.in` (`psycopg[binary,pool]`, `pip-compile` med hasher — Django velger
+      psycopg 3 selv når den er installert), settings, det ene direkte `psycopg2`-kallet i
+      `verifiser_migrasjoner._kobling` (samme nøkkelord til `connect`), testfiksturen
+      `PSYCOPG_TEKST` i `core/tests_kommando.py` (gjentakelsen kommer fra libpq og finnes i
+      begge, ordlyden er litt annerledes), og README-punktet «psycopg2-binary feiler ved
+      installasjon» kan trolig strykes — psycopg 3 har hjul for Windows og 3.13. Rå SQL
+      finnes seks steder utenom tester, alle med `%s`; ingen bruk av `psycopg2.extras`.
+      Hele suiten mot PostgreSQL i CI og migrasjonsprøvene lokalt. **Etter generalprøven,**
+      som egen rolig endring — et driverbytte er akkurat det man ikke vil feilsøke på en
+      vakt.
+
+- [ ] **Rett runbooken §4: backupklokka bruker ikke en «advisory lock»** (funnet 17. okt.
+      2026). `docs/RUNBOOK_VAKT.md` §4 sier «Backup-scheduler (advisory lock i DB sørger
+      for at kun én worker kjører)»; `core/backup/klokke.py` bruker en radlås,
+      `select_for_update(nowait=True)` på planraden. Radlåsen er transaksjonsbundet og
+      dermed trygg også bak en pooler i transaksjonsmodus — en sesjonsbundet advisory lock
+      hadde ikke vært det. Ikke farlig, men nøyaktig den typen påstand som gjør noen usikre
+      på om en pooler er trygg.
 
 ### Framtidige moduler
 
