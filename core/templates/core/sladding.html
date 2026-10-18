@@ -1,0 +1,95 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Sladding – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Søk i fritekst på tvers av portalene, og sladd det som ikke skal stå (fase 7, 18. okt. 2026,
+  `core/sladding.py`). Serverrendret. Teksten vises her og ingen andre steder — registeret
+  under har aldri den.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2"><i class="bi bi-eraser me-2"></i>Sladding</h1>
+  <p class="text-muted mb-0">
+    Søk i de frie tekstfeltene i alle portalene, og fjern tekst som ikke skal stå der — et navn,
+    en helseopplysning. Sladdingen står i registeret med hvem, når og hvorfor, aldri teksten, og
+    kjøres på nytt etter en gjenoppretting. Backupene beholder teksten til lagringstiden løper ut.
+    Hvert søk logges.
+  </p>
+</section>
+
+<form method="get" class="d-flex gap-2 mb-4 sladding-skjema">
+  <label class="visually-hidden" for="q">Tekst</label>
+  <input type="search" id="q" name="q" value="{{ q }}" class="form-control"
+         placeholder="Tekst å lete etter" minlength="2" required autofocus>
+  <button type="submit" class="btn btn-primary">Søk</button>
+</form>
+
+{% if for_kort %}
+<p class="text-muted">Skriv minst to tegn.</p>
+{% elif q %}
+<h2 class="h5 mb-3">{{ antall }} treff på «{{ q }}»</h2>
+{% for kilde in resultat %}
+<div class="card mb-3">
+  <div class="card-header"><strong>{{ kilde.handler.etikett }}</strong>
+    <span class="text-muted small ms-1">({{ kilde.funn|length }}{% if kilde.funn|length >= maks %}, de første {{ maks }}{% endif %})</span></div>
+  <div class="card-body p-0">
+    {% if kilde.feil %}
+    <p class="text-danger m-3">Kilden svarte ikke: {{ kilde.feil }}</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Hvor</th><th>Felt</th><th>Tekst</th><th>Sladd</th></tr></thead>
+        <tbody>
+          {% for f in kilde.funn %}
+          <tr>
+            <td class="small">{{ f.hvor|default:"–" }}{% if f.tid %}<div class="text-muted">{{ f.tid|date:"d.m.Y H:i" }}</div>{% endif %}</td>
+            <td class="small">{{ f.felt_navn }}</td>
+            <td class="sladding-tekst">{{ f.tekst|truncatechars:400 }}</td>
+            <td>
+              <form method="post" class="d-flex gap-1" data-confirm="Sladde teksten? Det kan ikke angres i portalen.">
+                {% csrf_token %}
+                <input type="hidden" name="q" value="{{ q }}">
+                <input type="hidden" name="kilde" value="{{ kilde.handler.slug }}">
+                <input type="hidden" name="modell" value="{{ f.modell }}">
+                <input type="hidden" name="pk" value="{{ f.pk }}">
+                <input type="hidden" name="felt" value="{{ f.felt }}">
+                <label class="visually-hidden" for="grunn-{{ f.modell }}-{{ f.pk }}-{{ f.felt }}">Grunn</label>
+                <input type="text" id="grunn-{{ f.modell }}-{{ f.pk }}-{{ f.felt }}" name="grunn" class="form-control form-control-sm"
+                       placeholder="Grunn" maxlength="255" required>
+                <button type="submit" class="btn btn-sm btn-outline-danger">Sladd</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted">Ingen treff.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2 class="h5 mt-5 mb-3">Registeret <span class="text-muted small">({{ i_registeret }}{% if i_registeret > 50 %}, de siste 50{% endif %})</span></h2>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead><tr><th>Sladdet</th><th>Av</th><th>Hva</th><th>Grunn</th></tr></thead>
+    <tbody>
+      {% for r in registeret %}
+      <tr>
+        <td class="small">{{ r.sladdet_at|date:"d.m.Y H:i" }}</td>
+        <td class="small">{{ r.av_navn|default:"–" }}</td>
+        <td class="small"><code>{{ r.modell }}#{{ r.rad_id }}.{{ r.felt }}</code></td>
+        <td class="small">{{ r.grunn }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-muted">Ingenting er sladdet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

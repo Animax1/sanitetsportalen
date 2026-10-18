@@ -156,9 +156,16 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Gjør `ModulTilgang.portaltilgang` påkrevd i basen** (etter fase 2, 17. okt. 2026). Den er
       nullbar bare for release-vinduet og migrasjonen som fylte den; `save()` krever den alt.
       Neste migrasjon på `accounts` kan sette `NOT NULL` når fase 2 har stått i prod.
-- [ ] **Fase 7:** sladding av fritekst for admin, med sladderegister som kjøres på nytt etter en
-      gjenoppretting. KO først, så oppdrag, så pasient (med ny signering av arkivet).
-      Uavhengig av portalene.
+- [ ] **Fase 7, pasient:** sladding av pasientens tekstfelt på `/admin/sladding/`. KO og oppdrag
+      er levert (18. okt. 2026, `core/sladding.py`); pasient gjenstår fordi tekstfeltene står i
+      `VaktArkiv`s `sha_payload()`, og en sladding der må signere arkivet på nytt med registeret
+      som begrunnelse — ellers melder det tukling.
+- [ ] **Den frosne KO-statistikken bærer fritekst uten frist.** `ko/statistikk.py` fryser
+      hendelsens `tittel` og `siste_linje` (operatørens siste linje, 160 tegn) i «verken»-lista,
+      og `core.VaktStatistikk` har ingen lagringstid (A.9, raden om lagregistreringene). Funnet
+      18. okt. 2026 da sladdingen måtte skrubbe kopiene. To veier: ta feltene ut av den frosne
+      formen (ny `statistikk_versjon`; nummeret er nok til gjennomgangen), eller gi de frosne
+      tallene en frist. Den første fjerner kopien; den andre bare forkorter den.
 
 ### Sikkerhetsgjennomgangen 28. sep. 2026 — alle fire puljer levert, se [`docs/SIKKERHETSGJENNOMGANG_2026-09-28.md`](./docs/SIKKERHETSGJENNOMGANG_2026-09-28.md)
 

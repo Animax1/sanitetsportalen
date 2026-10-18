@@ -683,9 +683,10 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     1. Lag en pre_restore-backup av nåværende tilstand (sikkerhetsnett).
     2. Slett eksisterende rader i restore_models (FK-trygg rekkefølge).
     3. Kall loaddata på den lagrede JSON-fila.
-    4. Skriv én auditrad om at det skjedde.
+    4. Kjør sladderegisteret på nytt (`core/sladding.py`).
+    5. Skriv én auditrad om at det skjedde.
 
-    Hele restore (steg 2-3) kjører i én transaksjon. Feiler noe ruller
+    Hele restore (steg 2-4) kjører i én transaksjon. Feiler noe ruller
     alt tilbake. pre_restore-backupen i steg 1 er allerede commitet og
     forblir på disk uansett.
 
@@ -736,6 +737,11 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     # Slett-rekkefølge bestemt av handler.
     restore_models = handler.get_restore_models()
 
+    # Sladderegisteret leses før noe røres: en hel gjenoppretting erstatter det også
+    # (`core/sladding.py`, 18. okt. 2026).
+    from core import sladding
+    registeret = sladding.les_registeret()
+
     with transaction.atomic():
         for model_label in restore_models:
             app_label, model_name = model_label.split('.')
@@ -750,6 +756,9 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
         finally:
             if tmp_path.exists():
                 tmp_path.unlink()
+        # Backupen beholder teksten som er sladdet etter at den ble tatt. Registeret tar den
+        # bort igjen, i samme transaksjon — den skal aldri stå lesbar etter en gjenoppretting.
+        sladding.etter_gjenoppretting(registeret)
 
     _logg_gjenoppretting(backup, user, kilde, for_bilde)
     logger.info(

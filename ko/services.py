@@ -456,8 +456,12 @@ def _kjeden_q(rot):
     return Q(pk=rot.pk) | Q(rot=rot)
 
 
+#: Grunnen KOs egen sletteinngang fører i sladderegisteret (`core/sladding.py`).
+FJERN_GRUNN = 'Fjernet fra KO-loggen'
+
+
 @transaction.atomic
-def fjern(linje, *, bruker, naa=None):
+def fjern(linje, *, bruker, naa=None, grunn=FJERN_GRUNN):
     """Sletteinngangen (§4.4) — **tøm innholdet, la rada stå**.
 
     Unntaket fra append-only, og det er én navngitt vei og ikke en generell
@@ -475,11 +479,17 @@ def fjern(linje, *, bruker, naa=None):
     den opprinnelige teksten blitt stående i den overstyrte raden — usynlig i
     loggen, men fullt lesbar i basen og i backupen. En sletteinngang som lar
     en kopi ligge igjen, er ikke en sletteinngang.
+
+    **Og hver fjernet rad føres i sladderegisteret** (18. okt. 2026, `core/sladding.py`):
+    en gjenoppretting av KO-fila tar ellers teksten tilbake. Registeret har aldri teksten.
+    Den frosne vaktstatistikken (siste linje på en hendelse) sladdes med.
     """
+    from core import sladding
+
     kjeden = Logglinje.objects.filter(_kjeden_q(linje.rot or linje))
     tid = naa or timezone.now()
     navn = getattr(bruker, 'username', '') or ''
-    antall = 0
+    rader = []
     for rad in kjeden:
         if rad.kilde == KILDE_SYSTEM:
             # Systemlinjer bærer ingen fritekst — de er bygget av verdimengder
@@ -487,14 +497,29 @@ def fjern(linje, *, bruker, naa=None):
             # en inngang som nådde dem ville vært en vei til å fjerne sporet
             # etter en overstyring.
             continue
-        rad.tekst = ''
-        rad.fjernet_at = tid
-        rad.fjernet_av = bruker if bruker and bruker.is_authenticated else None
-        rad.fjernet_av_navn = navn
-        rad.save(update_fields=['tekst', 'fjernet_at', 'fjernet_av',
-                                'fjernet_av_navn'])
-        antall += 1
-    return antall
+        tom_linje(rad, tid=tid, bruker=bruker, navn=navn)
+        rader.append((LOGGLINJE, rad.pk, 'tekst'))
+    sladding.registrer(rader, grunn=grunn, bruker=bruker, naa=tid)
+    return len(rader)
+
+
+#: Modellnavnet i sladderegisteret.
+LOGGLINJE = 'ko.logglinje'
+
+
+def tom_linje(rad, *, tid, bruker, navn) -> None:
+    """Tøm én linje, og kopiene av teksten i vaktens frosne statistikk. Brukt av `fjern` og
+    av sladdingen etter en gjenoppretting (`ko/sladding.py`)."""
+    from core import sladding
+
+    if rad.tekst:
+        # `_siste_operatorlinje` i ko/statistikk.py kapper ved 160 tegn.
+        sladding.skrubb_frosne(rad.vakt_id, {rad.tekst, rad.tekst[:160]})
+    rad.tekst = ''
+    rad.fjernet_at = tid
+    rad.fjernet_av = bruker if bruker and bruker.is_authenticated else None
+    rad.fjernet_av_navn = navn
+    rad.save(update_fields=['tekst', 'fjernet_at', 'fjernet_av', 'fjernet_av_navn'])
 
 
 def systemlinje(vakt, kode, data, *, tidspunkt=None, bruker=None,

@@ -9,6 +9,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from core.sortering import Norsk
 
@@ -1007,3 +1008,36 @@ class Backup(models.Model):
 
     def __str__(self):
         return f'{self.filename} ({self.get_kind_display()})'
+
+
+class Sladding(models.Model):
+    """Én sladdet tekst: hva, hvem, når og hvorfor — **aldri teksten** (§4.9, 18. okt. 2026).
+
+    Registeret som holder en sladding på plass etter en gjenoppretting: backupene beholder
+    teksten, og `core.backup.service.restore_backup` kjører registeret på nytt før den melder
+    ferdig. Reglene står i `core/sladding.py`. Modellen og raden er tekst og tall, ikke en
+    peker: raden skal kunne stå i registeret mens modulen gjenopprettes under den.
+    """
+
+    modell = models.CharField(max_length=100, verbose_name='Modell')
+    rad_id = models.BigIntegerField(verbose_name='Rad')
+    felt = models.CharField(max_length=64, verbose_name='Felt')
+    grunn = models.CharField(max_length=255, verbose_name='Grunn')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Sladdet av')
+    av_navn = models.CharField(max_length=150, blank=True, default='',
+                               verbose_name='Sladdet av (navn)')
+    sladdet_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name='Sladdet')
+
+    class Meta:
+        verbose_name = 'Sladding'
+        verbose_name_plural = 'Sladdinger'
+        ordering = ['-sladdet_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['modell', 'rad_id', 'felt'],
+                                    name='sladding_en_per_felt'),
+        ]
+
+    def __str__(self):
+        return f'{self.modell}#{self.rad_id}.{self.felt}'

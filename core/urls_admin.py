@@ -50,6 +50,7 @@ urlpatterns = [
     path('tilhorigheter/', views_portaler.tilhorigheter_view, name='tilhorigheter'),
     # Personsøk på tvers av portalene, for innsyn og sletting (18. okt. 2026, §4.5).
     path('personsok/', views_portaler.personsok_view, name='personsok'),
+    path('sladding/', views_portaler.sladding_view, name='sladding'),
     path('innstillinger/', views_admin.portal_settings_view,
          name='portal_settings'),
     path('moduler/', views_admin.module_admin_list_view,

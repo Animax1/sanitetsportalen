@@ -29,6 +29,7 @@
   "/admin/server-status/sessions/",
   "/admin/server-status/sessions/kill-all/",
   "/admin/server-status/sessions/kill/",
+  "/admin/sladding/",
   "/admin/tilhorigheter/",
   "/admin/vakt/",
   "/admin/vakt/1/gjenaapne/",

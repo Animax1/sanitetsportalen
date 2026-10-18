@@ -212,3 +212,51 @@ def personsok_view(request):
         'antall': sum(len(r['treff']) for r in resultat),
         'maks': personsok.MAKS_TREFF,
     })
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='portaladmin:sladding', rate='60/m', method='POST', on_limit='html')
+def sladding_view(request):
+    """Søk i fritekst på tvers av portalene, og sladd det som ikke skal stå (fase 7, §4.9).
+
+    Reglene står i `core/sladding.py`. Hvert søk logges med søkeordet, som personsøket; en
+    sladding logges med feltet og grunnen, aldri teksten.
+    """
+    from django.utils.http import urlencode
+
+    from core import sladding
+    from core.models import Sladding
+
+    if request.method == 'POST':
+        q = request.POST.get('q', '')
+        pk = request.POST.get('pk', '')
+        try:
+            if not pk.isdigit():
+                raise ValidationError('Feltet kan ikke sladdes herfra.')
+            antall = sladding.sladd(request.POST.get('kilde', ''), request.POST.get('modell', ''),
+                                    int(pk), request.POST.get('felt', ''),
+                                    grunn=request.POST.get('grunn', ''), bruker=request.user,
+                                    ip=klient_ip(request))
+        except ValidationError as feil:
+            _vis_feil(request, feil)
+        else:
+            messages.success(request, 'Teksten er sladdet' + (
+                f' i {antall} rader (kopiene med).' if antall > 1 else '.'))
+        return redirect(f"{request.path}?{urlencode({'q': q})}")
+
+    q = (request.GET.get('q') or '').strip()
+    resultat = sladding.sok(q)
+    if resultat:
+        AuditLog.objects.create(table_name='core_sladding', record_id=0, action='SOK',
+                                field_name='q', new_value=q[:200], user=request.user,
+                                ip=klient_ip(request))
+    return render(request, 'core/sladding.html', {
+        'q': q,
+        'for_kort': bool(q) and len(q) < sladding.MIN_TEGN,
+        'resultat': resultat,
+        'antall': sum(len(r['funn']) for r in resultat),
+        'maks': sladding.MAKS_TREFF,
+        'registeret': Sladding.objects.all()[:50],
+        'i_registeret': Sladding.objects.count(),
+    })

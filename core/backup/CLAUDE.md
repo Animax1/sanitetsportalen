@@ -18,6 +18,18 @@ mutant som fjernet en strippet peker overlevde, og den fant fire ustrippede
 pekere i moduler arbeidet ikke gjaldt. Det er den verste sorten overlevende:
 feilen viser seg bare den dagen man trenger backupen.
 
+## Rekkefølgen gjennom en sykel
+
+**`ko.Hendelse` ↔ `ko.Logglinje` er en sykel** (begge `SET_NULL`), og reserven i
+`utled_restore_models` la alt den ikke fikk sortert bakerst alfabetisk — `core.Vakt` foran
+`ko.Logglinje`, som peker på vakta med `PROTECT`. **En hel gjenoppretting i en base med én
+KO-linje feilet** (funnet 18. okt. 2026 av sladdetestene). Resten sorteres nå på nytt med
+bare de blokkerende kantene (`PROTECT`, `RESTRICT`), og
+`test_hver_blokkerende_kant_holdes_ogsaa_gjennom_en_sykel` krever det for hver handler.
+
+**Sladderegisteret kjøres inne i gjenopprettingen** (`core/sladding.py`): lest før tømmingen,
+flettet inn og kjørt etter `loaddata`, i samme transaksjon.
+
 ## Klokka og planene
 
 **Klokka er en tråd i web-prosessen** (`core/backup/klokke.py`), ikke en

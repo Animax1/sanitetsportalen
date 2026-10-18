@@ -308,6 +308,9 @@
           <li><a class="dropdown-item{% if '/admin/personsok' in request.path %} active{% endif %}" href="{% url 'portaladmin:personsok' %}">
             <i class="bi bi-person-lines-fill me-2"></i>Personsøk
           </a></li>
+          <li><a class="dropdown-item{% if '/admin/sladding' in request.path %} active{% endif %}" href="{% url 'portaladmin:sladding' %}">
+            <i class="bi bi-eraser me-2"></i>Sladding
+          </a></li>
           <li><a class="dropdown-item{% if '/admin/server-status' in request.path %} active{% endif %}" href="{% url 'portaladmin:admin_server_status' %}">
             <i class="bi bi-speedometer2 me-2"></i>Server-status
           </a></li>

@@ -39,6 +39,7 @@ GLOBALE = {
     'core.ModuleSettings': 'Modulene slås av og på for hele installasjonen',
     'core.Backupplan': 'Backup er per modul, ikke per portal (§5)',
     'core.Backup': 'Backup er per modul, ikke per portal (§5)',
+    'core.Sladding': 'Sladderegisteret gjelder rader i alle portaler, og kjøres av gjenopprettingen',
     'core.OffsiteKopi': 'Backup er per modul, ikke per portal (§5)',
     'core.AppSetting': 'Nøkkel/verdi; portalens nøkler sorteres i fase 4d (§4.7)',
     'core.Tilhorighet': 'Den felles katalogen (beslutning 9) — portalen velger sine',

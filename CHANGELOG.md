@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 7: sladding av fritekst i KO og oppdrag, med register som overlever en gjenoppretting  `#core/personvern` `#core/backup`
+
+`docs/BESLUTNING_PORTALER.md` §4.9: «Admin skal kunne fjerne fritekst i etterkant når
+helseopplysninger har havnet der de ikke skal … **KO først**, så oppdrag og pasient.»
+`/admin/sladding/` (global admin, under Personsøk i menyen): søk i de frie feltene i alle
+portaler, skriv en grunn, trykk «Sladd».
+
+| Kilde | Felt | Sladdet betyr |
+|---|---|---|
+| KO | `Logglinje.tekst` | Det samme som KOs egen «Fjern»: hele korreksjonskjeden tømmes, «fjernet av» står |
+| KO | `Hendelse.tittel` | «[Sladdet]», også i systemlinjene — med titler hendelsen hadde før en omdøping |
+| KO | `Hendelse.melder` | Tom |
+| Oppdrag | `Oppdrag.fritekst` | Tom |
+| Oppdrag | `Statusmelding.sted_tekst` («Annet sted») | Tom på alle meldingene på oppdraget med samme tekst — korreksjonene arver den |
+
+**Registeret (`core.Sladding`) har hva, hvem, når og hvorfor — aldri teksten.** Backupene
+beholder teksten, og en gjenoppretting ville tatt den tilbake. `restore_backup` leser
+registeret før tømmingen, fletter det inn etter `loaddata` og sladder alt i det på nytt — i
+samme transaksjon, så teksten aldri står lesbar etterpå. Flettingen trengs fordi **den hele
+fila har registeret i seg**: en fil fra før sladdingen ville ellers tatt med seg både teksten
+og sporet etter at den skulle bort. **KOs egen «Fjern» føres i det samme registeret** — den
+hadde nøyaktig det samme hullet.
+
+**Kopiene sladdes med originalen.** Funnet underveis: **den frosne KO-statistikken bærer
+fritekst** — hendelsens tittel og operatørens siste linje (160 tegn) i «verken»-lista, uten
+frist. `core.sladding.skrubb_frosne` erstatter hele strenger som er lik teksten. Selve funnet
+står som eget punkt i TODO.
+
+**Og en feil i backupen, funnet av testene for dette:** **en hel gjenoppretting feilet i en
+base med én KO-linje.** `ko.Hendelse` ↔ `ko.Logglinje` er en sykel (begge `SET_NULL`), og
+reserven i `utled_restore_models` la alt den ikke fikk sortert bakerst alfabetisk —
+`core.Vakt` foran `ko.Logglinje`, som peker på vakta med `PROTECT`. Resten sorteres nå på
+nytt med bare de blokkerende kantene (`PROTECT`, `RESTRICT`). Ny invariant for **hver**
+handler: en modell som peker på en annen med `PROTECT`, tømmes før den. Modulfilene var ikke
+rammet (KO-fila har ikke `core.Vakt` i settet).
+
+**Pasient gjenstår**: tekstfeltene står i `VaktArkiv`s signatur, og en sladding der må signere
+arkivet på nytt. Personverndokumentet (A.14) er oppdatert.
+
+Mutanter: **28**. 25 drept med en gang (blant dem at «Annet sted» sladdes med `update()`
+utenom signalene og derfor må øke sentralbordets endringsnummer selv — vakten
+`OppdragEndringerFangesTests` sa fra); én etter en ny test (den frosne kopien av tittelen
+hendelsen hadde *før* en omdøping); to overlevde fordi koden var overflødig, og den er fjernet —
+et filter mot systemlinjer i søket (de har aldri `tekst`) og et oppslag på hendelsesnummer ved
+siden av pekeren (hver linje med tittel har `hendelse`). Sykelbruddet i backupen: 3 av 3 drept,
+av invarianttesten.
+
 ## 2026-10-18 — Portaler fase 6: kartet får portalens slug og vakt-ID, og ny vakt tømmer kartet  `#core/kartkobling`
 
 `docs/BESLUTNING_PORTALER.md` §4.10: «I dag ser **alle** i en hvilken som helst gruppe med

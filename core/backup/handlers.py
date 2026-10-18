@@ -157,10 +157,17 @@ def utled_restore_models(app_labels: list[str], exclude: list[str]) -> list[str]
     - **Selvreferanser** (`Kompetanse.bygger_paa`, `Statusmelding.erstatter`)
       hoppes over. Å slette alle radene i én modell tar dem uansett samlet, og
       en kant fra en node til seg selv ville gjort grafen usorterbar.
-    - **Sykler** mellom to modeller kan ikke sorteres. Da legges restene bakerst
-      i alfabetisk rekkefølge og det logges — en ufullstendig rekkefølge er
-      bedre enn å kaste, siden dette kalles midt i en gjenoppretting. Handleren
-      kan overstyre med ``restore_models`` når det skjer.
+    - **Sykler** mellom modeller kan ikke sorteres på alle kantene. Da sorteres
+      resten på nytt med bare kantene som **blokkerer** en sletting — `PROTECT`
+      og `RESTRICT` (18. okt. 2026). `SET_NULL` og `CASCADE` lar seg slette i
+      hvilken som helst rekkefølge når begge modellene tømmes uansett. Det trengs:
+      `ko.Hendelse` ↔ `ko.Logglinje` (begge `SET_NULL`) er en sykel, og den gamle
+      reserven — resten bakerst i alfabetisk rekkefølge — la `core.Vakt` foran
+      `ko.Logglinje`, som peker på vakta med `PROTECT`. **En hel gjenoppretting
+      i en base med én KO-linje feilet.** Står det fortsatt noe igjen, er det en
+      sykel av blokkerende kanter: da legges den bakerst alfabetisk og det
+      logges — en ufullstendig rekkefølge er bedre enn å kaste midt i en
+      gjenoppretting. Handleren kan overstyre med ``restore_models``.
 
     Bare fremmednøkler *innenfor* settet teller. En FK ut av modulen — til
     `core.Vakt`, eller til en bruker — er ikke vår å tømme.
@@ -185,9 +192,12 @@ def utled_restore_models(app_labels: list[str], exclude: list[str]) -> list[str]
                 continue
             modeller[etikett] = modell
 
-    # Kant A → B: A må tømmes før B.
+    from django.db import models as dj_models
+
+    # Kant A → B: A må tømmes før B. `blokkerer` er kantene der rekkefølgen
+    # faktisk avgjør om slettingen går (PROTECT/RESTRICT).
     etter = {e: set() for e in modeller}
-    inngrad = {e: 0 for e in modeller}
+    blokkerer = {e: set() for e in modeller}
     for etikett, modell in modeller.items():
         for felt in modell._meta.get_fields():
             if not getattr(felt, 'concrete', False):
@@ -198,21 +208,14 @@ def utled_restore_models(app_labels: list[str], exclude: list[str]) -> list[str]
             mal = felt.related_model._meta.label
             if mal == etikett or mal not in modeller:
                 continue
-            if mal not in etter[etikett]:
-                etter[etikett].add(mal)
-                inngrad[mal] += 1
+            etter[etikett].add(mal)
+            if felt.remote_field.on_delete in (dj_models.PROTECT, dj_models.RESTRICT):
+                blokkerer[etikett].add(mal)
 
-    klare = sorted(e for e, n in inngrad.items() if n == 0)
-    ut = []
-    while klare:
-        etikett = klare.pop(0)
-        ut.append(etikett)
-        for mal in sorted(etter[etikett]):
-            inngrad[mal] -= 1
-            if inngrad[mal] == 0:
-                klare.append(mal)
-        klare.sort()
-
+    ut = _kahn(list(modeller), etter)
+    rest = [e for e in modeller if e not in ut]
+    if rest:
+        ut += _kahn(rest, {e: blokkerer[e] & set(rest) for e in rest})
     rest = sorted(e for e in modeller if e not in ut)
     if rest:
         import logging
@@ -222,6 +225,29 @@ def utled_restore_models(app_labels: list[str], exclude: list[str]) -> list[str]
             ', '.join(app_labels), ', '.join(rest),
         )
         ut.extend(rest)
+    return ut
+
+
+def _kahn(noder: list[str], etter: dict[str, set[str]]) -> list[str]:
+    """Topologisk sortering av `noder` på kantene i `etter` (A før B), alfabetisk
+    blant likeverdige. Noder i en sykel kommer ikke med."""
+    inngrad = {e: 0 for e in noder}
+    for e in noder:
+        for mal in etter[e]:
+            if mal in inngrad:
+                inngrad[mal] += 1
+    klare = sorted(e for e, n in inngrad.items() if n == 0)
+    ut = []
+    while klare:
+        etikett = klare.pop(0)
+        ut.append(etikett)
+        for mal in sorted(etter[etikett]):
+            if mal not in inngrad:
+                continue
+            inngrad[mal] -= 1
+            if inngrad[mal] == 0:
+                klare.append(mal)
+        klare.sort()
     return ut
 
 

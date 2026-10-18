@@ -38,6 +38,10 @@ class OppdragConfig(AppConfig):
         from .endringer import register_handlers as register_endringer
         register_endringer()
 
+        # Sladding av fritekst (18. okt. 2026, `core/sladding.py`).
+        from .sladding import register_handlers as register_sladding
+        register_sladding()
+
         # Fristen på fritekst (10. okt. 2026, `oppdrag/fritekstfrist.py`):
         # feiingen går gjennom `purge_old_logs`, feltet på portalinnstillingene.
         from .opprydding import register_handlers as register_opprydding

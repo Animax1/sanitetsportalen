@@ -104,6 +104,7 @@ class TavleEndringerFangesTests(SimpleTestCase):
         # `sted_tekst`, og tavla tegner ingen av dem.
         'oppdrag/fritekstfrist.py: Oppdrag.update': 'tømmer bare fritekst — tavla viser den ikke',
         'oppdrag/fritekstfrist.py: Statusmelding.update': 'tømmer bare sted_tekst — tavla viser den ikke',
+        'oppdrag/sladding.py: Statusmelding.update': 'sladder bare sted_tekst — tavla viser den ikke',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):

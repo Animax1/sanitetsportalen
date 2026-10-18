@@ -1134,6 +1134,18 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 > skift eller en pasient slettes ikke, fordi det er vaktas dokumentasjon. Fritekst i den
 > historikken er sladdingens sak (C.2, fase 7).
 
+> **Sladding (18. okt. 2026):** står et navn eller en helseopplysning i en fritekst der det
+> ikke skal stå, finner admin det på `/admin/sladding/` — KO-loggen (linjer, hendelsens tittel
+> og melder) og oppdragene (notatet og «Annet sted»), i alle portaler — og sladder det med en
+> grunn. **Kopiene sladdes med:** tittelen i KOs systemlinjer, og tittel og siste linje i den
+> frosne vaktstatistikken. Sladdingen føres i et register med hvem, når og hvorfor, **aldri
+> teksten**, og **gjenopprettingen kjører registeret på nytt** før den er ferdig — ellers ville
+> en backup tatt teksten tilbake. KOs egen «Fjern» føres i samme register. **Avviket:**
+> backupfilene beholder teksten til lagringstiden løper ut (730 dager for modulfilene, 90 for
+> den hele), fordi de er krypterte og ikke kan redigeres. Hvert søk logges. Pasientmodulens
+> tekstfelt er ikke med ennå: de står i arkivets signatur, og en sladding der krever ny
+> signering.
+
 > **Praktisk merk:** Ettersom pasienter kun er registrert med løpenummer og ikke med navn eller personnummer, forutsetter utøvelse av rettigheter at den registrerte kan identifisere seg på en annen måte (f.eks. tidspunkt for besøket og arrangementsnavnet).
 
 > **Om sletting av brukerkontoer:** En bruker som har arkivert en vakt kan slettes. Referansen fra `VaktArkiv` nulles ut, mens brukernavnet beholdes frosset i `importert_av_navn`. Arkivet viser dermed fortsatt hvem som arkiverte vakten, uten at kontoen må bevares. Dette er samme mønster som `forstehjelper_navn` på arkiverte pasienter, og er nødvendig for at sletterett etter art. 17 ikke skal være blokkert på databasenivå.

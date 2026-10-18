@@ -32,6 +32,10 @@ class KoConfig(AppConfig):
         from . import ressursplassering
         ressursplassering.register_handlers()
 
+        # Sladding av fritekst (18. okt. 2026, `core/sladding.py`).
+        from .sladding import register_handlers as register_sladding
+        register_sladding()
+
         # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
         from .vaktsletting import register_handlers as register_vaktsletting
         register_vaktsletting()

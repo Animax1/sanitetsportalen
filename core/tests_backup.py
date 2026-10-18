@@ -1773,6 +1773,47 @@ class SlettelistaDekkerDumpenTests(TestCase):
 
         self.assertNotIn('core.Vakt', utled_restore_models(['vaktliste'], []))
 
+    def test_hver_blokkerende_kant_holdes_ogsaa_gjennom_en_sykel(self) -> None:
+        """18. okt. 2026: `ko.Hendelse` ↔ `ko.Logglinje` er en sykel (begge `SET_NULL`), og
+        reserven la resten bakerst alfabetisk — `core.Vakt` foran `ko.Logglinje`, som peker
+        på vakta med `PROTECT`. En hel gjenoppretting i en base med én KO-linje feilet.
+
+        Invarianten for hver handler: en modell som peker på en annen med PROTECT eller
+        RESTRICT, tømmes før den."""
+        from django.apps import apps as django_apps
+        from django.db import models as dj_models
+
+        from core.backup import all_handlers
+
+        for handler in all_handlers():
+            rekkefolge = handler.get_restore_models()
+            plass = {m: i for i, m in enumerate(rekkefolge)}
+            for etikett in rekkefolge:
+                for felt in django_apps.get_model(etikett)._meta.get_fields():
+                    if not (getattr(felt, 'concrete', False) and felt.is_relation
+                            and (felt.many_to_one or felt.one_to_one)):
+                        continue
+                    mal = felt.related_model._meta.label
+                    if mal == etikett or mal not in plass:
+                        continue
+                    if felt.remote_field.on_delete in (dj_models.PROTECT, dj_models.RESTRICT):
+                        with self.subTest(handler=handler.slug, kant=f'{etikett}.{felt.name}'):
+                            self.assertLess(plass[etikett], plass[mal])
+
+    def test_den_hele_fila_kan_gjenopprettes_med_en_ko_linje_i_basen(self) -> None:
+        from ko import services as ko
+
+        admin = CustomUser.objects.create_user(username='admin', password='x', role='admin',
+                                               must_change_password=False)
+        ko.skriv_linje(vakt_for_year(2026), 'Lag 3 til scenen', bruker=admin)
+        mappe = _prepare_backup_dir()
+        with patch.dict(os.environ, {'BACKUP_DIR': str(mappe)}):
+            backup = create_backup(slug='full', kind=KIND_MANUAL)
+            restore_backup(backup)
+        from ko.models import Logglinje
+        self.assertEqual(list(Logglinje.objects.values_list('tekst', flat=True)),
+                         ['Lag 3 til scenen'])
+
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PortalBackupTests(TestCase):

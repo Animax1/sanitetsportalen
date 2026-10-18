@@ -448,7 +448,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **230 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **231 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 33 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, «Send posisjon», verdimengder |
 | `/vaktliste/` | 39 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/admin/` | 31 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/admin/` | 32 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/moderator/` | 7 | `accounts/urls.py`, `core/urls.py` | Moderatorens flate i sin portal: brukerne (5b — listen, én konto, ny konto), vakta (5c — navn og «Avslutt vakt») og portalens innstillinger |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
@@ -593,7 +593,7 @@ de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
 ### 5.5 Adminflaten (`/admin/`)
 
-31 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
+32 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
 og vanlig bruker.
 
@@ -608,7 +608,7 @@ skanner nå hver `{% url %}` i hver mal.
 
 ### 5.6 Oppdrag og vaktliste
 
-Disse to er de største flatene (31 og 28 ruter) og dokumenteres i sine egne
+Disse to er de største flatene (32 og 28 ruter) og dokumenteres i sine egne
 beslutningsnotater — `docs/BESLUTNING_OPPDRAGSMODULEN.md` og
 `docs/BESLUTNING_VAKTLISTE.md` — som forklarer *hvorfor* endepunktene ser ut som de gjør.
 `CLAUDE.md` har reglene som gjelder når man rører dem.
