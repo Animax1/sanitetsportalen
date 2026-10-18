@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 5c: portalnavnet i fanetittelen når kontoen har flere portaler  `#core/grensesnitt`
+
+`docs/BESLUTNING_PORTALER.md` §4.4. To faner med «Vaktliste» i hver sin portal så like ut i
+fanelinja. Fanevakten sier fra med 409 før noe skrives i feil portal, men da har man alt klikket.
+Nå står navnet i tittelen: **«[TEST] Brann · Vaktliste – Sanitetsportalen»**.
+
+**Gjennom `miljo.fane`, ikke en ny variabel.** Context processoren `statusmerke` legger
+«‹portal› · » etter miljøets prefiks når kontoen har flere portaler. Hver mal med eget `<head>`
+leser `{{ miljo.fane }}` først i tittelen (`core/tests_statusmerke.py` krever det), og
+`fanetittel()` i JS leser det samme gjennom `PORTAL_FANEPREFIKS`. Ingen mal er endret. **Med én
+portal er tittelen som før.** Mutasjoner: 2, begge drept.
+
 ## 2026-10-18 — Portaler fase 5c: et varsel fra en annen portal bytter portal når det åpnes  `#core/grensesnitt`
 
 `docs/BESLUTNING_PORTALER.md` §4.4. Lenken i et varsel er en sti som `/oppdrag/`, og den gjelder

@@ -113,4 +113,12 @@ def statusmerke(request):
         melding = aktiv()
     except Exception:   # noqa: BLE001 — databasen kan være nede; siden skal stå
         melding = None
-    return {'miljo': miljo(), 'statusmelding': melding}
+    # **Portalnavnet i fanen** når kontoen har flere portaler (fase 5c, §4.4):
+    # to faner med «Vaktliste» i hver sin portal skal kunne skilles i fanelinja.
+    # Det går inn i `fane`, ikke i en ny variabel — hver mal og `fanetittel()`
+    # leser den alt (`core/tests_statusmerke.py`), og med én portal er den uendret.
+    merke = dict(miljo())
+    portal = getattr(request, 'portal', None)
+    if portal is not None and getattr(request, 'portal_antall', 0) > 1:
+        merke['fane'] = f'{merke["fane"]}{portal.navn} · '
+    return {'miljo': merke, 'statusmelding': melding}

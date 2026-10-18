@@ -156,9 +156,6 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Gjør `ModulTilgang.portaltilgang` påkrevd i basen** (etter fase 2, 17. okt. 2026). Den er
       nullbar bare for release-vinduet og migrasjonen som fylte den; `save()` krever den alt.
       Neste migrasjon på `accounts` kan sette `NOT NULL` når fase 2 har stått i prod.
-- [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
-      toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
-      i JS, og tas sammen med flatene i fase 5.
 - [ ] **Fase 5:** flatene som står igjen — portalvelgeren, og forslaget «mannskap fra de
       siste 24 månedene» ved ny vakt. Også:
       **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn).
