@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Offline-kopiene slettes etter 24 timer, ikke bare skjules  `#core/personvern` `#vaktliste/offline`
+
+André: «Hvor lenge varer informasjon på det som er offline? På disse sw?» — og «stram det inn om
+det kan slettes etter 24 t». Begge service workerne (`vaktliste-sw.js`, `ko-sw.js`) nektet å
+*vise* en kopi eldre enn ett døgn, men slettet den først når noen ba om akkurat den uten nett.
+Hadde PC-en stått, lå forrige ukes mannskapsliste i nettleserens lager — usynlig, men der.
+
+Nå går `ryddUtgatte()` gjennom alt som er lagret med tid (`X-Vl-Lagret`/`X-Ko-Lagret`) og
+sletter det som er eldre enn 24 timer, **når workeren starter og ved trafikk på siden**, høyst én
+gang i minuttet (KO polles hvert 2,5. sekund). Statiske filer har ingen tid og står.
+**Grensen nettleseren setter:** en worker kjører bare når siden er i bruk; en PC som har stått
+av, rydder første gang siden åpnes igjen — eller ved «Logg ut», som sletter alt. Usendte
+stemplinger i køen (`localStorage`) har fortsatt ingen tidsgrense: de skal fram, og «Logg ut»
+spør før de slettes. Personverndokumentet (A.9, A.11) er rettet.
+
+Tester kjører hele workerfila med falske `self` og `caches`, så kallstedene er med.
+Mutanter: 7 av 7 drept, én etter at testen fikk en for gammel kopi ved aktiveringen.
+
 ## 2026-10-18 — KO: oppdragslista i to kolonner, «Trenger ressurs» delt i pasient og drift, og Besøk for biler på Plassering  `#ko/sentralbordet` `#ko/ressursbildet`
 
 André: «Fler kolonne visning i oppdragsliste … i første omgang en 2 kolonnes visning, en er

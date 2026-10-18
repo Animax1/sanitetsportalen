@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone as dt_tz
 from unittest import mock
 
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
@@ -29,7 +29,8 @@ from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Oppdrag
 
-from patients.js_test_utils import JS_DIR, build_harness, extract_function, node_available, run_node
+from patients.js_test_utils import (JS_DIR, build_harness, extract_function, node_available, read_js,
+                                    run_node)
 
 from .tests_hendelseslogg import _gi, skift
 from .tests_program import _Program
@@ -447,3 +448,40 @@ class KopiMerketTests(_Utskrift):
             'Lagret kopi fra 21:40 (2 t 5 min siden). Det som har skjedd etterpå står ikke her.',
             ''])
         self.assertIn('id="kopi-varsel" hidden', side, 'skjult når sida er fersk')
+
+
+class KopienSlettesEtterEttDoegnTests(SimpleTestCase):
+    """André, 18. okt. 2026: «stram det inn om det kan slettes etter 24 t». Workeren sletter
+    en for gammel utskrift når den starter og ved trafikk under /ko/ — ikke bare når noen ber
+    om den uten nett. Hele fila kjøres, så kallstedene er med."""
+
+    def test_aktivering_og_trafikk_sletter_den_for_gamle(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        forspill = """
+            const lyttere = {};
+            globalThis.self = { addEventListener: (n, fn) => { lyttere[n] = fn; },
+                                skipWaiting: async () => {}, clients: { claim: async () => {} },
+                                location: { origin: 'https://p' } };
+            const m = new Map();
+            const svar = (lagret) => ({ headers: { get: (h) => (h === 'X-Ko-Lagret' ? lagret : null) } });
+            globalThis.caches = { keys: async () => [], delete: async () => {},
+              open: async () => ({ match: async (k) => m.get(k), delete: async (k) => m.delete(k) }) };
+        """
+        ut = run_node(read_js(SW_JS), """
+            (async () => {
+              const venter = [];
+              const gammel = () => svar(new Date(Date.now() - 25 * 3600e3).toISOString());
+              const trafikk = () => { sistRyddet = 0; lyttere.fetch({
+                request: { url: 'https://p/ko/api/logg/', method: 'GET', mode: 'cors' },
+                waitUntil: (p) => venter.push(p), respondWith: () => {} }); };
+              m.set('/ko/utskrift/', gammel());
+              await lyttere.activate({ waitUntil: (p) => venter.push(p) }); await Promise.all(venter);
+              console.log(m.size);
+              m.set('/ko/utskrift/', svar(new Date().toISOString()));
+              trafikk(); await Promise.all(venter); console.log(m.size);
+              m.set('/ko/utskrift/', gammel());
+              trafikk(); await Promise.all(venter); console.log(m.size);
+            })();
+        """, preamble=forspill).strip().splitlines()
+        self.assertEqual([linje for linje in ut if linje != 'OK'], ['0', '1', '0'])

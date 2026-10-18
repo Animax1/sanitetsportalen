@@ -170,15 +170,39 @@ async function ryddGamleCacher() {
 }
 
 
+// **Slettes, ikke bare skjules, etter 24 timer** (André, 18. okt. 2026: «stram det inn om det
+// kan slettes etter 24 t»). Fram til da ble en for gammel kopi bare slettet når noen ba om akkurat
+// den uten nett. Nå går workeren gjennom alt den har lagret med tid (`X-Vl-Lagret` — lista,
+// mannskapet, siden) hver gang den får kjøre: når den starter, og ved hver forespørsel under
+// /vaktliste/, høyst én gang i minuttet. Statiske filer har ingen tid og står.
+// **Grensen nettleseren setter:** en worker kjører bare når noen er på siden. Står PC-en av,
+// slettes kopien første gang /vaktliste/ åpnes igjen — eller ved «Logg ut», som sletter alt.
+let sistRyddet = 0;
+
+async function ryddUtgatte(naaMs = Date.now()) {
+  sistRyddet = naaMs;
+  for (const navn of [DATA, SKALL]) {
+    const cache = await caches.open(navn);
+    for (const req of await cache.keys()) {
+      const svar = await cache.match(req);
+      const lagret = svar && svar.headers.get('X-Vl-Lagret');
+      if (lagret && erForGammel(lagret, naaMs)) await cache.delete(req);
+    }
+  }
+}
+
+
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     await ryddGamleCacher();
+    await ryddUtgatte();
     await self.clients.claim();
   })());
 });
 
 
 self.addEventListener('fetch', (e) => {
+  if (Date.now() - sistRyddet > 60000) e.waitUntil(ryddUtgatte());
   const valg = avgjor(e.request.url, e.request.method, e.request.mode, self.location.origin);
   if (valg === 'api') e.respondWith(nettForst(e.request, DATA));
   else if (valg === 'side') e.respondWith(nettForst(e.request, SKALL));

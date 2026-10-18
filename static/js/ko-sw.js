@@ -103,6 +103,22 @@ async function siden(req) {
 }
 
 
+// **Slettes, ikke bare skjules, etter 24 timer** (André, 18. okt. 2026: «stram det inn om det
+// kan slettes etter 24 t»). Fram til da ble en for gammel kopi bare slettet når noen ba om den
+// uten nett. Nå ryddes den hver gang workeren får kjøre: når den starter, og ved hver
+// forespørsel under /ko/ — høyst én gang i minuttet, for pollingen går hvert 2,5. sekund.
+// **Grensen nettleseren setter:** en worker kjører bare når noen er på siden. Står PC-en av,
+// slettes kopien første gang /ko/ åpnes igjen — eller ved «Logg ut», som sletter alt.
+let sistRyddet = 0;
+
+async function ryddUtgatte(naaMs = Date.now()) {
+  sistRyddet = naaMs;
+  const cache = await caches.open(KO_SW_CACHE);
+  const kopi = await cache.match(KO_SW_UTSKRIFT, { ignoreVary: true });
+  if (kopi && erForGammel(kopi.headers.get('X-Ko-Lagret'), naaMs)) await cache.delete(KO_SW_UTSKRIFT);
+}
+
+
 self.addEventListener('install', (e) => { e.waitUntil(self.skipWaiting()); });
 
 
@@ -111,12 +127,14 @@ self.addEventListener('activate', (e) => {
     const navn = await caches.keys();
     await Promise.all(navn.filter((n) => n.startsWith('ko-sw-') && !n.startsWith(KO_SW_VERSJON))
       .map((n) => caches.delete(n)));
+    await ryddUtgatte();
     await self.clients.claim();
   })());
 });
 
 
 self.addEventListener('fetch', (e) => {
+  if (Date.now() - sistRyddet > 60000) e.waitUntil(ryddUtgatte());
   const valg = avgjor(e.request.url, e.request.method, e.request.mode, self.location.origin);
   if (valg === 'utskrift') e.respondWith(utskriften(e.request));
   else if (valg === 'side') e.respondWith(siden(e.request));

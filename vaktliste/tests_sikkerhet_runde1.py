@@ -184,3 +184,55 @@ class KopiensAlderJsTests(SimpleTestCase):
         """)
         # Harnessens «OK» skrives synkront, før det asynkrone svaret: les siste linje.
         self.assertEqual(json.loads(ut.strip().splitlines()[-1]), [['nede', 1], 200, True])
+
+
+class KopienSlettesEtterEttDoegnTests(SimpleTestCase):
+    """André, 18. okt. 2026: «stram det inn om det kan slettes etter 24 t». Workeren sletter
+    for gamle kopier når den starter og ved trafikk — ikke bare når noen ber om akkurat dem.
+    Kjører hele fila med falske `self` og `caches`, så kallstedene er med."""
+
+    def test_aktivering_og_trafikk_sletter_de_for_gamle(self):
+        from patients.js_test_utils import read_js
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        forspill = """
+            const lyttere = {};
+            globalThis.self = { addEventListener: (n, fn) => { lyttere[n] = fn; },
+                                skipWaiting: async () => {}, clients: { claim: async () => {} },
+                                location: { origin: 'https://p' } };
+            const lagre = {};
+            const svar = (lagret) => ({ headers: { get: (h) => (h === 'X-Vl-Lagret' ? lagret : null) } });
+            globalThis.caches = {
+              keys: async () => Object.keys(lagre),
+              delete: async (n) => { delete lagre[n]; },
+              open: async (n) => {
+                lagre[n] = lagre[n] || new Map();
+                const m = lagre[n];
+                return { keys: async () => [...m.keys()], match: async (k) => m.get(k),
+                         delete: async (k) => m.delete(k), put: async (k, v) => m.set(k, v) };
+              },
+            };
+        """
+        ut = run_node(read_js(SW_JS), """
+            (async () => {
+              const gammel = new Date(Date.now() - 25 * 3600e3).toISOString();
+              const fersk = new Date().toISOString();
+              const data = await caches.open(DATA); const skall = await caches.open(SKALL);
+              data.put('/vaktliste/api/mannskap/', svar(gammel));
+              data.put('/vaktliste/api/ressurser/', svar(fersk));
+              skall.put('/vaktliste/', svar(gammel));
+              skall.put('/static/js/a.js', svar(null));
+              const venter = [];
+              await lyttere.activate({ waitUntil: (p) => venter.push(p) }); await Promise.all(venter);
+              console.log(JSON.stringify([[...lagre[DATA].keys()], [...lagre[SKALL].keys()]]));
+              lagre[DATA].set('/vaktliste/api/ressurser/', svar(gammel));
+              sistRyddet = 0;
+              lyttere.fetch({ request: { url: 'https://p/x', method: 'GET', mode: 'cors' },
+                              waitUntil: (p) => venter.push(p), respondWith: () => {} });
+              await Promise.all(venter);
+              console.log(JSON.stringify([...lagre[DATA].keys()]));
+            })();
+        """, preamble=forspill).strip().splitlines()
+        ut = [linje for linje in ut if linje != 'OK']
+        self.assertEqual(ut[0], '[["/vaktliste/api/ressurser/"],["/static/js/a.js"]]')
+        self.assertEqual(ut[1], '[]', 'ved trafikk også')
