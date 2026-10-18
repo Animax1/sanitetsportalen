@@ -324,6 +324,17 @@ class PorteneTests(_Oppsett):
                                      {'bruker': [self.kari.pk, self.kollega.pk]})
         self.assertFalse(Portaltilgang.objects.filter(bruker=self.kari).exists())
 
+    def test_knappen_vises_bare_naar_noen_kan_krysses_av(self):
+        """André, 18. okt. 2026: «knappen med legg valgte i standard, men det er ingen
+        avkrysningsbokser». I Standard var alle med — en knapp uten noe å velge."""
+        c = self._klient(self.mona)
+        self.assertContains(c.get('/moderator/brukere/'), 'Legg til valgte i')
+        Portaltilgang.objects.create(bruker=self.kari, portal=self.portal)
+        svar = c.get('/moderator/brukere/')
+        self.assertNotContains(svar, 'Legg til valgte i')
+        self.assertNotContains(svar, 'name="bruker"')
+        self.assertContains(svar, 'er med i portalen')
+
     def test_lista_har_avkrysning_for_dem_utenfor_og_rediger_tilgang_for_medlemmene(self):
         html = self._klient(self.mona).get('/moderator/brukere/').content.decode()
         self.assertIn(f'name="bruker" value="{self.kari.pk}"', html)

@@ -69,9 +69,13 @@ def brukere_view(request):
                                           + ', '.join(k.username for k in nye) + '.')
         return redirect('accounts:moderator_brukere')
 
+    grupper = moderering.grupper(portal)
     return render(request, 'accounts/moderator_brukere.html', {
         'portal': portal,
-        'grupper': moderering.grupper(portal),
+        'grupper': grupper,
+        # Knappen vises bare når det er noe å krysse av (18. okt. 2026, André: «knappen har
+        # ingen funksjon» — i Standard var alle med, og ingen rad hadde en boks).
+        'kan_legges_til': len({k.pk for _, rader in grupper for k, rolle in rader if not rolle}),
         'MODERATOR': PortalRolle.MODERATOR,
     })
 

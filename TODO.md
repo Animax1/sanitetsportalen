@@ -35,6 +35,13 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Test flere portaler på staging før `main`** (fase 0–7, 17.–18. okt. 2026). Moderator­
+      flyten på `/moderator/brukere/` (legg til flere, «Rediger tilgang», ny konto med tilgang i
+      samme skjema, gjør til moderator), tilhørighetene på `/admin/tilhorigheter/` og på
+      brukersiden, «Hent inn fra tidligere» i vaktlistas mannskapsregister, personsøket på
+      `/admin/personsok/` og sladdingen på `/admin/sladding/`. **Kartet** (gikk ut i prod
+      18. okt., kart-sanitet `519c975`): gruppen din skal stå med «standard» under
+      Administrasjon → Grupper, og bilene og lagene skal vises som før.
 - [ ] **Se over ordboka på staging før `main`** (bygget 14. okt. 2026). Sentralbordet
       («Ressurser» står, «Hent tilbake til oppdragslisten»), KO (vinduet «Ressursoversikt»
       står, «Vaktlistens enheter uten delt konto» i innstillingene, kolonnen «Enhet» i

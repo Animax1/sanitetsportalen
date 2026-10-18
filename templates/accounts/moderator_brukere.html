@@ -16,14 +16,17 @@
   </a>
 </section>
 
-{% if grupper %}
+{% if kan_legges_til %}
 <form method="post">
   {% csrf_token %}
   <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
     <button type="submit" class="btn btn-outline-primary">
       <i class="bi bi-person-check me-1"></i>Legg til valgte i {{ portal.navn }}</button>
-    <span class="form-text m-0">Kryss av for kontoene som ikke er med ennå.</span>
+    <span class="form-text m-0">{{ kan_legges_til }} konto{{ kan_legges_til|pluralize:"er" }} er ikke med ennå — kryss av for dem som skal inn.</span>
   </div>
+{% elif grupper %}
+<p class="form-text mb-3">Alle kontoene med {{ portal.navn }}s tilhørigheter er med i portalen. En konto
+  som får en av tilhørighetene, dukker opp her med en avkrysningsboks.</p>
 {% endif %}
 {% for tilh, rader in grupper %}
 <div class="card mb-3">
@@ -63,5 +66,5 @@
   Ingen kontoer ennå. Portalen har kanskje ingen tilhørigheter — det velger en administrator.
 </p>
 {% endfor %}
-{% if grupper %}</form>{% endif %}
+{% if kan_legges_til %}</form>{% endif %}
 {% endblock %}

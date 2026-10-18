@@ -4,6 +4,15 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — «Legg til valgte» uten avkrysningsbokser: knappen vises bare når noen kan legges til  `#core/tilgang`
+
+André: «i /moderator/brukere/ så har du knappen med legg valgte i standard, men det er ingen
+avkrysningsbokser. Så knappen har ingen funksjon!» Boksene står bare ved kontoer som **ikke**
+er med i portalen — og i Standard er alle med, fordi `accounts/0019` gjorde hver aktiv konto
+til medlem da medlemskapet kom (fase 2). Knappen ble tegnet uansett. Nå vises den bare når
+minst én konto kan krysses av, med antallet; ellers står det at alle er med. Testen
+`test_knappen_vises_bare_naar_noen_kan_krysses_av`.
+
 ## 2026-10-18 — Portaler fase 7, pasient: bare arkivets notat er fritekst, og det sladdes uten ny signering  `#core/personvern`
 
 Planen (§4.9) sa at pasientmodulen kom sist fordi «tekstfeltene står i `sha_payload()`», og at
