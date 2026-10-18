@@ -7,6 +7,17 @@
  *   - Samme modul som brukeren er i → marker lest inline, bli på siden
  *   - Annen modul (eller portal) → naviger til varselets URL
  */
+
+/* Bli på siden og merk lest der, eller gå til varselet? Står utenfor IIFE-en så
+ * regelen kan kjøres i en test. Et varsel fra en annen portal navigerer alltid:
+ * serveren bytter portal før lenken åpnes, og inline-merkingen ville latt Kari
+ * bli stående i feil portal (fase 5c). */
+function blirPaaSiden(varsel, modulen) {
+  if (!varsel.url) return true;
+  if (varsel.annenPortal) return false;
+  return !!varsel.modul && varsel.modul === modulen;
+}
+
 (function () {
   'use strict';
 
@@ -138,6 +149,7 @@
            data-id="${n.id}"
            data-url="${esc(n.url)}"
            data-module="${esc(n.module_slug)}"
+           data-annen-portal="${n.annen_portal ? '1' : ''}"
            role="button" tabindex="0">
         <div class="notif-item-body">
           <div class="notif-item-title">${esc(n.title)}</div>
@@ -155,12 +167,11 @@
 
   /* ── Klikk-logikk (kontekst-bevisst) ────────────────────────────────── */
   async function handleClick(el) {
-    const pk      = el.dataset.id;
-    const url     = el.dataset.url;
-    const mod     = el.dataset.module;
-    const sameApp = mod && mod === currentModule();
+    const pk  = el.dataset.id;
+    const varsel = {url: el.dataset.url, modul: el.dataset.module,
+                    annenPortal: !!el.dataset.annenPortal};
 
-    if (sameApp || !url) {
+    if (blirPaaSiden(varsel, currentModule())) {
       // Marker lest inline — brukeren blir på siden
       try {
         const data = await apiFetch(API_READ(pk), 'POST');

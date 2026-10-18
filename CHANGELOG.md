@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 5c: et varsel fra en annen portal bytter portal når det åpnes  `#core/grensesnitt`
+
+`docs/BESLUTNING_PORTALER.md` §4.4. Lenken i et varsel er en sti som `/oppdrag/`, og den gjelder
+portalen sesjonen står i. **Uten byttet åpnet et varsel om Brann Standards oppdrag** — og
+inline-merkingen i bjella kunne la Kari bli stående i feil portal uten å merke det.
+
+- **`/varsler/<id>/lest/` bytter portal før omdirigeringen** (`_bytt_til_varselets_portal`).
+  Varselsidene står utenfor portalregelen, så byttet skjer der. Med flere portaler sier en melding
+  «Du står nå i portalen ‹Brann›». En åpen fane i den andre portalen får fanevaktens 409 ved neste
+  skriving, som ved ethvert portalbytte.
+- **Er kontoen ikke lenger med i portalen, eller er portalen deaktivert, åpnes ingenting.** Svaret
+  er lista, med «Varselet hører til ‹X›, som du ikke lenger er med i». Å åpne lenken i portalen hun
+  står i, ville vist feil data under riktig overskrift.
+- **Bjella navigerer** for et varsel fra en annen portal, også når modulen er den samme
+  (`annen_portal` i `/api/varsler/`, `blirPaaSiden()` i `notifications.js`).
+  - Regelen står utenfor IIFE-en, så den kan kjøres i node.
+  - Én test går gjennom den ekte inngangen — bjella åpnes, lista tegnes, varselet klikkes. Med
+    bare testen av funksjonen overlevde mutanten som lot kallstedet slutte å bruke den (CLAUDE.md,
+    «tre måter», nr. 3).
+
+**Mutasjoner: 8, alle drept** (én etter testen gjennom inngangen).
+
 ## 2026-10-18 — Portaler fase 5c: innstillingene delt i portalens og systemets — moderatoren får portalens  `#core/tilgang`
 
 `docs/BESLUTNING_PORTALER.md` §4.7: «Moderator ser portalens kort på innstillingssiden; admin ser

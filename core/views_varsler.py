@@ -66,6 +66,30 @@ def notification_list_view(request):
     })
 
 
+def _bytt_til_varselets_portal(request, notif):
+    """Stå i portalen varselet hører til før lenken åpnes (fase 5c, §4.4).
+
+    Lenken i et varsel fra Brann er en sti som `/oppdrag/`, og den gjelder
+    portalen sesjonen står i — uten byttet ville Kari sett Standards oppdrag
+    under et varsel om Branns. Varselsidene står utenfor portalregelen, så
+    byttet skjer her, før omdirigeringen. Er kontoen ikke lenger med i portalen,
+    åpnes ingenting: svaret er lista, med grunnen.
+    """
+    from core.portal import SESJON_NOKKEL, mulige_portaler
+
+    if not notif.portal_id or request.session.get(SESJON_NOKKEL) == notif.portal_id:
+        return None
+    mulige = list(mulige_portaler(request.user))
+    if not any(p.pk == notif.portal_id for p in mulige):
+        messages.warning(request, f'Varselet hører til «{notif.portal.navn}», som du ikke '
+                                  'lenger er med i.')
+        return redirect('core:notification_list')
+    request.session[SESJON_NOKKEL] = notif.portal_id
+    if len(mulige) > 1:
+        messages.info(request, f'Du står nå i portalen «{notif.portal.navn}».')
+    return None
+
+
 @login_required
 @require_http_methods(['POST', 'GET'])
 def notification_mark_read_view(request, pk: int):
@@ -81,6 +105,9 @@ def notification_mark_read_view(request, pk: int):
         notif.is_read = True
         notif.read_at = timezone.now()
         notif.save(update_fields=['is_read', 'read_at'])
+    stopp = _bytt_til_varselets_portal(request, notif)
+    if stopp is not None:
+        return stopp
     # S4: Notification.url er et CharField uten validator. I dag settes den kun
     # fra patients/signals.py med hardkodede relative stier, men notify() er
     # eksplisitt designet som et generisk API for framtidige moduler. Første
@@ -120,6 +147,8 @@ def notification_api_list_view(request):
           .order_by('-created_at')[:10])
     unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
     flere = _flere_portaler(request.user)
+    from core.portal import SESJON_NOKKEL
+    her = request.session.get(SESJON_NOKKEL)
     return JsonResponse({
         'notifications': [
             {
@@ -130,6 +159,9 @@ def notification_api_list_view(request):
                 'module_slug': n.module_slug,
                 # Portalnavnet bare når kontoen har flere — med én er det støy.
                 'portal': n.portal.navn if flere and n.portal else '',
+                # Bjella navigerer da i stedet for å merke lest der man står:
+                # lenken gjelder en annen portal (`_bytt_til_varselets_portal`).
+                'annen_portal': bool(flere and n.portal_id and n.portal_id != her),
                 'level': n.level,
                 'is_read': n.is_read,
                 'created_at': n.created_at.isoformat(),
