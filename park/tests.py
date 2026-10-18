@@ -862,6 +862,7 @@ class SendPosisjonTests(_Grunnlag):
         self.assertEqual((type_, navn, lat, lon), ('lag', 'Sandnes 2.1', 59.41, 5.27))
         self.assertEqual(send.call_args.kwargs['kilde_id'], self.lag1.pk,
                          'KO trenger å vite hvilket lag, for å finne hendelsen')
+        self.assertEqual(send.call_args.kwargs['vakt'], services.aapen_vakt())
         self.assertGreaterEqual(utloper, foer + timedelta(minutes=20))
         self.assertLess(utloper, timezone.now() + timedelta(minutes=20, seconds=1))
         self.assertEqual(svar.json()['varighet_min'], 20)

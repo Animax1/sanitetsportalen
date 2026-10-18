@@ -28,6 +28,12 @@ De to knappene («Send posisjon» i bilen og hos lagene)
 har noen som venter på svaret, og en knapp som sier «sendt» om noe som aldri
 kom fram, er verre enn en som sier fra.
 
+**Hver melding bærer portalens slug og vakt-ID** (18. okt. 2026, `docs/BESLUTNING_PORTALER.md`
+§4.10): kartet viser én portal per gruppe, og en ny vakt-ID tømmer kartet for den portalen.
+Kallstedet sender `vakt=` — vakta raden hører til, ikke en gjettet «aktiv» — og
+`KallstedeneSenderVaktTests` krever det. Uten vakt sendes ingen av feltene, og kartet leser
+meldingen som «standard»; det er overgangen, ikke en vei å bruke.
+
 Signaturen er HMAC-SHA256 over `"<X-Portal-Tid>." + rå kropp`, som
 `portal/signatur.py` i kartet sjekker. Ikke kryptering: TLS bærer
 konfidensialiteten, HMAC bærer ekthet og integritet (B8).
@@ -139,17 +145,27 @@ def les_posisjon(pos) -> tuple[float, float, datetime]:
     return lat, lon, tid
 
 
-def send_enhet(navn: str, lat: float, lon: float, tidspunkt: datetime) -> bool:
+def _kilde(vakt) -> dict:
+    """``{'portal', 'vakt'}`` for meldingen — tomt uten vakt (kartet leser det som «standard»)."""
+    if vakt is None:
+        return {}
+    kilde = {'vakt': vakt.pk}
+    if vakt.portal_id is not None:
+        kilde['portal'] = vakt.portal.slug
+    return kilde
+
+
+def send_enhet(navn: str, lat: float, lon: float, tidspunkt: datetime, *, vakt=None) -> bool:
     """Bilens posisjon — ved en stempling, eller fra knappen «Send posisjon».
     Navnet skal være `Enhet.navn` fra databasen, aldri noe fra request-kroppen."""
     return _send('enhet', navn, lambda: {
-        'navn': navn, 'lat': lat, 'lon': lon, 'tidspunkt': _tidspunkt(tidspunkt),
+        **_kilde(vakt), 'navn': navn, 'lat': lat, 'lon': lon, 'tidspunkt': _tidspunkt(tidspunkt),
     })
 
 
-def send_lag(navn: str, sted: str, tidspunkt: datetime) -> bool:
+def send_lag(navn: str, sted: str, tidspunkt: datetime, *, vakt=None) -> bool:
     """Hvor laget står nå. Tomt sted tar laget av kartet."""
-    return _send('lag', navn, lambda: {'navn': navn, 'sted': sted,
+    return _send('lag', navn, lambda: {**_kilde(vakt), 'navn': navn, 'sted': sted,
                                        'tidspunkt': _tidspunkt(tidspunkt)})
 
 
@@ -166,7 +182,7 @@ posisjon_delt = Signal()
 
 
 def send_delt_posisjon(type_: str, navn: str, lat: float, lon: float, tidspunkt: datetime,
-                       utloper: datetime, *, kilde_id: int | None = None) -> bool:
+                       utloper: datetime, *, kilde_id: int | None = None, vakt=None) -> bool:
     """«Send posisjon» fra en bil (`enhet`) eller et lag (`lag`) — «OBS: Posisjon delt» i kartet
     (André, 7. okt. 2026).
 
@@ -180,7 +196,7 @@ def send_delt_posisjon(type_: str, navn: str, lat: float, lon: float, tidspunkt:
     if type_ not in DELT_TYPER:
         raise ValueError(f'Ukjent type {type_!r}')
     ok = _send('delt-posisjon', navn, lambda: {
-        'type': type_, 'navn': navn, 'lat': lat, 'lon': lon,
+        **_kilde(vakt), 'type': type_, 'navn': navn, 'lat': lat, 'lon': lon,
         'tidspunkt': _tidspunkt(tidspunkt), 'utloper': _tidspunkt(utloper),
     })
     if ok:

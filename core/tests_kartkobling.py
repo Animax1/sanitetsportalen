@@ -9,6 +9,7 @@ import hmac
 import json
 import time
 from datetime import datetime, timezone as dt_timezone
+from types import SimpleNamespace
 from unittest import mock
 from urllib import error
 
@@ -94,6 +95,19 @@ class KartkoblingTests(SimpleTestCase):
         self.assertEqual(lag, {'navn': 'Lag 3', 'sted': 'Parkscene',
                                'tidspunkt': '2026-09-30T19:04:11+02:00'})
         self.assertEqual(self._foresporsel(1).full_url, 'https://kart.example.no/api/portal/lag')
+
+    def test_vakta_gir_portalens_slug_og_vakt_id(self):
+        """Flere portaler (18. okt. 2026, §4.10): kartet viser én portal per gruppe, og en ny
+        vakt-ID tømmer kartet for den portalen. Uten vakt: ingen av feltene («standard»)."""
+        vakt = SimpleNamespace(pk=7, portal_id=2, portal=SimpleNamespace(slug='brann'))
+        kartkobling.send_enhet('Bil', 59.4, 5.2, TID, vakt=vakt)
+        kartkobling.send_lag('Lag 3', 'Parkscene', TID, vakt=vakt)
+        kartkobling.send_delt_posisjon('lag', 'Lag 3', 59.4, 5.2, TID, TID, vakt=vakt)
+        for n in range(3):
+            data = json.loads(self._foresporsel(n).data)
+            self.assertEqual((data['portal'], data['vakt']), ('brann', 7))
+        kartkobling.send_enhet('Bil', 59.4, 5.2, TID)
+        self.assertFalse({'portal', 'vakt'} & set(json.loads(self._foresporsel(3).data)))
 
     def test_delt_posisjon_har_eget_endepunkt_og_noyaktig_feltene(self):
         """«OBS: Posisjon delt» (7. okt. 2026): ikke et felt på `lag`, som er der
@@ -358,3 +372,39 @@ class VarighetenFlytterTests(TestCase):
         AppSetting.objects.create(key='park_hjelp_varighet_min', value='40')
         self._flytt()
         self.assertEqual(kartkobling.delt_posisjon_min(), 10)
+
+
+class KallstedeneSenderVaktTests(SimpleTestCase):
+    """Hvert kall til kartet utenfor testene oppgir `vakt=` (18. okt. 2026, §4.10).
+
+    `vakt` er valgfri i signaturen, så testene og overgangen virker uten — og da ville et nytt
+    kallsted som glemte den, sendt Brann-bilene til «standard» uten at noe ble rødt.
+    """
+
+    FUNKSJONER = {'send_enhet', 'send_lag', 'send_delt_posisjon'}
+
+    def test_hvert_kallsted_oppgir_vakt(self):
+        import ast
+        from pathlib import Path
+
+        from django.conf import settings
+
+        rot = Path(settings.BASE_DIR)
+        funnet, mangler = [], []
+        for fil in rot.rglob('*.py'):
+            del_ = fil.relative_to(rot).parts
+            if del_[0] in {'.venv', 'venv', 'node_modules'} or fil.name.startswith('tests'):
+                continue
+            if fil == rot / 'core' / 'kartkobling.py':
+                continue
+            for node in ast.walk(ast.parse(fil.read_text(encoding='utf-8'))):
+                if not isinstance(node, ast.Call):
+                    continue
+                navn = getattr(node.func, 'attr', getattr(node.func, 'id', None))
+                if navn in self.FUNKSJONER:
+                    sted = f'{fil.relative_to(rot)}:{node.lineno}'
+                    funnet.append(sted)
+                    if 'vakt' not in {k.arg for k in node.keywords}:
+                        mangler.append(sted)
+        self.assertGreaterEqual(len(funnet), 4, f'leseren fant for få kallsteder: {funnet}')
+        self.assertEqual(mangler, [])

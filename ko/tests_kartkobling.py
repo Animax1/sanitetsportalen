@@ -35,6 +35,8 @@ class LageneTilKartetTests(_Grunnlag):
         with mock.patch('core.kartkobling.send_lag') as send, \
                 self.captureOnCommitCallbacks(execute=True):
             handling()
+        for kall in send.call_args_list:
+            self.assertEqual(kall.kwargs['vakt'], self.vakt, 'kartet tømmer ved ny vakt-ID')
         return [(k.args[0], k.args[1]) for k in send.call_args_list]
 
     def _hendelse(self, lokasjon=None):

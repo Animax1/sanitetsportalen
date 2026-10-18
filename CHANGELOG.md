@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 6: kartet får portalens slug og vakt-ID, og ny vakt tømmer kartet  `#core/kartkobling`
+
+`docs/BESLUTNING_PORTALER.md` §4.10: «I dag ser **alle** i en hvilken som helst gruppe med
+`viser_portalen` **alle** biler og lag … med to portaler kan Brann-laget havne på
+Landsskytters «Hovedpost».» **Begge repoene; kartet gikk ut først** (kart-sanitet `519c975`),
+fordi det godtar meldinger både med og uten feltene — portalen kan da deployes når som helst.
+
+**Portalen** (`core/kartkobling.py`): `send_enhet`, `send_lag` og `send_delt_posisjon` tar
+`vakt=`, og meldingen får `portal` (slug) og `vakt` (ID). Kallstedene sender vakta raden hører
+til: stemplingen `oppdrag.vakt`, bilens «Send posisjon» aktiv vakt, KO aktiv vakt, lagene
+`aapen_vakt()`. **`vakt` er valgfri i signaturen**, så et nytt kallsted som glemte den ville
+sendt Brann-bilene til «standard» uten at noe ble rødt — `KallstedeneSenderVaktTests` leser
+alle kall med AST og krever nøkkelordet.
+
+**Kartet** (eget repo, se dets CHANGELOG):
+
+| Hva | Hvordan |
+|---|---|
+| En gruppe viser én portal | `Gruppe.viser_portalen` (ja/nei) → `Gruppe.portal` (slug). Avkryssede ble «standard» |
+| Posisjonene per portal | Unike per (portal, navn) — to portaler kan ha hver sin «Lag 1» |
+| **Ny vakt tømmer kartet** for den portalen | Bare når meldingen er *nyere* enn det nyeste fra gjeldende vakt: en forsinket stempling fra vakta før (offline-køen) forkastes i stedet for å tømme |
+| Gruppevelger | Under «Biler og lag fra portalen», for den som er med i flere grupper med portal. Laget matches bare mot steder i den valgte gruppen |
+| Uten slug | «standard», uten vakt ingen rydding — overgangen |
+
+**Oppsett for en ny portal:** lag en gruppe i kartet med portalens kortnavn (slug, står på
+`/admin/portaler/`) i «Viser biler og lag fra portalen». Eksisterende grupper er allerede
+«standard».
+
+**Gruppevelgeren gjelder kartlaget fra portalen, ikke tegningene** — beslutningen sier «én
+gruppes tegninger, biler og lag om gangen», men tegninger brukes også på tvers av grupper, og
+private hører ikke til noen. Står som et vurderingspunkt i kartets TODO.
+
+Mutanter: **portalen 9 av 9 drept** (kallstedene uten vakt, `vakt=None`, `_kilde` uten portal
+og tom, delt og lag uten kilde). **Kartet 20 av 20**, én etter at den fikk sin test (delt
+posisjon hoppet over vaktbyttet).
+
 ## 2026-10-18 — Portaler fase 5: personsøk på tvers av portalene, for innsyn og sletting  `#core/personvern`
 
 `docs/BESLUTNING_PORTALER.md` §4.5: «retting og sletting av én person skjer i flere rader.

@@ -47,6 +47,7 @@ class PosisjonVedStemplingTests(StemplingBasis):
         navn, lat, lon, tid = send.call_args.args
         self.assertEqual((navn, lat, lon), ('Haugesund 56', 59.4136, 5.2683))
         self.assertEqual(tid.isoformat(), pos['tid'])
+        self.assertEqual(send.call_args.kwargs['vakt'], o.vakt, 'kartet tømmer ved ny vakt-ID')
 
     def test_sendingen_venter_paa_commit(self):
         o = self._oppdrag()

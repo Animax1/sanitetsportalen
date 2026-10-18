@@ -1181,7 +1181,7 @@ def posisjon_view(request):
     naa = timezone.now()
     utloper = naa + timedelta(minutes=kartkobling.delt_posisjon_min())
     if not kartkobling.send_delt_posisjon('enhet', enhet.navn, lat, lon, tid, utloper,
-                                          kilde_id=enhet.pk):
+                                          kilde_id=enhet.pk, vakt=hent_aktiv_vakt()):
         return JsonResponse({'status': 'error', 'message': (
             'Kartet tok ikke imot posisjonen. Meld den på samband.')}, status=424)
     return JsonResponse({'status': 'ok', 'data': {'sendt_at': naa.isoformat(),
@@ -1369,9 +1369,10 @@ def stempling_view(request, pk, overgang, sted=None):
     posisjon = _posisjon(data)
     if posisjon is not None:
         navn = request.user.enhet.navn
+        vakt = oppdrag.vakt
         # Etter commit: en stempling som rulles tilbake skal aldri vises i
         # kartet. Klienten selv vet ingenting om transaksjoner, og kaster aldri.
-        transaction.on_commit(lambda: kartkobling.send_enhet(navn, *posisjon))
+        transaction.on_commit(lambda: kartkobling.send_enhet(navn, *posisjon, vakt=vakt))
 
     # Raden leses på nytt: `sett_status` skrev på sitt eget eksemplar av den,
     # og bilen skal se statusen den nettopp stemplet, ikke den før.

@@ -72,7 +72,8 @@ def _send(ressurs_id: int) -> None:
         ressurs = Ressurs.objects.filter(pk=ressurs_id).only('navn', 'enhet_id').first()
         if ressurs is None or ressurs.enhet_id is not None:
             return   # borte, eller en bil — bilene sendes ved stempling
-        kartkobling.send_lag(ressurs.navn, sted_naa(ressurs_id, hent_aktiv_vakt()),
-                             timezone.now())
+        vakt = hent_aktiv_vakt()
+        kartkobling.send_lag(ressurs.navn, sted_naa(ressurs_id, vakt), timezone.now(),
+                             vakt=vakt)
     except Exception:
         logger.warning('Kartkobling: laget %s ble ikke meldt', ressurs_id, exc_info=True)

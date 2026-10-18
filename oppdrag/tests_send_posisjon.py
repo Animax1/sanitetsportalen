@@ -13,6 +13,7 @@ from unittest import mock
 from django.test import override_settings
 from django.utils import timezone
 
+from core.vakt import hent_aktiv_vakt
 from oppdrag.models import Enhet
 from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_available, run_node
 
@@ -47,6 +48,7 @@ class SendPosisjonTests(StemplingBasis):
         self.assertEqual(resp.json()['data']['utloper'], utloper.isoformat())
         self.assertEqual(send.call_args.kwargs['kilde_id'], self.enhet.pk,
                          'KO trenger å vite hvilken bil, for å finne hendelsen')
+        self.assertEqual(send.call_args.kwargs['vakt'], hent_aktiv_vakt())
 
     def test_vises_i_kartet_saa_lenge_admin_har_satt(self):
         """«Delt posisjon vises i kartet» — samme innstilling som lagene."""
