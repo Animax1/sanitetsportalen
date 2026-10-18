@@ -161,9 +161,8 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
       i JS, og tas sammen med flatene i fase 5.
 - [ ] **Fase 5:** flatene som står igjen — portalvelgeren, og forslaget «mannskap fra de
       siste 24 månedene» ved ny vakt. Også:
-      **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn);
-      kortene på `/admin/innstillinger/` delt i portalens og systemets (§4.7); og at et
-      varsel fra en annen portal bytter portal når det åpnes.
+      **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn); og
+      at et varsel fra en annen portal bytter portal når det åpnes.
 - [ ] **Fase 6:** kartet, i begge repoer — portalens slug og vakt-ID i meldingen, `Gruppe.portal`
       i stedet for `viser_portalen`, `steder_for()` per portal, gruppevelgeren.
 - [ ] **Fase 7:** sladding av fritekst for admin, med sladderegister som kjøres på nytt etter en

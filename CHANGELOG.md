@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 5c: innstillingene delt i portalens og systemets — moderatoren får portalens  `#core/tilgang`
+
+`docs/BESLUTNING_PORTALER.md` §4.7: «Moderator ser portalens kort på innstillingssiden; admin ser
+begge.»
+
+**Synlig endring for en moderator:** «Innstillinger» under «Moderator» i avatar-menyen
+(`/moderator/innstillinger/`). Der står:
+- vaktlistas fil på e-post og pausene på utskriften;
+- KO-chatten og KO-tavlen;
+- lagregistreringens forhåndsvalg fra KO-tavlen.
+
+**For admin:** `/admin/innstillinger/` har to seksjoner — «‹portal›» øverst og «Hele
+installasjonen» under. Under «Hele installasjonen» står:
+- sesjonstiden;
+- statusmeldingen;
+- kartet;
+- KO-loggens oppbevaringstid;
+- oppdragsnotatets slettefrist;
+- lagregistreringens angrefrist.
+
+**Hver handler deklarerer `portalfelt`** (`core/portalinnstillinger.py`): POST-navnene som er
+portalens. **Standarden er tom, altså systemet.** En ny handler som glemmer å si noe, blir stående
+hos admin i stedet for å åpne en systemverdi for moderator.
+
+KO og park er blandet: oppbevaringstiden og angrefristen er slettefrister og hører til systemet. De
+to malbitene tegner hver halvdel etter flaggene `vis_portal` og `vis_system`, og siden inkluderer
+dem én gang i hver seksjon.
+
+**Sperra er to lag, og serveren holder begge:**
+1. **Bare handlerne med `portalfelt` kjøres** for moderatoren.
+2. **Innsendingen hennes siles til portalfeltene** (`_sil`) før `valider()`. Et fraværende felt er
+   «behold» i hver handler, så et systemfelt hun sender likevel, lagres ikke.
+
+Silen alene holder ikke: en handler som skriver også når feltet mangler — en avkryssing uten
+følgefelt — ville nullstilt systemverdien hver gang moderatoren lagret. Mutasjonen som kjørte alle
+handlerne for henne, overlevde første runde. Nå drepes den av en test med nettopp en slik handler.
+
+**Én kropp, to innganger** (`_innstillinger`), som vaktsiden. Testene krever i tillegg:
+- **hvert felt står én gang** på admins side — en blandet malbit uten flaggene ville tegnet feltene
+  dobbelt, og den siste verdien i POST vinner i stillhet;
+- **hvert `portalfelt` finnes i malbitene** — en skrivefeil ville silt bort et felt hun ser.
+
+**Mutasjoner: 14, alle drept** (én etter den nye testen).
+
 ## 2026-10-18 — Portaler fase 5c: «Avslutt vakt» til moderator, i egen portal  `#core/vakt`
 
 `docs/BESLUTNING_PORTALER.md` §4.8, som endrer `BESLUTNING_ROLLEMODELLEN.md` §3.3 («ingen

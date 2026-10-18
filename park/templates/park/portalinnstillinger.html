@@ -1,7 +1,11 @@
 {% comment %}
 Parks felter på /admin/innstillinger/ (docs/FORSLAG_PARK.md, B11 og B22).
 Malbiten bor i modulen; verdiene kommer fra `park/portalinnstillinger.py`.
+
+To flagg, to kort (fase 5c): angrefristen er systemets, forhåndsvalget fra
+KO-tavlen portalens. Siden inkluderer malbiten én gang for hvert.
 {% endcomment %}
+{% if vis_system %}
   <div class="card mb-3">
     <div class="card-header"><strong>Lagregistrering</strong></div>
     <div class="card-body">
@@ -16,7 +20,14 @@ Malbiten bor i modulen; verdiene kommer fra `park/portalinnstillinger.py`.
         {{ park_angrefrist_min }}–{{ park_angrefrist_maks }} minutter. Etter det kan bare
         <em>skriv_leder</em> i park slette den, med en grunn.
       </div>
-      <div class="form-check mt-3">
+    </div>
+  </div>
+{% endif %}
+{% if vis_portal %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Lagregistrering: stedet</strong></div>
+    <div class="card-body">
+      <div class="form-check">
         <input type="hidden" name="park_ko_posisjon_sendt" value="1">
         <input class="form-check-input" type="checkbox" id="park_ko_posisjon"
                name="park_ko_posisjon" value="1"{% if park_ko_posisjon %} checked{% endif %}>
@@ -32,3 +43,4 @@ Malbiten bor i modulen; verdiene kommer fra `park/portalinnstillinger.py`.
       </div>
     </div>
   </div>
+{% endif %}

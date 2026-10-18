@@ -21,7 +21,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from accounts.models import CustomUser
 from audit.models import AuditLog
-from core.auth_decorators import admin_required
+from core.auth_decorators import admin_required, moderator_kreves
 from core.forms import ModuleSettingsForm
 from core.models import ModuleSettings
 from core.modules import get_all_modules, get_module
@@ -53,48 +53,79 @@ def portal_settings_view(request):
     ``AppSetting`` er en generisk nøkkel/verdi-tabell uten validering, så den
     ligger her: en timeout på 0 timer ville logget ut alle umiddelbart.
     """
+    return _innstillinger(request, admin=True)
+
+
+@moderator_kreves
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='moderator:innstillinger', rate='30/m', method='POST', on_limit='html')
+def moderator_innstillinger_view(request):
+    """Portalens kort, for moderator i egen portal (fase 5c, §4.7)."""
+    return _innstillinger(request, admin=False)
+
+
+def _sil(post, tillatt):
+    """En kopi av `post` med bare navnene i `tillatt`. Resten er «fraværende», og
+    fraværende er «behold» i hver handler — det er hele sperra mot at en
+    moderator skriver en systemverdi."""
+    silt = post.copy()
+    for navn in list(silt.keys()):
+        if navn not in tillatt:
+            del silt[navn]
+    return silt
+
+
+def _innstillinger(request, *, admin: bool):
+    """Én kropp for begge sidene. Admin ser portalens og systemets kort; moderator
+    bare portalens, og innsendingen hennes siles til portalfeltene først."""
     from core.models import AppSetting
     from core.portalinnstillinger import all_handlers
     # **Modulenes felter kommer gjennom registeret**, ikke gjennom en import
     # av modulen (14. sep. 2026). Fram til da sto `from vaktliste import fil`
     # her, med modulens validering og lagring midt i rammeverkets view. Se
     # `core/portalinnstillinger.py`.
-    handlere = all_handlers()
+    handlere = all_handlers() if admin else [h for h in all_handlers() if h.portalfelt]
+    tilbake = 'portaladmin:portal_settings' if admin else 'core:moderator_innstillinger'
 
     if request.method == 'POST':
         feil = False
+        post = request.POST if admin else _sil(
+            request.POST, frozenset().union(*(h.portalfelt for h in handlere)))
 
         # ── Alt valideres, ingenting lagres ──────────────────────────────
         # Portalens felt og hver moduls felt skrives hver for seg, uten én
         # transaksjon rundt; denne todelingen er det eneste som hindrer at en
         # avvist innsending lagrer halve skjemaet. Hver handler får si sitt
         # før noen skriver.
-        try:
-            timer = int((request.POST.get('session_timeout_hours') or '').strip())
-        except (TypeError, ValueError):
-            messages.error(request, 'Sesjonstimeout må være et helt tall.')
-            feil = True
-        else:
-            if not 1 <= timer <= 24:
-                messages.error(
-                    request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
+        timer = None
+        if admin:
+            try:
+                timer = int((post.get('session_timeout_hours') or '').strip())
+            except (TypeError, ValueError):
+                messages.error(request, 'Sesjonstimeout må være et helt tall.')
                 feil = True
+            else:
+                if not 1 <= timer <= 24:
+                    messages.error(
+                        request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
+                    feil = True
 
         modulverdier = {}
         for handler in handlere:
             try:
-                modulverdier[handler.slug] = handler.valider(request.POST)
+                modulverdier[handler.slug] = handler.valider(post)
             except ValidationError as exc:
                 messages.error(request, exc.messages[0])
                 feil = True
 
         # ── Så lagres alt ────────────────────────────────────────────────
         if not feil:
-            AppSetting.set('session_timeout_hours', timer)
+            if admin:
+                AppSetting.set('session_timeout_hours', timer)
             for handler in handlere:
                 handler.lagre(modulverdier[handler.slug])
-            messages.success(request, 'Portalinnstillingene er lagret.')
-            return redirect('portaladmin:portal_settings')
+            messages.success(request, 'Innstillingene er lagret.')
+            return redirect(tilbake)
 
     try:
         timer = int(AppSetting.get('session_timeout_hours', 8))
@@ -102,8 +133,10 @@ def portal_settings_view(request):
         timer = 8
 
     kontekst = {
+        'admin': admin,
         'session_timeout_hours': timer,
-        'innstillingsfragmenter': [h.mal for h in handlere if h.mal],
+        'portalkort': [h.mal for h in handlere if h.mal and h.portalfelt],
+        'systemkort': [h.mal for h in handlere if h.mal and not h.bare_portal] if admin else [],
     }
     for handler in handlere:
         kontekst.update(handler.kontekst())

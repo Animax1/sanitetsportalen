@@ -39,6 +39,19 @@ class BasePortalinnstillingHandler:
     #: Rekkefølge på kortene. Lavest først, etter portalens egne.
     order: ClassVar[int] = 100
 
+    #: **Feltene som gjelder portalen** (fase 5c, `docs/BESLUTNING_PORTALER.md`
+    #: §4.7): POST-navnene moderatoren får sende. Tomt er **systemet** — bare
+    #: admin. Standarden er tom med vilje: en ny handler som glemmer å si noe,
+    #: blir stående hos admin i stedet for å åpne en systemverdi for moderator.
+    #: Moderatorens innsending siles til disse navnene, og et fraværende felt er
+    #: «behold» i hver handler — så et systemfelt hun sender, lagres ikke.
+    portalfelt: ClassVar[frozenset] = frozenset()
+
+    #: Sant når *alle* feltene er portalens. Ellers tegnes malbiten også under
+    #: systemets kort, med `vis_system`; en blandet malbit skiller med
+    #: `vis_portal` og `vis_system`.
+    bare_portal: ClassVar[bool] = False
+
     #: Sti til malbiten som tegner feltene, f.eks.
     #: ``'vaktliste/portalinnstillinger.html'``. Malbiten bor i **modulen**,
     #: ikke i `core`: markupen kjenner feltene, og feltene er modulens.

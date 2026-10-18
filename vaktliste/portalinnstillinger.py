@@ -14,6 +14,10 @@ class VaktlistefilInnstillinger(BasePortalinnstillingHandler):
     slug = 'vaktliste'
     order = 10
     mal = 'vaktliste/portalinnstillinger.html'
+    portalfelt = frozenset({'vaktliste_fil_mottakere', 'vaktliste_fil_ved_drift',
+                            'vaktliste_fil_intervall_min', 'vaktliste_fil_bare_endret',
+                            'vaktliste_vis_pauser'})
+    bare_portal = True
 
     def kontekst(self) -> dict:
         from vaktliste import fil, pauser

@@ -815,7 +815,9 @@ class PortalinnstillingeneTests(TestCase):
         from django.template.loader import render_to_string
         from core.portalinnstillinger import all_handlers
         self.assertIn('park', [h.slug for h in all_handlers()])
-        html = render_to_string(self.h.mal, self.h.kontekst())
+        # Begge halvdelene (fase 5c): siden tegner dem i hver sin seksjon.
+        html = render_to_string(self.h.mal, {**self.h.kontekst(), 'vis_portal': True,
+                                             'vis_system': True})
         self.assertIn('name="park_angrefrist"', html)
         self.assertIn('name="park_ko_posisjon_sendt"', html)
         self.assertIn('checked', html, 'bryteren er på uten rad')

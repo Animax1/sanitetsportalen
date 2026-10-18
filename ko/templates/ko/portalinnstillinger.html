@@ -5,10 +5,15 @@ Malbiten bor i **modulen**, ikke i `core`: markupen kjenner feltene, og
 feltene er KOs. Den inkluderes av portalens side gjennom registeret i
 `core/portalinnstillinger.py`, og verdiene kommer fra handlerens `kontekst()`.
 
+**To flagg, to kort** (fase 5c): `vis_system` tegner oppbevaringstiden — en
+slettefrist, og systemets — og `vis_portal` chatten og tavla, som er portalens.
+Siden inkluderer malbiten én gang for hvert (`core/portalinnstillinger.py`).
+
 **Hjelpeteksten sier hva fristen ikke er.** En oppbevaringstid som ser ut som
 en sletterett er verre enn ingen, fordi den lukker spørsmålet uten å svare på
 det — og backupene ligger der uansett hva tallet står på.
 {% endcomment %}
+{% if vis_system %}
   <div class="card mb-3">
     <div class="card-header"><strong>KO-loggen</strong></div>
     <div class="card-body">
@@ -25,7 +30,21 @@ det — og backupene ligger der uansett hva tallet står på.
         sletter linjene når fristen er ute; jobben går natt til søndag, så
         slettingen skjer inntil en uke etter grensa.
       </div>
-      <div class="form-check mt-3">
+      <div class="form-text">
+        <strong>Dette er ikke en sletterett.</strong> En linje som fjernes med
+        «Fjern» i loggen, eller som slettes når fristen løper ut, ligger
+        fortsatt i backupfilene: modulfilen i 730 dager og den hele basen i 90.
+        De fristene styres av livssyklusreglene i bucketen, ikke av dette
+        tallet. Se personverndokumentasjonen A.9.
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% if vis_portal %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>KO-loggen: chat</strong></div>
+    <div class="card-body">
+      <div class="form-check">
         <input type="hidden" name="ko_chat_sendt" value="1">
         <input class="form-check-input" type="checkbox" id="ko_chat_tillatt"
                name="ko_chat_tillatt" value="1"{% if ko_chat_tillatt %} checked{% endif %}>
@@ -37,13 +56,6 @@ det — og backupene ligger der uansett hva tallet står på.
           dempet. Slås chatten av, kan ingen skrive nye — linjene som alt er
           skrevet blir stående, ellers får loggen et hull.
         </div>
-      </div>
-      <div class="form-text">
-        <strong>Dette er ikke en sletterett.</strong> En linje som fjernes med
-        «Fjern» i loggen, eller som slettes når fristen løper ut, ligger
-        fortsatt i backupfilene: modulfilen i 730 dager og den hele basen i 90.
-        De fristene styres av livssyklusreglene i bucketen, ikke av dette
-        tallet. Se personverndokumentasjonen A.9.
       </div>
     </div>
   </div>
@@ -68,3 +80,4 @@ det — og backupene ligger der uansett hva tallet står på.
       </div>
     </div>
   </div>
+{% endif %}

@@ -15,6 +15,8 @@ class ParkInnstillinger(BasePortalinnstillingHandler):
     slug = 'park'
     order = 30
     mal = 'park/portalinnstillinger.html'
+    # Angrefristen (`park_angrefrist`) er systemets.
+    portalfelt = frozenset({'park_ko_posisjon_sendt', 'park_ko_posisjon'})
 
     def kontekst(self) -> dict:
         from park import services

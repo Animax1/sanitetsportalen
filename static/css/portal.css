@@ -166,3 +166,6 @@ code {
   white-space: nowrap;
 }
 .portalmerke:hover { border-color: var(--portal-accent); color: var(--portal-header-fg); }
+
+/* Innstillingssiden (`core/portal_settings.html`): en leseflate, ikke en konsoll. */
+.innstillinger-skjema { max-width: 560px; }

@@ -15,6 +15,9 @@ class KoInnstillinger(BasePortalinnstillingHandler):
     slug = 'ko'
     order = 20
     mal = 'ko/portalinnstillinger.html'
+    # Oppbevaringstiden (`ko_logg_dager`) er en slettefrist, og systemets.
+    portalfelt = frozenset({'ko_chat_sendt', 'ko_chat_tillatt', 'ko_tavle_timer',
+                            'ko_tavle_dognstart'})
 
     def kontekst(self) -> dict:
         from ko import services, tavle

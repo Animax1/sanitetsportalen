@@ -35,6 +35,9 @@ urlpatterns = [
     path('moderator/vakt/navn/', views_vakt.moderator_vakt_navn_view, name='moderator_vakt_navn'),
     path('moderator/vakt/avslutt/', views_vakt.moderator_vakt_avslutt_view,
          name='moderator_vakt_avslutt'),
+    # Portalens innstillinger (fase 5c, §4.7). Systemets står på /admin/innstillinger/.
+    path('moderator/innstillinger/', views_admin.moderator_innstillinger_view,
+         name='moderator_innstillinger'),
 
     # ── Admin-UI ────────────────────────────────────────────────────────────
     # Rutene under /admin/ flyttet til `core/urls_admin.py` 14. sep.
