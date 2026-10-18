@@ -43,6 +43,10 @@ class VaktlisteConfig(AppConfig):
         from .opprydding import register_handlers as register_opprydding
         register_opprydding()
 
+        # Personsøket på tvers av portalene (18. okt. 2026, `core/personsok.py`).
+        from .personsok import register_handlers as register_personsok
+        register_personsok()
+
         # Sletting av en tidligere vakt (28. sep. 2026, `core/vaktsletting.py`).
         from .vaktsletting import register_handlers as register_vaktsletting
         register_vaktsletting()

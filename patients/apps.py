@@ -16,6 +16,10 @@ class PatientsConfig(AppConfig):
         from patients.arkiv import register_handlers as register_arkiv_handlers
         register_arkiv_handlers()
 
+        # Personsøket på tvers av portalene (18. okt. 2026, `core/personsok.py`).
+        from patients.personsok import register_handlers as register_personsok
+        register_personsok()
+
         from patients.statistikk import (
             register_handlers as register_stats_handlers,
         )

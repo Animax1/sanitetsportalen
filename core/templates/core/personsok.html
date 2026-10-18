@@ -1,0 +1,76 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Personsøk – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Søk etter én person på tvers av portalene, for innsyn og sletting (18. okt. 2026,
+  `core/personsok.py`). Serverrendret; «Skriv ut» gir svaret på en innsynsbegjæring.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-4 d-print-none">
+  <h1 class="mb-2"><i class="bi bi-person-lines-fill me-2"></i>Personsøk</h1>
+  <p class="text-muted mb-0">
+    Søk på navn eller e-post i alle portalene — for å svare på innsyn, og for å slette en
+    person som ikke skal stå der. En person som går vakt i to portaler, står én gang i hver.
+    Hvert søk logges.
+  </p>
+</section>
+
+<form method="get" class="d-flex gap-2 mb-4 d-print-none personsok-skjema">
+  <label class="visually-hidden" for="q">Navn eller e-post</label>
+  <input type="search" id="q" name="q" value="{{ q }}" class="form-control"
+         placeholder="Navn eller e-post" minlength="2" required autofocus>
+  <button type="submit" class="btn btn-primary">Søk</button>
+  {% if antall %}<button type="button" class="btn btn-outline-secondary" data-skriv-ut>Skriv ut</button>{% endif %}
+</form>
+
+{% if for_kort %}
+<p class="text-muted">Skriv minst to tegn.</p>
+{% elif q %}
+<h2 class="h5 mb-3">{{ antall }} treff på «{{ q }}»</h2>
+{% for kilde in resultat %}
+<div class="card mb-3">
+  <div class="card-header"><strong>{{ kilde.handler.etikett }}</strong>
+    <span class="text-muted small ms-1">({{ kilde.treff|length }}{% if kilde.treff|length >= maks %}, de første {{ maks }}{% endif %})</span></div>
+  <div class="card-body p-0">
+    {% if kilde.feil %}
+    <p class="text-danger m-3">Kilden svarte ikke: {{ kilde.feil }}</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Navn</th><th>Portal</th><th>Opplysninger</th><th>Bruk</th><th class="d-print-none"></th></tr></thead>
+        <tbody>
+          {% for t in kilde.treff %}
+          <tr>
+            <td><strong>{{ t.navn }}</strong></td>
+            <td>{{ t.portal|default:"–" }}</td>
+            <td class="small">{% for etikett, verdi in t.felter %}<div><span class="text-muted">{{ etikett }}:</span> {{ verdi }}</div>{% endfor %}</td>
+            <td class="small">{{ t.bruk|join:", "|default:"–" }}</td>
+            <td class="text-end d-print-none">
+              {% if t.lenke %}<a href="{{ t.lenke }}" class="btn btn-sm btn-outline-secondary">Åpne</a>{% endif %}
+              {% if kilde.handler.kan_slette and not t.sperre %}
+              <form method="post" class="d-inline" data-confirm="Slette «{{ t.navn }}» fra {{ kilde.handler.etikett|lower }}{% if t.portal %} i {{ t.portal }}{% endif %}? Det kan ikke angres.">
+                {% csrf_token %}
+                <input type="hidden" name="q" value="{{ q }}">
+                <input type="hidden" name="kilde" value="{{ kilde.handler.slug }}">
+                <input type="hidden" name="pk" value="{{ t.pk }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Slett</button>
+              </form>
+              {% elif t.sperre %}
+              <span class="small text-muted" title="{{ t.sperre }}">Kan ikke slettes herfra</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted">Ingen treff.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

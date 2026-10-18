@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 5: personsøk på tvers av portalene, for innsyn og sletting  `#core/personvern`
+
+`docs/BESLUTNING_PORTALER.md` §4.5: «retting og sletting av én person skjer i flere rader.
+Innsyn og sletting krever derfor et søk på tvers av portalene, på e-post og navn, for admin.»
+Ola som går vakt i Standard og Brann, er to mannskapsrader, og et innsynssvar skal ha begge.
+**Dette var det siste punktet i fase 5.**
+
+**Synlig endring for admin:** «Personsøk» i Administrasjon-menyen (`/admin/personsok/`). Man
+søker på navn eller e-post og får treffene gruppert per kilde, med portal, opplysningene og
+hvor mye raden er brukt. «Skriv ut» gir svaret på innsyn (`data-skriv-ut` i `ui-actions.js`,
+fordi adminsidene ikke laster `portal-utils.js`).
+
+**Et register, som de andre** (`core/personsok.py`). `core` kjenner ingen modul ved navn, og hver
+modul melder inn sine registre fra `<app>/personsok.py`:
+
+| Kilde | Søker i | Slettes herfra |
+|---|---|---|
+| Kontoer (`core`) | brukernavn, navn, e-post | Nei — fra brukersiden, med sperrene der |
+| Vaktliste: mannskap | navn, e-post, kontoens e-post | Bare uten skift og overnatting |
+| Pasientregistrering: førstehjelpere og helsepersonell | navn, kontoens e-post | Bare uten pasienter |
+
+**Reglene:**
+- **Bare global admin, og hvert søk logges** med søkeordet. Ny handling `SOK` i auditen
+  (`audit/0005`, bare valgene). Et søk etter et navn på tvers av alle portaler er en lesing av
+  personopplysninger, og det skal kunne etterprøves hvem som gjorde det.
+- **Minst to tegn.** Ett tegn er hele registeret.
+- **Hver kilde fanges for seg.** En modul som feiler, viser feilen i sitt kort, og de andre
+  svarer.
+- **En rad med historikk slettes ikke herfra.** Skift, overnatting og pasienter er vaktas
+  dokumentasjon, og fjerning av fritekst i den er fase 7 (sladding). Slettingen logges også her,
+  med kilden.
+
+Personverndokumentasjonen (A.14) beskriver rutinen.
+
+**Mutasjoner: 11, alle drept.** Blant dem:
+- mannskapet søkt i bare én portal;
+- e-posten ikke søkt;
+- sperra for historikk fjernet;
+- søket ikke logget;
+- en feilende kilde som ikke fanges.
+
 ## 2026-10-18 — Vaktliste: mannskapsregisteret er vaktas — tomt etter avsluttet vakt, «Hent inn fra tidligere»  `#vaktliste/registeret`
 
 André: «Tomt mannskapsregister etter avsluttet vakt, men du kan hente inn fra tidligere

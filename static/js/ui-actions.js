@@ -69,3 +69,11 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
   }
 }, true);
+
+// ── «Skriv ut» (18. okt. 2026) ────────────────────────────────────────────
+// Personsøket skrives ut som svar på en innsynsbegjæring. Adminsidene laster ikke
+// `portal-utils.js`, så `data-action` finnes ikke der; en knapp med `data-skriv-ut`
+// er nok, og ingen inline `onclick` (CSP).
+document.addEventListener('click', (e) => {
+  if (e.target instanceof Element && e.target.closest('[data-skriv-ut]')) window.print();
+});

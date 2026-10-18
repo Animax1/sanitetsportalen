@@ -17,6 +17,9 @@ class AuditLog(models.Model):
         ('CREATE', 'Opprettet'),
         ('UPDATE', 'Oppdatert'),
         ('DELETE', 'Slettet'),
+        # Personsøket på tvers av portalene (18. okt. 2026, `core/personsok.py`): en
+        # lesing av personopplysninger som skal kunne etterprøves.
+        ('SOK', 'Søk'),
     ]
 
     app_label = models.CharField(

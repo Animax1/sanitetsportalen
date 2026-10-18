@@ -156,8 +156,6 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Gjør `ModulTilgang.portaltilgang` påkrevd i basen** (etter fase 2, 17. okt. 2026). Den er
       nullbar bare for release-vinduet og migrasjonen som fylte den; `save()` krever den alt.
       Neste migrasjon på `accounts` kan sette `NOT NULL` når fase 2 har stått i prod.
-- [ ] **Fase 5:** det som står igjen — **søk på tvers av portalene for innsyn og sletting**
-      (§4.5, admin, på e-post og navn).
 - [ ] **Fase 6:** kartet, i begge repoer — portalens slug og vakt-ID i meldingen, `Gruppe.portal`
       i stedet for `viser_portalen`, `steder_for()` per portal, gruppevelgeren.
 - [ ] **Fase 7:** sladding av fritekst for admin, med sladderegister som kjøres på nytt etter en

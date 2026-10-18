@@ -1126,6 +1126,14 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 | **Protest (art. 21)** | Registrert kan protestere mot behandlingen | Henvendelse vurderes av behandlingsansvarlig |
 | **Klage** | Klage kan rettes til Datatilsynet | www.datatilsynet.no, tlf. 74 07 70 00 |
 
+> **Personsøket (18. okt. 2026):** en frivillig, en konto eller en førstehjelper som går
+> vakt i flere portaler, står én gang i hver. Admin finner alle radene på
+> `/admin/personsok/` — navn eller e-post, alle portaler og alle registrene
+> (`core/personsok.py`) — og siden kan skrives ut som svar på innsyn. **Hvert søk logges**
+> med hvem som søkte og hva. Herfra kan en rad uten historikk slettes; en rad som står på et
+> skift eller en pasient slettes ikke, fordi det er vaktas dokumentasjon. Fritekst i den
+> historikken er sladdingens sak (C.2, fase 7).
+
 > **Praktisk merk:** Ettersom pasienter kun er registrert med løpenummer og ikke med navn eller personnummer, forutsetter utøvelse av rettigheter at den registrerte kan identifisere seg på en annen måte (f.eks. tidspunkt for besøket og arrangementsnavnet).
 
 > **Om sletting av brukerkontoer:** En bruker som har arkivert en vakt kan slettes. Referansen fra `VaktArkiv` nulles ut, mens brukernavnet beholdes frosset i `importert_av_navn`. Arkivet viser dermed fortsatt hvem som arkiverte vakten, uten at kontoen må bevares. Dette er samme mønster som `forstehjelper_navn` på arkiverte pasienter, og er nødvendig for at sletterett etter art. 17 ikke skal være blokkert på databasenivå.

@@ -168,3 +168,47 @@ def tilhorigheter_view(request):
         'typer': Tilhorighet.TYPE_VALG,
         'portaler': Vaktportal.objects.filter(er_aktiv=True),  # `Meta.ordering` er norsk
     })
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='portaladmin:personsok', rate='60/m', method='POST', on_limit='html')
+def personsok_view(request):
+    """Søk etter én person på tvers av portalene — for innsyn og sletting (§4.5).
+
+    Reglene står i `core/personsok.py`. Hvert søk logges med søkeordet; en sletting
+    logges av modulens egne signaler, og her i tillegg med hvilken kilde.
+    """
+    from core import personsok
+
+    if request.method == 'POST':
+        q = request.POST.get('q', '')
+        handler = personsok.for_slug(request.POST.get('kilde', ''))
+        pk = request.POST.get('pk', '')
+        try:
+            if handler is None or not handler.kan_slette or not pk.isdigit():
+                raise ValidationError('Raden kan ikke slettes herfra.')
+            navn = handler.slett(int(pk))
+        except ValidationError as feil:
+            _vis_feil(request, feil)
+        else:
+            AuditLog.objects.create(table_name='core_personsok', record_id=int(pk),
+                                    action='DELETE', field_name=handler.slug[:64],
+                                    old_value=navn, user=request.user, ip=klient_ip(request))
+            messages.success(request, f'«{navn}» er slettet fra {handler.etikett.lower()}.')
+        from django.utils.http import urlencode
+        return redirect(f"{request.path}?{urlencode({'q': q})}")
+
+    q = (request.GET.get('q') or '').strip()
+    resultat = personsok.sok(q)
+    if resultat:
+        AuditLog.objects.create(table_name='core_personsok', record_id=0, action='SOK',
+                                field_name='q', new_value=q[:200], user=request.user,
+                                ip=klient_ip(request))
+    return render(request, 'core/personsok.html', {
+        'q': q,
+        'for_kort': bool(q) and len(q) < personsok.MIN_TEGN,
+        'resultat': resultat,
+        'antall': sum(len(r['treff']) for r in resultat),
+        'maks': personsok.MAKS_TREFF,
+    })

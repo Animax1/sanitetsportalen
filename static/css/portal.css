@@ -177,3 +177,6 @@ code {
 .felt-navn { max-width: 18rem; }
 .felt-kort { max-width: 7rem; }
 .felt-type { max-width: 8rem; }
+
+/* Personsøket (`core/personsok.html`): søkefeltet tar ikke hele bredden. */
+.personsok-skjema { max-width: 640px; }

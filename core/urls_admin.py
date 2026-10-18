@@ -48,6 +48,8 @@ urlpatterns = [
     path('portaler/<int:pk>/', views_portaler.portal_view, name='portal'),
     # Katalogen over korps og «annet» (18. okt. 2026) — var registeret inne i vaktlista.
     path('tilhorigheter/', views_portaler.tilhorigheter_view, name='tilhorigheter'),
+    # Personsøk på tvers av portalene, for innsyn og sletting (18. okt. 2026, §4.5).
+    path('personsok/', views_portaler.personsok_view, name='personsok'),
     path('innstillinger/', views_admin.portal_settings_view,
          name='portal_settings'),
     path('moduler/', views_admin.module_admin_list_view,

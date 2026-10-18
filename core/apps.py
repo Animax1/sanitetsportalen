@@ -97,6 +97,11 @@ class CoreConfig(AppConfig):
         # `PORTAL_MILJO` ikke er en av de kjente verdiene. Se `core/miljo.py`.
         from core.statusmelding import register_handlers as registrer_statusmelding
         registrer_statusmelding()
+
+        # Personsøket på tvers av portalene (18. okt. 2026): kontoene står her,
+        # modulene melder inn sine egne registre. Se `core/personsok.py`.
+        from core.personsok import register_handlers as registrer_personsok
+        registrer_personsok()
         import logging
 
         from core.miljo import advar_ved_ukjent
