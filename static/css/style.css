@@ -314,6 +314,23 @@
     filter: saturate(0.4);
   }
 
+  /* Dra og slipp på tavla (patients-table.js). `touch-action: none` bare på
+     kortene som kan dras: på et nettbrett ruller en sveip over et kort ikke
+     siden — sveip på tomme plasser og mellomrom gjør. Samme valg som KO-tavla. */
+  .tavle-dras { cursor: grab; touch-action: none; }
+  .zone-list.tavle-mal-over,
+  .obs-cell.tavle-mal-over {
+    outline: 2px dashed #93c5fd;
+    outline-offset: 2px;
+    background: rgba(59, 130, 246, 0.18);
+  }
+  .tavle-spokelse {
+    position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -120%);
+    padding: 0.3rem 0.6rem; border-radius: 12px; background: #1d4ed8; color: #fff;
+    font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  body.tavle-drar, body.tavle-drar * { cursor: grabbing !important; user-select: none; }
+
   #row-count {
     font-size: 0.78rem;
     color: var(--text-soft);

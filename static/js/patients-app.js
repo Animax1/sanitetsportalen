@@ -144,6 +144,7 @@ document.addEventListener('visibilitychange', async () => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTable();
+  tavleLyttere();
   const mineBtn = document.getElementById('btn-mine');
   if (mineBtn) mineBtn.classList.toggle('active-mine', mineOnly);
   await loadForstehjelpere();

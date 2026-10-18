@@ -2502,6 +2502,136 @@ class AktivMineMarkeringTests(TestCase):
         self.assertEqual(av, [], 'og tas av ved det andre')
 
 
+class TavlaDraOgSlippTests(TestCase):
+    """Dra og slipp på pasienttavla (18. okt. 2026), kjørt i node.
+
+    Reglene er egne funksjoner i `patients-table.js`, men den viktigste testen
+    går gjennom **`renderBoard()`**: det er den som setter `data-plassering`,
+    `data-opptatt-av` og porten på kortene. Kalte bare testen hjelperne, kunne
+    byggeren slutte å kalle `tavleGjorDrabar()` uten at noe ble rødt.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import node_available
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+
+    def _kjor(self, snippet, preamble=''):
+        from patients.js_test_utils import (
+            PORTAL_UTILS_JS, TABLE_JS, build_harness, run_node,
+        )
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('nivaaMinst', 'escapeHtml')),
+            (TABLE_JS, ('tavleKanDra', 'tavleGjorDrabar', 'tavleMaal',
+                        'tavleAvgjorSlipp', 'forstehjelperNavn',
+                        'helsepersonellNavn', 'totalDuration', 'renderBoard')),
+        ))
+        return run_node(harness, snippet, preamble=preamble)
+
+    def test_slippet_avgjores(self):
+        self._kjor("""
+            const s = (pl, opp) => ({plassering: pl, opptattAv: opp || ''});
+            assert(tavleAvgjorSlipp('Obs 1', null) === null, 'utenfor tavla: ingenting');
+            assert(tavleAvgjorSlipp('Obs 1', s('Obs 1', '7')) === null, 'tilbake der det kom fra: ingenting');
+            assert(tavleAvgjorSlipp('', s('Grønn sone')).plassering === 'Grønn sone', 'uten plassering kan plasseres');
+            assert(tavleAvgjorSlipp('Obs 1', s('Gul sone')).plassering === 'Gul sone', 'til en sone');
+            assert(tavleAvgjorSlipp('Obs 1', s('Obs 2')).plassering === 'Obs 2', 'til en ledig seng');
+            const f = tavleAvgjorSlipp('Obs 1', s('Akutt 2', '12'));
+            assert(f && f.feil && f.feil.includes('#12') && !f.plassering, 'opptatt seng: nei, med nummeret');
+        """)
+
+    def test_maalet_er_naermeste_plassering(self):
+        self._kjor("""
+            const celle = {getAttribute: n => ({'data-plassering': 'Obs 3', 'data-opptatt-av': '4'})[n] ?? null};
+            const inni = {closest: sel => (sel === '[data-plassering]' ? celle : null)};
+            const m = tavleMaal(inni);
+            assert(m.plassering === 'Obs 3' && m.opptattAv === '4', JSON.stringify(m));
+            assert(tavleMaal({closest: () => null}) === null, 'utenfor tavla');
+            assert(tavleMaal(null) === null, 'ingen node under pekeren');
+        """)
+
+    _DOM = """
+        function lagEl(tag) {
+          const el = {tag, attr: {}, barn: [], klasser: new Set(), innerHTML: '', className: '',
+            setAttribute(n, v) { this.attr[n] = String(v); },
+            getAttribute(n) { return n in this.attr ? this.attr[n] : null; },
+            appendChild(b) { this.barn.push(b); return b; },
+            classList: null};
+          el.classList = {add: k => el.klasser.add(k), contains: k => el.klasser.has(k)};
+          return el;
+        }
+        const faste = {};
+        ['zone-gronn', 'zone-gul', 'akutt-grid', 'obs-grid', 'behandling-grid']
+          .forEach(id => { faste[id] = lagEl('div'); });
+        globalThis.document = {getElementById: id => faste[id] || null, createElement: lagEl};
+        globalThis.boardMineFilter = false;
+        globalThis.isMine = () => true;
+        globalThis.openEdit = () => {};
+        globalThis.parseDt = () => null;
+        globalThis.lastBoardEtag = null;
+        globalThis.lastBoardPatients = [];
+        globalThis.tavleDrag = null;
+        globalThis.tavleTegnEtterDrag = false;
+        const PAS = [
+          {id: 11, patient_nr: 3, plassering: 'Obs 2', grovsortering: 'Gul', utskrevet: ''},
+          {id: 12, patient_nr: 5, plassering: 'Grønn sone', grovsortering: 'Grønn', utskrevet: ''},
+        ];
+        globalThis.apiFetch = async () => ({status: 200, headers: {get: () => null}, json: async () => PAS});
+        const celle = navn => faste['obs-grid'].barn.find(c => c.attr['data-plassering'] === navn);
+    """
+
+    def _tegn(self, nivaa):
+        import json as _json
+        ut = self._kjor(self._DOM + """
+            globalThis.window = {MODUL_TILGANG: {patients: '%s'}};
+            (async () => {
+              await renderBoard();
+              const obs2 = celle('Obs 2'), obs1 = celle('Obs 1');
+              const kort = faste['zone-gronn'].barn[0];
+              console.log(JSON.stringify({
+                obs2: obs2.attr, obs1: obs1.attr, sone: faste['zone-gronn'].attr,
+                kort: kort.attr, kortDras: kort.klasser.has('tavle-dras'),
+                obs2Dras: obs2.klasser.has('tavle-dras'),
+              }));
+            })();
+        """ % nivaa)
+        return _json.loads([l for l in ut.splitlines() if l.startswith('{')][-1])
+
+    def test_renderBoard_merker_plassene_og_kortene(self):
+        r = self._tegn('skriv_full')
+        self.assertEqual(r['sone'].get('data-plassering'), 'Grønn sone')
+        self.assertEqual(r['obs1'], {'data-plassering': 'Obs 1'},
+                         'en ledig seng er et mål, ikke opptatt, og ikke drabar')
+        self.assertEqual(r['obs2']['data-opptatt-av'], '3')
+        self.assertEqual(r['obs2']['data-pasient'], '11')
+        self.assertEqual(r['obs2']['data-fra'], 'Obs 2')
+        self.assertEqual(r['kort']['data-pasient'], '12')
+        self.assertEqual(r['kort']['data-fra'], 'Grønn sone')
+        self.assertTrue(r['kortDras'] and r['obs2Dras'])
+
+    def test_les_kan_ikke_dra(self):
+        """Samme port som `openEdit()`: lagringen ville gitt 403."""
+        r = self._tegn('les')
+        self.assertNotIn('data-pasient', r['kort'])
+        self.assertNotIn('data-pasient', r['obs2'])
+        self.assertFalse(r['kortDras'] or r['obs2Dras'])
+        # Plassene er fortsatt merket — det er kortene som ikke kan løftes.
+        self.assertEqual(r['obs2']['data-opptatt-av'], '3')
+
+    def test_renderBoard_venter_mens_et_kort_er_i_lufta(self):
+        self._kjor(self._DOM + """
+            globalThis.window = {MODUL_TILGANG: {patients: 'skriv_full'}};
+            let hentet = 0;
+            globalThis.apiFetch = async () => { hentet++; return {status: 304, headers: {get: () => null}}; };
+            globalThis.tavleDrag = {drar: true};
+            (async () => {
+              await renderBoard();
+              assert(hentet === 0, 'tavla skal ikke tegnes om under et drag');
+              assert(tavleTegnEtterDrag === true, 'men huske å tegne etter slippet');
+            })();
+        """)
+
+
 class FlerlinjesMalkommentarTests(TestCase):
     """`{# … #}` er en **enlinjes** kommentar i Django, og strekker den seg
     over flere linjer, rendres den som tekst på siden.

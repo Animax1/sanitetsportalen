@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Pasienttavla: dra og slipp pasientene mellom soner og senger, som på KO-tavla
+
+André: «I /pasienter/ tavlen kan vi få den til å være drag/drop slik vi har i /ko/ tavlen?»
+Et pasientkort (Grønn/Gul sone) eller en opptatt seng (Behandling, Akutt, Obs) kan nå dras til en
+sone eller en **ledig** plass. Slippet er `PUT /pasienter/api/patients/<id>/ {plassering}` —
+samme endepunkt og samme validering som redigeringsskjemaet, så **obs-stemplingen** (inn/ut av
+obspost) og unikheten avgjøres fortsatt av serveren. Ingen endring i backend.
+
+Mønsteret er KO-tavlas (`ko-tavle.js`): pekerhendelser, ikke HTML5 drag-and-drop (som ikke
+virker med berøring), 6 px før et trykk blir et drag — **et vanlig klikk åpner pasienten som
+før** — og klikket etter et slipp svelges. Auto-refreshen venter mens et kort er i lufta.
+Slipp på en opptatt seng gir «Akutt 2 er opptatt av pasient #12» uten tur til serveren; tavla
+leser det av sin egen markup (`data-opptatt-av`), så lista over delte soner bor fortsatt bare i
+`patients/services.py`. Kan ikke dras med `les` — samme port som `openEdit()`.
+`touch-action: none` står bare på kortene som kan dras: på nettbrett ruller ikke siden når
+sveipet starter på et kort.
+
+Tester (`TavlaDraOgSlippTests`) kjører `renderBoard()` i node mot et minimalt DOM, så kallstedene
+er med. Mutanter: 8 av 8 drept (begge kallstedene til `tavleGjorDrabar`, porten,
+opptatt-regelen og -attributtet, sone-attributtet, «samme sted», drag-vakten i `renderBoard`).
+Lytterne selv (`tavleLyttere`) er ikke testet — de er ledninger; reglene ligger i funksjonene.
+
 ## 2026-10-18 — Offline-kopiene slettes etter 24 timer, ikke bare skjules  `#core/personvern` `#vaktliste/offline`
 
 André: «Hvor lenge varer informasjon på det som er offline? På disse sw?» — og «stram det inn om

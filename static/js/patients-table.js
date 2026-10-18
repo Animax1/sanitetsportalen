@@ -252,6 +252,136 @@ function totalDuration(p) {
 // ════════════════════════════════════════════════════════
 // BOARD (TAVLE)
 // ════════════════════════════════════════════════════════
+//
+// **Dra og slipp** (18. okt. 2026, som KO-tavla i `ko-tavle.js`): et kort dras
+// til en sone eller en ledig plass, og slippet er `PUT {plassering}` — samme
+// endepunkt og samme validering som redigeringsskjemaet. Obs-stemplingen og
+// unikheten avgjøres fortsatt av serveren (`patients/services.py`); tavla
+// avviser bare det den selv kan se, så et slipp på en opptatt seng ikke koster
+// en tur til serveren for å få et nei.
+//
+// Reglene er egne funksjoner (`tavleMaal`, `tavleAvgjorSlipp`, `tavleKanDra`),
+// fordi en regel inne i en lytter ikke lar seg kjøre i en test.
+
+//: Så langt må pekeren flytte seg før et trykk blir et drag. Under det er det
+//: et klikk, og klikket åpner pasienten — som før. Samme grense som KO-tavla.
+const TAVLE_DRAGRENSE_PX = 6;
+
+let tavleDrag = null;            // pågående drag: {id, fra, x, y, drar, spokelse, tekst}
+let tavleTegnEtterDrag = false;  // en auto-refresh kom mens kortet var i lufta
+let tavleSvelgKlikk = false;     // klikket nettleseren sender etter et drag
+
+// Samme port som `openEdit()`: den som ikke kan lagre skjemaet, kan ikke dra.
+function tavleKanDra() {
+  return nivaaMinst(window.MODUL_TILGANG, 'patients', 'skriv_full');
+}
+
+// Merker et kort som drabart. Ett sted, så porten ikke står i hver bygger.
+function tavleGjorDrabar(el, p) {
+  if (!tavleKanDra()) return;
+  el.setAttribute('data-pasient', String(p.id));
+  el.setAttribute('data-fra', p.plassering || '');
+  el.classList.add('tavle-dras');
+}
+
+// Hva pekeren står over: `{plassering, opptattAv}`, eller null utenfor tavla.
+// `opptattAv` er pasientnummeret som står i en seng — sonene får aldri det,
+// fordi de er delte. Lista over delte plasseringer bor dermed bare på serveren.
+function tavleMaal(el) {
+  const mal = el && el.closest ? el.closest('[data-plassering]') : null;
+  if (!mal) return null;
+  return {
+    plassering: mal.getAttribute('data-plassering'),
+    opptattAv: mal.getAttribute('data-opptatt-av') || '',
+  };
+}
+
+// null: ingenting skal skje. {feil}: si fra. {plassering}: flytt dit.
+function tavleAvgjorSlipp(fra, maal) {
+  if (!maal || !maal.plassering || maal.plassering === (fra || '')) return null;
+  if (maal.opptattAv) {
+    return { feil: `${maal.plassering} er opptatt av pasient #${maal.opptattAv}.` };
+  }
+  return { plassering: maal.plassering };
+}
+
+async function tavleFlytt(id, plassering) {
+  try {
+    const res = await apiFetch(`/pasienter/api/patients/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({ plassering }),
+    });
+    if (!res.ok) {
+      let msg = 'Kunne ikke flytte pasienten.';
+      try { const d = await res.json(); if (d.error) msg = d.error; } catch (e) {}
+      window.alert(msg);
+    }
+  } finally {
+    // Også etter et nei: en kollega kan ha tatt sengen, og det skal synes.
+    await loadPatients();
+    await renderBoard();
+  }
+}
+
+function tavleRyddDrag() {
+  if (tavleDrag && tavleDrag.spokelse) tavleDrag.spokelse.remove();
+  tavleDrag = null;
+  document.body.classList.remove('tavle-drar');
+  document.querySelectorAll('.tavle-mal-over').forEach(el => el.classList.remove('tavle-mal-over'));
+}
+
+// Kalles fra `DOMContentLoaded` i patients-app.js — alt som kjører på
+// toppnivå står i den siste fila.
+function tavleLyttere() {
+  const panel = document.getElementById('tab-tavle');
+  if (!panel) return;
+  panel.addEventListener('pointerdown', e => {
+    const kort = e.target.closest('[data-pasient]');
+    if (!kort || e.button > 0) return;
+    tavleDrag = { id: Number(kort.getAttribute('data-pasient')), fra: kort.getAttribute('data-fra') || '',
+                  x: e.clientX, y: e.clientY, drar: false, spokelse: null,
+                  tekst: (kort.querySelector('.zc-nr, .obs-patient-nr')?.textContent || '').trim() };
+  });
+  window.addEventListener('pointermove', e => {
+    const d = tavleDrag;
+    if (!d) return;
+    if (!d.drar && Math.hypot(e.clientX - d.x, e.clientY - d.y) < TAVLE_DRAGRENSE_PX) return;
+    if (!d.drar) {
+      d.drar = true;
+      d.spokelse = document.createElement('div');
+      d.spokelse.className = 'tavle-spokelse';
+      d.spokelse.textContent = d.tekst;
+      document.body.appendChild(d.spokelse);
+      document.body.classList.add('tavle-drar');
+    }
+    e.preventDefault();
+    d.spokelse.style.left = e.clientX + 'px';
+    d.spokelse.style.top = e.clientY + 'px';
+    document.querySelectorAll('.tavle-mal-over').forEach(el => el.classList.remove('tavle-mal-over'));
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const mal = under && under.closest ? under.closest('[data-plassering]') : null;
+    if (mal && !mal.hasAttribute('data-opptatt-av')) mal.classList.add('tavle-mal-over');
+  });
+  window.addEventListener('pointerup', e => {
+    const d = tavleDrag;
+    // Et trykk som ikke ble et drag, er et klikk, og `onclick` tar det.
+    if (!d || !d.drar) { tavleDrag = null; return; }
+    tavleRyddDrag();
+    tavleSvelgKlikk = true;
+    setTimeout(() => { tavleSvelgKlikk = false; }, 0);
+    const utfall = tavleAvgjorSlipp(d.fra, tavleMaal(document.elementFromPoint(e.clientX, e.clientY)));
+    if (utfall && utfall.feil) window.alert(utfall.feil);
+    if (utfall && utfall.plassering) { tavleTegnEtterDrag = false; tavleFlytt(d.id, utfall.plassering); return; }
+    if (tavleTegnEtterDrag) { tavleTegnEtterDrag = false; renderBoard(); }
+  });
+  window.addEventListener('pointercancel', tavleRyddDrag);
+  // **Klikket etter et drag svelges** i capture-fasen, før kortets `onclick`:
+  // slippes kortet der det kom fra, ville det ellers åpnet pasienten.
+  panel.addEventListener('click', e => {
+    if (tavleSvelgKlikk) { tavleSvelgKlikk = false; e.stopPropagation(); }
+  }, true);
+}
+
 async function toggleBoardMine() {
   boardMineFilter = !boardMineFilter;
   const btn = document.getElementById('btn-board-mine');
@@ -267,6 +397,9 @@ let lastBoardEtag = null;
 let lastBoardPatients = [];
 
 async function renderBoard() {
+  // Tegnes tavla om mens et kort er i lufta, forsvinner målet under pekeren.
+  // Auto-refreshen venter derfor til slippet.
+  if (tavleDrag && tavleDrag.drar) { tavleTegnEtterDrag = true; return; }
   const url = '/pasienter/api/patients/';
   const headers = {};
   if (lastBoardEtag) headers['If-None-Match'] = lastBoardEtag;
@@ -288,6 +421,7 @@ async function renderBoard() {
   function renderZone(elId, zoneName) {
     const container = document.getElementById(elId);
     if (!container) return;
+    container.setAttribute('data-plassering', zoneName);
     container.innerHTML = '';
     const zone_pts = act.filter(p => p.plassering === zoneName);
     if (!zone_pts.length) {
@@ -311,6 +445,7 @@ async function renderBoard() {
           <span class="zc-duration"><i class="bi bi-clock"></i> ${totalDuration(p)}</span>
         </div>
         ${hpNavn ? `<div class="zc-meta"><span class="zc-helsepersonell"><i class="bi bi-person"></i> H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
+      tavleGjorDrabar(card, p);
       card.onclick = () => openEdit(p);
       container.appendChild(card);
     });
@@ -323,7 +458,9 @@ async function renderBoard() {
   function cell(label, p) {
     const div = document.createElement('div');
     div.className = 'obs-cell';
+    div.setAttribute('data-plassering', label);
     if (p) {
+      div.setAttribute('data-opptatt-av', String(p.patient_nr));
       const cls = p.grovsortering === 'Grønn' ? 'occ-gronn'
                 : p.grovsortering === 'Gul'   ? 'occ-gul'
                 : p.grovsortering === 'Rød'   ? 'occ-rod' : '';
@@ -339,6 +476,7 @@ async function renderBoard() {
           <span class="obs-duration">${totalDuration(p)}</span>
         </div>
         ${hpNavn ? `<div class="obs-meta"><span class="obs-forstehjelper-name">H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
+      tavleGjorDrabar(div, p);
       div.onclick = () => openEdit(p);
     } else {
       div.innerHTML = `<div class="obs-bed-nr">${label}</div><div class="obs-empty">Ledig</div>`;
