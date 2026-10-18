@@ -39,7 +39,10 @@ function renderOppdrag() {
   // fra pulje 5 er borte. KO får beskjed etter tegningen — hendelsesloggen
   // leser oppdragene herfra — gjennom en vakt, fordi denne fila også kjører
   // på /oppdrag/, der `ko-hendelser.js` ikke finnes (CLAUDE.md).
-  el.innerHTML = sortert.map(_oppdragRadHtml).join('');
+  // I /ko/ i to kolonner, pasient og drift (18. okt. 2026); `/oppdrag/` har én.
+  el.innerHTML = (typeof koOppdragKolonner === 'function')
+    ? koOppdragKolonner(sortert, _oppdragRadHtml)
+    : sortert.map(_oppdragRadHtml).join('');
   if (typeof koEtterOppdragTegnet === 'function') koEtterOppdragTegnet();
 }
 

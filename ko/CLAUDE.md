@@ -278,5 +278,6 @@ Reglene — beredskapsnivå, validering, frosne navn, dekningen, endringene, pla
 kopieringen — står i docstringen til `ko/program.py` (flyttet dit 30. sep. 2026; to kopier glir
 fra hverandre).
 
-**Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
-oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.
+**Bilens tid på oppdrag skrives ikke som tavlehistorikk** — den står i oppdragsmodulen.
+**Unntaket er Plassering** (18. okt. 2026): `tavle.oppdragsbesok()` utleder besøk fra
+stemplingene, Fremme til Avreist/Ledig, og «Besøk» teller dem med. De andre hastegradene teller ikke.

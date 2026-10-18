@@ -713,6 +713,47 @@ def _iso(t):
     return t.isoformat() if t else None
 
 
+def oppdragsbesok(vakt, ressurser) -> list[dict]:
+    """Bilenes tid på **Plassering**-oppdrag, som besøk på oppdragets lokasjon (18. okt. 2026).
+
+    André: «Enheter som har plasseringsoppdrag som vises på tavlen, så må det telle antall
+    ganger og tid fra enheten er fremme til de er ledig/avreist.» Ett besøk per **Fremme**,
+    til første **Avreist** eller **Ledig** etter den; uten slutt pågår det (`til` er tom).
+    Bare Plassering: på de andre er bilen på et oppdrag, ikke plassert et sted.
+
+    **Utledet fra stemplingene ved hver lesing, aldri lagret** — samme regel som `opptatt()`.
+    Gjeldende meldinger (`gjeldende_bulk`), så en korrigert stempling teller med sin nye tid.
+    """
+    from oppdrag.choices import AVREIST, FREMME, LEDIG, PLASSERING
+    from oppdrag.models import Oppdrag, Oppdragsenhet, Statusmelding
+
+    ressurs_for = {r.enhet_id: r.pk for r in ressurser if r.enhet_id is not None}
+    if not ressurs_for:
+        return []
+    oppdrag = list(Oppdrag.objects.filter(vakt=vakt, hastegrad=PLASSERING, lokasjon__isnull=False)
+                   .only('pk', 'lokasjon_id', 'oppdragsnummer'))
+    enhet_for = dict(Oppdragsenhet.objects.filter(oppdrag__in=oppdrag)
+                     .values_list('pk', 'enhet_id'))
+    meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdrag])
+    ut = []
+    for o in oppdrag:
+        apne = {}
+        for m in sorted(meldinger[o.pk], key=lambda m: (m.tidspunkt, m.pk)):
+            ressurs_id = ressurs_for.get(enhet_for.get(m.oppdragsenhet_id))
+            if ressurs_id is None:
+                continue
+            if m.status == FREMME and ressurs_id not in apne:
+                apne[ressurs_id] = m.tidspunkt
+            elif m.status in (AVREIST, LEDIG) and ressurs_id in apne:
+                ut.append({'ressurs_id': ressurs_id, 'lokasjon_id': o.lokasjon_id,
+                           'oppdragsnummer': o.oppdragsnummer,
+                           'fra': _iso(apne.pop(ressurs_id)), 'til': _iso(m.tidspunkt)})
+        ut += [{'ressurs_id': rid, 'lokasjon_id': o.lokasjon_id,
+                'oppdragsnummer': o.oppdragsnummer, 'fra': _iso(fra), 'til': None}
+               for rid, fra in apne.items()]
+    return sorted(ut, key=lambda b: b['fra'])
+
+
 def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
     """Alt tavla trenger, i ett svar som polles.
 
@@ -774,6 +815,8 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
             # flyttet laget. Brukernavnet, som `window.KO_BRUKERNAVN`.
             'av_navn': p.av_navn,
         } for p in plasseringer],
+        # Bilenes tid på Plassering-oppdrag teller som besøk (18. okt. 2026).
+        'oppdragsbesok': oppdragsbesok(vakt, ressurser) if med_biler else [],
         # Programmet (steg 2): båndene bak radene, og det «følger konserten»
         # kan velge mellom.
         'program': program_poster(vakt),

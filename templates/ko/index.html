@@ -382,10 +382,16 @@
               Tallet på knappen er det ene stedet det står; hodet teller aktive · ferdig.
               (`{# … #}` er énlinjes — over to linjer ble den tegnet som tekst i hodet.)
             {% endcomment %}
+            {# «Venter på ressurs» i to (18. okt. 2026): pasient er viktigere enn drift. #}
             <button type="button" class="btn btn-outline-warning btn-sm ko-filter-knapp" id="ko-uten-ressurs-filter"
-                    data-action="koVippFilter" data-arg="uten_ressurs" aria-pressed="false"
-                    title="Vis bare oppdrag uten ressurs">
-              <i class="bi bi-exclamation-triangle-fill me-1"></i>Oppdrag uten ressurs <span class="tall"></span>
+                    data-action="koVippFilter" data-arg="uten_ressurs_pasient" aria-pressed="false"
+                    title="Vis bare pasientoppdrag (Akutt, Haster, Vanlig) som trenger ressurs">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Trenger ressurs: pasient <span class="tall"></span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ko-filter-knapp drift" id="ko-uten-ressurs-drift-filter"
+                    data-action="koVippFilter" data-arg="uten_ressurs_drift" aria-pressed="false"
+                    title="Vis bare drift og plassering som trenger ressurs">
+              <i class="bi bi-tools me-1"></i>Trenger ressurs: drift <span class="tall"></span>
             </button>
             <button type="button" class="btn btn-outline-info btn-sm ko-filter-knapp tildelt" id="ko-tildelt-filter"
                     data-action="koVippFilter" data-arg="tildelt" aria-pressed="false"

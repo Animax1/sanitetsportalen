@@ -201,6 +201,26 @@ class BilenPaaOppdragTests(_Grunnlag):
             enhet=self.enhet, problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=lokasjon or self.park)
 
+    def test_plassering_teller_som_besok_fra_fremme_til_avreist_eller_ledig(self):
+        """André, 18. okt. 2026: plasseringsoppdrag teller «antall ganger og tid fra enheten er
+        fremme til de er ledig/avreist». Andre hastegrader teller ikke."""
+        from datetime import timedelta
+        from django.utils import timezone
+        t0 = timezone.now() - timedelta(hours=3)
+        o = self._oppdrag()
+        o.hastegrad = 'Plassering'
+        o.save(update_fields=['hastegrad'])
+        for status, minutter in ((choices.RYKKER_UT, 0), (choices.FREMME, 10), (choices.AVREIST, 40)):
+            oservices.sett_status(o, status, enhet=self.enhet, tidspunkt=t0 + timedelta(minutes=minutter))
+        besok = tavle.oppdragsbesok(self.vakt, [self.bil])
+        self.assertEqual([(b['ressurs_id'], b['lokasjon_id'], b['til']) for b in besok],
+                         [(self.bil.pk, self.park.pk, (t0 + timedelta(minutes=40)).isoformat())])
+        self.assertEqual(besok[0]['fra'], (t0 + timedelta(minutes=10)).isoformat())
+        self.assertEqual(tavle.tavle_data(self.vakt)['oppdragsbesok'],
+                         tavle.oppdragsbesok(self.vakt, tavle.ressurser_paa_tavla(timezone.now())))
+        Oppdrag.objects.filter(pk=o.pk).update(hastegrad='Akutt')
+        self.assertEqual(tavle.oppdragsbesok(self.vakt, [self.bil]), [], 'bare Plassering')
+
     def test_bilen_som_rykker_ut_forlater_plassen_og_er_opptatt_der_oppdraget_er(self):
         p = self._plasser(self.bil, self.club)
         o = self._oppdrag()

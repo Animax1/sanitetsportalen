@@ -389,6 +389,18 @@ class Steg2Tests(TavlereglerTests):
         self.assertEqual(rader['Lag 3']['sist'], {'naa': True, 'til': self._json('NAA2'), 'merke': 'På H4'})
         self.assertIsNone(rader['Lag 2']['sist'])
 
+    def test_bilens_plassering_teller_som_besok(self):
+        """Plassering-oppdrag, Fremme til Avreist/Ledig (18. okt. 2026, `tavle.oppdragsbesok`)."""
+        b = self._json("""(() => {
+            const d = JSON.parse(JSON.stringify(D2));
+            d.oppdragsbesok = [{ressurs_id: 102, lokasjon_id: 1, oppdragsnummer: 7, fra: I(L(23, 20)), til: I(L(23, 21))},
+                               {ressurs_id: 102, lokasjon_id: 2, oppdragsnummer: 8, fra: I(L(23, 22)), til: null}];
+            return koTavleBesok(d, 1, 'alle', NAA2);
+        })()""")
+        lag2 = {r['navn']: r for r in b['rader']}['Lag 2']
+        self.assertEqual((lag2['antall'], lag2['tid_totalt']), (1, 60 * 60000))
+        self.assertEqual(lag2['sist']['merke'], 'O7')
+
     def test_fulgt_sted_gir_nuller_oeverst(self):
         ut = self._json("""(() => {
             const d = JSON.parse(JSON.stringify(D2));

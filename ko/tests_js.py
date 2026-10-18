@@ -1128,30 +1128,47 @@ class DelingOgLagTests(SimpleTestCase):
         ''').splitlines()
         self.assertEqual(ut[:3], ['1 false', '2 true true 2', '1 false'])
 
-    def test_telling_og_de_to_filtrene(self):
-        """Uten ressurs, tildelt, ferdig — og ferdige i historikken teller med
-        (André, 21. sep. 2026: «vises ikke som ferdig i tallstatistikken»)."""
-        harness = build_harness(((KO_JS, ('koOppdragTelling', 'koOppdragFilter', 'koVippFilter',
-                                          'koOppdragTomMelding')),))
+    def test_telling_og_filtrene(self):
+        """Venter på ressurs i to — pasient og drift (André, 18. okt. 2026) — tildelt og ferdig;
+        ferdige i historikken teller med (21. sep. 2026)."""
+        harness = build_harness(((KO_JS, ('koErDrift', 'koOppdragTelling', 'koOppdragFilter',
+                                          'koVippFilter', 'koOppdragTomMelding')),))
         ut = run_node(harness, '''
+            const KO_UTEN_PASIENT = ['Drift', 'Plassering'];
             let koOppdragFilterValg = null;
-            const liste = [{ id: 1, status: 'venter', trenger_ressurs: true }, { id: 2, status: 'fremme', trenger_ressurs: false },
-                           { id: 3, status: 'ledig', trenger_ressurs: false }, { id: 4, status: 'venter', trenger_ressurs: false }];
-            console.log(JSON.stringify(koOppdragTelling(liste)));
+            const liste = [{ id: 1, status: 'venter', trenger_ressurs: true, hastegrad: 'Akutt' },
+                           { id: 2, status: 'fremme', trenger_ressurs: false, hastegrad: 'Vanlig' },
+                           { id: 3, status: 'ledig', trenger_ressurs: false, hastegrad: 'Haster' },
+                           { id: 4, status: 'venter', trenger_ressurs: false, hastegrad: 'Vanlig' },
+                           { id: 5, status: 'venter', trenger_ressurs: true, hastegrad: 'Plassering' }];
             console.log(JSON.stringify(koOppdragTelling(liste, 5)));
-            console.log(koOppdragFilter(liste).length, koOppdragTomMelding());
             let tegnet = 0; globalThis.renderOppdrag = () => { tegnet += 1; };
-            koVippFilter('uten_ressurs'); console.log(koOppdragFilterValg, tegnet, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)), koOppdragTomMelding());
-            koVippFilter('tildelt'); console.log(koOppdragFilterValg, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)), koOppdragTomMelding());
+            koVippFilter('uten_ressurs_pasient'); console.log(tegnet, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)), koOppdragTomMelding());
+            koVippFilter('uten_ressurs_drift'); console.log(JSON.stringify(koOppdragFilter(liste).map((o) => o.id)));
+            koVippFilter('tildelt'); console.log(JSON.stringify(koOppdragFilter(liste).map((o) => o.id)));
             koVippFilter('tildelt'); console.log(koOppdragFilterValg, koOppdragFilter(liste).length);
         ''').splitlines()
-        self.assertEqual(ut[:6], [
-            '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":1}',
-            '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":6}',
-            '4 Ingen oppdrag i oppdragslisten.',
-            'uten_ressurs 1 [1] Ingen oppdrag uten ressurs.',
-            'tildelt [4] Ingen tildelte oppdrag som venter.',
-            'null 4'])
+        self.assertEqual(ut[:5], [
+            '{"aktive":2,"uten_ressurs_pasient":1,"uten_ressurs_drift":1,"tildelt":1,"ferdig":6}',
+            '1 [1] Ingen pasientoppdrag trenger ressurs.',
+            '[5]', '[4]', 'null 5'])
+
+    def test_to_kolonner_pasient_og_drift(self):
+        """André, 18. okt. 2026: «2 kolonner hvor en er Akutt+Haster+Vanlig, Drift+Plassering».
+        Lista i JS skal være `oppdrag.choices.UTEN_PASIENT`."""
+        from oppdrag.choices import UTEN_PASIENT
+        harness = build_harness(((KO_JS, ('koErDrift', 'koOppdragKolonner')),))
+        ut = run_node(harness, '''
+            const KO_UTEN_PASIENT = ['Drift', 'Plassering'];
+            const html = koOppdragKolonner([{ id: 1, hastegrad: 'Akutt' }, { id: 2, hastegrad: 'Drift' },
+                                            { id: 3, hastegrad: 'Vanlig' }], (o) => `[${o.id}]`);
+            const [pasient, drift] = html.split('ko-oppdrag-kolonne"').slice(1);
+            console.log(pasient.match(/\\[\\d\\]/g).join(''), drift.match(/\\[\\d\\]/g).join(''));
+        ''').splitlines()
+        self.assertEqual(ut[0], '[1][3] [2]')
+        import re
+        verdi = re.search(r"const KO_UTEN_PASIENT = (\[[^\]]*\]);", read_js(KO_JS)).group(1)
+        self.assertEqual(set(json.loads(verdi.replace("'", '"'))), set(UTEN_PASIENT))
 
     def test_hendelsevalget_bygges_ikke_om_under_operatoren(self):
         """Nedtrekket «Hendelse» fylles ved hver poll; står fokus i det, eller

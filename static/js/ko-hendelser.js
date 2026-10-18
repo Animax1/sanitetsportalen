@@ -548,7 +548,8 @@ function koEtterOppdragTegnet() {
   if (tall) {
     tall.textContent = '· ' + telling.aktive + ' aktive · ' + telling.ferdig + ' ferdig';
   }
-  for (const [valg, id, antall] of [['uten_ressurs', 'ko-uten-ressurs-filter', telling.uten_ressurs],
+  for (const [valg, id, antall] of [['uten_ressurs_pasient', 'ko-uten-ressurs-filter', telling.uten_ressurs_pasient],
+                                     ['uten_ressurs_drift', 'ko-uten-ressurs-drift-filter', telling.uten_ressurs_drift],
                                      ['tildelt', 'ko-tildelt-filter', telling.tildelt]]) {
     const knapp = document.getElementById(id);
     if (!knapp) continue;
@@ -561,19 +562,46 @@ function koEtterOppdragTegnet() {
   koTegnHendelser();
 }
 
+// ── To kolonner: pasient og drift (André, 18. okt. 2026) ────────────────────
+// «2 kolonner hvor en er Akutt+Haster+Vanlig, Drift+Plassering.» Pasientrelatert
+// er viktigere enn drift, og skal ikke drukne blant dem. Hastegradene uten
+// pasient er `oppdrag.choices.UTEN_PASIENT`; `ko/tests_js.py` holder lista lik.
+const KO_UTEN_PASIENT = ['Drift', 'Plassering'];
+
+function koErDrift(o) {
+  return KO_UTEN_PASIENT.includes(o.hastegrad);
+}
+
+// Lista er allerede sortert av `_sorterOppdrag`; kolonnene beholder rekkefølgen.
+// `rad` er sentralbordets radbygger (`_oppdragRadHtml`), som escaper selv.
+function koOppdragKolonner(sortert, rad) {
+  const pasient = sortert.filter((o) => !koErDrift(o));
+  const drift = sortert.filter(koErDrift);
+  const kolonne = (tittel, liste, tom) => {
+    const innhold = liste.length ? liste.map(rad).join('') : `<div class="tom-melding">${tom}</div>`;
+    return `<section class="ko-oppdrag-kolonne"><h3 class="ko-oppdrag-kolonne-tittel">${tittel} <span class="text-muted">${liste.length}</span></h3>${innhold}</section>`;
+  };
+  return `<div class="ko-oppdrag-kolonner">${kolonne('Pasient', pasient, 'Ingen pasientoppdrag.')}${kolonne('Drift og plassering', drift, 'Ingen drift eller plassering.')}</div>`;
+}
+
 // Tellingen (André, 19. og 21. sep. 2026): «uten ressurs» er oppdrag som
 // trenger en (`trenger_ressurs`), «tildelt» er oppdrag der en enhet er
 // varslet og ennå ikke har rykket ut, «ferdig» er de meldt ledig — på
 // tavla **og i historikken**, dit et ferdig oppdrag går av seg selv. Aktive
 // er resten. `iHistorikk` er et argument, ikke en global, så regelen lar
 // seg kjøre i en test.
+//
+// «Venter på ressurs» er delt i pasient og drift (André, 18. okt. 2026: «pasient
+// relatert er viktigere enn drift»), med hver sin teller og hvert sitt filter.
 function koOppdragTelling(liste, iHistorikk = 0) {
   const uten_ressurs = liste.filter((o) => o.trenger_ressurs).length;
+  const uten_ressurs_drift = liste.filter((o) => o.trenger_ressurs && koErDrift(o)).length;
   const tildelt = liste.filter((o) => o.status === 'venter' && !o.trenger_ressurs).length;
   const ferdigPaaTavla = liste.filter((o) => o.status === 'ledig' && !o.trenger_ressurs).length;
   return {
     aktive: liste.length - uten_ressurs - ferdigPaaTavla,
-    uten_ressurs,
+    uten_ressurs_pasient: uten_ressurs - uten_ressurs_drift,
+    uten_ressurs_drift,
     tildelt,
     ferdig: ferdigPaaTavla + iHistorikk,
   };
@@ -585,7 +613,8 @@ function koOppdragTelling(liste, iHistorikk = 0) {
 let koOppdragFilterValg = null;
 
 function koOppdragFilter(liste) {
-  if (koOppdragFilterValg === 'uten_ressurs') return liste.filter((o) => o.trenger_ressurs);
+  if (koOppdragFilterValg === 'uten_ressurs_pasient') return liste.filter((o) => o.trenger_ressurs && !koErDrift(o));
+  if (koOppdragFilterValg === 'uten_ressurs_drift') return liste.filter((o) => o.trenger_ressurs && koErDrift(o));
   if (koOppdragFilterValg === 'tildelt') return liste.filter((o) => o.status === 'venter' && !o.trenger_ressurs);
   return liste;
 }
@@ -598,7 +627,8 @@ function koVippFilter(valg) {
 // Tom liste betyr to ting: filteret tok alt, eller tavla er tom. Teksten
 // skal si hvilket.
 function koOppdragTomMelding() {
-  if (koOppdragFilterValg === 'uten_ressurs') return 'Ingen oppdrag uten ressurs.';
+  if (koOppdragFilterValg === 'uten_ressurs_pasient') return 'Ingen pasientoppdrag trenger ressurs.';
+  if (koOppdragFilterValg === 'uten_ressurs_drift') return 'Ingen drift eller plassering trenger ressurs.';
   if (koOppdragFilterValg === 'tildelt') return 'Ingen tildelte oppdrag som venter.';
   return 'Ingen oppdrag i oppdragslisten.';
 }

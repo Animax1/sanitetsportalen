@@ -776,6 +776,13 @@ function koTavleBesok(data, lokasjonId, filter, naaMs) {
                    merke: r.opptatt.merke });
     }
   });
+  // Bilene på Plassering: Fremme til Avreist/Ledig (18. okt. 2026, `tavle.oppdragsbesok`).
+  (data.oppdragsbesok || []).filter((b) => b.lokasjon_id === lokasjonId).forEach((b) => {
+    besok.push({ ressurs_id: b.ressurs_id, fra: Date.parse(b.fra), til: b.til ? Date.parse(b.til) : naaMs,
+                 naa: !b.til, merke: 'O' + b.oppdragsnummer });
+  });
+  // I tidsrekkefølge, så den siste er den siste også når kildene blandes.
+  besok.sort((a, b) => a.fra - b.fra);
   const rader = (data.ressurser || []).filter((r) => koTavleSynlig(r, filter)).map((r, rekke) => {
     const mine = besok.filter((b) => b.ressurs_id === r.id);
     const per = {};
@@ -785,8 +792,7 @@ function koTavleBesok(data, lokasjonId, filter, naaMs) {
       const k = koTavleDognnokkel(b.fra, data.dognstart);
       per[k] = (per[k] || 0) + 1;
       tid[k] = (tid[k] || 0) + (b.til - b.fra);
-      // Plasseringene kommer i tidsrekkefølge og hendelsen nå sist, og ett lag
-      // står ett sted om gangen — så den siste er den siste.
+      // Sortert over, og en ressurs står ett sted om gangen — så den siste er den siste.
       sist = b;
     });
     return {

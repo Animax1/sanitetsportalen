@@ -770,6 +770,20 @@ class EnhetskortetTests(SimpleTestCase):
         self.assertEqual(ut[0], 'true'); self.assertEqual(ut[1], 'true')
         self.assertIn('Ingen ventende oppdrag.', ut[2])
 
+    def test_ko_tegner_lista_i_kolonner(self):
+        """I /ko/ to kolonner, pasient og drift (18. okt. 2026), gjennom en vakt: uten
+        `koOppdragKolonner` (på /oppdrag/) én liste."""
+        ut = run_node(self.harness, self.STUBB + """
+            globalThis.oppdragsliste = [
+              { id: 1, status: 'venter', status_navn: 'Venter', enhet_navn: 'E1', lokasjon_navn: 'Scene', nummer: 12,
+                problemstilling: 'Fallskade', hastegrad: 'Haster', opprettet: new Date().toISOString(), status_tidspunkt: null, fritekst: '', trenger_ressurs: false }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            globalThis.koOppdragKolonner = (liste, rad) => '<kolonner>' + liste.map(rad).join('') + '</kolonner>';
+            renderOppdrag(); console.log(el.innerHTML.startsWith('<kolonner>') && el.innerHTML.includes('Fallskade'));
+        """).strip().splitlines()
+        self.assertEqual(ut[0], 'true')
+
 
 class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     """Bilens skjerm: stedvalget ved «Avreist», og Rød/Gul/Grønn.

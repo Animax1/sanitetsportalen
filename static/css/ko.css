@@ -387,6 +387,7 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 /* Filteret «Ventende» i oppdragslistas hode. */
 .ko-filter-knapp.aktiv { background: #78350f; border-color: #f59e0b; color: #fde68a; }
 .ko-filter-knapp.tildelt.aktiv { background: #164e63; border-color: #22d3ee; color: #cffafe; }
+.ko-filter-knapp.drift.aktiv { background: #374151; border-color: #9ca3af; color: #e5e7eb; }
 .ko-filter-knapp .tall:not(:empty)::before { content: '· '; }
 
 /* ── Loggstrømmen ───────────────────────────────────────────────────────── */
@@ -700,3 +701,9 @@ body.ko-eget-vindu #ko-skjulte { display: none !important; }
 .ko-plan-under { color: #fcd34d; }
 .ko-plan-historikk { font-size: 0.78rem; padding-left: 1rem; margin: 0; }
 .ko-plan-historikk .ko-plan-tid { min-width: 0; margin-right: 0.3rem; }
+
+/* Oppdragslista i to kolonner: pasient og drift (18. okt. 2026). Brytes til én
+   under hverandre når vinduet er for smalt til to kort i bredden. */
+.ko-oppdrag-kolonner { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 0.75rem; align-items: start; }
+.ko-oppdrag-kolonne { min-width: 0; }
+.ko-oppdrag-kolonne-tittel { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 0.5rem; }

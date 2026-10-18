@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — KO: oppdragslista i to kolonner, «Trenger ressurs» delt i pasient og drift, og Besøk for biler på Plassering  `#ko/sentralbordet` `#ko/ressursbildet`
+
+André: «Fler kolonne visning i oppdragsliste … i første omgang en 2 kolonnes visning, en er
+Akutt+Haster+Vanlig, Drift+Plassering», «Venter på ressurs kan vi skille mellom 2 … Pasient
+relatert er viktigere enn drift», og «I besøk på tavlen … Enheter som har plasserings oppdrag …
+må det telle antall ganger og tid fra enheten er fremme til de er ledig/avreist».
+
+- **To kolonner i `/ko/`: Pasient (Akutt, Haster, Vanlig) og Drift og plassering**
+  (`koOppdragKolonner` i `ko-hendelser.js`), hver med sitt antall. Sorteringen innenfor er som
+  før. Brytes til én under hverandre når vinduet er for smalt. `/oppdrag/` har fortsatt én liste
+  — kallet går gjennom en vakt, som filteret. `KO_UTEN_PASIENT` holdes lik
+  `oppdrag.choices.UTEN_PASIENT` av en test.
+- **«Oppdrag uten ressurs» er to knapper: «Trenger ressurs: pasient» og «Trenger ressurs:
+  drift»**, med hver sin teller og hvert sitt filter. Pasient er den gule; drift er dempet.
+  «Trenger ressurs» og ikke «Venter på ressurs», fordi det er fagordet ordboka holder.
+- **Besøk teller biler på Plassering** (`ko/tavle.oppdragsbesok()`): ett besøk per Fremme, til
+  første Avreist eller Ledig — utledet fra de gjeldende stemplingene ved hver lesing, ikke
+  lagret. Bare Plassering; «Kjent grense» i `ko/CLAUDE.md` er skrevet om.
+
+Mutanter: 9. To overlevde først — kallstedene (`tavle_data` og `renderOppdrag`) — og fikk tester
+gjennom den ekte inngangen.
+
 ## 2026-10-18 — «Siden sa ikke hvilken portal den gjelder» på admin-sidene: hvert skjema ble avvist med to portaler  `#core/tilgang`
 
 André, ved «Slett portalen»: `{"status": "error", "message": "Siden sa ikke hvilken portal den

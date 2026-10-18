@@ -34,6 +34,6 @@ class OrdbokaTests(SimpleTestCase):
     def test_leseren_ser_teksten(self):
         alt = ' '.join(t for sti in FILER for t in synlig_tekst(sti))
         for ventet in ('Ressursoversikt', 'Ukjent enhet.', 'Enheten finnes ikke lenger i vaktlisten.',
-                       'Vaktlistens enheter uten delt konto', 'Oppdrag uten ressurs',
+                       'Vaktlistens enheter uten delt konto', 'Trenger ressurs: pasient',
                        'Samme ressurstype står to ganger i behovet.'):
             self.assertIn(ventet, alt)
