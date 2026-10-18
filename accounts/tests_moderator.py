@@ -139,6 +139,59 @@ class StyreTests(_Oppsett):
         self.assertTrue(moderering.fjern(self.admin, self.portal, self.kollega))
 
 
+class ModeratorUtnevnerTests(_Oppsett):
+    """André, 18. okt. 2026: «Jeg trodde moderatorer skulle kunne sette andre moderatorer.»"""
+
+    def test_moderatoren_gjor_et_medlem_til_moderator(self):
+        moderering.gjor_til_moderator(self.mona, self.portal, self.ola)
+        self.assertEqual(Portaltilgang.objects.get(bruker=self.ola, portal=self.portal).rolle,
+                         PortalRolle.MODERATOR)
+        self.assertTrue(er_moderator(self.ola, self.portal))
+
+    def test_bare_medlemmer(self):
+        with self.assertRaises(ValidationError):
+            moderering.gjor_til_moderator(self.mona, self.portal, self.kari)
+        self.assertFalse(Portaltilgang.objects.filter(bruker=self.kari).exists())
+
+    def test_aldri_utenfor_portalen_eller_admin(self):
+        for konto in (self.fremmed, self.admin):
+            with self.assertRaises(ValidationError):
+                moderering.gjor_til_moderator(self.mona, self.portal, konto)
+        self.assertFalse(Portaltilgang.objects.filter(bruker=self.admin).exists())
+
+    def test_rollen_tas_ikke_bort_av_en_moderator(self):
+        """Å gjøre til moderator er ikke å ta bort: siden har ingen vei til det, og de andre
+        handlingene på en moderator er stengt for henne."""
+        c = Client()
+        c.force_login(self.mona)
+        c.post(f'/moderator/brukere/{self.kollega.pk}/', {'handling': 'fjern'})
+        c.post(f'/moderator/brukere/{self.kollega.pk}/', {'handling': 'moduler',
+                                                           'modul_vaktliste': 'les'})
+        self.assertEqual(Portaltilgang.objects.get(bruker=self.kollega).rolle,
+                         PortalRolle.MODERATOR)
+        self.assertContains(c.get(f'/moderator/brukere/{self.kollega.pk}/'),
+                            'endres av en administrator')
+
+    @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+    def test_fra_siden_med_audit(self):
+        c = Client()
+        c.force_login(self.mona)
+        self.assertContains(c.get(f'/moderator/brukere/{self.ola.pk}/'), 'Gjør til moderator')
+        c.post(f'/moderator/brukere/{self.ola.pk}/', {'handling': 'moderator'})
+        self.assertEqual(Portaltilgang.objects.get(bruker=self.ola).rolle, PortalRolle.MODERATOR)
+        self.assertTrue(AuditLog.objects.filter(table_name='accounts_portaltilgang',
+                                                record_id=self.ola.pk,
+                                                new_value=PortalRolle.MODERATOR).exists())
+
+    @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+    def test_et_medlem_kan_ikke(self):
+        c = Client()
+        c.force_login(self.ola)
+        self.assertEqual(c.post(f'/moderator/brukere/{self.lege.pk}/',
+                                {'handling': 'moderator'}).status_code, 403)
+        self.assertEqual(Portaltilgang.objects.get(bruker=self.lege).rolle, PortalRolle.MEDLEM)
+
+
 class UtdelbartTests(_Oppsett):
 
     def test_grensen_er_eget_nivaa_under_taket(self):

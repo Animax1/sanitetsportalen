@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler: moderator kan gjøre et medlem til moderator  `#core/tilgang`
+
+André, om punkt 9: «Jeg trodde moderatorer skulle kunne sette andre moderatorer.» Notatet
+(§4.2) sa at bare admin utnevner, og det er nå endret.
+
+- **«Gjør til moderator»** står på kontosiden under «Brukere i ‹portal›»
+  (`moderering.gjor_til_moderator`). Den gjelder bare medlemmer, aldri admin, og logges som
+  rolleendring (`accounts_portaltilgang`).
+- **Å ta rollen bort er fortsatt admins**, og det samme er å ta en moderator ut av portalen og å
+  endre tilgangen hennes. Ellers kunne den første moderatoren som kom til, stenge de andre ute.
+- **Kontosiden til en moderator** sier «Rollen, tilgangen og medlemskapet endres av en
+  administrator», i stedet for å vise knapper som fører til en vegg.
+- **Det gir ingen høyere tilgang.** Modulnivåene deles fortsatt ut innenfor moderatorens eget
+  nivå og portalens tak.
+
+**Mutasjoner: 3.** Én overlevde: `kan_styre()` i utnevningen avgjorde ingenting, fordi
+medlemskravet og `sett_moderator` dekket hvert tilfelle. Den ble fjernet, så regelen står ett
+sted.
+
 ## 2026-10-18 — Portaler: Andrés ni punkter — moderatorvelger, «Legg til valgte», tilgang ved opprettelse, korpsene ut av /vaktliste  `#core/tilgang`
 
 André testet fase 5 på staging («Ellers fungerer ting som det skal») og listet ni ting å rydde.

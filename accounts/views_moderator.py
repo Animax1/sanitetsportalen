@@ -81,7 +81,7 @@ def brukere_view(request):
 @require_http_methods(['GET', 'POST'])
 @rate_limit(group='moderator:bruker', rate='60/m', method='POST', on_limit='html')
 def bruker_view(request, pk):
-    """Én konto: modultilgangen i portalen, og «Fjern fra portalen»."""
+    """Én konto: modultilgangen i portalen, «Gjør til moderator» og «Ta ut av portalen»."""
     portal = gjeldende_portal()
     bruker = get_object_or_404(moderering.synlige_kontoer(portal), pk=pk)
     tilgang = Portaltilgang.objects.filter(bruker=bruker, portal=portal).first()
@@ -101,6 +101,14 @@ def bruker_view(request, pk):
                 messages.success(request, f'{bruker.username} er tatt ut av {portal.navn}. '
                                           'Kontoen står.')
                 return redirect('accounts:moderator_brukere')
+            if handling == 'moderator':
+                moderering.gjor_til_moderator(request.user, portal, bruker)
+                _log_user_admin_action(request, bruker, 'UPDATE',
+                                       field_name=f'rolle i {portal.slug}',
+                                       old_value=PortalRolle.MEDLEM, new_value=PortalRolle.MODERATOR,
+                                       table_name='accounts_portaltilgang')
+                messages.success(request, f'{bruker.username} er moderator i {portal.navn}.')
+                return redirect('accounts:moderator_bruker', pk=bruker.pk)
             if handling != 'moduler':
                 raise ValidationError('Ukjent handling.')
             moderering.kan_styre(request.user, portal, bruker)
@@ -124,6 +132,7 @@ def bruker_view(request, pk):
         'portal': portal,
         'bruker': bruker,
         'tilgang': tilgang,
+        'er_moderator': bool(tilgang and tilgang.rolle == PortalRolle.MODERATOR),
         'sperre': sperre,
         'matrise': matrise,
         'tilhorigheter': bruker.tilhorigheter.select_related('tilhorighet'),

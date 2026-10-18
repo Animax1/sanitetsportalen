@@ -7,7 +7,8 @@ står her og ikke i viewet, så de kan prøves uten en side.
 |---|---|
 | **Moderatoren ser kontoene med portalens tilhørigheter, og portalens medlemmer** | Beslutning 8. Kontoer utenfor ser hun ikke — ellers er portalgrensen en liste over hele installasjonen |
 | **Global admin står utenfor** | Admin har alle portaler uten rader; en moderator som kunne fjerne eller endre en admin, styrte over den som utnevnte henne |
-| **En moderator rører ikke en moderator, heller ikke seg selv** | §4.2: moderatorer utnevnes av admin. Kunne de fjerne hverandre, var utnevnelsen en mening og ikke en regel |
+| **En moderator kan gjøre et medlem til moderator** (André, 18. okt. 2026: «Jeg trodde moderatorer skulle kunne sette andre moderatorer») | Uten det er admin flaskehals hver gang en portal trenger én til. Det gir ingen høyere tilgang: modulnivåene deles fortsatt ut innenfor hennes eget |
+| **…men rører ikke en moderator, heller ikke seg selv** — ta bort rollen, ta ut, endre tilgang er admins | Kunne de ta rollen fra hverandre, ville den første som kom til, kunnet stenge de andre ute. Det som ikke lar seg angre av den det gjelder, ligger hos admin |
 | **Fjerning tar medlemskapet, aldri kontoen** | Beslutning 7. Kontoen kan være med i en annen portal; modulradene går med (`CASCADE`) |
 | **Aldri over taket, aldri over eget nivå** | §4.2. `utdelbart()` er grensen, og matrisen tilbyr ikke mer |
 | **En ny konto er en person, med en av portalens tilhørigheter** | §4.3. Uten tilhørighet forsvinner den fra moderatorens egen liste i det den fjernes fra portalen |
@@ -138,3 +139,19 @@ def kandidater_til_moderator(portal):
                 rad['tilhorighet'] = tilh.navn
     return sorted(ut.values(),
                   key=lambda r: norsk_nokkel(r['konto'].fullt_navn or r['konto'].username))
+
+
+def gjor_til_moderator(aktor, portal, bruker) -> None:
+    """Gjør et medlem til moderator i portalen (18. okt. 2026).
+
+    André: «Jeg trodde moderatorer skulle kunne sette andre moderatorer.» Bare et
+    medlem — kontoer utenfor portalen er det ikke — og aldri admin
+    (`sett_moderator` avviser). En som alt er moderator, blir det fortsatt. `kan_styre`
+    kalles ikke: mutasjonen viste at den ikke avgjorde noe her. **Å ta bort rollen er
+    admins** (`/admin/portaler/<pk>/`) — ellers kunne én moderator stenge de andre ute.
+    """
+    from core.portaladmin import sett_moderator
+
+    if not Portaltilgang.objects.filter(bruker=bruker, portal=portal).exists():
+        raise ValidationError('Kontoen er ikke med i portalen — legg den til først.')
+    sett_moderator(portal, bruker, True)

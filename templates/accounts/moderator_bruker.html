@@ -12,7 +12,12 @@
   </p>
 </section>
 
-{% if sperre %}
+{% if er_moderator %}
+<div class="alert alert-info">
+  <i class="bi bi-shield-check me-1"></i>{{ bruker.fullt_navn|default:bruker.username }} er moderator i
+  {{ portal.navn }}. Rollen, tilgangen og medlemskapet endres av en administrator.
+</div>
+{% elif sperre %}
 <div class="alert alert-secondary">{{ sperre }}</div>
 {% elif not tilgang %}
 <div class="alert alert-secondary">Kontoen er ikke med i portalen. Legg den til fra listen.</div>
@@ -41,6 +46,20 @@
     </div>
   </div>
   <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Moderator</strong></div>
+      <div class="card-body">
+        <p class="form-text mt-0">
+          En moderator legger til og tar ut kontoer i {{ portal.navn }}, gir dem tilgang og kan
+          gjøre andre til moderator. Bare en administrator kan ta rollen bort igjen.
+        </p>
+        <form method="post" data-confirm="Gjøre {{ bruker.username }} til moderator i {{ portal.navn }}? Bare en administrator kan ta rollen bort igjen.">
+          {% csrf_token %}
+          <input type="hidden" name="handling" value="moderator">
+          <button type="submit" class="btn btn-outline-primary">Gjør til moderator</button>
+        </form>
+      </div>
+    </div>
     <div class="card mb-3">
       <div class="card-header"><strong>Ta ut av portalen</strong></div>
       <div class="card-body">

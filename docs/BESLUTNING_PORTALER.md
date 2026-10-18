@@ -128,7 +128,10 @@ annerledes ut:** ingen velger, ingen ny meny. Det er det som gjør de første de
 - **`Portalmodul(portal, modul_slug, tak)`**, satt av admin. Moderator deler ut innenfor
   taket. En modul uten rad finnes ikke i portalen, heller ikke i menyen.
 - **Moderator kan aldri dele ut over eget nivå eller over taket**, og aldri gjøre noen til
-  moderator eller global admin. Moderatorer utnevnes av admin.
+  global admin. **Moderator kan gjøre et medlem til moderator** (André, 18. okt. 2026: «Jeg
+  trodde moderatorer skulle kunne sette andre moderatorer»), men **å ta rollen bort, ta en
+  moderator ut eller endre tilgangen hennes er admins** — ellers kunne én moderator stenge de
+  andre ute.
 - **Global admin** står utenfor som i dag: alle portaler, alle moduler, toppen av stigen.
 
 ### 4.3 Tilhørighet

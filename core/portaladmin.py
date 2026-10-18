@@ -10,7 +10,7 @@ går gjennom de samme sperrene.
 | **Siste aktive portal kan ikke deaktiveres** | Da har ingen en portal å stå i, og alle andre enn admin møter «Ingen portal» |
 | **En modul ut av portalen sletter ikke tilgangene** | `ModulTilgang` står, men gir ingenting (`_tilganger`); settes modulen inn igjen, er tilgangene der. Å slette dem ville gjort et feilklikk irreversibelt |
 | **Taket må være et nivå modulen har** | Et tak modulen ikke kjenner, ville stengt alt eller ingenting uten at noen så hvorfor |
-| **Moderator utnevnes bare av admin** | §4.2: moderator kan aldri gjøre noen til moderator |
+| **Moderatorrollen tas bort bare av admin** | §4.2: en moderator kan utnevne en annen (18. okt. 2026), men ikke ta rollen fra noen |
 """
 from __future__ import annotations
 
