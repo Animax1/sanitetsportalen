@@ -1268,8 +1268,9 @@ def _handling_frys(request, user, side):
     # Frys = deaktiver kontoen OG slett aktive sesjoner i samme
     # operasjon. Uten sesjonsslettingen kan en allerede innlogget
     # bruker fortsette å jobbe til cookien utløper.
-    if user.pk == request.user.pk:
-        messages.error(request, 'Du kan ikke fryse din egen konto.')
+    sperre = _kan_fryses(user, request.user)
+    if sperre:
+        messages.error(request, sperre)
         return redirect('portaladmin:user_detail', pk=user.pk)
 
     user.is_active = False
@@ -1287,6 +1288,22 @@ def _handling_frys(request, user, side):
         + 'Bruk «Tø konto» for å reversere.',
     )
     return redirect('portaladmin:user_detail', pk=user.pk)
+
+
+def _kan_fryses(target, actor) -> str:
+    """Hvorfor ``target`` ikke kan fryses av ``actor`` — tom streng når det går.
+
+    **Superbrukeren fryses ikke** (André, 18. okt. 2026: «Superbruker skal ikke kunne
+    fryses»). Frysing kan reverseres med «Tø konto» — men bare av en administrator som
+    kommer inn. Er superbrukeren frosset og de andre administratorene borte, er nødutgangen
+    stengt, og den fantes nettopp for det tilfellet. Samme grunn som `_kan_degraderes`.
+    """
+    if target.pk == actor.pk:
+        return 'Du kan ikke fryse din egen konto.'
+    if target.is_superuser:
+        return ('Denne kontoen er portalens superbruker og kan ikke fryses — den er veien '
+                'tilbake inn når noe har gått galt.')
+    return ''
 
 
 def _handling_to(request, user, side):
@@ -1432,6 +1449,7 @@ def user_detail_view(request, pk):
         'has_totp_device': has_totp_device,
         'kan_slettes': kan_slettes,
         'slette_sperre': slette_sperre,
+        'frys_sperre': _kan_fryses(user, request.user),
     })
 
 

@@ -238,15 +238,21 @@ class SuperbrukerenErNodutgangenTests(TestCase):
         self.assertTrue(CustomUser.objects.filter(pk=self.super.pk).exists())
         self.assertIn(res.status_code, (302, 403))
 
-    def test_frysing_staar_igjen_med_vilje(self):
-        """**Grensen er om handlingen lar seg reversere.** Frysing er det —
-        «Tø konto» står ved siden av — og en annen administrator kan alltid
-        tine kontoen. Degradering og sletting er det ikke."""
-        self.c.post(reverse('portaladmin:user_detail',
-                            kwargs={'pk': self.super.pk}), {'action': 'freeze'})
+    def test_den_fryses_ikke_heller(self):
+        """André, 18. okt. 2026: «Superbruker skal ikke kunne fryses.» Frysing kan tines —
+        men bare av en administrator som kommer inn, og superbrukeren er den ene som alltid
+        gjør det. Var de andre borte, sto nødutgangen stengt."""
+        svar = self.c.post(reverse('portaladmin:user_detail',
+                                   kwargs={'pk': self.super.pk}), {'action': 'freeze'},
+                           follow=True)
         self.super.refresh_from_db()
-        self.assertFalse(self.super.is_active)
-        self.assertEqual(self.super.role, 'admin', 'rollen står, kontoen er tint tilbake')
+        self.assertTrue(self.super.is_active)
+        self.assertContains(svar, 'kan ikke fryses')
+        self.assertNotContains(svar, 'value="freeze"', msg_prefix='knappen er borte')
+
+    def test_frysknappen_er_borte_paa_din_egen_konto(self):
+        svar = self.c.get(reverse('portaladmin:user_detail', kwargs={'pk': self.admin.pk}))
+        self.assertNotContains(svar, 'value="freeze"')
 
     # ── Rollen er låst i skjemaet, ikke bare i viewet ────────────────────
     def test_rollevalget_er_laast_paa_superbrukeren(self):

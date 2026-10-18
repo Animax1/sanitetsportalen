@@ -368,6 +368,10 @@ def _lokke() -> None:
             kjor_forfalte()
         except Exception:   # noqa: BLE001 — tråden skal aldri dø
             logger.exception('backup-klokka: feil i tikk')
+        # Belastningsvarselet (18. okt. 2026, `core/belastning.py`) bruker samme tråd — den
+        # er den eneste web-prosessen har. Kaster aldri.
+        from core import belastning
+        belastning.vurder_og_varsle()
         time.sleep(TIKK_SEKUNDER)
 
 

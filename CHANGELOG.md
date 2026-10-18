@@ -4,6 +4,69 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Slette en portal med alt i den, for global admin  `#core/vakt`
+
+André: «jeg må kunne slette portaler og ja med det all info i portalen. Det skal være
+forbeholdt admin rollen.» Snur §4.1 i `docs/BESLUTNING_PORTALER.md` («en portal med vakter
+slettes ikke, den deaktiveres»). Kortet **«Slett portalen»** nederst på `/admin/portaler/<pk>/`.
+
+**Bygget på «Slett tidligere vakt»** (`core/vaktsletting.py`): hver vakt i portalen, også den
+aktive, slettes med modulenes egne handlere — og **arkivene og den frosne statistikken går med**
+(André: ja). Så det portalen eier uten en vakt: alt som peker på `Vaktportal`, utledet fra
+modellene og ikke listet, slik at en ny modul er med fra dagen den finnes. Portalens egne
+innstillinger (`…@p<id>`) går også. **Kontoene står** og mister bare medlemskapet.
+
+| Sperre | |
+|---|---|
+| Portalens navn skrives inn | En knapp alene er ett feilklikk unna |
+| Ikke den siste portalen | Standard kan slettes som alle andre (André: ja) |
+| Sperrene fra «Avslutt vakt» på den aktive vakta | Et oppdrag på tavla stopper slettingen |
+| Hel databasebackup først, så alt i én transaksjon | Én auditrad på `core_vaktportal` med hva som gikk |
+
+**Funnet underveis:** vaktslettingens fikstur (`core/tests_vaktsletting.py`) slo opp
+lokasjonen og parklenken uten portal, så en vakt i en annen portal lånte den første portalens
+«Scene» — Brann-oppdraget pekte på Standards lokasjon. I drift går oppslagene gjennom
+`i_portal()`; fiksturen er rettet.
+
+**Arkivene og den frosne statistikken peker på vakta med `SET_NULL`**: en vanlig
+`vakt.delete()` lar dem stå, og en test som telte rader mot vakta, ville sett dem som borte.
+Testen teller dem på primærnøkkel.
+
+Mutanter: **14**. 9 drept med en gang; 5 overlevde og fikk tester — arkivene og statistikken
+(over), tilbakerullingen (feilen kom før slettingen begynte, så den prøvde ingenting),
+«siste portal» på siden, og at oversikten teller bare portalens egne rader.
+
+## 2026-10-18 — Belastningsvarsel: e-post til ADMINS når serveren har det tungt, og når den er tilbake  `#core/drift`
+
+André: «en epost varsel som sendes til meg når serveren opplever høy belastning». Betterstack
+melder når portalen er **nede**; dette melder når den er **treg og i trøbbel**, som bare serveren
+selv ser. Mottaker er `ADMINS` (Railway), som feilvarslene. Ingen bjelle.
+
+| Signal | Standard | Merk |
+|---|---|---|
+| Svartid P95, siste 5 min | over 2000 ms | Bare med minst 20 forespørsler i vinduet — i en stille time er én treg side P95 |
+| Serverfeil (5xx), siste 5 min | 5 | |
+| Minne mot containerens tak | 85 % | cgroup (`memory.current`/`memory.max`); uten tak teller den ikke |
+| Databasen svarer ikke | alltid | |
+| **Varighet** | 5 min | Tilstanden må vare før det sendes |
+
+**Én e-post når det starter, én når det er over** — med verdiene, de tregeste stiene og miljøet
+i emnet («[test] Høy belastning …»). En topp som går over før den har vart, gir ingenting.
+Tersklene og en av/på-bryter står i kortet **«Belastningsvarsel»** på `/admin/innstillinger/`
+(global admin). `core/belastning.py`; kjøres hvert minutt av backup-klokkas tråd, den ene web-
+prosessen har — er klokka slått av (`BACKUP_KLOKKE=av`), vurderes ingenting. Ingen
+personopplysninger i e-posten: tall og stier, gjennom `vask()`.
+
+Mutanter: 15 av 15 drept, blant dem kallstedet i klokketråden.
+
+## 2026-10-18 — Superbrukeren kan ikke fryses  `#core/tilgang`
+
+André: «Superbruker skal ikke kunne fryses.» Frysing sto igjen med vilje fordi den kan
+reverseres — men «Tø konto» krever en administrator som kommer inn, og superbrukeren er
+nødutgangen nettopp for det tilfellet. `_kan_fryses()` i `accounts/views.py` sperrer den (og din
+egen konto, som før); knappen er borte og en linje sier hvorfor. Testen som krevde at frysing
+gikk, er snudd. Mutanter: 3 av 3 drept, én etter en ny test.
+
 ## 2026-10-18 — «Legg til valgte» uten avkrysningsbokser: knappen vises bare når noen kan legges til  `#core/tilgang`
 
 André: «i /moderator/brukere/ så har du knappen med legg valgte i standard, men det er ingen

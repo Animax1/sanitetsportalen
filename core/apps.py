@@ -92,6 +92,9 @@ class CoreConfig(AppConfig):
         # hos en modul. Se `core/kart_innstillinger.py`.
         from core.kart_innstillinger import register_handlers as registrer_kart_innstillinger
         registrer_kart_innstillinger()
+        # Tersklene for belastningsvarselet (18. okt. 2026, `core/belastning.py`).
+        from core.belastning_innstillinger import register_handlers as registrer_belastning
+        registrer_belastning()
 
         # Statusmeldingen i toppmenyen (11. okt. 2026), og én linje i loggen om
         # `PORTAL_MILJO` ikke er en av de kjente verdiene. Se `core/miljo.py`.

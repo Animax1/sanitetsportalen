@@ -32,6 +32,9 @@ flettet inn og kjørt etter `loaddata`, i samme transaksjon.
 
 ## Klokka og planene
 
+**Tråden vurderer også belastningen** (18. okt. 2026, `core/belastning.py`): hvert tikk, etter
+planene. Den er den eneste tråden web-prosessen har; `BACKUP_KLOKKE=av` slår av begge.
+
 **Klokka er en tråd i web-prosessen** (`core/backup/klokke.py`), ikke en
 cron-jobb: et Railway-volum kan bare henge på én tjeneste, og `/data` henger på
 web-tjenesten. Se «Cron-jobbene» i rota for hva en cron-tjeneste uten volum ville

@@ -94,7 +94,9 @@ Vaktportal                                  «Brann», «Landsskytter»
 ### 4.1 `Vaktportal` og aktiv vakt
 
 `core.Vaktportal(navn, slug, er_aktiv)`. `core.Vakt` får `portal` (FK, `PROTECT` — en
-portal med vakter slettes ikke, den deaktiveres). Én aktiv vakt *per portal* — samme
+portal med vakter slettes ikke ved et uhell). **Endret 18. okt. 2026** (André: «jeg må kunne
+slette portaler og ja med det all info i portalen»): global admin sletter en portal med alt i
+den, vakt for vakt, gjennom `core/portalsletting.py`; deaktivering står for det som skal tilbake. Én aktiv vakt *per portal* — samme
 begrunnelse som før (et vaktvalg i hver visning er en pasient på feil vakt), bare én etasje ned.
 
 **Ingen peker** (beslutning 19). `AppSetting['aktiv_vakt_id']` erstattes av

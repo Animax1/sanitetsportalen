@@ -140,7 +140,9 @@
           </form>
 
           {% if target_user.is_active %}
-            {% if target_user.pk != request.user.pk %}
+            {% if target_user.is_superuser %}
+            <p class="form-text mb-0"><i class="bi bi-shield-lock me-1"></i>{{ frys_sperre }}</p>
+            {% elif not frys_sperre %}
             <form method="post" data-confirm="Fryse kontoen til {{ target_user.username }}? Brukeren logges ut umiddelbart og kan ikke logge inn igjen før kontoen tøs." >
               {% csrf_token %}
               <input type="hidden" name="action" value="freeze">

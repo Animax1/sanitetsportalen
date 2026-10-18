@@ -305,8 +305,8 @@ kommer tilbake inn med. **Flagget er eksklusivt til bootstrap-kontoen** (André,
 Den siste er den som holder de tre andre i live: sperrene verner nøyaktig de veiene som
 finnes i dag, og en ny vei er usynlig for dem. **«Siste admin»-sperra dekker den ikke** — er det tre
 administratorer, kan superbrukeren degraderes uten at noe protesterer, og da er nødutgangen
-borte mens portalen ser helt normal ut. **Frysing står igjen med vilje:** grensen går ved om
-handlingen lar seg reversere, og «Tø konto» står ved siden av.
+borte mens portalen ser helt normal ut. **Og frysing** (`_kan_fryses`, 18. okt.
+2026): «Tø konto» krever en admin som kommer inn, og superbrukeren er den som alltid gjør det.
 
 De fem `kan_redigere_*`-flaggene er **borte** (deploy 3). Skal en ny modul gates, trengs
 ingen kolonne på `CustomUser` — en `ModulTilgang`-rad er hele mekanismen. Det var nettopp

@@ -72,7 +72,12 @@ class _Data:
         from vaktliste.test_helpers import lag_ressurs
 
         naa = timezone.now()
-        lokasjon = Lokasjon.objects.get_or_create(navn='Scene')[0]
+        # Per portal (`PortalEid`): uten avgrensningen lånte en vakt i en annen portal
+        # den første portalens «Scene», og portalslettingen snublet i det (18. okt. 2026).
+        from core.portal import eneste_portal
+        portal = vakt.portal or eneste_portal()
+        lokasjon = Lokasjon.objects.filter(portal=portal).get_or_create(
+            navn='Scene', defaults={'portal': portal})[0]
         enhet = Enhet.objects.get_or_create(navn='Bil 1', defaults={'pa_vakt': True})[0]
         Patient.objects.create(vakt=vakt, pasientnummer=next_patient_nr(vakt))
         arkiver_aktiv_vakt(vakt.navn, '', admin, vakt=vakt)
@@ -101,8 +106,9 @@ class _Data:
         from vaktliste.test_helpers import lag_mannskap
         korps = Tilhorighet.objects.get_or_create(navn='Slettkorps')[0]
         lag_mannskap(vakt=vakt, navn=f'Per {vakt.pk}', korps=korps)   # registeret (18. okt.)
-        lenke = Parklenke.objects.get_or_create(
-            navn='Kort', defaults={'hemmelighet_hash': 'x' * 64, 'aapen_fra': naa,
+        lenke = Parklenke.objects.filter(portal=portal).get_or_create(
+            navn='Kort', defaults={'portal': portal, 'hemmelighet_hash': f'{portal.pk:x}'.rjust(64, 'x'),
+                                   'aapen_fra': naa,
                                    'aapen_til': naa + timezone.timedelta(days=1)})[0]
         Registrering.objects.create(vakt=vakt, lenke=lenke, ressurs=ressurs, ressurs_navn='Lag 1',
                                     problemstilling='Svimmelhet', utfall='Behandlet på stedet',

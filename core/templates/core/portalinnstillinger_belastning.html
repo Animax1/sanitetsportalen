@@ -1,0 +1,32 @@
+{% comment %}
+Kortet «Belastningsvarsel» på /admin/innstillinger/ (18. okt. 2026). Verdiene kommer fra
+`core/belastning_innstillinger.py`; reglene står i `core/belastning.py`.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Belastningsvarsel</strong></div>
+    <div class="card-body">
+      <input type="hidden" name="belastning_sendt" value="1">
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="belastning_aktiv" name="belastning_aktiv" value="1"{% if belastning_aktiv %} checked{% endif %}>
+        <label class="form-check-label" for="belastning_aktiv">Send e-post til administratorene (ADMINS) ved høy belastning</label>
+      </div>
+      <div class="row g-3 belastning-terskler">
+        {% for f in belastning_felt %}
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label" for="{{ f.navn }}">{{ f.etikett }}</label>
+          <div class="input-group">
+            <input type="number" id="{{ f.navn }}" name="{{ f.navn }}" class="form-control"
+                   min="{{ f.min }}" max="{{ f.maks }}" value="{{ f.verdi }}">
+            <span class="input-group-text">{% if f.navn == 'belastning_p95_ms' %}ms{% elif f.navn == 'belastning_feil_5xx' %}stk{% elif f.navn == 'belastning_minne_pst' %}%{% else %}min{% endif %}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="form-text mt-2">
+        Én e-post når serveren har vært over en av tersklene så lenge som «Varighet» — svartiden
+        for de 5 % tregeste forespørslene, serverfeil siste 5 minutter, eller minnet mot
+        containerens tak — og én når den er normal igjen. Databasen som ikke svarer, teller alltid.
+        At portalen er helt nede, meldes av den eksterne overvåkingen, ikke herfra.
+      </div>
+    </div>
+  </div>

@@ -575,8 +575,9 @@ class Vaktportal(models.Model):
     legger sykler bakerst — i `portal`-handleren, som gjenopprettes først. Den
     aktive vakta er `Vakt.er_aktiv`, og databasen håndhever at det er én.
 
-    Slettes ikke når den har vakter (`Vakt.portal` er `PROTECT`); den
-    deaktiveres. Bærer ingen personopplysninger.
+    `Vakt.portal` er `PROTECT`, så en portal med vakter går ikke med et uhell. Global admin
+    sletter den med alt i den gjennom `core/portalsletting.py` (18. okt. 2026), eller
+    deaktiverer den. Bærer ingen personopplysninger.
     """
 
     navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')

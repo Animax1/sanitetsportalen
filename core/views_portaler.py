@@ -20,6 +20,7 @@ from core.ratelimit import rate_limit
 from accounts.moderering import kandidater_til_moderator
 
 from . import portaladmin
+from .portalsletting import oversikt as portalsletting_oversikt
 
 
 def _vis_feil(request, feil: ValidationError) -> None:
@@ -98,6 +99,19 @@ def portal_view(request, pk):
                     user=request.user, ip=klient_ip(request))
                 messages.success(request, f'{bruker.username} er {"moderator" if er else "ikke lenger moderator"} '
                                           f'i {portal.navn}.')
+            elif handling == 'slett':
+                # Alt i portalen går (André, 18. okt. 2026). Reglene: `core/portalsletting.py`.
+                from core.portalsletting import slett_portal
+                from core.vaktsletting import KanIkkeSlettes
+                navn = portal.navn
+                try:
+                    o = slett_portal(portal, bekreftelse=request.POST.get('bekreftelse', ''),
+                                     bruker=request.user, request=request)
+                except KanIkkeSlettes as feil:
+                    raise ValidationError(str(feil)) from feil
+                messages.success(request, f'Portalen «{navn}» er slettet, med {len(o["vakter"])} '
+                                          'vakter. En hel backup ble tatt først.')
+                return redirect('portaladmin:portaler')
             else:
                 raise ValidationError('Ukjent handling.')
         except ValidationError as feil:
@@ -120,6 +134,7 @@ def portal_view(request, pk):
         'moderatorer': (Portaltilgang.objects
                         .filter(portal=portal, rolle=PortalRolle.MODERATOR)
                         .select_related('bruker').order_by('bruker__username')),
+        'sletting': portalsletting_oversikt(portal),
     })
 
 
