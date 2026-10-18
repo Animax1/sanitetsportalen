@@ -12,9 +12,10 @@
 <section class="mb-4">
   <h1 class="mb-2"><i class="bi bi-flag me-2"></i>Vakt</h1>
   <p class="text-muted mb-0">
-    Vakten alle modulene registrerer på. Innstillingene for hver funksjon står under
+    Vakten alle modulene registrerer på{% if not admin %} i {{ vakt.portal.navn }}{% endif %}.
+    {% if admin %}Innstillingene for hver funksjon står under
     <a href="{% url 'portaladmin:portal_settings' %}">Innstillinger</a>; det som gjelder
-    selve vakten, står her.
+    selve vakten, står her.{% else %}En avsluttet vakt kan gjenåpnes av en administrator.{% endif %}
   </p>
 </section>
 
@@ -25,7 +26,7 @@
       <div class="card-body">
         <p class="mb-2"><strong>{{ vakt.navn }}</strong>
           <span class="text-muted small">· startet {{ vakt.startet|date:"d.m.Y H:i" }}</span></p>
-        <form method="post" action="{% url 'portaladmin:vakt_navn' %}" class="d-flex gap-2 flex-wrap">
+        <form method="post" action="{{ url_navn }}" class="d-flex gap-2 flex-wrap">
           {% csrf_token %}
           <label class="visually-hidden" for="vakt-navn">Navn på vakten</label>
           <input type="text" id="vakt-navn" name="navn" class="form-control form-control-sm"
@@ -50,7 +51,7 @@
         {% for sperre in oversikt.sperrer %}
           <p class="text-danger fw-semibold small mb-2">{{ sperre }}</p>
         {% endfor %}
-        <form method="post" action="{% url 'portaladmin:vakt_avslutt' %}"
+        <form method="post" action="{{ url_avslutt }}"
               data-confirm="Avslutte «{{ vakt.navn }}»? Radene arkiveres og tømmes, og det kan ikke angres herfra.">
           {% csrf_token %}
           <label class="form-label small mb-1" for="ny-vakt-navn">Navnet på den nye vakten</label>
@@ -90,7 +91,8 @@
               <td class="small">{{ t.vakt.avsluttet|date:"d.m.Y H:i"|default:"–" }}</td>
               <td class="text-end text-nowrap">
                 {% if t.nokkel %}<a class="btn btn-sm btn-link" href="/statistikk/?vakt={{ t.nokkel|urlencode }}">Statistikk</a>{% endif %}
-                {% if t.kan_gjenaapnes %}
+                {% if not admin %}
+                {% elif t.kan_gjenaapnes %}
                 <form method="post" action="{% url 'portaladmin:vakt_gjenaapne' t.vakt.pk %}" class="d-inline"
                       data-confirm="Gjenåpne «{{ t.vakt.navn }}»? «{{ vakt.navn }}» avsluttes uten arkivering. Arkiverte rader hentes ikke tilbake — de ligger i arkivene og backupen.">
                   {% csrf_token %}
@@ -99,7 +101,7 @@
                 {% else %}
                 <span class="small text-muted" title="Et arkiv for vakten er kollapset">kollapset</span>
                 {% endif %}
-                <a class="btn btn-sm btn-link text-danger" href="{% url 'portaladmin:vakt_slett' t.vakt.pk %}">Slett</a>
+                {% if admin %}<a class="btn btn-sm btn-link text-danger" href="{% url 'portaladmin:vakt_slett' t.vakt.pk %}">Slett</a>{% endif %}
               </td>
             </tr>
           {% empty %}
@@ -111,6 +113,7 @@
     </details>
   </div>
 
+  {% if admin %}
   <div class="col-12">
     <details class="card vakt-liste" open>
       <summary class="card-header"><strong>Arkiver</strong>
@@ -141,5 +144,6 @@
       </div>
     </details>
   </div>
+  {% endif %}
 </div>
 {% endblock %}

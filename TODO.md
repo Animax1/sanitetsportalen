@@ -159,8 +159,8 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Portalnavnet i fanetittelen** når kontoen har flere portaler (notatet §4.4). Merket i
       toppen står fra fase 2; tittelen går gjennom `{{ miljo.fane }}` i hver mal og `fanetittel()`
       i JS, og tas sammen med flatene i fase 5.
-- [ ] **Fase 5:** flatene som står igjen — «Avslutt vakt» til moderator i egen portal,
-      portalvelgeren, og forslaget «mannskap fra de siste 24 månedene» ved ny vakt. Også:
+- [ ] **Fase 5:** flatene som står igjen — portalvelgeren, og forslaget «mannskap fra de
+      siste 24 månedene» ved ny vakt. Også:
       **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn);
       kortene på `/admin/innstillinger/` delt i portalens og systemets (§4.7); og at et
       varsel fra en annen portal bytter portal når det åpnes.

@@ -12,8 +12,14 @@ lastes, skjemaene poster og videresender (PRG), og bekreftelsen er
 `data-confirm` fra `ui-actions.js`, som backupsiden. Malen escaper selv, så det
 finnes ingen mal-strenger å skanne.
 
-**Alt er global admin** (`admin_required`), som resten av `/admin/`. Arbeidet
-gjøres av `core/vaktslutt.py`; denne fila kjenner ingen modul ved navn.
+**Admin og moderator** (fase 5c, 17. okt. 2026, `docs/BESLUTNING_PORTALER.md` §4.8):
+navn og «Avslutt vakt» har to innganger — `/admin/vakt/` og `/moderator/vakt/` — og én
+kropp hver. Avslutningen er reversibel (`pre_reset`-backup, gjenåpning), og uten den
+ville admin vært flaskehals for hver kamp. **Gjenåpning, sletting og arkivene står hos
+admin**: de er enten irreversible, eller går på tvers av portalene. Moderatorens side
+viser dem ikke, og rutene er `admin_required`.
+
+Arbeidet gjøres av `core/vaktslutt.py`; denne fila kjenner ingen modul ved navn.
 """
 from __future__ import annotations
 
@@ -23,10 +29,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core import vaktslutt
-from core.auth_decorators import admin_required
+from core.auth_decorators import admin_required, moderator_kreves
 from core.models import Vakt
 from core.ratelimit import rate_limit
 from core.vakt import (
@@ -82,9 +89,12 @@ def _arkiver() -> list[dict]:
     return sorted(rader, key=lambda r: r['importert_at'], reverse=True)
 
 
-@admin_required
-@require_GET
-def vakt_view(request):
+def _tilbake(request):
+    """Siden innsendingen kom fra: moderatorens eller admins."""
+    return 'core:moderator_vakt' if request.path.startswith('/moderator/') else 'portaladmin:vakt'
+
+
+def _side(request, *, admin: bool):
     from core.vaktstatistikk import tidligere_vakter
 
     vakt = hent_aktiv_vakt()
@@ -95,33 +105,36 @@ def vakt_view(request):
     for oppforing in oppforinger:
         if oppforing.get('vakt_id'):
             statistikk_for_vakt.setdefault(oppforing['vakt_id'], oppforing['nokkel'])
-    arkiver = _arkiver()
+    # Arkivene går på tvers av portalene, og slettingen er admins.
+    arkiver = _arkiver() if admin else []
     for rad in arkiver:
         if rad['vakt_id']:
             rad['nokkel'] = statistikk_for_vakt.get(rad['vakt_id'])
 
     kollapset = _kollapsede_vakter()
+    # Alle i portalen utenom den aktive. For admin også en vakt uten portal
+    # (lastet fra en backup tatt før portalene fantes), så den kan gjenåpnes
+    # og tas inn — ellers ville den forsvunnet fra lista uten spor.
+    hvilke = Q(portal=vakt.portal) | Q(portal__isnull=True) if admin else Q(portal=vakt.portal)
     tidligere = [
         {'vakt': v, 'kan_gjenaapnes': v.pk not in kollapset,
          'nokkel': statistikk_for_vakt.get(v.pk)}
-        # Alle i portalen utenom den aktive. En vakt uten portal (lastet fra en
-        # backup tatt før portalene fantes) vises også, så den kan gjenåpnes
-        # og tas inn — ellers ville den forsvunnet fra lista uten spor.
-        for v in (Vakt.objects.filter(Q(portal=vakt.portal) | Q(portal__isnull=True))
+        for v in (Vakt.objects.filter(hvilke)
                   .exclude(pk=vakt.pk).order_by('-avsluttet', '-startet'))
     ]
+    navnerom = 'portaladmin' if admin else 'core'
     return render(request, 'core/vakt.html', {
         'vakt': vakt,
         'oversikt': vaktslutt.oversikt(vakt),
         'tidligere': tidligere,
         'arkiver': arkiver,
+        'admin': admin,
+        'url_navn': reverse(f'{navnerom}:{"vakt_navn" if admin else "moderator_vakt_navn"}'),
+        'url_avslutt': reverse(f'{navnerom}:{"vakt_avslutt" if admin else "moderator_vakt_avslutt"}'),
     })
 
 
-@admin_required
-@require_POST
-@rate_limit(group='portaladmin:vakt-navn', rate='20/m', method='POST', on_limit='html')
-def vakt_navn_view(request):
+def _navn(request):
     """Gi den aktive vakta nytt navn. Samme regler som ved start: påkrevd og unikt
     — to vakter med samme navn lar seg ikke skille i statistikken."""
     vakt = hent_aktiv_vakt()
@@ -134,31 +147,30 @@ def vakt_navn_view(request):
         vakt.navn = navn
         vakt.save(update_fields=['navn'])
         messages.success(request, f'Vakten heter nå «{navn}».')
-    return redirect('portaladmin:vakt')
+    return redirect(_tilbake(request))
 
 
-@admin_required
-@require_POST
-@rate_limit(group='portaladmin:vakt-avslutt', rate='5/m', method='POST', on_limit='html')
-def vakt_avslutt_view(request):
+def _avslutt(request):
     """Avslutt den aktive vakta og start en ny (`core/vaktslutt.py`).
 
     Krever avkrysningen `bekreft` i tillegg til `data-confirm` i nettleseren: den
-    første er en port serveren håndhever, den andre bare et spørsmål.
+    første er en port serveren håndhever, den andre bare et spørsmål. Vakta er
+    den aktive **i portalen forespørselen står i** — en moderator når ingen annen.
     """
+    tilbake = _tilbake(request)
     if request.POST.get('bekreft') != 'ja':
         messages.error(request, 'Kryss av for at du har sett oversikten.')
-        return redirect('portaladmin:vakt')
+        return redirect(tilbake)
     nytt_navn = (request.POST.get('ny_vakt_navn') or '').strip()
     if not nytt_navn:
         messages.error(request, 'Den nye vakten må ha et navn — det settes ved vaktstart.')
-        return redirect('portaladmin:vakt')
+        return redirect(tilbake)
     # Tidlig, så et åpenbart opptatt navn ikke koster en backup. Vernet er
     # `opprett_vakt` i orkestratoren — denne sjekken er et kappløp.
     vakt = hent_aktiv_vakt()
     if Vakt.objects.filter(portal=vakt.portal, navn=nytt_navn).exists():
         messages.error(request, vaktnavn_opptatt_melding(nytt_navn))
-        return redirect('portaladmin:vakt')
+        return redirect(tilbake)
 
     try:
         svar = vaktslutt.avslutt(vakt, ny_vakt_navn=nytt_navn, bruker=request.user,
@@ -166,10 +178,10 @@ def vakt_avslutt_view(request):
     except vaktslutt.Sperret as sperret:
         for grunn in sperret.grunner:
             messages.error(request, grunn)
-        return redirect('portaladmin:vakt')
+        return redirect(tilbake)
     except VaktnavnOpptatt as feil:
         messages.error(request, str(feil))
-        return redirect('portaladmin:vakt')
+        return redirect(tilbake)
 
     deler = []
     for h in vaktslutt.all_handlers():
@@ -178,7 +190,47 @@ def vakt_avslutt_view(request):
     messages.success(request, (
         f'Arkivert og tømt: {", ".join(deler) or "ingenting"}. Statistikken er frosset. '
         f'«{svar["avsluttet_vakt"]}» er avsluttet, og «{svar["ny_vakt"]}» er aktiv.'))
-    return redirect('portaladmin:vakt')
+    return redirect(tilbake)
+
+
+@admin_required
+@require_GET
+def vakt_view(request):
+    return _side(request, admin=True)
+
+
+@admin_required
+@require_POST
+@rate_limit(group='portaladmin:vakt-navn', rate='20/m', method='POST', on_limit='html')
+def vakt_navn_view(request):
+    return _navn(request)
+
+
+@admin_required
+@require_POST
+@rate_limit(group='portaladmin:vakt-avslutt', rate='5/m', method='POST', on_limit='html')
+def vakt_avslutt_view(request):
+    return _avslutt(request)
+
+
+@moderator_kreves
+@require_GET
+def moderator_vakt_view(request):
+    return _side(request, admin=False)
+
+
+@moderator_kreves
+@require_POST
+@rate_limit(group='moderator:vakt-navn', rate='20/m', method='POST', on_limit='html')
+def moderator_vakt_navn_view(request):
+    return _navn(request)
+
+
+@moderator_kreves
+@require_POST
+@rate_limit(group='moderator:vakt-avslutt', rate='5/m', method='POST', on_limit='html')
+def moderator_vakt_avslutt_view(request):
+    return _avslutt(request)
 
 
 @admin_required

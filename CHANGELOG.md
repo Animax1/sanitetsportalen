@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 5c: «Avslutt vakt» til moderator, i egen portal  `#core/vakt`
+
+`docs/BESLUTNING_PORTALER.md` §4.8, som endrer `BESLUTNING_ROLLEMODELLEN.md` §3.3 («ingen
+modul-admin»). Begrunnelsen for §3.3 holder fortsatt: det irreversible skal ligge hos de få. Og
+«Avslutt vakt» er reversibel — den tar `pre_reset`-backup og kan gjenåpnes til arkivet er
+kollapset. Uten flyttingen ville admin vært flaskehals for hver kamp.
+
+**Synlig endring for en moderator:** «Vakt» under «Moderator» i avatar-menyen
+(`/moderator/vakt/`). Siden viser:
+- vaktas navn, med «Endre navn»;
+- oversikten over hva som arkiveres, med sperrene;
+- «Avslutt vakt og start ny»;
+- tidligere vakter **i egen portal**, med lenken til statistikken.
+
+**For admin: ingenting** — `/admin/vakt/` er som før.
+
+**Én kropp, to innganger.** `_side`, `_navn` og `_avslutt` i `core/views_vakt.py` er det
+admin-viewene var. Inngangene er `admin_required` under `/admin/vakt/` og `moderator_kreves`
+under `/moderator/vakt/`, med hver sin rate-limit-gruppe. En regel i to kopier glir fra
+hverandre, og den ene ville vært den moderatoren bruker. Vakta er alltid den aktive **i portalen
+forespørselen står i**, så en moderator når ingen annen; orkestratoren (`core/vaktslutt.py`)
+låste allerede på `vakt.portal`.
+
+**Hos admin står fortsatt:**
+- gjenåpning;
+- sletting av tidligere vakter og arkiv;
+- arkivlisten, som går på tvers av portalene;
+- vakter uten portal (fra backuper før portalene), som skal tas inn.
+
+Moderatorens side viser ingen av dem — **heller ikke i konteksten**, ikke bare i malen. Rutene er
+`admin_required` som før.
+
+**Mutasjoner: 11, alle drept.** To overlevde i første runde. Malen skjulte arkivene og vaktene
+uten portal, så testen så ikke at viewet fortsatt sendte dem. Den andre grunnen var at testbasen
+verken hadde et arkiv eller en vakt uten portal. Testen sjekker nå konteksten, med begge til
+stede.
+
 ## 2026-10-17 — Portaler fase 5b: moderatorens brukere — «Brukere i portalen», legg til, ta ut, gi tilgang, ny konto  `#core/tilgang`
 
 Andre pulje av fase 5 (`docs/BESLUTNING_PORTALER.md` §4.2, §4.3, §4.11; beslutning 7, 8, 13).

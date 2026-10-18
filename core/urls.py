@@ -13,7 +13,7 @@ myproject/urls.py.
 """
 from django.urls import path, re_path
 
-from . import views_admin, views_portal, views_portalvalg, views_varsler
+from . import views_admin, views_portal, views_portalvalg, views_vakt, views_varsler
 
 app_name = 'core'
 
@@ -28,6 +28,13 @@ urlpatterns = [
     # utenfor portalregelen i `core/portal_middleware.py` — den er der man
     # velger.
     path('portal/', views_portalvalg.velg_view, name='portal_velg'),
+
+    # Vakta for moderator i egen portal (fase 5c, §4.8): navn og «Avslutt vakt».
+    # Samme kropp som `/admin/vakt/`; gjenåpning, sletting og arkiv står der.
+    path('moderator/vakt/', views_vakt.moderator_vakt_view, name='moderator_vakt'),
+    path('moderator/vakt/navn/', views_vakt.moderator_vakt_navn_view, name='moderator_vakt_navn'),
+    path('moderator/vakt/avslutt/', views_vakt.moderator_vakt_avslutt_view,
+         name='moderator_vakt_avslutt'),
 
     # ── Admin-UI ────────────────────────────────────────────────────────────
     # Rutene under /admin/ flyttet til `core/urls_admin.py` 14. sep.

@@ -635,7 +635,7 @@ feiler de etter en refaktorering, er det refaktoreringen som er feil.
 
 ### Avslutt vakt (core/vaktslutt.py, core/vaktstatistikk.py)
 
-**Ett trykk på `/admin/vakt/` avslutter hele vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
+**Ett trykk på `/admin/vakt/` (moderator: `/moderator/vakt/`) avslutter vakta**: sperrer → `pre_reset`-backup → i én transaksjon frys
 hver statistikkfane (`core.VaktStatistikk`), arkiver og tøm, åpne ny vakt. Frosne tall
 regnes aldri ut på nytt — tell opp `statistikk_versjon` når formen endres.
 

@@ -327,6 +327,9 @@
           <li><a class="dropdown-item{% if '/moderator/brukere' in request.path %} active{% endif %}" href="{% url 'accounts:moderator_brukere' %}">
             <i class="bi bi-people me-2"></i>Brukere i {{ aktiv_portal.navn }}
           </a></li>
+          <li><a class="dropdown-item{% if '/moderator/vakt' in request.path %} active{% endif %}" href="{% url 'core:moderator_vakt' %}">
+            <i class="bi bi-flag me-2"></i>Vakt
+          </a></li>
           {% endif %}
           <li><hr class="dropdown-divider"></li>
           <li>

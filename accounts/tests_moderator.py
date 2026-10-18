@@ -204,7 +204,7 @@ class PorteneTests(_Oppsett):
 
     def test_hver_moderatorrute_er_merket_og_stengt_for_andre(self):
         ruter = _moderatorruter()
-        self.assertEqual(len(ruter), 3)
+        self.assertGreaterEqual(len(ruter), 6, 'brukerne (5b) og vakta (5c)')
         anonym = Client()
         medlem = self._klient(self.ola)
         for monster, cb in ruter:
@@ -212,11 +212,13 @@ class PorteneTests(_Oppsett):
             res = anonym.get(self._sti(monster))
             self.assertEqual(res.status_code, 302, monster)
             self.assertIn('/accounts/login/', res['Location'])
+            # Porten før metoden: et medlem får 403 også på en POST-rute.
             self.assertEqual(medlem.get(self._sti(monster)).status_code, 403, monster)
-            self.assertEqual(self._klient(self.mona).get(self._sti(monster)).status_code, 200,
-                             monster)
-            self.assertEqual(self._klient(self.admin).get(self._sti(monster)).status_code, 200,
-                             monster)
+            self.assertEqual(medlem.post(self._sti(monster)).status_code, 403, monster)
+            # 405 er en rute som bare tar POST — porten slapp gjennom.
+            for slipper in (self.mona, self.admin):
+                self.assertIn(self._klient(slipper).get(self._sti(monster)).status_code,
+                              (200, 405), monster)
 
     def test_moderator_i_en_annen_portal_er_ikke_moderator_her(self):
         brann = Vaktportal.objects.create(navn='Brann', slug='brann')
