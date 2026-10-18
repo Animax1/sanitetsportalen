@@ -337,15 +337,16 @@ class KoSidebarenTests(PortalBasis):
 
 
 class KlientenTests(TestCase):
-    """`portal-utils.js`: nøkkelen og skjemafeltet."""
+    """`portal-utils.js`: nøkkelen; `ui-actions.js`: skjemafeltet."""
 
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
 
     def _kjor(self, kode, portal):
-        harness = build_harness([(PORTAL_UTILS_JS, ('sidensPortal', 'brukerNokkel',
-                                                    'leggPortalPaaSkjema'))])
+        from core.tests_utlogging import UI_ACTIONS_JS
+        harness = build_harness([(PORTAL_UTILS_JS, ('sidensPortal', 'brukerNokkel')),
+                                 (UI_ACTIONS_JS, ('leggPortalPaaSkjema',))])
         forspill = f"""
             const felt = [];
             globalThis.document = {{
@@ -407,3 +408,54 @@ class KlientenTests(TestCase):
             console.log(lagt.length);
         """, 'brann')
         self.assertEqual(ut, '0')
+
+
+class SkjemafeltetPaaHverSideTests(TestCase):
+    """«Siden sa ikke hvilken portal den gjelder» på `/admin/portaler/<pk>/` (André, 18. okt.
+    2026, ved «Slett portalen»). Feltet `_portal` ble lagt på av `portal-utils.js`, som
+    admin-sidene ikke laster — så med to portaler ble *hvert* skjema der avvist. Det legges nå
+    på av `ui-actions.js`, som hver side laster."""
+
+    def test_den_ekte_innsendingen_faar_feltet(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        from core.tests_utlogging import UI_ACTIONS_JS
+        from patients.js_test_utils import read_js
+        forspill = """
+            class HTMLFormElement { constructor(m) { this.method = m; this.dataset = {}; this.barn = [];
+              } querySelector() { return null; } appendChild(e) { this.barn.push(e); } }
+            globalThis.HTMLFormElement = HTMLFormElement;
+            const lyttere = [];
+            globalThis.document = {
+              addEventListener(navn, fn) { if (navn === 'submit') lyttere.push(fn); },
+              querySelector: (s) => s === 'meta[name="portal"]'
+                ? { getAttribute: () => 'brann' } : null,
+              createElement: () => ({}),
+            };
+            globalThis.window = globalThis;
+        """
+        ut = run_node(read_js(UI_ACTIONS_JS), """
+            const skjema = new HTMLFormElement('post');
+            for (const fn of lyttere) fn({ target: skjema, preventDefault() {} });
+            console.log(JSON.stringify(skjema.barn.map(e => [e.name, e.value])));
+        """, preamble=forspill).strip().splitlines()[0]
+        self.assertEqual(json.loads(ut), [['_portal', 'brann']])
+
+    def test_adminsiden_har_portalen_og_fila_som_legger_den_paa(self):
+        from accounts.models import CustomUser
+        standard = eneste_portal()
+        Vaktportal.objects.create(navn='Brann', slug='brann')
+        admin = CustomUser.objects.create_user(username='sjef', password='x', role='admin',
+                                               must_change_password=False)
+        self.client.force_login(admin)
+        sesjon = self.client.session
+        sesjon['portal_id'] = standard.pk
+        sesjon.save()
+        html = self.client.get('/admin/portaler/').content.decode()
+        # Uten feltet avvises innsendingen; med det går den gjennom til viewet.
+        uten = self.client.post(f'/admin/portaler/{standard.pk}/', {'handling': 'x'})
+        med = self.client.post(f'/admin/portaler/{standard.pk}/',
+                               {'handling': 'x', '_portal': 'standard'})
+        self.assertEqual((uten.status_code, med.status_code), (409, 302))
+        self.assertIn('<meta name="portal" content="standard">', html)
+        self.assertIn('js/ui-actions', html)

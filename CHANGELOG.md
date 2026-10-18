@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — «Siden sa ikke hvilken portal den gjelder» på admin-sidene: hvert skjema ble avvist med to portaler  `#core/tilgang`
+
+André, ved «Slett portalen»: `{"status": "error", "message": "Siden sa ikke hvilken portal den
+gjelder. Last den på nytt.", "portal_byttet": true}` — og portalen sto der fortsatt.
+**Feilen gjaldt ikke slettingen, men hvert skjema på sider som arver `base_portal` uten å laste
+`portal-utils.js`**: admin-sidene, moderatorsidene og andre rene skjemasider. Fanevakten
+(`core/portal_middleware.py`, fase 2) avviser en skrivende innsending uten `_portal` når kontoen
+har flere portaler, og feltet ble lagt på av `portal-utils.js` — som bare modulsidene laster. Med
+én portal slår vakten ikke inn, så feilen sto skjult til portal nummer to fantes.
+
+`leggPortalPaaSkjema()` og lytteren er flyttet til `ui-actions.js`, som `base_portal` og
+pasientsiden laster på hver side. Tester: den ekte innsendingen gjennom lytteren i
+`ui-actions.js`, at admin-siden har portalen i `<meta>` og laster fila, og at en innsending uten
+feltet gir 409 og med feltet går gjennom. Mutanter: 3 av 3 drept.
+
 ## 2026-10-18 — Slette en portal med alt i den, for global admin  `#core/vakt`
 
 André: «jeg må kunne slette portaler og ja med det all info i portalen. Det skal være

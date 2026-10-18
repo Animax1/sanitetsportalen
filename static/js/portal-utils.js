@@ -158,24 +158,8 @@ function sidensPortal() {
   return meta ? (meta.getAttribute('content') || '') : '';
 }
 
-// Skjemaer bærer portalen i et skjult felt, så en innsending fra en fane som
-// står i en annen portal enn sesjonen avvises (409) i stedet for å skrive feil
-// sted. Ett felt per skjema, lagt til når det sendes.
-function leggPortalPaaSkjema(skjema) {
-  const portal = sidensPortal();
-  if (!portal || !skjema || (skjema.method || '').toLowerCase() !== 'post') return;
-  let felt = skjema.querySelector('input[name="_portal"]');
-  if (!felt) {
-    felt = globalThis.document.createElement('input');
-    felt.type = 'hidden';
-    felt.name = '_portal';
-    skjema.appendChild(felt);
-  }
-  felt.value = portal;
-}
-if (globalThis.document?.addEventListener) {
-  globalThis.document.addEventListener('submit', (e) => leggPortalPaaSkjema(e.target), true);
-}
+// Skjemafeltet `_portal` legges på av `ui-actions.js` (18. okt. 2026): den fila lastes på
+// hver side, også admin-sidene, som ikke laster denne.
 
 
 async function apiFetch(url, options = {}) {

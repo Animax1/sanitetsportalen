@@ -10,6 +10,31 @@
 // Bruk: <form ... data-confirm="Slette Kari permanent?">
 // ════════════════════════════════════════════════════════
 
+// ── Portalen på skjemaet (fanevakten, 17. okt. 2026) ──────────────────────
+// Skjemaer bærer portalen i et skjult felt, så en innsending fra en fane som
+// står i en annen portal enn sesjonen avvises (409) i stedet for å skrive feil
+// sted. Med flere portaler avviser `PortalMiddleware` en innsending *uten*
+// feltet. Sto i `portal-utils.js` til 18. okt. 2026 — og admin-sidene laster
+// ikke den fila, så hvert skjema der ga «Siden sa ikke hvilken portal den
+// gjelder» så snart det fantes to portaler (André, ved «Slett portalen»).
+// Denne fila lastes på hver side med skjemaer.
+function leggPortalPaaSkjema(skjema) {
+  const meta = globalThis.document?.querySelector?.('meta[name="portal"]');
+  const portal = meta ? (meta.getAttribute('content') || '') : '';
+  if (!portal || !skjema || (skjema.method || '').toLowerCase() !== 'post') return;
+  let felt = skjema.querySelector('input[name="_portal"]');
+  if (!felt) {
+    felt = globalThis.document.createElement('input');
+    felt.type = 'hidden';
+    felt.name = '_portal';
+    skjema.appendChild(felt);
+  }
+  felt.value = portal;
+}
+if (globalThis.document?.addEventListener) {
+  globalThis.document.addEventListener('submit', (e) => leggPortalPaaSkjema(e.target), true);
+}
+
 // ── «Logg ut» med usendte stemplinger (10. okt. 2026) ─────────────────────
 // Utloggingen sender `Clear-Site-Data: "storage"` (H4), og det tømmer
 // offline-køene i bilen og vaktlista. Køen skal *ikke* overleve utloggingen —
