@@ -1142,9 +1142,10 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 > teksten**, og **gjenopprettingen kjører registeret på nytt** før den er ferdig — ellers ville
 > en backup tatt teksten tilbake. KOs egen «Fjern» føres i samme register. **Avviket:**
 > backupfilene beholder teksten til lagringstiden løper ut (730 dager for modulfilene, 90 for
-> den hele), fordi de er krypterte og ikke kan redigeres. Hvert søk logges. Pasientmodulens
-> tekstfelt er ikke med ennå: de står i arkivets signatur, og en sladding der krever ny
-> signering.
+> den hele), fordi de er krypterte og ikke kan redigeres. Hvert søk logges. **Pasientmodulen
+> har ingen fritekst** i de kliniske feltene (verdimengder og tidspunkter, validert); pasient-
+> arkivets notat er med i sladdingen. Navnene på førstehjelper og helsepersonell står frosset i
+> arkivets signatur og kan ikke sladdes uten ny signering — se TODO.
 
 > **Praktisk merk:** Ettersom pasienter kun er registrert med løpenummer og ikke med navn eller personnummer, forutsetter utøvelse av rettigheter at den registrerte kan identifisere seg på en annen måte (f.eks. tidspunkt for besøket og arrangementsnavnet).
 

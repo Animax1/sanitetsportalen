@@ -600,3 +600,31 @@ class ArkivSignaturLaastTests(TestCase):
         self.assertEqual(
             _compute_sha256_for_aggregat(self._FakeArkiv(), {'basis': {'total': 2}}),
             self.AGGREGAT_SHA)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class NotatetSladdesUtenAaBryteSignaturenTests(ArkivTestMixin, TestCase):
+    """Fase 7 (18. okt. 2026, `patients/sladding.py`): arkivets notat er pasientmodulens eneste
+    fritekst, og det står utenfor `sha_payload()`. Sladdes det, skal arkivet fortsatt verifisere."""
+
+    def test_notatet_sladdes_og_arkivet_melder_ikke_tukling(self):
+        from core import sladding
+        from patients.services import arkiver_aktiv_vakt
+
+        self._lag_pasient(1, 'Grønn')
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', 'Ola Nordmann var med', self.admin)
+        funn = {(k['handler'].slug, f.pk, f.felt)
+                for k in sladding.sok('nordmann') for f in k['funn']}
+        self.assertIn(('patients', arkiv.pk, 'notat'), funn)
+
+        sladding.sladd('patients', 'patients.vaktarkiv', arkiv.pk, 'notat',
+                       grunn='Navn i notatet', bruker=self.admin)
+        arkiv.refresh_from_db()
+        self.assertEqual(arkiv.notat, '')
+        resp = self.admin_client.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
+        self.assertFalse(resp.json()['tamper_detected'])
+
+        VaktArkiv.objects.filter(pk=arkiv.pk).update(notat='Ola Nordmann var med')
+        sladding.kjor_registeret()
+        arkiv.refresh_from_db()
+        self.assertEqual(arkiv.notat, '', 'registeret tar det bort igjen etter en gjenoppretting')

@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler fase 7, pasient: bare arkivets notat er fritekst, og det sladdes uten ny signering  `#core/personvern`
+
+Planen (§4.9) sa at pasientmodulen kom sist fordi «tekstfeltene står i `sha_payload()`», og at
+en sladding der måtte signere arkivet på nytt. **Koden sier noe annet:** de kliniske feltene er
+verdimengder (`patients/choices.py`) og tidspunkter i fast format, validert ved hver
+registrering siden 12. aug. 2026. Det finnes ingen fritekst der et navn eller en diagnose kan
+havne. Ny signering ble derfor ikke bygget — det ville vært et inngrep i signerte arkiver i drift
+for et behov som ikke finnes.
+
+**Det eneste frie feltet er arkivets notat** (`VaktArkiv.notat`), og det står *utenfor*
+signaturen. Det er nå med på `/admin/sladding/` som «Pasientarkivet», og
+`NotatetSladdesUtenAaBryteSignaturenTests` krever at arkivet verifiserer etter sladdingen og at
+registeret tar notatet bort igjen etter en gjenoppretting.
+
+**Åpent spørsmål** (TODO): førstehjelperens og helsepersonellets navn står frosset i
+signaturen — frivillige, ikke pasienter. Skal de kunne sladdes, er det der ny signering trengs.
+
+Mutanter: 3 av 3 drept.
+
 ## 2026-10-18 — Portaler fase 7: sladding av fritekst i KO og oppdrag, med register som overlever en gjenoppretting  `#core/personvern` `#core/backup`
 
 `docs/BESLUTNING_PORTALER.md` §4.9: «Admin skal kunne fjerne fritekst i etterkant når
