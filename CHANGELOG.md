@@ -4,6 +4,67 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Portaler: Andrés ni punkter — moderatorvelger, «Legg til valgte», tilgang ved opprettelse, korpsene ut av /vaktliste  `#core/tilgang`
+
+André testet fase 5 på staging («Ellers fungerer ting som det skal») og listet ni ting å rydde.
+Åtte er gjort her; punkt 9 er et spørsmål (se under).
+
+**Portalsiden for admin (`/admin/portaler/`):**
+1. **Knappen heter «Rediger», ikke «Sett opp».**
+2. **Moderatoren velges fra en liste, ikke et brukernavn i fritekst.** André: «fritekst felt for
+   å legge inn hvem som skal være moderator er dårlig arbeidsflyt». Lista
+   (`moderering.kandidater_til_moderator`) er det moderatoren selv ville sett — kontoene med
+   portalens tilhørigheter og portalens medlemmer — utenom admin og dem som alt er moderator,
+   sortert på navn. Hver rad viser tilhørigheten og «ikke med ennå».
+
+**Moderatorsidene (`/moderator/…`):**
+3. **Admin ser «Moderator»-menyen også.** André: «admin har ikke tilgang til moderator sine
+   sider, de må han». Sidene slapp ham inn hele tiden (`moderator_kreves`), men lenkene sto bare
+   for moderatoren — samme feil som før: en mekanisme som virket, uten flate.
+4. **«Legg til valgte»**: avkrysning per konto som ikke er med ennå, og én knapp for alle. André:
+   «å legge til flere brukere samtidig i portalen må være enklere enn å trykke per bruker».
+   **Alle eller ingen** (`transaction.atomic()`): én konto som ikke kan legges til — en kollega
+   som er moderator, eller en konto utenfor portalen — stopper hele innsendingen, så lista aldri
+   står halvveis.
+6. **«Rediger tilgang»**, ikke «Tilgang», og kortet heter «Modultilgang i ‹portal›». Det er det
+   moderatoren kan endre.
+7. **En konto uten e-post trenger ingen tilhørighet.** Med e-post kreves den fortsatt — ellers
+   forsvinner personen fra moderatorens liste idet hun tas ut av portalen.
+8. **Tilgangen settes i samme skjema som kontoen opprettes.** André: «dårlig ux å opprette bruker
+   og så ikke kunne umiddelbart sette tilganger». Matrisen har samme grense som på kontosiden —
+   aldri over taket, aldri over moderatorens eget nivå — og et nivå over gir ingen konto i det
+   hele tatt.
+
+**5. Korpsene settes opp under Administrasjon → Tilhørigheter (`/admin/tilhorigheter/`), ikke i
+`/vaktliste/`.** André: «korpsene bør settes opp av admin UTENFOR /vaktliste — det blir dårlig
+design å sette opp hvem korpser de får når de er inni en annen modul.»
+- **Katalogen:** navn, kortnavn, type (korps / annet, som «Leger»), aktiv, og hvilke portaler den
+  er med i ved opprettelse.
+  - **En tilhørighet i bruk slettes ikke**, den settes inaktiv.
+  - «I bruk» telles av `portaladmin.bruk_av()` over modellenes egne pekere — kontoer, mannskap,
+    reserverte ressurser, skift. Pekerne utledes av modellene, ikke av en liste: `core` kjenner
+    ingen modul ved navn, og en ny peker teller uten at noen husker den.
+- **Brukersiden har fått kortet «Tilhørigheter»** (`sett_kontoens_tilhorigheter`, med audit
+  `core_kontotilhorighet`). Uten det kunne ingen sette tilhørigheten på en konto som fantes fra
+  før, og moderatorens liste bygger på nettopp den.
+- **`/vaktliste/api/korps/` er bare lesing** (405 på skriving, for alle). `korps_detalj_view`, knappen
+  «Korps» i «Innstillinger» og korps-vinduet er borte. Tom-tilstanden i «Mannskap» sier hvor
+  korpsene settes opp, og admin får lenken dit.
+  - Registerfabrikken mistet `rader`, `etter_opprett` og `krav='admin'`, som bare korpsene
+    brukte.
+  - `scripts/sikkerhetssjekk.py` prøver nå `/admin/tilhorigheter/` som leser.
+
+**Punkt 9 er ikke endret.** «Moderator kan ikke sette bruker tilgang nivå til moderator i sin
+portal» — slik er regelen i dag (§4.2: moderatorer utnevnes av admin). Det er spurt om det var en
+bekreftelse eller et ønske om endring, og sperra står til svaret kommer.
+
+**Mutasjoner: 17, alle drept.** Blant dem:
+- `transaction.atomic()` fjernet rundt «Legg til valgte»;
+- matrisen ved opprettelse uten grensen;
+- korps-API-et som tar POST igjen;
+- admin tatt ut av menyen;
+- `bruk_av()` som ikke teller.
+
 ## 2026-10-18 — Portaler fase 5c: portalnavnet i fanetittelen når kontoen har flere portaler  `#core/grensesnitt`
 
 `docs/BESLUTNING_PORTALER.md` §4.4. To faner med «Vaktliste» i hver sin portal så like ut i

@@ -17,6 +17,8 @@ from core.klientip import klient_ip
 from core.models import Portalmodul, Tilhorighet, Vaktportal
 from core.ratelimit import rate_limit
 
+from accounts.moderering import kandidater_til_moderator
+
 from . import portaladmin
 
 
@@ -81,10 +83,12 @@ def portal_view(request, pk):
                 endringer = portaladmin.sett_moduler(portal, onsket)
                 messages.success(request, f'Modulene er lagret ({len(endringer)} endret).')
             elif handling == 'moderator':
-                bruker = CustomUser.objects.filter(
-                    username=(request.POST.get('brukernavn') or '').strip()).first()
+                # Valgt i en liste, ikke skrevet inn (André, 18. okt. 2026: «fritekst
+                # for å legge inn hvem som skal være moderator er dårlig arbeidsflyt»).
+                pk = request.POST.get('bruker', '')
+                bruker = CustomUser.objects.filter(pk=int(pk)).first() if pk.isdigit() else None
                 if bruker is None:
-                    raise ValidationError('Fant ingen konto med det brukernavnet.')
+                    raise ValidationError('Velg en konto fra listen.')
                 er = request.POST.get('er_moderator') == '1'
                 portaladmin.sett_moderator(portal, bruker, er)
                 AuditLog.objects.create(
@@ -112,7 +116,55 @@ def portal_view(request, pk):
         'portal': portal,
         'moduler': moduler,
         'katalog': katalog,
+        'kandidater': kandidater_til_moderator(portal),
         'moderatorer': (Portaltilgang.objects
                         .filter(portal=portal, rolle=PortalRolle.MODERATOR)
                         .select_related('bruker').order_by('bruker__username')),
+    })
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='portaladmin:tilhorigheter', rate='60/m', method='POST', on_limit='html')
+def tilhorigheter_view(request):
+    """Katalogen: korps og «annet» (som Leger), for alle portaler (18. okt. 2026).
+
+    Var korpsregisteret inne i vaktlista. André: «korpsene bør settes opp av admin
+    UTENFOR /vaktliste». Tre skjemaer med hver sin `handling`: ny, rediger, slett.
+    """
+    if request.method == 'POST':
+        handling = request.POST.get('handling')
+        try:
+            if handling == 'ny':
+                portaler = Vaktportal.objects.filter(
+                    pk__in=[int(p) for p in request.POST.getlist('portal') if p.isdigit()])
+                t = portaladmin.opprett_tilhorighet(
+                    request.POST.get('navn'), request.POST.get('kortnavn'),
+                    request.POST.get('type') or Tilhorighet.KORPS, portaler)
+                messages.success(request, f'«{t.navn}» er lagt til i katalogen.')
+            elif handling in ('rediger', 'slett'):
+                pk = request.POST.get('pk', '')
+                t = get_object_or_404(Tilhorighet, pk=int(pk) if pk.isdigit() else 0)
+                if handling == 'slett':
+                    portaladmin.slett_tilhorighet(t)
+                    messages.success(request, f'«{t.navn}» er slettet.')
+                else:
+                    portaladmin.endre_tilhorighet(
+                        t, navn=request.POST.get('navn'), kortnavn=request.POST.get('kortnavn'),
+                        type_=request.POST.get('type'),
+                        er_aktiv=request.POST.get('er_aktiv') == 'on')
+                    messages.success(request, f'«{t.navn}» er lagret.')
+            else:
+                raise ValidationError('Ukjent handling.')
+        except ValidationError as feil:
+            _vis_feil(request, feil)
+        return redirect('portaladmin:tilhorigheter')
+
+    rader = [{'t': t, 'bruk': portaladmin.bruk_av(t),
+              'portaler': [p.navn for p in t.portaler.all()]}
+             for t in Tilhorighet.objects.prefetch_related('portaler')]
+    return render(request, 'core/tilhorigheter.html', {
+        'rader': rader,
+        'typer': Tilhorighet.TYPE_VALG,
+        'portaler': Vaktportal.objects.filter(er_aktiv=True),  # `Meta.ordering` er norsk
     })

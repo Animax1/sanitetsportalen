@@ -695,16 +695,20 @@ class ModeratorKontoForm(AdminUserCreateForm):
     `role` (`RollenSettesBareGjennomSkjemaeneTests`). Kontoen får standarden,
     `bruker`.
 
-    **Tilhørigheten kreves, og er en av portalens** (§4.3) — ellers forsvinner
-    kontoen fra moderatorens egen liste i det den fjernes fra portalen.
+    **Tilhørigheten er en av portalens** (§4.3), **og kreves når kontoen har
+    e-post** — ellers forsvinner personen fra moderatorens egen liste i det den
+    fjernes fra portalen. En konto uten e-post trenger den ikke (André, 18. okt.
+    2026): den finnes for portalen, og står i lista som medlem.
     """
 
     tilhorighet = forms.ModelChoiceField(
         queryset=None,
+        required=False,
         label='Tilhørighet',
-        empty_label='Velg …',
+        empty_label='Ingen',
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text='Hvilket korps eller hvilken gruppe kontoen hører til.',
+        help_text='Hvilket korps eller hvilken gruppe kontoen hører til. Kreves når kontoen '
+                  'har e-post.',
     )
 
     class Meta(AdminUserCreateForm.Meta):
@@ -715,6 +719,12 @@ class ModeratorKontoForm(AdminUserCreateForm):
         for navn in ('kontotype', 'enhetsnavn'):
             self.fields.pop(navn, None)
         self.fields['tilhorighet'].queryset = portal.tilhorigheter.filter(er_aktiv=True)
+
+    def clean(self):
+        data = super().clean()
+        if data.get('email') and not data.get('tilhorighet'):
+            self.add_error('tilhorighet', 'En konto med e-post må ha en tilhørighet.')
+        return data
 
     def clean_email(self):
         epost = super().clean_email()

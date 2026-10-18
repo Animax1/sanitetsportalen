@@ -32,7 +32,7 @@
       <td class="text-muted">{{ rad.moderatorer|join:", "|default:"–" }}</td>
       <td>{{ rad.moduler }}</td>
       <td><a href="{% url 'portaladmin:portal' pk=rad.portal.pk %}" class="btn btn-sm btn-primary">
-        <i class="bi bi-pencil me-1"></i>Sett opp</a></td>
+        <i class="bi bi-pencil me-1"></i>Rediger</a></td>
     </tr>
     {% endfor %}
   </tbody>

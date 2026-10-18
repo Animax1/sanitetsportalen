@@ -387,23 +387,20 @@
           oppdager at gruppa man trenger ikke finnes.
         {% endcomment %}
         {% comment %}
-          **Korps og kompetanser bor her fra 30. aug. 2026.** De lå på
-          /vaktliste/registre/, som er lagt ned. De er portalens oppsett, ikke
-          denne vaktas — og de røres sjelden, så de hører til bak
-          «Innstillinger» og ikke i fanerekka, der mannskapet står.
+          **Kompetansene bor her fra 30. aug. 2026.** De er portalens oppsett, ikke
+          denne vaktas — og de røres sjelden, så de hører til bak «Innstillinger».
+          `skriv_full`, ikke `skriv_leder`: den som deler ut endrer dem.
 
-          `skriv_full`, ikke `skriv_leder`: korps-føreren ser dem (nedtrekkene
-          trenger dem), men det er den som deler ut som endrer dem.
+          **Korpsene sto her til 18. okt. 2026.** De settes nå opp av admin under
+          Administrasjon → Tilhørigheter (André: «korpsene bør settes opp av admin
+          UTENFOR /vaktliste»), og portalen velger sine på portalens side.
         {% endcomment %}
-        <div class="vl-krev-full d-none mb-3 d-flex gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-secondary btn-sm"
-                  data-action="apneVerdier" data-arg="korps">
-            <i class="bi bi-flag me-1"></i>Korps
-          </button>
+        <div class="vl-krev-full d-none mb-3 d-flex gap-2 flex-wrap align-items-center">
           <button type="button" class="btn btn-outline-secondary btn-sm"
                   data-action="apneVerdier" data-arg="kompetanser">
             <i class="bi bi-award me-1"></i>Kompetanser
           </button>
+          <span class="form-text m-0">Korpsene settes opp av en administrator under Administrasjon → Tilhørigheter.</span>
         </div>
 
         <div class="vl-krev-leder d-none mb-3">

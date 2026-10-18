@@ -60,9 +60,14 @@ class RegisterFlateFinnesTests(TestCase):
         return self.c.post(sti, data=kropp, content_type='application/json')
 
     def test_hele_veien_fra_tom_base_til_bemannet_vakt(self):
-        korps = self._post('/vaktliste/api/korps/',
-                           navn='Haugesund', kortnavn='HGSD')
-        self.assertEqual(korps.status_code, 201)
+        # Korpset settes opp under Administrasjon → Tilhørigheter (18. okt. 2026),
+        # med i portalen man står i; vaktlista leser det derfra.
+        from core.portal import gjeldende_portal
+        self.c.post('/admin/tilhorigheter/', {'handling': 'ny', 'navn': 'Haugesund',
+                                               'kortnavn': 'HGSD', 'type': 'korps',
+                                               'portal': gjeldende_portal().pk})
+        korps = self.c.get('/vaktliste/api/korps/').json()['data'][0]
+        self.assertEqual((korps['navn'], korps['kortnavn']), ('Haugesund', 'HGSD'))
         komp = self._post('/vaktliste/api/kompetanser/', navn='Sykepleier')
         self.assertEqual(komp.status_code, 201)
         # Gruppa finnes fra migrasjonen; rollen hører til den.
@@ -73,7 +78,7 @@ class RegisterFlateFinnesTests(TestCase):
 
         person = self._post(
             '/vaktliste/api/mannskap/', navn='Kari Nordmann',
-            korps_id=korps.json()['data']['id'],
+            korps_id=korps['id'],
             kompetanse_ider=[komp.json()['data']['id']],
             telefon='90000000')
         self.assertEqual(person.status_code, 201)
@@ -113,12 +118,20 @@ class RegisterFlateFinnesTests(TestCase):
         self.assertContains(res, 'id="personModal"')
         self.assertContains(res, 'id="vl-sok"')
 
-    def test_korps_og_kompetanser_ligger_i_innstillinger(self):
-        """De røres sjelden og er portalens oppsett, ikke denne vaktas."""
+    def test_kompetansene_ligger_i_innstillinger_og_korpsene_ikke(self):
+        """Kompetansene røres sjelden og ligger bak «Innstillinger». Korpsene settes opp
+        av admin utenfor vaktlista (André, 18. okt. 2026), og knappen er borte."""
         res = self.c.get('/vaktliste/')
-        self.assertContains(res, 'data-action="apneVerdier" data-arg="korps"')
+        self.assertNotContains(res, 'data-arg="korps"')
         self.assertContains(
             res, 'data-action="apneVerdier" data-arg="kompetanser"')
+
+    def test_korpsene_skrives_ikke_her(self):
+        korps = lag_korps(navn='Haugesund')
+        self.assertEqual(self._post('/vaktliste/api/korps/', navn='Nytt').status_code, 405)
+        self.assertEqual(self.c.put(f'/vaktliste/api/korps/{korps.pk}/', data={'navn': 'X'},
+                                    content_type='application/json').status_code, 404)
+        self.assertEqual(Korps.objects.get(pk=korps.pk).navn, 'Haugesund')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -131,7 +144,9 @@ class VerdimengdeTests(TestCase):
     ikke lenger at leddene er like. Se `RollerErGruppasTests`.
     """
 
-    STIER = ('korps', 'kompetanser')
+    #: Korpsene var med til 18. okt. 2026; de settes nå opp under
+    #: Administrasjon → Tilhørigheter, og `/api/korps/` er bare lesing.
+    STIER = ('kompetanser',)
 
     def setUp(self):
         self.c = _klient(_bruker('adm', admin=True))
@@ -161,8 +176,9 @@ class VerdimengdeTests(TestCase):
                 self.assertIn('Dublett', res.json()['message'])
 
     def test_korps_har_kortnavn_de_andre_ikke(self):
-        res = self._post('korps', navn='Haugesund', kortnavn='HGSD')
-        self.assertEqual(res.json()['data']['kortnavn'], 'HGSD')
+        lag_korps(navn='Haugesund', kortnavn='HGSD')
+        self.assertEqual(self.c.get('/vaktliste/api/korps/').json()['data'][0]['kortnavn'],
+                         'HGSD')
         self.assertNotIn(
             'kortnavn', self._post('kompetanser', navn='X').json()['data'])
 
@@ -177,16 +193,16 @@ class VerdimengdeTests(TestCase):
                          [('Utgått', False)])
 
     def test_lista_er_alfabetisk_uansett_hva_som_ble_lagt_inn_forst(self):
-        self._post('korps', navn='Karmøy')
-        self._post('korps', navn='Bokn')
+        lag_korps(navn='Karmøy')
+        lag_korps(navn='Bokn')
         data = self.c.get('/vaktliste/api/korps/').json()['data']
         self.assertEqual([r['navn'] for r in data], ['Bokn', 'Karmøy'])
 
     def test_api_et_tilbyr_ikke_rekkefolge(self):
         """Feltet er borte fra verdimengdene, og skal ikke lekke tilbake
         gjennom svaret — et felt klienten ser, er et felt noen vil sette."""
-        rad = self._post('korps', navn='Haugesund').json()['data']
-        self.assertNotIn('rekkefolge', rad)
+        lag_korps(navn='Haugesund')
+        self.assertNotIn('rekkefolge', self.c.get('/vaktliste/api/korps/').json()['data'][0])
 
     # ── Sletting ─────────────────────────────────────────────────────────
     def test_ubrukt_verdi_kan_slettes(self):
@@ -197,11 +213,14 @@ class VerdimengdeTests(TestCase):
 
 
     def test_korps_i_bruk_kan_ikke_slettes(self):
+        # Slettingen står under Administrasjon → Tilhørigheter (18. okt. 2026);
+        # tellingen i `core.portaladmin.bruk_av` må se vaktlistas pekere.
+        from django.core.exceptions import ValidationError
+        from core import portaladmin
         korps = lag_korps(navn='Haugesund')
         Mannskap.objects.create(navn='Kari', korps=korps)
-        res = self.c.delete(f'/vaktliste/api/korps/{korps.pk}/')
-        self.assertEqual(res.status_code, 409)
-        self.assertIn('inaktiv', res.json()['message'])
+        with self.assertRaisesMessage(ValidationError, 'inaktiv'):
+            portaladmin.slett_tilhorighet(korps)
         self.assertTrue(Korps.objects.filter(pk=korps.pk).exists())
 
     def test_korps_reservert_paa_en_ressurs_teller_som_i_bruk(self):
@@ -217,11 +236,11 @@ class VerdimengdeTests(TestCase):
         vl = services.opprett_planlagt_vakt('Vakta')
         lag_ressurs(vaktliste=vl, navn='Lag K', korps=korps)
 
+        from core import portaladmin
         rad = [k for k in self.c.get('/vaktliste/api/korps/').json()['data']
                if k['navn'] == 'Karmøy'][0]
         self.assertEqual(rad['i_bruk'], 1, 'reservasjonen skal telle')
-        self.assertEqual(
-            self.c.delete(f'/vaktliste/api/korps/{korps.pk}/').status_code, 409)
+        self.assertEqual(portaladmin.bruk_av(korps), 1, 'også for admins sletting')
 
     def test_kompetanse_i_bruk_kan_ikke_slettes(self):
         """M2M-en ville ikke protestert — den ville stilltiende strippet

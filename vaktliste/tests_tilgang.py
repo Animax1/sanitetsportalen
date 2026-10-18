@@ -290,17 +290,20 @@ class UtdelingTests(TilgangsBasis):
 
     def test_korpsene_er_global_admin(self):
         """Beslutning 10 i `docs/BESLUTNING_PORTALER.md`: katalogen er felles, og en
-        endring i den gjelder alle portaler. `skriv_full` og `skriv_leder` får
-        ikke opprette, endre eller slette et korps."""
+        endring i den gjelder alle portaler. Den settes opp under Administrasjon →
+        Tilhørigheter (18. okt. 2026), og vaktlista skriver ikke korps for noen."""
         from accounts.models import CustomUser
-        self.assertEqual(self.c_vl.post('/vaktliste/api/korps/', data={'navn': 'Nytt'},
-                                        content_type='application/json').status_code, 403)
+        from vaktliste.models import Korps
+        self.assertEqual(self.c_vl.post('/admin/tilhorigheter/',
+                                        {'handling': 'ny', 'navn': 'Nytt'}).status_code, 403)
         admin = CustomUser.objects.create_user(username='kat_admin', password='x',
                                                role='admin', must_change_password=False)
         c = Client()
         c.force_login(admin)
         self.assertEqual(c.post('/vaktliste/api/korps/', data={'navn': 'Nytt'},
-                                content_type='application/json').status_code, 201)
+                                content_type='application/json').status_code, 405)
+        c.post('/admin/tilhorigheter/', {'handling': 'ny', 'navn': 'Nytt', 'type': 'korps'})
+        self.assertTrue(Korps.objects.filter(navn='Nytt').exists())
 
     def test_verdimengdene_kan_leses_av_alle(self):
         """Nedtrekkslistene trenger dem — også korps-førerens."""

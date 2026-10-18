@@ -1353,7 +1353,25 @@ def _handling_nullstill_mfa(request, user, side):
 #: passord). **Navnene her går foran modulenes kontokoblinger**, og
 #: `TabellenOgKnappeneTests` i `accounts/tests_brukerhandlinger.py` holder dem fra
 #: hverandre: en kobling som tok et av dem, ville aldri blitt kalt.
+def _handling_tilhorigheter(request, user, side):
+    """Kontoens tilhørigheter (18. okt. 2026). Styrer hvem moderatoren ser —
+    ingen tilgang i seg selv."""
+    from django.core.exceptions import ValidationError
+    from core.portaladmin import sett_kontoens_tilhorigheter
+    try:
+        endringer = sett_kontoens_tilhorigheter(user, request.POST.getlist('tilhorighet'))
+    except ValidationError as feil:
+        messages.error(request, ' '.join(feil.messages))
+    else:
+        for navn, til in endringer:
+            _log_user_admin_action(request, user, 'UPDATE', field_name=f'tilhørighet {navn}',
+                                   new_value=til, table_name='core_kontotilhorighet')
+        messages.success(request, 'Tilhørighetene er lagret.')
+    return redirect('portaladmin:user_detail', pk=user.pk)
+
+
 _BRUKERHANDLINGER = {
+    'tilhorigheter': _handling_tilhorigheter,
     'edit': _handling_rediger,
     'send_invitasjon': _handling_send_invitasjon,
     'logg_ut': _handling_logg_ut,
@@ -1400,9 +1418,15 @@ def user_detail_view(request, pk):
     has_totp_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
     kan_slettes, slette_sperre = _kan_slettes(user, request.user)
 
+    from core.models import Tilhorighet
+    har = set(user.tilhorigheter.values_list('tilhorighet_id', flat=True))
     return render(request, 'accounts/user_detail.html', {
         'target_user': user,
         **side,
+        # Aktive, og de kontoen alt har — en inaktiv skal ikke forsvinne stille
+        # fra kontoen ved neste lagring.
+        'tilhorighetsvalg': [{'t': t, 'har': t.pk in har}
+                             for t in Tilhorighet.objects.all() if t.er_aktiv or t.pk in har],
         'kontokoblingsfragmenter': [h.mal for h in kontokoblingshandlere() if h.mal],
         'recent_events': recent_events,
         'has_totp_device': has_totp_device,

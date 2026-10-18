@@ -135,3 +135,84 @@ def sett_moderator(portal: Vaktportal, bruker, er_moderator: bool) -> None:
                                                     rolle=PortalRolle.MODERATOR):
             tilgang.rolle = PortalRolle.MEDLEM
             tilgang.save(update_fields=['rolle'])
+
+
+# ── Tilhørighetene (18. okt. 2026) ───────────────────────────────────────────
+#
+# André: «korpsene bør settes opp av admin UTENFOR /vaktliste — det blir dårlig
+# design å sette opp hvem korpser de får når de er inni en annen modul.» Katalogen
+# er felles for alle portaler (beslutning 10), og bare admin endrer den.
+
+def bruk_av(tilhorighet) -> int:
+    """Hvor mange rader som peker på tilhørigheten — kontoer, mannskap, ressurser,
+    skift. **Utledet av modellene**, ikke en liste: `core` kjenner ingen modul ved
+    navn, og en ny peker skal telle uten at noen husker å legge den til her.
+    Portalenes utvalg (M2M) er ikke bruk — det er katalogens plass i portalen."""
+    antall = 0
+    for rel in tilhorighet._meta.related_objects:
+        if rel.one_to_many:
+            antall += getattr(tilhorighet, rel.get_accessor_name()).count()
+    return antall
+
+
+def _rens(navn, kortnavn, type_):
+    navn = (navn or '').strip()
+    if not navn:
+        raise ValidationError('Tilhørigheten må ha et navn.')
+    if type_ not in dict(Tilhorighet.TYPE_VALG):
+        raise ValidationError('Velg korps eller annet.')
+    return navn, (kortnavn or '').strip()[:20]
+
+
+def opprett_tilhorighet(navn, kortnavn='', type_=Tilhorighet.KORPS, portaler=()) -> Tilhorighet:
+    """Ny i katalogen, og med i de valgte portalene."""
+    navn, kortnavn = _rens(navn, kortnavn, type_)
+    if Tilhorighet.objects.filter(navn__iexact=navn).exists():
+        raise ValidationError(f'«{navn}» finnes allerede.')
+    with transaction.atomic():
+        t = Tilhorighet.objects.create(navn=navn, kortnavn=kortnavn, type=type_)
+        for portal in portaler:
+            portal.tilhorigheter.add(t)
+    return t
+
+
+def endre_tilhorighet(t, *, navn, kortnavn, type_, er_aktiv) -> None:
+    navn, kortnavn = _rens(navn, kortnavn, type_)
+    if Tilhorighet.objects.filter(navn__iexact=navn).exclude(pk=t.pk).exists():
+        raise ValidationError(f'«{navn}» finnes allerede.')
+    t.navn, t.kortnavn, t.type, t.er_aktiv = navn, kortnavn, type_, er_aktiv
+    t.save(update_fields=['navn', 'kortnavn', 'type', 'er_aktiv'])
+
+
+def slett_tilhorighet(t) -> None:
+    """Bare en som ingenting peker på. Ellers: sett den inaktiv — da skjules den i
+    nedtrekkene, men står der den alt er brukt."""
+    n = bruk_av(t)
+    if n:
+        raise ValidationError(f'«{t.navn}» er i bruk ({n}) og kan ikke slettes. Sett den inaktiv '
+                              'i stedet.')
+    t.delete()
+
+
+def sett_kontoens_tilhorigheter(bruker, ider) -> list[tuple]:
+    """Kontoens tilhørigheter fra brukersiden. Returnerer `[(navn, 'ja'|'nei')]`
+    for audit. Domenedata, ikke tilgang — samme skille som `Mannskap.user`."""
+    from core.models import Kontotilhorighet
+
+    ider = {int(i) for i in ider}
+    rader = {t.pk: t for t in Tilhorighet.objects.filter(pk__in=ider)}
+    if len(rader) != len(ider):
+        raise ValidationError('Listen inneholder ukjente tilhørigheter — last siden på nytt.')
+    naa = dict(Kontotilhorighet.objects.filter(bruker=bruker)
+               .values_list('tilhorighet_id', 'tilhorighet__navn'))
+    endringer = []
+    with transaction.atomic():
+        for pk in set(naa) - ider:
+            # `delete()` per rad: auditsignalene skal fyre der de finnes.
+            for rad in Kontotilhorighet.objects.filter(bruker=bruker, tilhorighet_id=pk):
+                rad.delete()
+            endringer.append((naa[pk], 'nei'))
+        for pk in ider - set(naa):
+            Kontotilhorighet.objects.create(bruker=bruker, tilhorighet=rader[pk])
+            endringer.append((rader[pk].navn, 'ja'))
+    return endringer

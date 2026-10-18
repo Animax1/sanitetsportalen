@@ -6,7 +6,7 @@
 <section class="mb-4">
   <p class="mb-1"><a href="{% url 'accounts:moderator_brukere' %}"><i class="bi bi-arrow-left me-1"></i>Brukere i {{ portal.navn }}</a></p>
   <h1 class="mb-1">Ny konto i {{ portal.navn }}</h1>
-  <p class="text-muted mb-0">En personlig konto. Den blir med i portalen; tilgangen gir du på neste side.</p>
+  <p class="text-muted mb-0">En personlig konto. Den blir med i portalen med tilgangen du velger under.</p>
 </section>
 
 {% if midlertidig %}
@@ -14,7 +14,7 @@
   <p class="mb-1"><strong>«{{ ny_bruker.username }}» er opprettet.</strong> Engangspassordet vises bare nå:</p>
   <p class="mb-2"><code>{{ midlertidig }}</code></p>
   <p class="mb-0">Kontoen må bytte det ved første innlogging.
-    <a href="{% url 'accounts:moderator_bruker' ny_bruker.pk %}">Gi tilgang</a>.</p>
+    <a href="{% url 'accounts:moderator_bruker' ny_bruker.pk %}">Se kontoen</a>.</p>
 </div>
 {% endif %}
 
@@ -31,6 +31,17 @@
       </div>
       {% endfor %}
       {% if form.non_field_errors %}<div class="text-danger small mb-2">{{ form.non_field_errors.0 }}</div>{% endif %}
+      <h2 class="h6 mt-4">Modultilgang i {{ portal.navn }}</h2>
+      <p class="form-text mt-0">Opp til ditt eget nivå, og aldri over portalens tak.</p>
+      {% for felt in matrise.rader %}
+      <div class="mb-2">
+        <label class="form-label small mb-1" for="{{ felt.id_for_label }}">{{ felt.label }}</label>
+        {{ felt }}
+        {% if felt.errors %}<div class="text-danger small mt-1">{{ felt.errors.0 }}</div>{% endif %}
+      </div>
+      {% empty %}
+      <p class="text-muted small">Du har ingen moduler å dele ut i denne portalen.</p>
+      {% endfor %}
       <div class="mb-3">
         <div class="form-check">
           <input class="form-check-input" type="radio" name="metode" id="m_inv" value="invitasjon" checked>

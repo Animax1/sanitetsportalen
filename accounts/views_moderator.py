@@ -41,20 +41,33 @@ def _logg_medlemskap(request, bruker, portal, fra, til):
 @require_http_methods(['GET', 'POST'])
 @rate_limit(group='moderator:brukere', rate='60/m', method='POST', on_limit='html')
 def brukere_view(request):
-    """Lista, gruppert på portalens tilhørigheter, og «Legg til i portalen»."""
+    """Lista, gruppert på portalens tilhørigheter, og «Legg til valgte».
+
+    **Flere om gangen** (André, 18. okt. 2026: «å legge til flere brukere samtidig må
+    være enklere enn å trykke per bruker»). Alle eller ingen: en konto som ikke kan
+    legges til, stopper innsendingen, så lista aldri står halvveis oppdatert.
+    """
     portal = gjeldende_portal()
     if request.method == 'POST':
-        pk = request.POST.get('bruker', '')
-        bruker = get_object_or_404(moderering.synlige_kontoer(portal),
-                                   pk=int(pk) if pk.isdigit() else 0)
-        try:
-            if moderering.legg_til(request.user, portal, bruker):
-                _logg_medlemskap(request, bruker, portal, 'nei', 'ja')
-            messages.success(request, f'{bruker.username} er med i {portal.navn}.')
-        except ValidationError as feil:
-            _vis_feil(request, feil)
-            return redirect('accounts:moderator_brukere')
-        return redirect('accounts:moderator_bruker', pk=bruker.pk)
+        ider = {int(v) for v in request.POST.getlist('bruker') if v.isdigit()}
+        kontoer = list(moderering.synlige_kontoer(portal).filter(pk__in=ider))
+        if not ider:
+            messages.error(request, 'Kryss av for minst én konto.')
+        elif len(kontoer) != len(ider):
+            messages.error(request, 'Listen inneholder kontoer som ikke hører til portalen — '
+                                    'last siden på nytt.')
+        else:
+            try:
+                with transaction.atomic():
+                    nye = [k for k in kontoer if moderering.legg_til(request.user, portal, k)]
+            except ValidationError as feil:
+                _vis_feil(request, feil)
+            else:
+                for konto in nye:
+                    _logg_medlemskap(request, konto, portal, 'nei', 'ja')
+                messages.success(request, f'{len(nye)} lagt til i {portal.navn}: '
+                                          + ', '.join(k.username for k in nye) + '.')
+        return redirect('accounts:moderator_brukere')
 
     return render(request, 'accounts/moderator_brukere.html', {
         'portal': portal,
@@ -122,16 +135,21 @@ def bruker_view(request, pk):
 @require_http_methods(['GET', 'POST'])
 @rate_limit(group='moderator:ny', rate='20/m', method='POST', on_limit='html')
 def ny_view(request):
-    """Ny konto i portalen: en person, med en av portalens tilhørigheter.
+    """Ny konto i portalen: en person, med tilgang satt i samme skjema.
 
     Invitasjon når e-posten finnes og kan brukes, ellers et engangspassord som
     vises én gang — samme to veier som admins skjema.
     """
     portal = gjeldende_portal()
     form = ModeratorKontoForm(portal=portal)
+    # Tilgangen settes i samme skjema (André, 18. okt. 2026: «dårlig ux å opprette
+    # bruker og så ikke kunne umiddelbart sette tilganger») — med samme grense som
+    # på kontosiden: aldri over taket, aldri over hennes eget nivå.
+    matrise = ModulTilgangForm(portal=portal, utdeler=request.user)
     if request.method == 'POST':
         form = ModeratorKontoForm(request.POST, portal=portal)
-        if form.is_valid():
+        matrise = ModulTilgangForm(request.POST, portal=portal, utdeler=request.user)
+        if form.is_valid() and matrise.is_valid():
             vil_invitere = (request.POST.get('metode', 'invitasjon') == 'invitasjon'
                             and bool(form.cleaned_data.get('email')))
             midlertidig = None
@@ -145,22 +163,29 @@ def ny_view(request):
                     bruker.set_password(midlertidig)
                     bruker.must_change_password = True
                 bruker.save()
-                Kontotilhorighet.objects.create(
-                    bruker=bruker, tilhorighet=form.cleaned_data['tilhorighet'])
+                if form.cleaned_data.get('tilhorighet'):
+                    Kontotilhorighet.objects.create(
+                        bruker=bruker, tilhorighet=form.cleaned_data['tilhorighet'])
                 Portaltilgang.objects.create(bruker=bruker, portal=portal)
+                endringer = matrise.save(bruker)
             tom_tilgangscache(bruker)
             _log_user_admin_action(request, bruker, 'CREATE', field_name='username',
                                    new_value=bruker.username)
             _logg_medlemskap(request, bruker, portal, 'nei', 'ja')
+            for slug, fra, til in endringer:
+                _log_user_admin_action(request, bruker, 'CREATE', field_name=slug,
+                                       old_value=fra or 'ingen', new_value=til or 'ingen',
+                                       table_name='accounts_modultilgang')
 
             if midlertidig is not None:
                 return render(request, 'accounts/moderator_ny.html', {
                     'portal': portal, 'form': ModeratorKontoForm(portal=portal),
+                    'matrise': ModulTilgangForm(portal=portal, utdeler=request.user),
                     'midlertidig': midlertidig, 'ny_bruker': bruker,
                 })
             if send_invitasjon(bruker, request):
                 messages.success(request, f'«{bruker.username}» er opprettet, og invitasjonen '
-                                          f'er sendt til {bruker.email}. Gi tilgang under.')
+                                          f'er sendt til {bruker.email}.')
             else:
                 messages.warning(request, f'«{bruker.username}» er opprettet, men invitasjonen '
                                           'kunne ikke sendes. Be en administrator sende den '
@@ -168,5 +193,5 @@ def ny_view(request):
             return redirect('accounts:moderator_bruker', pk=bruker.pk)
 
     return render(request, 'accounts/moderator_ny.html', {
-        'portal': portal, 'form': form,
+        'portal': portal, 'form': form, 'matrise': matrise,
     })

@@ -106,9 +106,8 @@ urlpatterns = [
          name='vaktliste_api_mannskap'),
     path('api/mannskap/<int:pk>/', views_registre.mannskap_detalj_view,
          name='vaktliste_api_mannskap_detalj'),
+    # Korpsene leses her; de settes opp under /admin/tilhorigheter/ (18. okt. 2026).
     path('api/korps/', views_registre.korps_view, name='vaktliste_api_korps'),
-    path('api/korps/<int:pk>/', views_registre.korps_detalj_view,
-         name='vaktliste_api_korps_detalj'),
     path('api/kompetanser/', views_registre.kompetanser_view,
          name='vaktliste_api_kompetanser'),
     path('api/kompetanser/<int:pk>/', views_registre.kompetanse_detalj_view,

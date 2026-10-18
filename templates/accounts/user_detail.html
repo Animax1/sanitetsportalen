@@ -198,6 +198,36 @@
   {% endcomment %}
   {% for fragment in kontokoblingsfragmenter %}{% include fragment %}{% endfor %}
 
+  {% comment %}
+  Tilhørighetene (18. okt. 2026): hvem moderatoren i en portal ser. Domenedata, ikke
+  tilgang. Katalogen settes opp under Administrasjon → Tilhørigheter.
+  {% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Tilhørigheter</strong></div>
+    <div class="card-body">
+      {% if tilhorighetsvalg %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="tilhorigheter">
+        <div class="d-flex flex-wrap gap-3 mb-2">
+          {% for v in tilhorighetsvalg %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tilhorighet" value="{{ v.t.pk }}"
+                   id="tilh-{{ v.t.pk }}"{% if v.har %} checked{% endif %}>
+            <label class="form-check-label" for="tilh-{{ v.t.pk }}">{{ v.t.navn }}{% if not v.t.er_aktiv %} (inaktiv){% endif %}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="form-text mb-2">Avgjør hvilke portaler sine moderatorer ser kontoen. Gir ingen tilgang i seg selv.</div>
+        <button type="submit" class="btn btn-sm btn-primary">Lagre tilhørighetene</button>
+      </form>
+      {% else %}
+      <p class="text-muted mb-0">Katalogen er tom. Legg inn tilhørigheter under
+        <a href="{% url 'portaladmin:tilhorigheter' %}">Administrasjon → Tilhørigheter</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Siste innloggingshendelser -->
   <div class="card">
     <div class="card-header"><strong>Siste 20 innloggingshendelser</strong></div>

@@ -2947,13 +2947,25 @@ class MannskapsfanenTests(SimpleTestCase):
         """)
 
     def test_uten_korps_peker_knappen_paa_korps(self):
-        """Korpset er badgen, og uten ett kan ingen person opprettes. En
-        «Nytt mannskap»-knapp som i stedet åpner korpsvinduet er en knapp man
-        klikker på én gang og aldri stoler på igjen."""
+        """Korpset er badgen, og uten ett kan ingen person opprettes. Korpsene settes
+        opp under Administrasjon → Tilhørigheter (18. okt. 2026): admin får lenken dit,
+        de andre beskjeden — og ingen får en «Nytt mannskap»-knapp som fører til en vegg."""
         ut = self._mannskap("{korps: [], mannskap: []}")
-        self.assertIn('data-action="apneVerdier" data-arg="korps"', ut)
+        self.assertIn('href="/admin/tilhorigheter/"', ut)
+        self.assertNotIn('data-arg="korps"', ut)
         self.assertNotIn('apneNyPerson', ut)
         self.assertIn('Ingen korps', ut)
+
+    def test_uten_korps_faar_lederen_beskjeden_men_ikke_lenken(self):
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_leder' } };
+            globalThis.personsok = '';
+            globalThis.document = { getElementById: () => null };
+            globalThis.register = {korps: [], mannskap: []};
+            console.log(mkMannskap());
+        """)
+        self.assertNotIn('/admin/tilhorigheter/', ut)
+        self.assertIn('Administrasjon → Tilhørigheter', ut)
 
     def test_med_korps_men_uten_folk_ber_om_folk(self):
         ut = self._mannskap("{korps: [{id: 1, navn: 'HGSD'}], mannskap: []}")

@@ -329,7 +329,9 @@ def test_roller(base, r, admin, leser, enhet):
                 r.sjekk(st == 403, f'leser: GET {sti} → {st}', f'leser: GET {sti} → {st} (forventet 403)')
             st, h, html = kl.kall('/pasienter/api/patients/', 'POST', json_data={'navn': 'Test'}, csrf=True)
             r.sjekk(st == 403, f'leser: POST ny pasient → {st}', f'leser: POST ny pasient → {st} (forventet 403)')
-            st, h, html = kl.kall('/vaktliste/api/korps/', 'POST', json_data={'navn': 'Testkorps'}, csrf=True)
+            # Korpsene settes opp under /admin/tilhorigheter/ (18. okt. 2026); vaktlistas
+            # korps-API er bare lesing, og svarer 405 på skriving for alle.
+            st, h, html = kl.kall('/admin/tilhorigheter/', 'POST', data={'handling': 'ny', 'navn': 'Testkorps'}, csrf=True)
             r.sjekk(st == 403, f'leser: POST nytt korps → {st}', f'leser: POST nytt korps → {st} (forventet 403)')
             st, h, html = kl.kall('/oppdrag/api/lokasjoner/', 'POST', json_data={'navn': 'Test'}, csrf=True)
             r.sjekk(st == 403, f'leser: POST ny lokasjon → {st}', f'leser: POST ny lokasjon → {st} (forventet 403)')

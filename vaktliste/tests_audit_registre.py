@@ -71,15 +71,15 @@ class RegistreneLoggesTests(TilgangsBasis):
                 for r in qs.order_by('pk')]
 
     def test_korps_opprettes_endres_og_slettes(self):
-        # Katalogen er global admin siden 17. okt. 2026 (`core.Tilhorighet`).
-        res = self.c_adm.post('/vaktliste/api/korps/', data={'navn': 'Sola', 'kortnavn': 'SOLA'},
-                              content_type='application/json')
-        self.assertEqual(res.status_code, 201, res.content)
-        pk = res.json()['data']['id']
-        self.c_adm.put(f'/vaktliste/api/korps/{pk}/', data={'navn': 'Sola RK'},
-                       content_type='application/json')
-        self.c_adm.delete(f'/vaktliste/api/korps/{pk}/', data={'confirm': True},
-                          content_type='application/json')
+        # Katalogen settes opp under Administrasjon → Tilhørigheter (18. okt. 2026);
+        # auditen er fortsatt vaktlistas signal på tabellen.
+        self.c_adm.post('/admin/tilhorigheter/', {'handling': 'ny', 'navn': 'Sola',
+                                                  'kortnavn': 'SOLA', 'type': 'korps'})
+        pk = Korps.objects.get(navn='Sola').pk
+        self.c_adm.post('/admin/tilhorigheter/', {'handling': 'rediger', 'pk': pk,
+                                                  'navn': 'Sola RK', 'kortnavn': 'SOLA',
+                                                  'type': 'korps', 'er_aktiv': 'on'})
+        self.c_adm.post('/admin/tilhorigheter/', {'handling': 'slett', 'pk': pk})
         rader = self._rader('vaktliste_korps', pk)
         self.assertEqual([r[0] for r in rader], ['CREATE', 'UPDATE', 'DELETE'])
         self.assertEqual(rader[1][1:4], ('navn', 'Sola', 'Sola RK'))

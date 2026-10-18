@@ -28,6 +28,7 @@ KARTET = {
     'admin/vakt/': 'vakt',
     'admin/portaler/': 'portaler',
     'admin/portaler/<int:pk>/': 'portal',
+    'admin/tilhorigheter/': 'tilhorigheter',
     'admin/vakt/navn/': 'vakt_navn',
     'admin/vakt/avslutt/': 'vakt_avslutt',
     'admin/vakt/<int:pk>/gjenaapne/': 'vakt_gjenaapne',

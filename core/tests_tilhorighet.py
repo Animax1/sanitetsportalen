@@ -126,7 +126,11 @@ class KorpsIPortalenTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class AdminOgKatalogenTests(TestCase):
-    """Bare admin oppretter og endrer, og det hun lager havner i portalen hun står i."""
+    """Katalogen settes opp under Administrasjon → Tilhørigheter (18. okt. 2026).
+
+    André: «korpsene bør settes opp av admin UTENFOR /vaktliste — det blir dårlig
+    design å sette opp hvem korpser de får når de er inni en annen modul.»
+    """
 
     def setUp(self):
         self.standard = eneste_portal()
@@ -137,37 +141,98 @@ class AdminOgKatalogenTests(TestCase):
         self.c.force_login(self.admin)
         self.c.post('/portal/', {'portal': 'brann'})
 
-    def _ny(self, navn):
-        return self.c.post('/vaktliste/api/korps/', content_type='application/json',
-                           data={'navn': navn}, headers={'X-Portal': 'brann'})
+    def _post(self, **data):
+        # To portaler: skjemaet bærer fanens portal, som `portal-utils.js` legger på.
+        return self.c.post('/admin/tilhorigheter/', {'_portal': 'brann', **data}, follow=True)
 
-    def test_nytt_korps_havner_i_portalen_man_staar_i(self):
-        self.assertEqual(self._ny('Kvinesdal').status_code, 201)
-        korps = Tilhorighet.objects.get(navn='Kvinesdal')
-        self.assertEqual(list(korps.portaler.all()), [self.brann])
-        self.assertEqual(korps.type, Tilhorighet.KORPS)
+    def test_ny_med_type_og_portaler(self):
+        self._post(handling='ny', navn='Leger', kortnavn='LEGE', type='annet',
+                   portal=[self.brann.pk, self.standard.pk])
+        leger = Tilhorighet.objects.get(navn='Leger')
+        self.assertEqual((leger.kortnavn, leger.type), ('LEGE', Tilhorighet.ANNET))
+        self.assertEqual(set(leger.portaler.all()), {self.standard, self.brann})
 
-    def test_et_korps_fra_katalogen_tas_inn_i_stedet_for_aa_avvises(self):
-        """«HGSD» finnes én gang. Skriver admin navnet i Brann, er svaret å ta det
-        med — ikke «finnes allerede», som ville sendt henne til en annen side."""
-        hgsd = Tilhorighet.objects.create(navn='HGSD')
-        self.standard.tilhorigheter.add(hgsd)
-        svar = self._ny('HGSD')
-        self.assertEqual(svar.status_code, 200)
-        self.assertEqual(set(hgsd.portaler.all()), {self.standard, self.brann})
-        self.assertEqual(Tilhorighet.objects.filter(navn='HGSD').count(), 1)
+    def test_navnet_finnes_en_gang(self):
+        Tilhorighet.objects.create(navn='HGSD')
+        self.assertContains(self._post(handling='ny', navn='hgsd', type='korps'),
+                            'finnes allerede')
+        self.assertEqual(Tilhorighet.objects.filter(navn__iexact='hgsd').count(), 1)
 
-    def test_et_korps_som_alt_er_i_portalen_avvises(self):
-        hgsd = Tilhorighet.objects.create(navn='HGSD')
-        self.brann.tilhorigheter.add(hgsd)
-        self.assertEqual(self._ny('HGSD').status_code, 400)
+    def test_tomt_navn_og_ukjent_type_avvises(self):
+        self._post(handling='ny', navn='  ', type='korps')
+        self._post(handling='ny', navn='X', type='tull')
+        self.assertFalse(Tilhorighet.objects.exists())
 
-    def test_admin_endrer_ikke_et_korps_utenfor_portalen_herfra(self):
+    def test_rediger_og_sett_inaktiv(self):
         sola = Tilhorighet.objects.create(navn='Sola')
-        self.standard.tilhorigheter.add(sola)
-        svar = self.c.put(f'/vaktliste/api/korps/{sola.pk}/', content_type='application/json',
-                          data={'navn': 'Sola RK'}, headers={'X-Portal': 'brann'})
-        self.assertEqual(svar.status_code, 404)
+        self._post(handling='rediger', pk=sola.pk, navn='Sola RK', kortnavn='SRK', type='korps')
+        sola.refresh_from_db()
+        self.assertEqual((sola.navn, sola.kortnavn, sola.er_aktiv), ('Sola RK', 'SRK', False))
+
+    def test_en_i_bruk_slettes_ikke_en_ubrukt_gjor(self):
+        from core.models import Kontotilhorighet
+        brukt = Tilhorighet.objects.create(navn='Brukt')
+        Kontotilhorighet.objects.create(bruker=self.admin, tilhorighet=brukt)
+        ubrukt = Tilhorighet.objects.create(navn='Ubrukt')
+        self.brann.tilhorigheter.add(ubrukt)
+        self.assertContains(self._post(handling='slett', pk=brukt.pk), 'inaktiv')
+        self._post(handling='slett', pk=ubrukt.pk)
+        self.assertEqual(list(Tilhorighet.objects.values_list('navn', flat=True)), ['Brukt'])
+
+    def test_bare_admin(self):
+        kari = CustomUser.objects.create_user(username='kari', password='x',
+                                              must_change_password=False)
+        from accounts.models import Portaltilgang
+        Portaltilgang.objects.create(bruker=kari, portal=self.standard)
+        c = Client()
+        c.force_login(kari)
+        self.assertEqual(c.get('/admin/tilhorigheter/').status_code, 403)
+        self.assertEqual(c.post('/admin/tilhorigheter/',
+                                {'handling': 'ny', 'navn': 'X', 'type': 'korps'}).status_code, 403)
+        self.assertFalse(Tilhorighet.objects.exists())
+
+    def test_vaktlista_skriver_ikke_korps(self):
+        self.assertEqual(self.c.post('/vaktliste/api/korps/', content_type='application/json',
+                                     data={'navn': 'X'}, headers={'X-Portal': 'brann'})
+                         .status_code, 405)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KontoensTilhorigheterTests(TestCase):
+    """Brukersiden: tilhørighetene på en konto (18. okt. 2026). De avgjør hvem
+    moderatoren ser."""
+
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='sjef', password='x', role='admin', must_change_password=False)
+        self.kari = CustomUser.objects.create_user(username='kari', password='x',
+                                                   must_change_password=False)
+        self.c = Client()
+        self.c.force_login(self.admin)
+        self.hgsd = Tilhorighet.objects.create(navn='HGSD')
+        self.leger = Tilhorighet.objects.create(navn='Leger', type=Tilhorighet.ANNET)
+
+    def _har(self):
+        return set(self.kari.tilhorigheter.values_list('tilhorighet__navn', flat=True))
+
+    def test_settes_og_tas_bort_med_audit(self):
+        from audit.models import AuditLog
+        url = f'/admin/brukere/{self.kari.pk}/'
+        self.c.post(url, {'action': 'tilhorigheter', 'tilhorighet': [self.hgsd.pk, self.leger.pk]})
+        self.assertEqual(self._har(), {'HGSD', 'Leger'})
+        self.c.post(url, {'action': 'tilhorigheter', 'tilhorighet': [self.leger.pk]})
+        self.assertEqual(self._har(), {'Leger'})
+        logget = AuditLog.objects.filter(table_name='core_kontotilhorighet', record_id=self.kari.pk)
+        self.assertEqual(sorted(logget.values_list('new_value', flat=True)), ['ja', 'ja', 'nei'])
+
+    def test_kortet_viser_valgene(self):
+        self.assertContains(self.c.get(f'/admin/brukere/{self.kari.pk}/'),
+                            f'name="tilhorighet" value="{self.hgsd.pk}"')
+
+    def test_ukjent_id_endrer_ingenting(self):
+        self.c.post(f'/admin/brukere/{self.kari.pk}/',
+                    {'action': 'tilhorigheter', 'tilhorighet': [self.hgsd.pk, 99999]})
+        self.assertEqual(self._har(), set())
 
 
 class GamleFilerTests(TestCase):

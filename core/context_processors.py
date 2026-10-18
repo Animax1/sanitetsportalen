@@ -94,9 +94,11 @@ def portal(request):
     return {
         'aktiv_portal': portal,
         'flere_portaler': getattr(request, 'portal_antall', 0) > 1,
-        # Menylenken «Brukere i portalen» (fase 5b). Admin har sin egen liste.
-        'er_moderator': (portal is not None and not er_global_admin(user)
-                         and er_moderator(user, portal)),
+        # «Moderator»-gruppa i avatar-menyen (fase 5b). **Admin ser den også**
+        # (André, 18. okt. 2026: «admin har ikke tilgang til moderator sine sider, de
+        # må han») — sidene slapp ham inn, men lenkene sto bare for moderatoren.
+        'vis_moderatormeny': (portal is not None
+                              and (er_global_admin(user) or er_moderator(user, portal))),
     }
 
 

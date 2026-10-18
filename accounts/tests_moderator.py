@@ -230,14 +230,17 @@ class PorteneTests(_Oppsett):
         c = self._klient(self.mona)
         self.assertEqual(c.get(f'/moderator/brukere/{self.fremmed.pk}/').status_code, 404)
         self.assertEqual(c.get(f'/moderator/brukere/{self.admin.pk}/').status_code, 404)
-        res = c.post('/moderator/brukere/', {'bruker': self.fremmed.pk})
-        self.assertEqual(res.status_code, 404)
-        self.assertEqual(c.post('/moderator/brukere/', {'bruker': 'x'}).status_code, 404)
+        # En konto utenfor i utvalget stopper hele innsendingen — kari kommer ikke inn heller.
+        c.post('/moderator/brukere/', {'bruker': [self.kari.pk, self.fremmed.pk]})
+        self.assertFalse(Portaltilgang.objects.filter(bruker__in=[self.kari, self.fremmed])
+                         .exists())
+        c.post('/moderator/brukere/', {'bruker': 'x'})
+        self.assertFalse(Portaltilgang.objects.filter(bruker=self.fremmed).exists())
 
     def test_legg_til_og_ta_ut_fra_siden_med_audit(self):
         c = self._klient(self.mona)
         res = c.post('/moderator/brukere/', {'bruker': self.kari.pk})
-        self.assertRedirects(res, f'/moderator/brukere/{self.kari.pk}/')
+        self.assertRedirects(res, '/moderator/brukere/')
         self.assertTrue(Portaltilgang.objects.filter(bruker=self.kari).exists())
         c.post(f'/moderator/brukere/{self.kari.pk}/', {'handling': 'fjern'})
         self.assertFalse(Portaltilgang.objects.filter(bruker=self.kari).exists())
@@ -245,6 +248,35 @@ class PorteneTests(_Oppsett):
                                               record_id=self.kari.pk)
                       .values_list('new_value', flat=True))
         self.assertEqual(sorted(logget), ['ja', 'nei'])
+
+    def test_flere_legges_til_i_ett_trykk(self):
+        """André, 18. okt. 2026: «å legge til flere brukere samtidig må være enklere
+        enn å trykke per bruker»."""
+        andre = _bruker('andre')
+        Kontotilhorighet.objects.create(bruker=andre, tilhorighet=self.leger)
+        svar = self._klient(self.mona).post('/moderator/brukere/',
+                                            {'bruker': [self.kari.pk, andre.pk]}, follow=True)
+        self.assertEqual(set(Portaltilgang.objects.filter(portal=self.portal,
+                                                          bruker__in=[self.kari, andre])
+                             .values_list('bruker__username', flat=True)), {'kari', 'andre'})
+        self.assertContains(svar, '2 lagt til')
+        self.assertEqual(AuditLog.objects.filter(table_name='accounts_portaltilgang',
+                                                 new_value='ja').count(), 2)
+
+    def test_en_kollega_i_utvalget_stopper_alle(self):
+        Portaltilgang.objects.filter(bruker=self.kollega).delete()
+        Portaltilgang.objects.create(bruker=self.kollega, portal=self.portal,
+                                     rolle=PortalRolle.MODERATOR)
+        self._klient(self.mona).post('/moderator/brukere/',
+                                     {'bruker': [self.kari.pk, self.kollega.pk]})
+        self.assertFalse(Portaltilgang.objects.filter(bruker=self.kari).exists())
+
+    def test_lista_har_avkrysning_for_dem_utenfor_og_rediger_tilgang_for_medlemmene(self):
+        html = self._klient(self.mona).get('/moderator/brukere/').content.decode()
+        self.assertIn(f'name="bruker" value="{self.kari.pk}"', html)
+        self.assertNotIn(f'name="bruker" value="{self.ola.pk}"', html)
+        self.assertIn(f'href="/moderator/brukere/{self.ola.pk}/"', html)
+        self.assertIn('Rediger tilgang', html)
 
     def test_moderatoren_kan_ikke_ta_ut_en_kollega_fra_siden(self):
         self._klient(self.mona).post(f'/moderator/brukere/{self.kollega.pk}/',
@@ -284,8 +316,9 @@ class PorteneTests(_Oppsett):
                          'skriv_full')
         self.assertFalse(ModulTilgang.objects.filter(bruker=self.kollega).exists())
 
-    def test_menyen_viser_lenken_bare_for_moderatoren(self):
-        for bruker, ser in ((self.mona, True), (self.ola, False), (self.admin, False)):
+    def test_menyen_viser_lenkene_for_moderatoren_og_admin(self):
+        """Admin ser dem også (André, 18. okt. 2026)."""
+        for bruker, ser in ((self.mona, True), (self.ola, False), (self.admin, True)):
             html = self._klient(bruker).get('/').content.decode()
             self.assertEqual('/moderator/brukere/' in html, ser, bruker.username)
 
@@ -322,10 +355,42 @@ class NyKontoTests(_Oppsett):
         self.assertFalse(nils.has_usable_password())
 
     def test_tilhorigheten_maa_vaere_portalens(self):
-        for t in ('', self.annet.pk):
-            res = self._post(username='nora', tilhorighet=t, metode='passord')
-            self.assertEqual(res.status_code, 200)
-            self.assertFalse(CustomUser.objects.filter(username='nora').exists())
+        res = self._post(username='nora', tilhorighet=self.annet.pk, metode='passord')
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(CustomUser.objects.filter(username='nora').exists())
+
+    def test_med_epost_kreves_tilhorighet(self):
+        self._post(username='nora', email='nora@example.org', metode='passord')
+        self.assertFalse(CustomUser.objects.filter(username='nora').exists())
+
+    def test_uten_epost_trengs_ingen_tilhorighet(self):
+        """André, 18. okt. 2026: «kontoer uten epost trenger ikke tilhørighet»."""
+        self._post(username='nora', metode='passord')
+        nora = CustomUser.objects.get(username='nora')
+        self.assertFalse(Kontotilhorighet.objects.filter(bruker=nora).exists())
+        self.assertTrue(Portaltilgang.objects.filter(bruker=nora, portal=self.portal).exists())
+
+    def test_tilgangen_settes_i_samme_skjema_og_innenfor_grensen(self):
+        """André, 18. okt. 2026: «dårlig ux å opprette bruker og så ikke kunne
+        umiddelbart sette tilganger»."""
+        self.assertContains(self._klient_get(), 'name="modul_vaktliste"')
+        self._post(username='nora', metode='passord', modul_vaktliste='skriv_full',
+                   modul_patients='les')
+        nora = CustomUser.objects.get(username='nora')
+        self.assertEqual(dict(ModulTilgang.objects.filter(bruker=nora)
+                              .values_list('modul_slug', 'nivaa')),
+                         {'vaktliste': 'skriv_full', 'patients': 'les'})
+        self.assertTrue(AuditLog.objects.filter(table_name='accounts_modultilgang',
+                                                record_id=nora.pk).exists())
+
+    def test_over_eget_nivaa_gir_ingen_konto(self):
+        self._post(username='nora', metode='passord', modul_vaktliste='skriv_leder')
+        self.assertFalse(CustomUser.objects.filter(username='nora').exists())
+
+    def _klient_get(self):
+        c = Client()
+        c.force_login(self.mona)
+        return c.get('/moderator/brukere/ny/')
 
     def test_en_epost_som_finnes_gir_ingen_konto_nummer_to(self):
         self.ola.email = 'ola@example.org'

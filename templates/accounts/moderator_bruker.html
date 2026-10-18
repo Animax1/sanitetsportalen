@@ -20,7 +20,7 @@
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card mb-3">
-      <div class="card-header"><strong>Tilgang i {{ portal.navn }}</strong></div>
+      <div class="card-header"><strong>Modultilgang i {{ portal.navn }}</strong></div>
       <div class="card-body">
         <p class="form-text mt-0">Du kan gi opp til ditt eget nivå, og aldri over portalens tak.</p>
         <form method="post">
@@ -35,7 +35,7 @@
           {% empty %}
           <p class="text-muted">Du har ingen moduler å dele ut i denne portalen.</p>
           {% endfor %}
-          <button type="submit" class="btn btn-primary">Lagre tilgangen</button>
+          <button type="submit" class="btn btn-primary">Lagre modultilgangen</button>
         </form>
       </div>
     </div>

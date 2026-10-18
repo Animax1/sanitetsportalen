@@ -224,11 +224,47 @@ class SideneTests(TestCase):
     def test_moderator_fra_siden_logges(self):
         kari = _bruker()
         self.c.post(f'/admin/portaler/{self.standard.pk}/',
-                    {'handling': 'moderator', 'brukernavn': 'kari', 'er_moderator': '1'})
+                    {'handling': 'moderator', 'bruker': kari.pk, 'er_moderator': '1'})
         self.assertEqual(Portaltilgang.objects.get(bruker=kari).rolle, PortalRolle.MODERATOR)
         self.assertTrue(AuditLog.objects.filter(table_name='accounts_portaltilgang',
                                                 record_id=kari.pk).exists())
         self.assertContains(self.c.get(f'/admin/portaler/{self.standard.pk}/'), 'kari')
+
+    def test_moderator_velges_fra_en_liste_av_portalens_kontoer(self):
+        """Ikke et brukernavn å skrive (18. okt. 2026): listen er kontoene med portalens
+        tilhørigheter og portalens medlemmer — ikke admin, ikke de som alt er moderator,
+        ikke kontoer utenfor."""
+        from core.models import Kontotilhorighet
+        hgsd = Tilhorighet.objects.create(navn='HGSD')
+        annet = Tilhorighet.objects.create(navn='Annet korps')
+        self.standard.tilhorigheter.set([hgsd])
+        kari = _bruker('kari', fullt_navn='Kari Nordmann')
+        Kontotilhorighet.objects.create(bruker=kari, tilhorighet=hgsd)
+        ola = _bruker('ola')
+        Portaltilgang.objects.create(bruker=ola, portal=self.standard)
+        fremmed = _bruker('fremmed')
+        Kontotilhorighet.objects.create(bruker=fremmed, tilhorighet=annet)
+        mona = _bruker('mona')
+        Portaltilgang.objects.create(bruker=mona, portal=self.standard, rolle=PortalRolle.MODERATOR)
+        svar = self.c.get(f'/admin/portaler/{self.standard.pk}/')
+        kandidater = [k['konto'].username for k in svar.context['kandidater']]
+        self.assertEqual(kandidater, ['kari', 'ola'])
+        self.assertContains(svar, 'Kari Nordmann (kari) — HGSD · ikke med ennå')
+        self.assertNotContains(svar, 'name="brukernavn"')
+        self.assertNotIn('fremmed', kandidater)
+
+    def test_ta_bort_rollen_fra_listen(self):
+        kari = _bruker()
+        Portaltilgang.objects.create(bruker=kari, portal=self.standard, rolle=PortalRolle.MODERATOR)
+        self.c.post(f'/admin/portaler/{self.standard.pk}/',
+                    {'handling': 'moderator', 'bruker': kari.pk, 'er_moderator': '0'})
+        self.assertEqual(Portaltilgang.objects.get(bruker=kari).rolle, PortalRolle.MEDLEM)
+
+    def test_ukjent_konto_gir_melding(self):
+        svar = self.c.post(f'/admin/portaler/{self.standard.pk}/',
+                           {'handling': 'moderator', 'bruker': 'x', 'er_moderator': '1'},
+                           follow=True)
+        self.assertContains(svar, 'Velg en konto fra listen')
 
     def test_siden_viser_avvisningen(self):
         svar = self.c.post(f'/admin/portaler/{self.standard.pk}/',

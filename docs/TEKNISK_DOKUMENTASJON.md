@@ -477,8 +477,8 @@ for sti, view in sorted(gaa(get_resolver())):
 |---|---|---|---|
 | `/pasienter/` | 13 | `patients/urls.py` | Pasient-CRUD, registre, arkiv |
 | `/oppdrag/` | 33 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, «Send posisjon», verdimengder |
-| `/vaktliste/` | 38 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
-| `/admin/` | 29 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
+| `/vaktliste/` | 37 | `vaktliste/urls.py` | Ressurser, vaktposter, pauser, overnatting, mannskap, drift, service worker |
+| `/admin/` | 30 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/moderator/` | 7 | `accounts/urls.py`, `core/urls.py` | Moderatorens flate i sin portal: brukerne (5b — listen, én konto, ny konto), vakta (5c — navn og «Avslutt vakt») og portalens innstillinger |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
@@ -593,7 +593,7 @@ de nøkkel, ville kilde nummer to servert kilde éns tall i et minutt.
 
 ### 5.5 Adminflaten (`/admin/`)
 
-29 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
+30 ruter, alle i `core/urls_admin.py` under navnerommet `portaladmin`, og alle bak
 `@admin_required`. `core/tests_sikkerhet_runde2.py` går gjennom hele prefikset med anonym
 og vanlig bruker.
 

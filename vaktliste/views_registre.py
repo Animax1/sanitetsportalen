@@ -132,8 +132,7 @@ VERDIMENGDER = {
 
 
 def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
-                    stige=False, gruppe=False, krav='skriv_alt', rader=None,
-                    etter_opprett=None):
+                    stige=False, gruppe=False, krav='skriv_alt'):
     """Bygg (liste-view, detalj-view) for en av verdimengdene.
 
     Args:
@@ -151,18 +150,11 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
         krav: hvilken terskel skriving krever. `'skriv_alt'` for
             kompetansene, `'lede'` for rollene: en rolle er del av
             vaktoppsettet, og `skriv_full` bemanner det oppsettet uten å
-            bestemme det. `'admin'` for korpsene (17. okt. 2026): de er
-            `core.Tilhorighet`, en felles katalog, og en endring gjelder alle
-            portaler (beslutning 10 i `docs/BESLUTNING_PORTALER.md`).
-        rader: hvilke rader registeret viser og slår opp i — korpsene i
-            portalen. Uten: alle.
-        etter_opprett: kalles med raden når den er laget, eller med den som
-            fantes fra før med samme navn — et korps som finnes i katalogen tas
-            inn i portalen i stedet for å avvises.
+            bestemme det. Korpsene går ikke gjennom fabrikken lenger: de
+            settes opp under Administrasjon → Tilhørigheter (18. okt. 2026).
     """
-    _slipper_inn = {'lede': services.kan_lede,
-                    'admin': er_global_admin}.get(krav, services.kan_skrive_alt)
-    _qs = rader or model.objects.all
+    _slipper_inn = {'lede': services.kan_lede}.get(krav, services.kan_skrive_alt)
+    _qs = model.objects.all
 
     def _til_dict(rad):
         return verdi_til_dict(model, rad, ekstra_felt=ekstra_felt,
@@ -210,13 +202,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
                     **felter,
                 )
         except IntegrityError:
-            fra_for = model.objects.filter(navn=navn).first() if etter_opprett else None
-            if fra_for is None or _qs().filter(pk=fra_for.pk).exists():
-                return json_feil(f'«{navn}» finnes allerede.')
-            etter_opprett(fra_for)
-            return JsonResponse({'status': 'ok', 'data': _til_dict(fra_for)}, status=200)
-        if etter_opprett:
-            etter_opprett(rad)
+            return json_feil(f'«{navn}» finnes allerede.')
         return JsonResponse({'status': 'ok', 'data': _til_dict(rad)}, status=201)
 
     @modul_kreves('vaktliste', 'les', svar='json')
@@ -295,14 +281,20 @@ def _antall_bruk(model, rad):
     return rad.vaktposter.count()          # Ressursrolle
 
 
-def _ta_inn_i_portalen(korps):
-    from core.portal import gjeldende_portal
-    gjeldende_portal().tilhorigheter.add(korps)
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET'])
+def korps_view(request):
+    """Korpsene i portalen — **bare lesing** (18. okt. 2026).
 
+    De er `core.Tilhorighet`, og settes opp av admin under Administrasjon →
+    Tilhørigheter. André: «korpsene bør settes opp av admin UTENFOR /vaktliste —
+    det blir dårlig design å sette opp hvem korpser de får når de er inni en annen
+    modul.» Skrivingen her (POST, PUT, DELETE) er fjernet, så det finnes én vei.
+    """
+    return JsonResponse({'status': 'ok', 'data': [
+        verdi_til_dict(Korps, r, ekstra_felt=('kortnavn',)) for r in services.korps_i_portal()]})
 
-korps_view, korps_detalj_view = _register_views(
-    Korps, 'Korpset', 'Korpset', ekstra_felt=('kortnavn',), krav='admin',
-    rader=lambda: services.korps_i_portal(), etter_opprett=_ta_inn_i_portalen)
 kompetanser_view, kompetanse_detalj_view = _register_views(
     Kompetanse, 'Kompetansen', 'Kompetansen', stige=True)
 roller_view, rolle_detalj_view = _register_views(
@@ -310,8 +302,6 @@ roller_view, rolle_detalj_view = _register_views(
 
 # Navn for tracebacks og URL-reversering — uten dette heter alle seks
 # `liste_view`/`detalj_view`. Samme grep som i pasientmodulen.
-korps_view.__name__ = 'korps_view'
-korps_detalj_view.__name__ = 'korps_detalj_view'
 kompetanser_view.__name__ = 'kompetanser_view'
 kompetanse_detalj_view.__name__ = 'kompetanse_detalj_view'
 roller_view.__name__ = 'roller_view'

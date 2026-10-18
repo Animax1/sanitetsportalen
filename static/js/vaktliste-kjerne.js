@@ -67,7 +67,7 @@ let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
 let redigererPerson = null;      // id-en som redigeres, eller null for «ny»
 let redigererVerdi = null;
-let aktivVerdiregister = 'korps';  // hvilket register verdivinduet står i
+let aktivVerdiregister = 'kompetanser';  // hvilket register verdivinduet står i
 //: **Sammenslåtte ressurskort** (André, 14. sep. 2026). `tegnFaner()` og
 //: `mkRessurs()` bygger markupen på nytt ved hvert panelbytte — det er samme
 //: grunn til at `gateKnapper()` ikke kan gate dem — så tilstanden kan ikke bo
@@ -114,8 +114,6 @@ let overnattingUtskrift = 'natt';
 // og «kompetanse» hankjønn, så en hardkodet «Ny » foran gir feil artikkel på
 // en av dem uansett hvilken man velger.
 const REGISTRE = {
-  korps: { sti: 'korps', nyEtikett: 'Nytt korps', tittel: 'Korps',
-           kortnavn: true },
   kompetanser: { sti: 'kompetanser', nyEtikett: 'Ny kompetanse',
                  tittel: 'Kompetanser', stige: true },
 };

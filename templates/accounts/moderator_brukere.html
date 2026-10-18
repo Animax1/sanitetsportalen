@@ -16,6 +16,15 @@
   </a>
 </section>
 
+{% if grupper %}
+<form method="post">
+  {% csrf_token %}
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <button type="submit" class="btn btn-outline-primary">
+      <i class="bi bi-person-check me-1"></i>Legg til valgte i {{ portal.navn }}</button>
+    <span class="form-text m-0">Kryss av for kontoene som ikke er med ennå.</span>
+  </div>
+{% endif %}
 {% for tilh, rader in grupper %}
 <div class="card mb-3">
   <div class="card-header"><strong>{% if tilh %}{{ tilh.navn }}{% else %}Uten tilhørighet i portalen{% endif %}</strong></div>
@@ -23,11 +32,12 @@
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
-          <tr><th>Navn</th><th>Brukernavn</th><th>I portalen</th><th>Siste innlogging</th><th></th></tr>
+          <tr><th class="kolonne-velg"><span class="visually-hidden">Velg</span></th><th>Navn</th><th>Brukernavn</th><th>I portalen</th><th>Siste innlogging</th><th></th></tr>
         </thead>
         <tbody>
           {% for konto, rolle in rader %}
           <tr>
+            <td>{% if not rolle %}<input class="form-check-input" type="checkbox" name="bruker" value="{{ konto.pk }}" id="velg-{{ forloop.parentloop.counter }}-{{ konto.pk }}" aria-label="Legg til {{ konto.username }}">{% endif %}</td>
             <td>{{ konto.fullt_navn|default:"–" }}{% if not konto.is_active %} <span class="badge bg-secondary">Fryst</span>{% endif %}</td>
             <td><code>{{ konto.username }}</code></td>
             <td>
@@ -38,13 +48,7 @@
             <td class="text-muted">{{ konto.last_login_at|date:"d.m.Y H:i"|default:"Aldri" }}</td>
             <td class="text-end">
               {% if rolle %}
-                <a href="{% url 'accounts:moderator_bruker' konto.pk %}" class="btn btn-sm btn-outline-secondary">Tilgang</a>
-              {% else %}
-                <form method="post" class="d-inline">
-                  {% csrf_token %}
-                  <input type="hidden" name="bruker" value="{{ konto.pk }}">
-                  <button type="submit" class="btn btn-sm btn-outline-primary">Legg til i portalen</button>
-                </form>
+                <a href="{% url 'accounts:moderator_bruker' konto.pk %}" class="btn btn-sm btn-outline-secondary">Rediger tilgang</a>
               {% endif %}
             </td>
           </tr>
@@ -59,4 +63,5 @@
   Ingen kontoer ennå. Portalen har kanskje ingen tilhørigheter — det velger en administrator.
 </p>
 {% endfor %}
+{% if grupper %}</form>{% endif %}
 {% endblock %}

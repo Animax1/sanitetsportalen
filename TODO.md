@@ -156,9 +156,15 @@ global admin, moderator og medlem — ingen portaladmin. Hver fase deployes for 
 - [ ] **Gjør `ModulTilgang.portaltilgang` påkrevd i basen** (etter fase 2, 17. okt. 2026). Den er
       nullbar bare for release-vinduet og migrasjonen som fylte den; `save()` krever den alt.
       Neste migrasjon på `accounts` kan sette `NOT NULL` når fase 2 har stått i prod.
-- [ ] **Fase 5:** flatene som står igjen — portalvelgeren, og forslaget «mannskap fra de
-      siste 24 månedene» ved ny vakt. Også:
-      **søk på tvers av portalene for innsyn og sletting** (§4.5, admin, på e-post og navn).
+- [ ] **Fase 5:** det som står igjen — **søk på tvers av portalene for innsyn og sletting**
+      (§4.5, admin, på e-post og navn).
+- [ ] **«Hvem skal på vakt» i vaktlista** (André, 18. okt. 2026 — erstatter «hent fra 24
+      mnd»): en ny vaktliste starter tom, og man legger til hvem som skal på vakt med
+      fleravkrysning fra portalens mannskapsregister. Korps-føreren (`skriv_handling`) ser
+      bare sitt korps, `skriv_full` og opp ser alle. Vaktlista har ikke noe slikt begrep i dag
+      — en person er bare knyttet til vakta gjennom et skift — så det trengs en ny tabell.
+      Åpent: om bemanningsnedtrekket bare skal tilby de som er lagt til, og om lister i drift
+      fylles med dem som alt står på et skift.
 - [ ] **Fase 6:** kartet, i begge repoer — portalens slug og vakt-ID i meldingen, `Gruppe.portal`
       i stedet for `viser_portalen`, `steder_for()` per portal, gruppevelgeren.
 - [ ] **Fase 7:** sladding av fritekst for admin, med sladderegister som kjøres på nytt etter en

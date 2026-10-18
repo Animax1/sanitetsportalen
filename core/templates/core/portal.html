@@ -45,7 +45,7 @@
             <form method="post" class="d-inline">
               {% csrf_token %}
               <input type="hidden" name="handling" value="moderator">
-              <input type="hidden" name="brukernavn" value="{{ t.bruker.username }}">
+              <input type="hidden" name="bruker" value="{{ t.bruker.pk }}">
               <input type="hidden" name="er_moderator" value="0">
               <button type="submit" class="btn btn-sm btn-outline-secondary">Ta bort rollen</button>
             </form>
@@ -54,13 +54,26 @@
           <li class="text-muted">Ingen moderatorer ennå.</li>
           {% endfor %}
         </ul>
+        {% if kandidater %}
         <form method="post" class="d-flex gap-2">
           {% csrf_token %}
           <input type="hidden" name="handling" value="moderator">
           <input type="hidden" name="er_moderator" value="1">
-          <input type="text" name="brukernavn" class="form-control" placeholder="Brukernavn" required>
+          <label class="visually-hidden" for="ny-moderator">Velg konto</label>
+          <select id="ny-moderator" name="bruker" class="form-select" required>
+            <option value="">Velg konto …</option>
+            {% for k in kandidater %}
+            <option value="{{ k.konto.pk }}">{{ k.konto.fullt_navn|default:k.konto.username }}{% if k.konto.fullt_navn %} ({{ k.konto.username }}){% endif %}{% if k.tilhorighet %} — {{ k.tilhorighet }}{% endif %}{% if not k.medlem %} · ikke med ennå{% endif %}</option>
+            {% endfor %}
+          </select>
           <button type="submit" class="btn btn-primary text-nowrap">Gjør til moderator</button>
         </form>
+        <div class="form-text">Kontoene med portalens tilhørigheter, og portalens medlemmer.
+          En konto som ikke er med ennå, blir medlem.</div>
+        {% else %}
+        <p class="text-muted mb-0">Ingen kontoer å velge. Velg tilhørigheter for portalen, eller
+          legg til medlemmer først.</p>
+        {% endif %}
       </div>
     </div>
 

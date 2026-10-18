@@ -155,16 +155,14 @@ regel ble funnet, står i CHANGELOG på datoen.
   flaten er kun rutet under `DEBUG` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
-- **Mannskapet er en fane på planleggingssiden; korps og kompetanser ligger i
-  «Innstillinger»** (30. aug. 2026). `/vaktliste/registre/` er lagt ned.
-  Argumentet for en egen side — registrene er globale, fanene gjelder én vakt —
-  holdt ikke i bruk: et klikk dit kostet plassen i planleggingen, og mannskap
-  og ressurser er nettopp de to man veksler mellom. **Både fanen og
-  «Innstillinger» står uten vaktliste**, og fanen velges automatisk da: korps
-  må inn før mannskap, og mannskap før noen kan settes på vakt.
-  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner korps eller
-  kompetanser — lista og skjemaet i **samme** vindu, siden vinduet selv åpnes
-  fra «Innstillinger». En lagring kaller `_lastRegisterOgListe()`: navnene
+- **Mannskapet er en fane på planleggingssiden; kompetansene ligger i
+  «Innstillinger»** (30. aug. 2026). `/vaktliste/registre/` er lagt ned: et klikk
+  dit kostet plassen i planleggingen. **Korpsene settes opp under
+  `/admin/tilhorigheter/`** (18. okt. 2026, André: «UTENFOR /vaktliste»), og
+  `/api/korps/` er bare lesing. **Fanen og «Innstillinger» står uten vaktliste**:
+  korps må inn før mannskap, og mannskap før noen settes på vakt.
+  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner kompetansene — lista
+  og skjemaet i **samme** vindu. En lagring kaller `_lastRegisterOgListe()`: navnene
   står i planleggingens nedtrekk også.
 - **`Ressursgruppe` er typen, og den er en tabell** (30. aug. 2026 — lå i `choices.py`
   før det). Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:

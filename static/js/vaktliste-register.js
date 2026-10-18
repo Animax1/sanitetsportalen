@@ -98,14 +98,12 @@ function mkMannskap() {
 
   if (!register.korps.length) {
     // **Korpset først.** Det er badgen tilgangsmodellen hviler på, og uten
-    // ett kan ingen person opprettes. Knappen sier derfor «Legg inn korps»
-    // og ikke «Nytt mannskap»: en knapp som åpner noe annet enn det den
-    // heter, er en knapp man klikker på én gang og aldri stoler på igjen.
-    const tilKorps = kanSkriveAlt()
-      ? `<button class="btn btn-sm btn-primary" type="button"
-                 data-action="apneVerdier" data-arg="korps">
-           <i class="bi bi-flag me-1"></i>Legg inn korps
-         </button>`
+    // ett kan ingen person opprettes. Korpsene settes opp av admin utenfor
+    // vaktlista (18. okt. 2026), så admin får lenken dit og de andre beskjeden.
+    const tilKorps = _erAdmin()
+      ? `<a class="btn btn-sm btn-primary" href="/admin/tilhorigheter/">
+           <i class="bi bi-flag me-1"></i>Sett opp korps
+         </a>`
       : '';
     return `
       <div class="vl-kort">
@@ -116,8 +114,9 @@ function mkMannskap() {
           ${tilKorps}
         </div>
         <div class="vl-tom">
-          Ingen korps ennå. Et mannskap må høre til et korps — korpset er
-          badgen tilgangsmodellen hviler på.
+          Ingen korps i portalen ennå. Et mannskap må høre til et korps — korpset
+          er badgen tilgangsmodellen hviler på. Korpsene settes opp av en
+          administrator under Administrasjon → Tilhørigheter.
         </div>
       </div>`;
   }
@@ -320,7 +319,7 @@ function _fyllPersonskjema(person) {
 
 function apneNyPerson() {
   if (!register) return;
-  if (!register.korps.length) { apneVerdier('korps'); return; }
+  if (!register.korps.length) return;  // knappen finnes ikke uten korps — se mkMannskap
   redigererPerson = null;
   _skjulFeil('person-feil');
   document.getElementById('person-tittel').textContent = 'Nytt mannskap';

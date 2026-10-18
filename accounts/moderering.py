@@ -119,3 +119,22 @@ def utdelbart(aktor, portal) -> dict:
             continue
         ut[slug] = min(eget, taket, key=NIVAA_HIERARKI.get)
     return ut
+
+
+def kandidater_til_moderator(portal):
+    """Kontoene admin kan gjøre til moderator, sortert på navn: de moderatoren selv
+    ville sett (`synlige_kontoer`), utenom dem som alt er moderator.
+
+    `[{'konto', 'tilhorighet' (første av portalens, eller ''), 'medlem'}]`. En
+    liste å velge fra, ikke et brukernavn å skrive (18. okt. 2026).
+    """
+    ut = {}
+    for tilh, rader in grupper(portal):
+        for konto, rolle in rader:
+            if rolle == PortalRolle.MODERATOR:
+                continue
+            rad = ut.setdefault(konto.pk, {'konto': konto, 'tilhorighet': '', 'medlem': bool(rolle)})
+            if tilh is not None and not rad['tilhorighet']:
+                rad['tilhorighet'] = tilh.navn
+    return sorted(ut.values(),
+                  key=lambda r: norsk_nokkel(r['konto'].fullt_navn or r['konto'].username))

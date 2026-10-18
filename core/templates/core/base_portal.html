@@ -302,6 +302,9 @@
           <li><a class="dropdown-item{% if '/admin/portaler' in request.path %} active{% endif %}" href="{% url 'portaladmin:portaler' %}">
             <i class="bi bi-diagram-3 me-2"></i>Portaler
           </a></li>
+          <li><a class="dropdown-item{% if '/admin/tilhorigheter' in request.path %} active{% endif %}" href="{% url 'portaladmin:tilhorigheter' %}">
+            <i class="bi bi-flag me-2"></i>Tilhørigheter
+          </a></li>
           <li><a class="dropdown-item{% if '/admin/server-status' in request.path %} active{% endif %}" href="{% url 'portaladmin:admin_server_status' %}">
             <i class="bi bi-speedometer2 me-2"></i>Server-status
           </a></li>
@@ -321,7 +324,7 @@
             <i class="bi bi-cloud-arrow-up me-2"></i>Backup
           </a></li>
           {% endif %}
-          {% if er_moderator %}
+          {% if vis_moderatormeny %}
           <li><hr class="dropdown-divider"></li>
           <li><h6 class="dropdown-header">Moderator</h6></li>
           <li><a class="dropdown-item{% if '/moderator/brukere' in request.path %} active{% endif %}" href="{% url 'accounts:moderator_brukere' %}">

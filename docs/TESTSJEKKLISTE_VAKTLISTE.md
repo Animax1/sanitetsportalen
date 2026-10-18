@@ -189,7 +189,8 @@ plass, og hvem som får **fylle** den.*
 - [ ] **Kontokobling for hånd er global admin**, og flytting mellom korps sjekkes mot
       **begge** korps.
 - [ ] **Notat lagres uten verdier i audit-loggen** (sjekk en endring i audit).
-- [ ] **Korps og kompetanser** under «Innstillinger»: opprett, endre navn, deaktiver.
+- [ ] **Kompetanser** under «Innstillinger»: opprett, endre navn, deaktiver. Korpsene settes
+      opp under Administrasjon → Tilhørigheter.
 - [ ] **Kompetansestigen**: gi noen AFØR → VFØR og GFØR skjules i listene.
 - [ ] **Kompetansene er avkryssinger** i personvinduet — prøv på telefon. Gi noen både AFØR
       og VFØR, lagre telefonnummeret, åpne igjen → **begge** står krysset av.

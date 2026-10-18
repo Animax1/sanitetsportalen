@@ -1,0 +1,109 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Tilhørigheter – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Katalogen over korps og «annet» (18. okt. 2026, `core/views_portaler.py`). Felles for
+  alle portaler; hver portal velger sine på portalens side. Serverrendret, uten JS.
+{% endcomment %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2"><i class="bi bi-flag me-2"></i>Tilhørigheter</h1>
+  <p class="text-muted mb-0">
+    Korpsene og de andre gruppene en konto kan høre til. Katalogen er felles for alle
+    portaler; hver portal velger sine under <a href="{% url 'portaladmin:portaler' %}">Portaler</a>.
+    «Korps» står i vaktlistens korpsliste, «annet» — som Leger — bare i brukerlistene.
+  </p>
+</section>
+
+<div class="card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead>
+          <tr><th>Navn</th><th>Kortnavn</th><th>Type</th><th>Aktiv</th><th>Portaler</th><th>I bruk</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for rad in rader %}
+          <tr>
+            <td colspan="5">
+              <form method="post" id="t-{{ rad.t.pk }}" class="d-flex gap-2 flex-wrap align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="handling" value="rediger">
+                <input type="hidden" name="pk" value="{{ rad.t.pk }}">
+                <label class="visually-hidden" for="navn-{{ rad.t.pk }}">Navn</label>
+                <input type="text" id="navn-{{ rad.t.pk }}" name="navn" value="{{ rad.t.navn }}"
+                       class="form-control form-control-sm felt-navn" maxlength="120" required>
+                <label class="visually-hidden" for="kort-{{ rad.t.pk }}">Kortnavn</label>
+                <input type="text" id="kort-{{ rad.t.pk }}" name="kortnavn" value="{{ rad.t.kortnavn }}"
+                       class="form-control form-control-sm felt-kort" maxlength="20" placeholder="Kortnavn">
+                <label class="visually-hidden" for="type-{{ rad.t.pk }}">Type</label>
+                <select id="type-{{ rad.t.pk }}" name="type" class="form-select form-select-sm felt-type">
+                  {% for verdi, navn in typer %}
+                  <option value="{{ verdi }}"{% if verdi == rad.t.type %} selected{% endif %}>{{ navn }}</option>
+                  {% endfor %}
+                </select>
+                <div class="form-check m-0">
+                  <input class="form-check-input" type="checkbox" id="aktiv-{{ rad.t.pk }}" name="er_aktiv"
+                         {% if rad.t.er_aktiv %}checked{% endif %}>
+                  <label class="form-check-label" for="aktiv-{{ rad.t.pk }}">Aktiv</label>
+                </div>
+                <span class="small text-muted">{{ rad.portaler|join:", "|default:"Ingen portal" }}</span>
+                <button type="submit" class="btn btn-sm btn-outline-primary">Lagre</button>
+              </form>
+            </td>
+            <td>{{ rad.bruk }}</td>
+            <td class="text-end">
+              {% if not rad.bruk %}
+              <form method="post" data-confirm="Slette «{{ rad.t.navn }}»?">
+                {% csrf_token %}
+                <input type="hidden" name="handling" value="slett">
+                <input type="hidden" name="pk" value="{{ rad.t.pk }}">
+                <button type="submit" class="btn btn-sm btn-link text-danger">Slett</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-muted">Ingen tilhørigheter ennå.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row"><div class="col-lg-6">
+<div class="card">
+  <div class="card-header"><strong>Ny tilhørighet</strong></div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="handling" value="ny">
+      <label class="form-label" for="ny-navn">Navn</label>
+      <input type="text" id="ny-navn" name="navn" class="form-control mb-2" maxlength="120" required
+             placeholder="F.eks. «Haugesund Sanitetsforening»">
+      <label class="form-label" for="ny-kort">Kortnavn <span class="text-muted">(valgfritt)</span></label>
+      <input type="text" id="ny-kort" name="kortnavn" class="form-control mb-2" maxlength="20"
+             placeholder="HGSD">
+      <label class="form-label" for="ny-type">Type</label>
+      <select id="ny-type" name="type" class="form-select mb-3">
+        {% for verdi, navn in typer %}<option value="{{ verdi }}">{{ navn }}</option>{% endfor %}
+      </select>
+      {% if portaler %}
+      <p class="form-label mb-1">Med i portalene</p>
+      {% for p in portaler %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="portal" value="{{ p.pk }}" id="ny-p-{{ p.pk }}"
+               {% if p == aktiv_portal %}checked{% endif %}>
+        <label class="form-check-label" for="ny-p-{{ p.pk }}">{{ p.navn }}</label>
+      </div>
+      {% endfor %}
+      {% endif %}
+      <button type="submit" class="btn btn-primary mt-3">Legg til</button>
+    </form>
+  </div>
+</div>
+</div></div>
+{% endblock %}

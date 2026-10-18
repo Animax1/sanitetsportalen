@@ -278,8 +278,9 @@ grunnen til at `tegning` ikke vokser tilbake over 1 800 linjer.
 
 **Siden er én fane per ressursgruppe**, bygget av dataene og ikke av kode: fanene tilpasser
 seg vaktas art av seg selv. Hver ressurs er et regneark med redigering i raden. «Oversikt»
-er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og
-kompetanser administreres i modaler på siden.
+er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper og
+kompetanser administreres i modaler på siden. Korpsene settes opp under
+`/admin/tilhorigheter/` (18. okt. 2026).
 
 **Vaktlinja (`.vl-vaktvelger`) er tre linjer under 992 px.** Statusmerket slipper `nowrap`
 for spennet, og spaceren foran knappene tar hele linja.
