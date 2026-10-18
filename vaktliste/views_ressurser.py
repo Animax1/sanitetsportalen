@@ -343,6 +343,8 @@ def vaktposter_view(request, pk):
     try:
         with transaction.atomic():
             lagde = [Vaktpost.objects.create(**felter) for _ in range(antall)]
+            if mannskap is not None:
+                services.i_registeret_for(mannskap, ressurs)
     except IntegrityError:
         # Unik-skranken gjelder bare en person — en ledig plass har ingen
         # `mannskap`, og meldingen under leste `mannskap.navn` (A7).
@@ -441,6 +443,8 @@ def vaktpost_detalj_view(request, pk):
             if not services.kan_sette_vaktpost(
                     request.user, vaktpost.ressurs, ny_person, vaktpost=vaktpost):
                 return _nektet()
+            if ny_person is not None:
+                services.i_registeret_for(ny_person, vaktpost.ressurs)
         vaktpost.mannskap = ny_person
 
     var_planlagt = services.er_planlagt(vaktpost)

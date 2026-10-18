@@ -161,9 +161,10 @@ regel ble funnet, står i CHANGELOG på datoen.
   `/admin/tilhorigheter/`** (18. okt. 2026, André: «UTENFOR /vaktliste»), og
   `/api/korps/` er bare lesing. **Fanen og «Innstillinger» står uten vaktliste**:
   korps må inn før mannskap, og mannskap før noen settes på vakt.
-  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner kompetansene — lista
-  og skjemaet i **samme** vindu. En lagring kaller `_lastRegisterOgListe()`: navnene
-  står i planleggingens nedtrekk også.
+  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner kompetansene. En lagring
+  kaller `_lastRegisterOgListe()`: navnene står i nedtrekkene også.
+- **Registeret er vaktas** (`Vaktmannskap`, 18. okt.): ny vakt er tom, «Hent inn fra
+  tidligere» henter. Et skift legger personen inn.
 - **`Ressursgruppe` er typen, og den er en tabell** (30. aug. 2026 — lå i `choices.py`
   før det). Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:
   ikonlegger fanen, samler bemanningskurven, og avgrenser rollene. Ikonet er et felt —

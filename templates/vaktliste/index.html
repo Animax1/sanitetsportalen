@@ -919,6 +919,36 @@
   Mannskapsskjemaet. Flyttet hit fra registre.html 30. aug. 2026 sammen med
   fanen.
 {% endcomment %}
+{% comment %}
+  «Hent inn fra tidligere» (18. okt. 2026). André: «Tomt mannskapsregister etter avsluttet
+  vakt, men du kan hente inn fra tidligere mannskapsregister fra samme portal med
+  fleravkrysning.» Lista er portalens folk fra registrene de siste 24 månedene, og
+  korps-føreren ser bare sitt korps — serveren avgjør (`services.kan_hentes_inn`).
+{% endcomment %}
+<div class="modal fade" id="hentInnModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Hent inn fra tidligere</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-text mt-0">Personer som har stått i registeret til en vakt i portalen
+          de siste 24 månedene. Kryss av for dem som skal med på denne vakten.</p>
+        <label class="visually-hidden" for="hentinn-sok">Søk</label>
+        <input type="search" id="hentinn-sok" class="form-control form-control-sm mb-2"
+               placeholder="Søk i navn eller korps…" autocomplete="off">
+        <div id="hentinn-liste"></div>
+        <div id="hentinn-feil" class="alert alert-danger d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="hentinn-lagre" data-action="lagreHentInn" disabled>Hent inn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="personModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">

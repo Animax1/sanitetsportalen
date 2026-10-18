@@ -1659,3 +1659,8 @@ button.vl-pause:hover { border-style: solid; }
 .vl-veil-ord dt { margin-top: .5rem; }
 .vl-veil-ord dd { margin-left: 0; color: var(--text-soft); }
 .vl-veil-merk { color: var(--text-soft); margin-top: .5rem; }
+
+/* «Hent inn fra tidligere» (18. okt. 2026): én linje per person, gruppert på korps. */
+.vl-hentinn-korps { margin-bottom: 0.75rem; }
+.vl-hentinn-rad { display: flex; align-items: baseline; gap: 0.5rem; margin: 0.15rem 0; }
+.vl-hentinn-rad .vl-meta { margin-left: auto; }

@@ -109,6 +109,7 @@ TEMAER: dict[str, dict[str, str]] = {
         'belastning': 'timer, budsjett, tak, hvile, timeoversikt',
         'offline': 'service worker, køen, fil på e-post, reserven',
         'planlegging': 'skift, plasser, ressurser, dagbolker, utskrift, planleggeren',
+        'registeret': 'mannskapsregisteret per vakt, «Hent inn fra tidligere», Vaktmannskap',
         'roller': 'Ressursrolle, Ressursgruppe, kompetanser, rekkefølge',
         'tilgang': 'badgen, reservasjonen, korpsfilteret, hvem får røre hva',
     },

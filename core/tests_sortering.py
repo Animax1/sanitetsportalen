@@ -239,10 +239,10 @@ class EndepunkteneTests(TestCase):
         return svar['data'] if isinstance(svar, dict) else svar   # registrene svarer med en ren liste
 
     def test_mannskap(self):
-        from vaktliste.models import Korps, Mannskap
+        from vaktliste.test_helpers import lag_mannskap
         korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         for navn in ('Åse Åsen', 'Ola Olsen', 'Øyvind Ødegård', 'Anne Berg', 'Ærlig Ærdal'):
-            Mannskap.objects.create(navn=navn, korps=korps)
+            lag_mannskap(navn=navn, korps=korps)
         self.assertEqual([m['navn'] for m in self._hent('/vaktliste/api/mannskap/')['mannskap']],
                          ['Anne Berg', 'Ola Olsen', 'Ærlig Ærdal', 'Øyvind Ødegård', 'Åse Åsen'])
 

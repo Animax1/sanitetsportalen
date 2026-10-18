@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-18 — Vaktliste: mannskapsregisteret er vaktas — tomt etter avsluttet vakt, «Hent inn fra tidligere»  `#vaktliste/registeret`
+
+André: «Tomt mannskapsregister etter avsluttet vakt, men du kan hente inn fra tidligere
+mannskapsregister fra samme portal med fleravkrysning for enkelhets skyld. For de som har skrive
+eget korps må de bare kunne se sin korps, de med skrive alle kan se alle.» Dette erstatter «hent
+inn fra de siste 24 månedene» i `docs/BESLUTNING_PORTALER.md` §4.5.
+
+**Hvordan det så ut før:** registeret var portalens og ble aldri tømt. «Ikke plassert» viste
+derfor alle som noen gang hadde vært med, og nedtrekkene tilbød hele registeret.
+
+**`vaktliste.Vaktmannskap(vakt, mannskap)`** sier hvem som er med på hvilken vakt.
+- **Personen er fortsatt én rad per portal**, ikke en kopi per vakt. Telefonnummeret rettes ett
+  sted, kontokoblingen og korpsbadgen henger på personen som før, og gamle skift peker på samme
+  person.
+- **Registeret på `/vaktliste/` viser vaktas folk.** Det er vakta til lista man står på, eller den
+  aktive uten liste (`?vakt=` på `/api/mannskap/`, `registerVaktId()` i JS). Bytter man til en
+  liste i en annen vakt, hentes registeret på nytt. En ny vakt starter tom.
+- **«Hent inn fra tidligere»** står på Mannskap-fanen (`hentInnModal`, `/api/mannskap/hent-inn/`).
+  - Lista viser portalens folk som har stått i registeret til en vakt de siste 24 månedene
+    (`services.TIDLIGERE_DAGER`), og som ikke står i denne. Avkrysningen er gruppert på korps,
+    med «Velg alle» per korps, søk og «sist på vakt».
+  - Innhentingen er alle eller ingen.
+  - **Korps-føreren ser og henter bare sitt korps**, «skriv alle» ser alle, og leseren henter
+    ingen (`services.kan_foeres_av`, samme regel som `kan_fore_korps`).
+- **Nedtrekket når noen settes på et skift tilbyr bare vaktas register.**
+- **Å sette noen på et skift legger dem i vaktas register** (`services.i_registeret_for`), i
+  stedet for å avvise. Nedtrekket tilbyr bare registeret, så i vanlig bruk står de der fra før;
+  dette dekker en side som har stått åpen. Ingen kan altså stå på et skift uten å stå i
+  registeret.
+- **«Ta ut av vakten»** (ny knapp per rad) tar personen ut av vaktas register, mens personen står
+  i portalen. Det går ikke mens hun står på et skift i vakta (409, med antallet), og
+  korps-føreren tar bare ut sine egne. Søppelbøtta heter nå «Slett … fra portalen».
+- **En ny person havner i registeret til vakta man ser på.** Prøver man å legge inn et navn som
+  finnes fra en tidligere vakt, svarer serveren «finnes fra en tidligere vakt — hent henne inn»
+  (409), i stedet for å lage samme menneske to ganger.
+- **Migrasjonen `0035`** sørger for at ingen forsvinner ved deploy:
+  - hver vakt som ikke er avsluttet (den aktive og de planlagte) får hele portalens register;
+  - hver tidligere vakt får dem som sto på et skift der, så «Hent inn» har noe å vise.
+- **Auditlogges** (`vaktliste_vaktmannskap`).
+
+Testene lager personer med `test_helpers.lag_mannskap()`, som gjør det siden gjør: legger dem i
+registeret til den aktive vakta.
+
+**Mutasjoner: 17, alle drept.** To overlevde i første runde. Testen av «et skift legger personen
+inn» brukte en vakt der personen alt sto i registeret, så den beviste ingenting. Den kjører nå
+mot en planlagt vakt med tomt register, både for en ny plass og for en ledig plass som fylles.
+
 ## 2026-10-18 — Portaler: moderator kan gjøre et medlem til moderator  `#core/tilgang`
 
 André, om punkt 9: «Jeg trodde moderatorer skulle kunne sette andre moderatorer.» Notatet

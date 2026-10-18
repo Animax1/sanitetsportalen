@@ -97,6 +97,10 @@ class _Data:
         vl = Vaktliste.objects.create(vakt=vakt)
         ressurs = lag_ressurs(vaktliste=vl, navn='Lag 1')
         Vaktpost.objects.create(ressurs=ressurs, fra_tid=naa, til_tid=naa + timezone.timedelta(hours=2))
+        from core.models import Tilhorighet
+        from vaktliste.test_helpers import lag_mannskap
+        korps = Tilhorighet.objects.get_or_create(navn='Slettkorps')[0]
+        lag_mannskap(vakt=vakt, navn=f'Per {vakt.pk}', korps=korps)   # registeret (18. okt.)
         lenke = Parklenke.objects.get_or_create(
             navn='Kort', defaults={'hemmelighet_hash': 'x' * 64, 'aapen_fra': naa,
                                    'aapen_til': naa + timezone.timedelta(days=1)})[0]

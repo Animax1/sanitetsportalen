@@ -11,7 +11,9 @@ from core.vaktsletting import BaseVaktslettHandler, register
 class VaktlisteVaktsletting(BaseVaktslettHandler):
     slug = 'vaktliste'
     order = 50
-    modeller = ('vaktliste.Vaktliste',)
+    # `Vaktmannskap` (18. okt. 2026) går med vakta (CASCADE): registeret til en vakt
+    # som slettes, er ingenting å ta vare på — personene står i portalen.
+    modeller = ('vaktliste.Vaktliste', 'vaktliste.Vaktmannskap')
 
     def antall(self, vakt):
         from .models import Vaktliste, Vaktpost

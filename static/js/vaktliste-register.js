@@ -65,6 +65,8 @@ function _koblPersonsok() {
   // klikkbasert, og dette er et tastetrykk.
   const el = document.getElementById('vl-sok');
   if (el) el.addEventListener('input', () => settPersonsok(el.value));
+  const hent = document.getElementById('hentinn-sok');
+  if (hent) hent.addEventListener('input', () => sokHentInn(hent.value));
 }
 
 
@@ -87,13 +89,21 @@ function mkMannskap() {
          <i class="bi bi-person-plus me-1"></i>Nytt mannskap
        </button>`
     : '';
+  // «Hent inn fra tidligere» (18. okt. 2026): registeret er vaktas, og en ny vakt
+  // starter tom. Samme terskel som «Nytt mannskap» — korps-føreren henter sine.
+  const hentKnapp = kanSkriveNoe()
+    ? `<button class="btn btn-sm btn-outline-primary" type="button"
+               data-action="apneHentInn">
+         <i class="bi bi-box-arrow-in-down me-1"></i>Hent inn fra tidligere
+       </button>`
+    : '';
   const hode = `
       <div class="vl-kort-topp">
         <span class="vl-kort-tittel">
           <i class="bi bi-person-vcard me-1"></i>Mannskap
-          <span class="vl-meta">${escHtmlValue(register.mannskap.length)} i registeret</span>
+          <span class="vl-meta">${escHtmlValue(register.mannskap.length)} i registeret for ${escapeHtml(register.vakt_navn || 'vakten')}</span>
         </span>
-        ${nyKnapp}
+        <span class="d-flex gap-2 flex-wrap">${hentKnapp}${nyKnapp}</span>
       </div>`;
 
   if (!register.korps.length) {
@@ -123,7 +133,8 @@ function mkMannskap() {
 
   if (!register.mannskap.length) {
     return `<div class="vl-kort">${hode}`
-         + '<div class="vl-tom">Ingen i registeret ennå. Trykk «Nytt mannskap».</div></div>';
+         + '<div class="vl-tom">Ingen i registeret for denne vakten ennå. Hent inn folk fra '
+         + 'tidligere vakter, eller trykk «Nytt mannskap».</div></div>';
   }
 
   // **Tabell, ikke merkelapper på rad.** Med én kompetanse så den gamle
@@ -153,8 +164,11 @@ function mkMannskap() {
       ? `<button class="btn btn-sm btn-outline-secondary" type="button"
                  title="Rediger ${escHtmlValue(m.navn)}" aria-label="Rediger ${escHtmlValue(m.navn)}"
                  data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-pencil"></i></button>
+         <button class="btn btn-sm btn-outline-secondary" type="button"
+                 title="Ta ${escHtmlValue(m.navn)} ut av vakten" aria-label="Ta ${escHtmlValue(m.navn)} ut av vakten"
+                 data-action="taUtAvVakten" data-id="${escHtmlValue(m.id)}"><i class="bi bi-person-dash"></i></button>
          <button class="btn btn-sm btn-outline-danger" type="button"
-                 title="Slett ${escHtmlValue(m.navn)}" aria-label="Slett ${escHtmlValue(m.navn)}"
+                 title="Slett ${escHtmlValue(m.navn)} fra portalen" aria-label="Slett ${escHtmlValue(m.navn)} fra portalen"
                  data-action="slettPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-trash"></i></button>`
       : '';
 
@@ -358,6 +372,8 @@ async function lagrePerson() {
       issi: _lesFelt('person-issi'),
       notat: _lesFelt('person-notat'),
       kompetanse_ider: _valgteKompetanser(),
+      // En ny person havner i registeret til vakta man ser på.
+      vakt_id: register ? register.vakt_id : null,
     };
     if (redigererPerson) {
       kropp.er_aktiv = document.getElementById('person-aktiv').checked;
@@ -397,6 +413,131 @@ async function slettPerson(id) {
   const res = await apiFetch(`/vaktliste/api/mannskap/${id}/`, { method: 'DELETE' });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) { alert(d.message || 'Kunne ikke slette.'); return; }
+  await _lastRegisterOgListe();
+}
+
+
+async function taUtAvVakten(id) {
+  // Personen står i portalen og kan hentes inn igjen; serveren nekter mens hun
+  // står på et skift i vakta (409), og meldingen sier hvorfor.
+  const person = register?.mannskap.find((m) => m.id === id);
+  if (!person) return;
+  if (!confirm(`Ta ${person.navn} ut av registeret for denne vakten? Personen kan hentes inn igjen.`)) return;
+  const res = await apiFetch(`/vaktliste/api/mannskap/${id}/ta-ut/`,
+    { method: 'POST', body: JSON.stringify({ vakt_id: register.vakt_id }) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(d.message || 'Kunne ikke ta ut.'); return; }
+  await _lastRegisterOgListe();
+}
+
+
+// ── Hent inn fra tidligere (18. okt. 2026) ──────────────────────────────────
+//
+// Avkrysning, gruppert på korps. Tilstanden er `hentInnFolk` og `hentInnValgt` i JS,
+// ikke i DOM-en — lista tegnes på nytt ved søk, og en avkrysning i markupen ville
+// forsvunnet med den.
+
+let hentInnFolk = [];
+let hentInnValgt = new Set();
+let hentInnSok = '';
+
+
+async function apneHentInn() {
+  hentInnValgt = new Set();
+  hentInnSok = '';
+  const sok = document.getElementById('hentinn-sok');
+  if (sok) sok.value = '';
+  _skjulFeil('hentinn-feil');
+  const res = await apiFetch('/vaktliste/api/mannskap/hent-inn/'
+    + (register && register.vakt_id ? `?vakt=${encodeURIComponent(register.vakt_id)}` : ''));
+  const d = await res.json().catch(() => ({}));
+  hentInnFolk = res.ok ? (d.data || []) : [];
+  tegnHentInn();
+  _apneModal('hentInnModal');
+}
+
+
+function hentInnSynlige() {
+  const q = hentInnSok.trim().toLowerCase();
+  return hentInnFolk.filter((m) => !q || m.navn.toLowerCase().includes(q)
+    || (m.korps_navn || '').toLowerCase().includes(q));
+}
+
+
+function mkHentInn(folk, valgt) {
+  if (!folk.length) {
+    return '<div class="vl-tom">Ingen fra de siste 24 månedene å hente inn. Nye personer '
+      + 'legges inn med «Nytt mannskap».</div>';
+  }
+  const korps = [...new Set(folk.map((m) => m.korps_navn))]
+    .sort((a, b) => a.localeCompare(b, 'nb'));
+  return korps.map((k) => {
+    const her = folk.filter((m) => m.korps_navn === k);
+    const rader = her.map((m) => `
+      <label class="form-check vl-hentinn-rad">
+        <input class="form-check-input" type="checkbox" data-action="velgHentInn"
+               data-hendelse="change" data-id="${escHtmlValue(m.id)}"${valgt.has(m.id) ? ' checked' : ''}>
+        <span class="form-check-label">${escapeHtml(m.navn)}</span>
+        <span class="vl-meta">${m.sist ? 'sist ' + escapeHtml(new Date(m.sist).toLocaleDateString('nb-NO')) : ''}</span>
+      </label>`).join('');
+    const alleValgt = her.every((m) => valgt.has(m.id));
+    return `
+      <div class="vl-hentinn-korps">
+        <div class="d-flex align-items-center justify-content-between">
+          <strong>${escapeHtml(k)}</strong>
+          <button class="btn btn-sm btn-link" type="button" data-action="velgKorpsHentInn"
+                  data-arg="${escHtmlValue(k)}">${alleValgt ? 'Fjern alle' : 'Velg alle'}</button>
+        </div>
+        ${rader}
+      </div>`;
+  }).join('');
+}
+
+
+function tegnHentInn() {
+  const el = document.getElementById('hentinn-liste');
+  if (el) el.innerHTML = mkHentInn(hentInnSynlige(), hentInnValgt);
+  const knapp = document.getElementById('hentinn-lagre');
+  if (knapp) {
+    knapp.disabled = hentInnValgt.size === 0;
+    knapp.textContent = hentInnValgt.size ? `Hent inn ${hentInnValgt.size}` : 'Hent inn';
+  }
+}
+
+
+function velgHentInn(id) {
+  const n = Number(id);
+  if (hentInnValgt.has(n)) hentInnValgt.delete(n); else hentInnValgt.add(n);
+  tegnHentInn();
+}
+
+
+function velgKorpsHentInn(korps) {
+  const her = hentInnSynlige().filter((m) => m.korps_navn === korps);
+  const alle = her.every((m) => hentInnValgt.has(m.id));
+  her.forEach((m) => (alle ? hentInnValgt.delete(m.id) : hentInnValgt.add(m.id)));
+  tegnHentInn();
+}
+
+
+function sokHentInn(verdi) {
+  hentInnSok = String(verdi ?? '');
+  tegnHentInn();
+}
+
+
+async function lagreHentInn() {
+  if (!hentInnValgt.size) return;
+  const res = await apiFetch('/vaktliste/api/mannskap/hent-inn/', {
+    method: 'POST',
+    body: JSON.stringify({ vakt_id: register.vakt_id, ider: [...hentInnValgt] }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('hentinn-feil', d.message || 'Kunne ikke hente inn.');
+    return;
+  }
+  _lukkModal('hentInnModal');
   await _lastRegisterOgListe();
 }
 

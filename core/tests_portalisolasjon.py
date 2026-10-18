@@ -19,6 +19,8 @@ krympe, og testen krever det: en modell som har fått en vei, må ut av lista.
 """
 from __future__ import annotations
 
+from vaktliste.test_helpers import lag_mannskap
+
 from django.apps import apps
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
@@ -131,11 +133,12 @@ class VaktlistaHolderPortaleneAdskiltTests(TestCase):
         self.kari = CustomUser.objects.create_user(username='kari', password='x',
                                                    must_change_password=False)
         with aktiver_portal(self.brann):
-            self.i_brann = Mannskap.objects.create(navn='Bjørn Brann', korps=self.hgsd,
-                                                   telefon='11111111', user=self.kari)
+            # I registeret til portalens aktive vakt, som siden gjør (18. okt. 2026).
+            self.i_brann = lag_mannskap(navn='Bjørn Brann', korps=self.hgsd,
+                                        telefon='11111111', user=self.kari)
         with aktiver_portal(self.standard):
-            self.i_standard = Mannskap.objects.create(navn='Stine Standard', korps=self.hgsd,
-                                                      telefon='22222222', user=self.kari)
+            self.i_standard = lag_mannskap(navn='Stine Standard', korps=self.hgsd,
+                                           telefon='22222222', user=self.kari)
         self.leder = CustomUser.objects.create_user(username='leder', password='x',
                                                     must_change_password=False)
         gi_modultilgang(bruker=self.leder, modul_slug='vaktliste', nivaa='skriv_leder',
@@ -201,6 +204,9 @@ class VaktlistasKallstederTests(VaktlistaHolderPortaleneAdskiltTests):
             vakt = opprett_vakt('Kamp 7', year=2026, startet=timezone.now())
         with transaction.atomic():
             gjor_aktiv(vakt)
+        # Ny vakt, tomt register (18. okt. 2026): Bjørn hentes inn, som siden gjør.
+        from vaktliste.models import Vaktmannskap
+        Vaktmannskap.objects.create(vakt=vakt, mannskap=self.i_brann)
         self.vl = Vaktliste.objects.create(vakt=vakt)
         self.bil = lag_ressurs(vaktliste=self.vl, navn='Bil 1')
         self.plass = Vaktpost.objects.create(ressurs=self.bil, fra_tid=timezone.now(),

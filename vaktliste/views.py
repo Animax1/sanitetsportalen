@@ -577,7 +577,7 @@ def vaktliste_detalj_view(request, pk):
         'mannskap': [
             {'id': m.pk, 'navn': m.navn, 'korps_id': m.korps_id,
              'korps_navn': m.korps.navn}
-            for m in services.mannskap_brukeren_kan_sette(request.user)
+            for m in services.mannskap_brukeren_kan_sette(request.user, vakt=vl.vakt)
         ],
         'enheter': _enheter(),
     }})

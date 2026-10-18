@@ -543,6 +543,8 @@ async function lastListe(id) {
   // korpsvelgeren lar stå igjen. Byggerne leser `vaktposter` som før, så
   // filteret gjelder alle fanene uten at noen av dem vet om det.
   aktivListe.alle_vaktposter = aktivListe.vaktposter;
+  // En liste fra en annen vakt har et annet register.
+  if (register && register.vakt_id !== registerVaktId()) lastRegister();
   _projiserKo();
   fyllKorpsvelger();
   brukKorpsfilter();
@@ -570,11 +572,19 @@ async function lastListe(id) {
 }
 
 
+function registerVaktId() {
+  // **Registeret er vaktas** (18. okt. 2026, André: «tomt mannskapsregister etter
+  // avsluttet vakt»): det som står i lista man ser på. Uten vaktliste er det
+  // portalens aktive vakt, og serveren velger den når ID-en mangler.
+  return aktivListe && aktivListe.vaktliste ? aktivListe.vaktliste.vakt_id : null;
+}
+
+
 async function lastRegister() {
-  // Registeret er globalt, ikke vaktas. Det hentes for seg, og lastes på
-  // nytt etter hver endring — navn og korps står i nedtrekkene på
-  // planleggingssiden, så `lastListe()` må med når personer endres.
-  const res = await apiFetch('/vaktliste/api/mannskap/');
+  // Det hentes for seg, og lastes på nytt etter hver endring — navn og korps står
+  // i nedtrekkene på planleggingssiden, så `lastListe()` må med når personer endres.
+  const vakt = registerVaktId();
+  const res = await apiFetch('/vaktliste/api/mannskap/' + (vakt ? `?vakt=${encodeURIComponent(vakt)}` : ''));
   if (!res.ok) return;
   register = (await res.json()).data;
   register.alle_mannskap = register.mannskap;

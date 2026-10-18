@@ -82,3 +82,16 @@ def hent_eller_lag_korps(navn):
     korps, ny = Korps.objects.get_or_create(navn=navn)
     gjeldende_portal().tilhorigheter.add(korps)
     return korps, ny
+
+
+def lag_mannskap(vakt=None, **felter):
+    """Som `Mannskap.objects.create(**felter)`, **og i registeret til vakta**
+    (18. okt. 2026) — standard den aktive. Det er det siden gjør når en person legges
+    inn: hun havner i registeret til vakta man ser på. En rad uten registerrad står
+    ikke i registeret og ikke i nedtrekkene."""
+    from core.vakt import hent_aktiv_vakt
+
+    from .models import Mannskap, Vaktmannskap
+    m = Mannskap.objects.create(**felter)
+    Vaktmannskap.objects.create(vakt=vakt or hent_aktiv_vakt(), mannskap=m)
+    return m

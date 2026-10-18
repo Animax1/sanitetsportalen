@@ -11,6 +11,7 @@ mal som ber brukeren gå til `/django-admin/` sender henne til en dør som ikke
 finnes i prod.
 """
 import json
+from vaktliste.test_helpers import lag_mannskap
 from datetime import timedelta
 
 from django.test import Client, SimpleTestCase, TestCase, override_settings
@@ -218,7 +219,7 @@ class VerdimengdeTests(TestCase):
         from django.core.exceptions import ValidationError
         from core import portaladmin
         korps = lag_korps(navn='Haugesund')
-        Mannskap.objects.create(navn='Kari', korps=korps)
+        lag_mannskap(navn='Kari', korps=korps)
         with self.assertRaisesMessage(ValidationError, 'inaktiv'):
             portaladmin.slett_tilhorighet(korps)
         self.assertTrue(Korps.objects.filter(pk=korps.pk).exists())
@@ -247,7 +248,7 @@ class VerdimengdeTests(TestCase):
         kompetansen fra alle som har den. Derfor sjekkes den eksplisitt."""
         korps = lag_korps(navn='Haugesund')
         komp = Kompetanse.objects.create(navn='Sykepleier')
-        person = Mannskap.objects.create(navn='Kari', korps=korps)
+        person = lag_mannskap(navn='Kari', korps=korps)
         person.kompetanser.add(komp)
 
         res = self.c.delete(f'/vaktliste/api/kompetanser/{komp.pk}/')
@@ -258,7 +259,7 @@ class VerdimengdeTests(TestCase):
     def test_rolle_i_bruk_kan_ikke_slettes(self):
         korps = lag_korps(navn='Haugesund')
         rolle = lag_rolle('Lagleder')
-        person = Mannskap.objects.create(navn='Kari', korps=korps)
+        person = lag_mannskap(navn='Kari', korps=korps)
         vl = services.opprett_planlagt_vakt('Vakta')
         r = lag_ressurs(vaktliste=vl, navn='Lag 1')
         na = timezone.now()
@@ -271,8 +272,8 @@ class VerdimengdeTests(TestCase):
         """Tallet vises i grensesnittet: en verdimengde man kan slette uten å
         vite hva som henger i den, sletter man for lett."""
         korps = lag_korps(navn='Haugesund')
-        Mannskap.objects.create(navn='Kari', korps=korps)
-        Mannskap.objects.create(navn='Ola', korps=korps)
+        lag_mannskap(navn='Kari', korps=korps)
+        lag_mannskap(navn='Ola', korps=korps)
         data = self.c.get('/vaktliste/api/korps/').json()['data']
         self.assertEqual(data[0]['i_bruk'], 2)
 
@@ -681,7 +682,7 @@ class KompetansestigeTests(TestCase):
         self.c = _klient(_bruker('adm', admin=True))
 
     def _person(self, *kompetanser):
-        p = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        p = lag_mannskap(navn='Kari', korps=self.korps)
         p.kompetanser.set(kompetanser)
         return p
 
@@ -786,7 +787,7 @@ class SammeFormBeggeVeierTests(TestCase):
         gfor = Kompetanse.objects.create(navn='GFØR')
         Kompetanse.objects.create(navn='VFØR', bygger_paa=gfor)
         lag_rolle('Lagleder')
-        Mannskap.objects.create(navn='Kari', korps=self.korps)
+        lag_mannskap(navn='Kari', korps=self.korps)
         self.c = _klient(_bruker('adm', admin=True))
 
     def _fra_mannskapsendepunktet(self, nokkel):
@@ -1466,7 +1467,7 @@ class RadeneFoelgerRollerangeringenTests(TestCase):
         """Den gamle regelen — ledige plasser er lette å se — gjelder nå
         *innenfor* rollen, som er der den fortsatt betyr noe. Også denne sto
         udekket og bare tilfeldigvis sann i SQLite."""
-        person = Mannskap.objects.create(
+        person = lag_mannskap(
             navn='Kari', korps=lag_korps(navn='Haugesund'))
         self._plass('Lagsmedlem', person=person)
         self._plass('Lagsmedlem')

@@ -409,6 +409,37 @@ class Mannskap(BaseTimeStampedModel, PortalEid):
         super().save(*args, **kwargs)
 
 
+class Vaktmannskap(models.Model):
+    """At en person står i mannskapsregisteret **for én vakt** (18. okt. 2026).
+
+    André: «Tomt mannskapsregister etter avsluttet vakt, men du kan hente inn fra
+    tidligere mannskapsregister fra samme portal med fleravkrysning.» Personen
+    (`Mannskap`) er fortsatt én rad per portal — telefonnummer, korps og
+    kontokobling rettes ett sted, og gamle skift peker på samme person. Det som
+    er per vakt, er *hvem som er med*: registeret på `/vaktliste/` viser vaktas
+    rader, nedtrekkene tilbyr bare dem, og en ny vakt starter uten noen.
+
+    **Ingen brukerpeker**: hvem som hentet inn står i auditen, og en peker her
+    måtte strippes i backupen (`BrukerpekereStrippesEllerBegrunnesTests`).
+    """
+
+    vakt = models.ForeignKey('core.Vakt', on_delete=models.CASCADE,
+                             related_name='mannskapsregister', verbose_name='Vakt')
+    mannskap = models.ForeignKey(Mannskap, on_delete=models.CASCADE,
+                                 related_name='vakter', verbose_name='Mannskap')
+    lagt_til = models.DateTimeField(auto_now_add=True, verbose_name='Lagt til')
+
+    class Meta:
+        verbose_name = 'Mannskap på vakten'
+        verbose_name_plural = 'Mannskap på vaktene'
+        constraints = [
+            models.UniqueConstraint(fields=['vakt', 'mannskap'], name='en_rad_per_person_og_vakt'),
+        ]
+
+    def __str__(self):
+        return f'{self.mannskap_id}@{self.vakt_id}'
+
+
 class Kontokorps(BaseTimeStampedModel, PortalEid):
     """Korpset en **konto** fører — satt av global admin på brukersiden.
 

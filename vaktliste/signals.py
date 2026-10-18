@@ -35,7 +35,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request, ikke_under_loaddata
 
-from .models import (Belastningsgrenser, Kompetanse, Kontokorps, Korps, Mannskap, Overnatting,
+from .models import (Vaktmannskap, Belastningsgrenser, Kompetanse, Kontokorps, Korps, Mannskap, Overnatting,
                      Overnattingsrom, Pause, Ressurs, Ressursgruppe, Ressursrolle, Utsending,
                      Vaktliste, Vaktpost)
 
@@ -348,6 +348,36 @@ def kontokorps_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Kontokorps)
 def kontokorps_post_delete(sender, instance, **kwargs):
     _logg_slettet(instance, KONTOKORPS_TABELLNAVN, f'{instance.user_id} fører {instance.korps}')
+
+
+# ── Registeret per vakt (18. okt. 2026) ──────────────────────────────────────
+#
+# Hvem som er hentet inn i, og tatt ut av, vaktas mannskapsregister — og av hvem.
+# Det avgjør hvem nedtrekkene tilbyr.
+
+VAKTMANNSKAP_TABELLNAVN = 'vaktliste_vaktmannskap'
+
+
+def _beskriv_vaktmannskap(v) -> str:
+    return f'{v.mannskap_id} i registeret for vakt {v.vakt_id}'
+
+
+@receiver(pre_save, sender=Vaktmannskap)
+@ikke_under_loaddata
+def vaktmannskap_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Vaktmannskap, instance, VAKTMANNSKAP_TABELLNAVN)
+
+
+@receiver(post_save, sender=Vaktmannskap)
+@ikke_under_loaddata
+def vaktmannskap_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, VAKTMANNSKAP_TABELLNAVN, _beskriv_vaktmannskap(instance))
+
+
+@receiver(post_delete, sender=Vaktmannskap)
+def vaktmannskap_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, VAKTMANNSKAP_TABELLNAVN, _beskriv_vaktmannskap(instance))
 
 
 # ── Pausene (23. sep. 2026) ──────────────────────────────────────────────────

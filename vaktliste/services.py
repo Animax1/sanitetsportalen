@@ -9,13 +9,15 @@ huske badgen og glemme reservasjonen.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
 
-from .models import Kontokorps, Mannskap, Ressurs, Vaktliste
+from .models import Kontokorps, Mannskap, Ressurs, Vaktliste, Vaktmannskap
 
 
 # ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
@@ -480,17 +482,15 @@ def kan_fore_korps(user, korps_id) -> bool:
     return korps is not None and korps_id == korps.pk
 
 
-def mannskap_brukeren_kan_sette(user):
+def mannskap_brukeren_kan_sette(user, vakt=None):
     """Personene brukeren får sette på en plass — for nedtrekkene. Speiler
     `kan_redigere_mannskap`: alle for den som skriver alt, eget korps for
-    korps-føreren, ingen uten badge."""
+    korps-føreren, ingen uten badge. **Med `vakt`: bare vaktas register**
+    (18. okt. 2026) — den som ikke er hentet inn, står ikke i nedtrekket."""
     qs = Mannskap.objects.i_portal().filter(er_aktiv=True).select_related('korps')
-    if kan_skrive_alt(user):
-        return qs
-    korps = brukerens_korps(user)
-    if korps is None or not har_tilgang(user, 'vaktliste', 'skriv_handling'):
-        return qs.none()
-    return qs.filter(korps=korps)
+    if vakt is not None:
+        qs = qs.filter(vakter__vakt=vakt)
+    return kan_foeres_av(qs, user)
 
 
 def kan_redigere_mannskap(user, mannskap) -> bool:
@@ -785,3 +785,99 @@ def kan_sette_opp_skift(user) -> bool:
     femti tomme plasser på sin egen ressurs, og flytte tidene på dem som sto.
     """
     return kan_skrive_alt(user)
+
+
+# ── Registeret per vakt (18. okt. 2026) ──────────────────────────────────────
+#
+# André: «Tomt mannskapsregister etter avsluttet vakt, men du kan hente inn fra
+# tidligere mannskapsregister fra samme portal med fleravkrysning. For de som har
+# skrive eget korps må de bare kunne se sin korps, de med skrive alle kan se alle.»
+# Personen er én `Mannskap`-rad per portal; `Vaktmannskap` sier hvem som er med
+# på hvilken vakt. Se modellen for hvorfor det ikke er en kopi per vakt.
+
+#: Hvor langt tilbake «Hent inn fra tidligere» ser. Samme frist som radnivået
+#: ellers (`docs/BESLUTNING_PORTALER.md` §4.5).
+TIDLIGERE_DAGER = 730
+
+
+def registerets_vakt(vakt_id=None):
+    """Vakta registeret gjelder: den oppgitte, i portalen man står i — ellers den
+    aktive. `None` når ID-en ikke er en vakt i portalen."""
+    from core.models import Vakt
+    from core.portal import gjeldende_portal
+    from core.vakt import hent_aktiv_vakt
+
+    if vakt_id:
+        return Vakt.objects.filter(pk=vakt_id, portal=gjeldende_portal()).first()
+    return hent_aktiv_vakt()
+
+
+def i_registeret(qs, vakt):
+    """Bare personene som står i vaktas register."""
+    return qs.filter(vakter__vakt=vakt)
+
+
+def kan_foeres_av(qs, user):
+    """Personene brukeren får føre: alle for den som skriver alt, eget korps for
+    korps-føreren, ingen ellers. Samme regel som `kan_fore_korps`, som et filter."""
+    if kan_skrive_alt(user):
+        return qs
+    korps = brukerens_korps(user)
+    if korps is None or not har_tilgang(user, 'vaktliste', 'skriv_handling'):
+        return qs.none()
+    return qs.filter(korps=korps)
+
+
+def kan_hentes_inn(user, vakt):
+    """«Hent inn fra tidligere»: personer i portalen som har stått i registeret til
+    en vakt de siste 24 månedene, men ikke står i denne. Korps-føreren ser sitt
+    korps, den som skriver alt ser alle."""
+    grense = timezone.now() - timedelta(days=TIDLIGERE_DAGER)
+    qs = (Mannskap.objects.i_portal().filter(er_aktiv=True, vakter__vakt__startet__gte=grense)
+          .exclude(vakter__vakt=vakt).distinct().select_related('korps'))
+    return kan_foeres_av(qs, user)
+
+
+def hent_inn(user, vakt, ider) -> list:
+    """Legg personene inn i vaktas register. Alle eller ingen: én ID brukeren ikke
+    får hente, stopper hele innsendingen."""
+    from django.core.exceptions import ValidationError
+
+    ider = {int(i) for i in ider}
+    if not ider:
+        raise ValidationError('Kryss av for minst én person.')
+    folk = list(kan_hentes_inn(user, vakt).filter(pk__in=ider))
+    if len(folk) != len(ider):
+        raise ValidationError('Listen inneholder personer du ikke kan hente inn — last siden på nytt.')
+    with transaction.atomic():
+        for m in folk:
+            Vaktmannskap.objects.get_or_create(vakt=vakt, mannskap=m)
+    return folk
+
+
+def ta_ut_av_registeret(user, vakt, mannskap) -> None:
+    """Ta personen ut av vaktas register. Personen står i portalen, og kan hentes inn
+    igjen. **Ikke mens hun står på et skift i vakta** — da ville skiftet vist en
+    person registeret ikke har."""
+    from django.core.exceptions import ValidationError
+
+    if not kan_fore_korps(user, mannskap.korps_id):
+        raise ValidationError('Du kan ikke føre personer i dette korpset.')
+    skift = mannskap.vaktposter.filter(ressurs__vaktliste__vakt=vakt).count()
+    if skift:
+        raise ValidationError(f'{mannskap.navn} står på {skift} skift i vakten. Ta henne av '
+                              'skiftene først.')
+    for rad in Vaktmannskap.objects.filter(vakt=vakt, mannskap=mannskap):
+        rad.delete()
+
+
+def i_registeret_for(mannskap, ressurs) -> None:
+    """**Står hun på et skift i vakta, står hun i vaktas register.** Kalles når en
+    person settes på en plass. Nedtrekket tilbyr bare registeret, så i vanlig bruk er
+    hun der fra før; dette dekker en side som har stått åpen siden før hun ble tatt ut,
+    uten å avvise noe. Uten det kunne et skift vist en person registeret ikke har, og
+    «Ikke plassert» og «Ta ut av vakten» ville regnet feil."""
+    vakt_id = Vaktliste.objects.filter(pk=ressurs.vaktliste_id).values_list(
+        'vakt_id', flat=True).first()
+    if vakt_id is not None:
+        Vaktmannskap.objects.get_or_create(vakt_id=vakt_id, mannskap=mannskap)

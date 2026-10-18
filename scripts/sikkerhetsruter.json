@@ -179,6 +179,8 @@
   "/vaktliste/api/korps/",
   "/vaktliste/api/mannskap/",
   "/vaktliste/api/mannskap/1/",
+  "/vaktliste/api/mannskap/1/ta-ut/",
+  "/vaktliste/api/mannskap/hent-inn/",
   "/vaktliste/api/overnattinger/1/",
   "/vaktliste/api/overnattingsrom/1/",
   "/vaktliste/api/overnattingsrom/1/plasser/",

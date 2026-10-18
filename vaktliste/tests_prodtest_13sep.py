@@ -11,6 +11,7 @@ er tomt» og kunne ikke redigere noen. To ting, hver med sin test:
 """
 import json
 
+from vaktliste.test_helpers import lag_mannskap
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from vaktliste.test_helpers import lag_korps
@@ -24,7 +25,7 @@ from vaktliste.tests_tilgang import _bruker, _klient
 class KorpsforerUtenBadgeTests(TestCase):
     def setUp(self):
         self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
-        Mannskap.objects.create(navn='Ola', korps=self.korps)
+        lag_mannskap(navn='Ola', korps=self.korps)
 
     def test_sida_sier_hvorfor_hun_ikke_faar_redigere(self):
         res = _klient(_bruker('kf_uten', 'skriv_handling')).get('/vaktliste/')
@@ -34,7 +35,7 @@ class KorpsforerUtenBadgeTests(TestCase):
 
     def test_med_badge_ingen_merknad(self):
         kf = _bruker('kf_med', 'skriv_handling')
-        Mannskap.objects.create(navn='Fører', korps=self.korps, user=kf)
+        lag_mannskap(navn='Fører', korps=self.korps, user=kf)
         self.assertNotContains(_klient(kf).get('/vaktliste/'), 'vl-korpsfilter')
 
     def test_de_som_staar_utenfor_badgen_faar_ingen_merknad(self):
@@ -78,7 +79,7 @@ class KoblingBareForLederTests(TestCase):
                 self.assertEqual(d['user_id'], self.kari.pk)
 
     def test_redigering_med_skriv_full_kobler_heller_ikke(self):
-        person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        person = lag_mannskap(navn='Kari', korps=self.korps)
         res = _klient(_bruker('vl2', 'skriv_full')).put(
             f'/vaktliste/api/mannskap/{person.pk}/', content_type='application/json',
             data={'epost': 'kari@example.org'})

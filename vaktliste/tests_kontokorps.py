@@ -17,6 +17,8 @@ Fire ting prøves, og alle gjennom de ekte inngangene:
 """
 from __future__ import annotations
 
+from vaktliste.test_helpers import lag_mannskap
+
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -54,8 +56,8 @@ class _Basis(TestCase):
     def setUp(self):
         self.hgsd = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.karmoy = lag_korps(navn='Karmøy', kortnavn='KRM')
-        Mannskap.objects.create(navn='Hanne Haugesund', korps=self.hgsd)
-        Mannskap.objects.create(navn='Kari Karmøy', korps=self.karmoy)
+        lag_mannskap(navn='Hanne Haugesund', korps=self.hgsd)
+        lag_mannskap(navn='Kari Karmøy', korps=self.karmoy)
         self.admin = _bruker('adm', admin=True)
 
     def _navn_i_registeret(self, bruker):
@@ -247,7 +249,7 @@ class BackupTests(TestCase):
         self.env = patch.dict(os.environ, {'BACKUP_DIR': str(TEST_BACKUP_DIR)})
         self.env.start()
         self.hgsd = lag_korps(navn='Haugesund')
-        Mannskap.objects.create(navn='Hanne', korps=self.hgsd)
+        lag_mannskap(navn='Hanne', korps=self.hgsd)
         self.per = _bruker('per', 'les')
         Kontokorps.objects.create(user=self.per, korps=self.hgsd)
 

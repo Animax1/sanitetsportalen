@@ -15,6 +15,8 @@ Fasen lovte fire ting, og det er de fire som testes her:
 Reglene i punkt 4 håndheves først i fase 3. De testes likevel nå, fordi de er
 skrevet nå: en regel uten test er en regel som stemmer helt til noen rører den.
 """
+from vaktliste.models import Vaktmannskap
+from vaktliste.test_helpers import lag_mannskap
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
@@ -155,7 +157,7 @@ class KopierOppsettTests(TestCase):
         # Rekkefølgen settes normalt av `neste_rekkefolge()`; her settes den
         # eksplisitt fordi testen handler om at kopien bevarer den.
 
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         na = timezone.now()
         Vaktpost.objects.create(
             ressurs=self.bil, mannskap=self.person,
@@ -252,7 +254,7 @@ class ModellReglerTests(TestCase):
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(
             vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         self.na = timezone.now()
 
     def _post(self, **kwargs):
@@ -339,8 +341,8 @@ class TilgangsregelTests(TestCase):
             vaktliste=self.vl, navn='Lag Karmøy', korps=self.karmoy)
         self.res_fri = lag_ressurs(vaktliste=self.vl, navn='KO')
 
-        self.p_hgsd = Mannskap.objects.create(navn='Kari', korps=self.hgsd)
-        self.p_karmoy = Mannskap.objects.create(navn='Ola', korps=self.karmoy)
+        self.p_hgsd = lag_mannskap(navn='Kari', korps=self.hgsd)
+        self.p_karmoy = lag_mannskap(navn='Ola', korps=self.karmoy)
 
         # Korps-brukeren: skriv_handling *og* en mannskapsrad i Haugesund.
         self.korpsbruker = _bruker('kb', 'skriv_handling')
@@ -420,7 +422,7 @@ class ApiTests(TestCase):
         self.aktiv = sett_aktiv_vakt(2098)
         self.korps = lag_korps(navn='Haugesund', kortnavn='HGSD')
         self.rolle = lag_rolle('Lagleder')
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         self.admin = _bruker('adm', admin=True)
         self.c = _klient(self.admin)
         self.na = timezone.now()
@@ -514,8 +516,11 @@ class ApiTests(TestCase):
 
     def test_inaktivt_mannskap_tilbys_ikke(self):
         vl = self._liste()
-        Mannskap.objects.create(navn='Pensjonert', korps=self.korps,
-                                er_aktiv=False)
+        # Nedtrekket er vaktas register (18. okt. 2026): begge står i det, og bare
+        # den aktive tilbys.
+        Vaktmannskap.objects.create(vakt=vl.vakt, mannskap=self.person)
+        lag_mannskap(vakt=vl.vakt, navn='Pensjonert', korps=self.korps,
+                     er_aktiv=False)
         data = self.c.get(f'/vaktliste/api/vaktlister/{vl.pk}/').json()['data']
         self.assertEqual([m['navn'] for m in data['mannskap']], ['Kari'])
 
@@ -804,7 +809,7 @@ class RessurstabellensDataTests(TestCase):
 
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         self.person.kompetanser.set([self.gfor, self.afor, self.syk])
         na = timezone.now()
         self.vp = Vaktpost.objects.create(
@@ -829,7 +834,7 @@ class RessurstabellensDataTests(TestCase):
         self.assertEqual(self._vaktpost()['rolle'], 'Lagleder')
 
     def test_person_uten_kompetanse_gir_tom_liste(self):
-        annen = Mannskap.objects.create(navn='Ola', korps=self.korps)
+        annen = lag_mannskap(navn='Ola', korps=self.korps)
         na = timezone.now()
         Vaktpost.objects.create(
             ressurs=self.ressurs, mannskap=annen,
@@ -865,7 +870,7 @@ class LedigePlasserTests(TestCase):
         self.rolle = lag_rolle('Lagleder')
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         self.c = _klient(_bruker('adm', admin=True))
         self.na = timezone.now()
 
@@ -1039,7 +1044,7 @@ class RessursrolleTests(TestCase):
         self.utgatt = lag_rolle('Utgått', er_aktiv=False)
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
-        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person = lag_mannskap(navn='Kari', korps=self.korps)
         na = timezone.now()
         Vaktpost.objects.create(ressurs=self.ressurs, mannskap=self.person,
                                 rolle=self.rolle, fra_tid=na,

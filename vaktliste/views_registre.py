@@ -49,7 +49,7 @@ from core.portal import gjeldende_portal
 from core.ratelimit import rate_limit
 
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe, korpskonflikt,
-                     Ressursrolle)
+                     Ressursrolle, Vaktmannskap)
 from . import services
 from core.jsonkropp import json_body, json_feil
 
@@ -460,14 +460,24 @@ def mannskap_view(request):
 
     POST er `kan_fore_korps` på **målkorpset**: korps-brukeren legger til sine
     egne folk, ikke andres.
+
+    **Registeret er vaktas** (18. okt. 2026): GET gir personene i registeret til
+    `?vakt=` (standard: den aktive), og en ny person havner i den vaktas register.
+    En ny vakt starter derfor tom — «Hent inn fra tidligere» er veien tilbake.
     """
+    vakt = services.registerets_vakt(
+        _int(request.GET.get('vakt') if request.method == 'GET'
+             else json_body(request).get('vakt_id')))
+    if vakt is None:
+        return json_feil('Fant ikke vakten.', status=404)
+
     if request.method == 'GET':
         # Korps-brukeren ser sitt eget korps (11. sep. 2026) — registeret
         # er adresseboka, og andres telefonnumre er ikke noe hun trenger
         # for å føre sin egen liste.
         from django.db.models import Count
         folk = services.synlig_mannskap(
-            Mannskap.objects.i_portal()
+            services.i_registeret(Mannskap.objects.i_portal(), vakt)
             .select_related('korps', 'user')
             .prefetch_related('kompetanser')
             .annotate(i_bruk_antall=Count('vaktposter'))
@@ -479,6 +489,8 @@ def mannskap_view(request):
         leder = services.kan_lede(request.user)
         kjente = _kjente_eposter() if leder else set()
         return JsonResponse({'status': 'ok', 'data': {
+            'vakt_id': vakt.pk,
+            'vakt_navn': vakt.navn,
             'mannskap': [_mannskap_til_dict(m, foreldre, kjente, vis_konto=leder)
                          for m in folk],
             **{
@@ -541,7 +553,14 @@ def mannskap_view(request):
                 return json_feil(konflikt, status=409)
             person.save()
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
+            Vaktmannskap.objects.create(vakt=vakt, mannskap=person)
     except IntegrityError:
+        if not services.i_registeret(Mannskap.objects.i_portal(), vakt).filter(
+                korps=korps, navn=navn).exists():
+            # Personen finnes fra en tidligere vakt — å lage henne på nytt ville gitt
+            # to rader for samme menneske.
+            return json_feil(f'«{navn}» i {korps.navn} finnes fra en tidligere vakt. '
+                             'Hent henne inn med «Hent inn fra tidligere».', status=409)
         return json_feil(f'«{navn}» finnes allerede i {korps.navn}. '
                      f'To like navn i samme korps er umulige å skille i listen.')
 
@@ -551,6 +570,59 @@ def mannskap_view(request):
         {'status': 'ok', 'data': _mannskap_til_dict(
             person, services.foreldrekart(), vis_konto=services.kan_lede(request.user))},
         status=201)
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='vaktliste:mannskap-hent-inn', rate='30/m', method='POST')
+def hent_inn_view(request):
+    """«Hent inn fra tidligere» (18. okt. 2026): GET gir personene som kan hentes inn i
+    `?vakt=`, POST `{vakt_id, ider}` legger dem i registeret — alle eller ingen.
+
+    Kandidatene er portalens folk fra registrene de siste 24 månedene som ikke står
+    i denne vakta. Korps-føreren ser bare sitt korps (`services.kan_foeres_av`).
+    """
+    data = json_body(request) if request.method == 'POST' else {}
+    vakt = services.registerets_vakt(
+        _int(request.GET.get('vakt') if request.method == 'GET' else data.get('vakt_id')))
+    if vakt is None:
+        return json_feil('Fant ikke vakten.', status=404)
+
+    if request.method == 'GET':
+        from django.db.models import Max
+        folk = (services.kan_hentes_inn(request.user, vakt)
+                .annotate(sist=Max('vakter__vakt__startet'))
+                .order_by(*Mannskap._meta.ordering))
+        return JsonResponse({'status': 'ok', 'data': [{
+            'id': m.pk, 'navn': m.navn, 'korps_id': m.korps_id, 'korps_navn': m.korps.navn,
+            'sist': m.sist.isoformat() if m.sist else None,
+        } for m in folk]})
+
+    try:
+        folk = services.hent_inn(request.user, vakt, _ider(data.get('ider')))
+    except ValidationError as feil:
+        return json_feil(' '.join(feil.messages))
+    return JsonResponse({'status': 'ok', 'data': {'hentet': len(folk)}})
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:mannskap-ta-ut', rate='60/m', method='POST')
+def ta_ut_view(request, pk):
+    """Ta personen ut av vaktas register (`{vakt_id}`). Personen står i portalen."""
+    data = json_body(request)
+    vakt = services.registerets_vakt(_int(data.get('vakt_id')))
+    if vakt is None:
+        return json_feil('Fant ikke vakten.', status=404)
+    person = Mannskap.objects.i_portal().filter(pk=pk).first()
+    if person is None:
+        return json_feil('Personen finnes ikke.', status=404)
+    try:
+        services.ta_ut_av_registeret(request.user, vakt, person)
+    except ValidationError as feil:
+        return json_feil(' '.join(feil.messages), status=409)
+    return JsonResponse({'status': 'ok'})
 
 
 @modul_kreves('vaktliste', 'les', svar='json')

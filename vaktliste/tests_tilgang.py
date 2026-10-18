@@ -26,6 +26,7 @@ De to reglene som bærer fasen:
 """
 import json
 import re
+from vaktliste.test_helpers import lag_mannskap
 from datetime import timedelta
 
 from django.test import Client, SimpleTestCase, TestCase, override_settings
@@ -74,8 +75,8 @@ class TilgangsBasis(TestCase):
         self.res_fri = lag_ressurs(
             vaktliste=self.vl, navn='KO', gruppe=gruppe(KO))
 
-        self.p_hgsd = Mannskap.objects.create(navn='Kari', korps=self.hgsd)
-        self.p_karmoy = Mannskap.objects.create(navn='Ola', korps=self.karmoy)
+        self.p_hgsd = lag_mannskap(navn='Kari', korps=self.hgsd)
+        self.p_karmoy = lag_mannskap(navn='Ola', korps=self.karmoy)
 
         self.leser = _bruker('leser', 'les')
         self.korpsbruker = _bruker('kb', 'skriv_handling')
@@ -505,7 +506,7 @@ class MannskapsregisterTilgangTests(TilgangsBasis):
         """Koblingen flytter en badge: kontoen arver korpset, og dermed hva
         *den* kontoen får redigere."""
         offer = _bruker('offer')
-        ny = Mannskap.objects.create(navn='Nyansatt', korps=self.hgsd)
+        ny = lag_mannskap(navn='Nyansatt', korps=self.hgsd)
         res = self.c_kb.put(f'/vaktliste/api/mannskap/{ny.pk}/',
                             data={'user_id': offer.pk},
                             content_type='application/json')
@@ -527,7 +528,7 @@ class MannskapsregisterTilgangTests(TilgangsBasis):
         """«Konto-raden fjernes fra alle som ikke er admin» (André, 12. sep.
         2026). Vaktlederen kobler gjennom e-posten i stedet."""
         bruker = _bruker('koblet')
-        ny = Mannskap.objects.create(navn='Nyansatt', korps=self.hgsd)
+        ny = lag_mannskap(navn='Nyansatt', korps=self.hgsd)
         res = self.c_vl.put(f'/vaktliste/api/mannskap/{ny.pk}/',
                             data={'user_id': bruker.pk},
                             content_type='application/json')
@@ -540,7 +541,7 @@ class MannskapsregisterTilgangTests(TilgangsBasis):
     def test_korpsbruker_sletter_sin_egen_ubrukte(self):
         """Speilbildet av å legge inn. PROTECT stopper det uansett i det
         personen har gått en vakt."""
-        ny = Mannskap.objects.create(navn='Feilført', korps=self.hgsd)
+        ny = lag_mannskap(navn='Feilført', korps=self.hgsd)
         self.assertEqual(
             self.c_kb.delete(f'/vaktliste/api/mannskap/{ny.pk}/').status_code, 200)
 
@@ -1188,7 +1189,7 @@ class KorpsfilterTests(TilgangsBasis):
     def setUp(self):
         super().setUp()
         # Leseren får badge i Haugesund; Ola i Karmøy får sin egen leser.
-        self.p_leser = Mannskap.objects.create(
+        self.p_leser = lag_mannskap(
             navn='Leseren', korps=self.hgsd, user=self.leser)
         self.leser_uten = _bruker('leser_uten', 'les')
         self.samordner = _bruker('samordner', 'les_alle')
@@ -1526,7 +1527,7 @@ class EgenPersonPaaAndresPlassTests(TilgangsBasis):
 
     def test_hun_kan_bytte_til_en_annen_av_egne(self):
         pk = self._egen_paa_karmoys_plass()
-        ola = Mannskap.objects.create(navn='Ola HGSD', korps=self.hgsd)
+        ola = lag_mannskap(navn='Ola HGSD', korps=self.hgsd)
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
                             data={'mannskap_id': ola.pk}, content_type='application/json')
         self.assertEqual(res.status_code, 200, res.content)
@@ -2619,6 +2620,7 @@ class MinnetBrukesFraDeEkteInngangeneTests(SimpleTestCase):
             }};
             let aktivListe = null;
             let belastning = null;
+            let register = null;  // registeret er vaktas (18. okt. 2026); ikke hentet ennå
             let aktivFane = 'oversikt';
             globalThis.offlineTilstand = {{}};
             globalThis.apiFetch = async () => ({{

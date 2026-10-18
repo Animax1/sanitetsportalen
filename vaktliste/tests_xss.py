@@ -623,6 +623,7 @@ REGISTER_REVIEWED = {
     'linjer': 'tabellrader bygget lokalt i samme funksjon',
     'verdiKnapper': 'markup bygget lokalt, rad-id escapet inni',
     'nyKnapp': 'markup bygget lokalt, etiketten escapet inni',
+    'hentKnapp': 'markup bygget lokalt, ingen data i seg',
     'tilKorps': 'markup bygget lokalt, ingen data i seg',
     # Mannskapstabellen. `inaktivMerke`, `merker` og `konto` sto allerede over
     # med samme begrunnelse — tabellen gjenbruker dem.
@@ -4355,6 +4356,8 @@ class PlanleggingsfanenTests(SimpleTestCase):
     # stille, og det er ikke den de er til for.
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.localStorage = { getItem: () => null, setItem: () => {} };\n"
+             # `lastListe()` spør om registeret gjelder lista (18. okt. 2026); ikke hentet ennå.
+             "globalThis.register = null;\n"
              "const SISTE_LISTE_NOKKEL = 'vaktliste:siste';\n")
 
     def setUp(self):
