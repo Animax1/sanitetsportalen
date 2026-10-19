@@ -30,21 +30,24 @@ from unittest.mock import patch
 from django.core.management import call_command
 from core.management.commands.verifiser_backup import Command as VerifiserBackup
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, tag
 
 from vaktliste.test_helpers import lag_korps
 from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler
 from core.vakt import vakt_for_year
+from core.test_helpers import prosessmappe
 
-TEST_BACKUP_DIR = Path('/tmp/test-backups-verifiser')
+
+def _testmappe() -> Path:
+    """Per prosess, så `--parallel` ikke deler den — `core.test_helpers.prosessmappe`."""
+    return prosessmappe('verifiser')
 
 
 def _backup_dir() -> Path:
-    TEST_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    for f in TEST_BACKUP_DIR.glob('*'):
+    for f in _testmappe().glob('*'):
         if f.is_file():
             f.unlink(missing_ok=True)
-    return TEST_BACKUP_DIR
+    return _testmappe()
 
 
 _EKTE_UNDERPROSESS = VerifiserBackup._underprosess
@@ -53,6 +56,9 @@ _EKTE_UNDERPROSESS = VerifiserBackup._underprosess
 EKTE_MIGRATE = 'test_modulfilene_lastes_og_radene_stemmer'
 
 
+#: **Treg** (ekte underprosesser og én ekte `migrate`, om lag 45 s).
+#: `rask_sjekk` hopper over den; CI kjører den.
+@tag('treg')
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class VerifiserBackupTests(TestCase):
 

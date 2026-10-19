@@ -1215,10 +1215,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 ### Løse punkter
 
-- [ ] **`core/tests_backup.py` tåler ikke `--parallel`.** Testene skriver ekte filer til
-      én backupmappe og rører det globale handlerregisteret. Feilen kommer ut som
-      «cannot pickle 'traceback' object», som ikke ligner det den er. Så lenge den står,
-      må `core` kjøres serielt for seg — se kommandoblokka i `CLAUDE.md`.
 - [ ] **Rate-limit GET på pasient- og oppdragsarkivet.** `arkiv_detalj_view` i
       `patients/views_arkiv.py` og `oppdrag/views_arkiv.py` regner full statistikk ved
       GET, men bøtta der gjelder bare DELETE. Statistikkens arkivendepunkt fikk sin

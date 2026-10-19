@@ -63,20 +63,22 @@ from core.models import AppSetting, Backup
 from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 from oppdrag.test_helpers import lag_oppdrag
+from core.test_helpers import prosessmappe
 
 
 # Felles testmappe for backup-filer.
-TEST_BACKUP_DIR = Path('/tmp/test-backups-fase4')
+def _testmappe() -> Path:
+    """Per prosess, så `--parallel` ikke deler den — `core.test_helpers.prosessmappe`."""
+    return prosessmappe('fase4')
 
 
 def _prepare_backup_dir() -> Path:
-    TEST_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     # Rydd opp gamle filer fra forrige runde.
-    for f in TEST_BACKUP_DIR.glob('backup-*.json.gz'):
+    for f in _testmappe().glob('backup-*.json.gz'):
         f.unlink(missing_ok=True)
-    for f in TEST_BACKUP_DIR.glob('.restore-tmp-*.json'):
+    for f in _testmappe().glob('.restore-tmp-*.json'):
         f.unlink(missing_ok=True)
-    return TEST_BACKUP_DIR
+    return _testmappe()
 
 
 def _restore_patients_handler() -> None:

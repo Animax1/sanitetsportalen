@@ -80,29 +80,32 @@ python -m venv .venv
 pip install -r requirements.txt   # låst med hasher; ny pakke går i requirements.in + pip-compile
 Copy-Item .env.example .env          # rediger SECRET_KEY
 python manage.py migrate
+python manage.py collectstatic --noinput   # testene leser manifestet
 python manage.py create_admin --username admin --password "bytt-meg"
 
 # Kjøre lokalt
 python manage.py runserver           # http://127.0.0.1:8000/
 
-# CI: `.github/workflows/tester.yml` — det samme, PostgreSQL, `KREV_NODE=1`.
-# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): settings-vaktene.
+# Mens du arbeider: appene du har endret, uten `@tag('treg')`, testbasen beholdt
+# (`core/rask_sjekk.py`). `--vis` viser utvalget, `--mot staging` tar hele grenen.
+python manage.py rask_sjekk
+
+# CI: `.github/workflows/tester.yml` — samme suite, PostgreSQL, `KREV_NODE=1`, tre jobber.
+# Hele suiten. **`myproject` skal med** (14. sep. 2026): settings-vaktene.
 # `core/tests_ci.py` krever at hver app med tester står i CI-kjøringen.
 python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog park myproject -v 2
 
-# Samme suite, delt (~106 s mot 190). `core` står for seg: `core/tests_backup.py`
-# skriver ekte backupfiler til én mappe og rører det globale handlerregisteret.
-# `--parallel` trenger `tblib` (`requirements-ci.txt`), ellers blir én feil til mange.
+# Før push: samme suite, delt (19. okt. 2026: 178 s + 75 s mot PostgreSQL). `core` tåler
+# `--parallel` siden backupmappa ble per prosess. Det trenger `tblib` (`requirements-ci.txt`).
 python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog park myproject -v 1 --parallel 4
-python manage.py test core -v 1
+python manage.py test core -v 1 --parallel 4
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
 
-# Bare .md-filer endret (9. okt. 2026): dokumenttestene, ~12 s. Ingen database leser
-# Markdown, og CI kjører hele suiten likevel. Én .py/.js/.html i diffen: hele suiten.
+# Bare .md-filer endret (9. okt. 2026): dokumenttestene, ~5 s. CI kjører alt likevel.
 # Lista utledes av testene som leser .md — `core/tests_testkommandoen.py` holder den.
-python manage.py test core.tests_beredskap core.tests_changelog core.tests_ci core.tests_claude_md core.tests_dokumentråte core.tests_oppdateringsintervaller core.tests_testkommandoen core.tests_todo -v 1
+python manage.py test core.tests_beredskap core.tests_changelog core.tests_ci core.tests_claude_md core.tests_dokumentråte core.tests_oppdateringsintervaller core.tests_rask_sjekk core.tests_testkommandoen core.tests_todo -v 1
 
 # Migrasjoner
 python manage.py makemigrations
@@ -118,8 +121,7 @@ Antall mutanter og hva som overlevde føres i CHANGELOG sammen med endringen.
 
 **Kjør de testene som dekker mutanten, ikke hele appen.** Målt 16. sep. 2026:
 `manage.py test oppdrag` er 38 sekunder, `oppdrag.tests_passiv_avvente` er 5. Med 21
-mutanter blir det tretten minutter mot to, for nøyaktig samme svar — og over en økt med
-hundre mutanter er forskjellen en klokketime. Fristelsen er å kjøre alt som en forsikring
+mutanter blir det tretten minutter mot to, for nøyaktig samme svar. Fristelsen er å kjøre alt som en forsikring
 mot at «mutanten traff et annet sted enn du tror», men den fella løses ved å **lese diffen
 til mutanten**, ikke ved å kjøre 560 urelaterte tester. Hele suiten kjøres én gang, på
 slutten.
@@ -909,8 +911,7 @@ lokal installasjon (`winget install PostgreSQL.PostgreSQL.16`), eller en egen
 Postgres-tjeneste i Railway. Ikke pek den på prod-basen — kommandoen rører den
 riktignok ikke, men den lager og sletter baser på serveren, og det er ikke noe
 man gjør på siden av produksjonsdata.
-Kommandoen lager og sletter sin egen engangsbase, og rører aldri basen URL-en
-peker på. Den kjører `migrate` i en **underprosess** mot `default`, ikke som et
+Den kjører `migrate` i en **underprosess** mot `default`, ikke som et
 databasealias: atten migrasjoner i dette prosjektet gjør ORM-kall i `RunPython`
 uten `schema_editor.connection.alias`, og ville med et alias skrevet til din
 egen base i stedet for prøvebasen.

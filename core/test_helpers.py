@@ -9,6 +9,8 @@ modul: en kopi ville mistet neste skrivemåte noen lærte den første.
 from __future__ import annotations
 
 import ast
+import os
+import tempfile
 from pathlib import Path
 
 from django.conf import settings
@@ -50,3 +52,22 @@ def koblet(signal, etikett, mottaker) -> bool:
     from django.apps import apps
     synkrone, _asynkrone = signal._live_receivers(apps.get_model(etikett))
     return any(r is mottaker for r in synkrone)
+
+
+def prosessmappe(navn: str) -> Path:
+    """En backupmappe for testene, **én per prosess** (19. okt. 2026).
+
+    Testene som skriver ekte backupfiler brukte faste stier som
+    `/tmp/test-backups-fase4`, og rydder mappa i `setUp`. Under `--parallel`
+    kjører arbeiderne hver sin testklasse samtidig, så én prosess slettet
+    filene en annen var midt i — derfor måtte `core` kjøres serielt. Hver
+    arbeider er sin egen prosess med sitt eget handlerregister og sin egen
+    testbase; mappa var det eneste de delte.
+
+    **Kalles når den trengs, ikke ved import:** arbeiderne forkes etter at
+    testmodulene er lastet, så en sti regnet ut ved import ville hatt
+    foreldreprosessens nummer i alle arbeiderne.
+    """
+    mappe = Path(tempfile.gettempdir()) / f'test-backups-{navn}-{os.getpid()}'
+    mappe.mkdir(parents=True, exist_ok=True)
+    return mappe

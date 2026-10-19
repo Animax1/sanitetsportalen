@@ -10,7 +10,7 @@ import re
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings, tag
 
 from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
@@ -182,6 +182,9 @@ class AntallFraBilenTests(StemplingBasis):
         self.assertContains(res, 'Transport')
 
 
+#: **Treg** (migrerer ned og opp igjen, om lag 24 s).
+#: `rask_sjekk` hopper over den; CI kjører den.
+@tag('treg')
 class SeedMigrasjonTests(TransactionTestCase):
     """`0020` seeder tabellene og oversetter `Enhet.type` (slug) til FK-en.
     Kjøres mot skjemaet slik det var før `0019`, med rader i den gamle

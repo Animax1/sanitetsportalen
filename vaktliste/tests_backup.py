@@ -40,16 +40,19 @@ from vaktliste.models import (
     Vaktpost,
 )
 from vaktliste.test_helpers import gruppe, lag_korps
+from core.test_helpers import prosessmappe
 
-TEST_BACKUP_DIR = Path('/tmp/test-backups-vaktliste')
+
+def _testmappe() -> Path:
+    """Per prosess, så `--parallel` ikke deler den — `core.test_helpers.prosessmappe`."""
+    return prosessmappe('vaktliste')
 
 
 def _backup_dir() -> Path:
-    TEST_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    for f in TEST_BACKUP_DIR.glob('*'):
+    for f in _testmappe().glob('*'):
         if f.is_file():
             f.unlink(missing_ok=True)
-    return TEST_BACKUP_DIR
+    return _testmappe()
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

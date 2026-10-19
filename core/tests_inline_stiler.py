@@ -28,7 +28,7 @@ import re
 from pathlib import Path
 
 from django.conf import settings
-from django.test import Client, SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 
 from accounts.models import CustomUser
 from accounts.test_helpers import gi_standardtilgang
@@ -101,6 +101,9 @@ class MaleneTests(SimpleTestCase):
         self.assertGreaterEqual(antall, 20)
 
 
+#: **Treg** (henter hver GET-rute to ganger, om lag 13 s).
+#: `rask_sjekk` hopper over den; CI kjører den.
+@tag('treg')
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class EkteSvarTests(TestCase):
     """Hver GET-rute, som admin og som anonym."""

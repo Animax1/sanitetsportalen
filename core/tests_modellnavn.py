@@ -34,12 +34,16 @@ from core.backup import (
     registrer_alle_moduler,
     restore_backup,
 )
+from core.test_helpers import prosessmappe
 
 #: Den oppdiktede flyttingen testene bruker. Appen har aldri eksistert, så
 #: ingenting i basen kan tilfeldigvis svare på navnet.
 PRØVETABELL = {'gammelapp.patient': 'patients.patient'}
 
-TEST_BACKUP_DIR = Path('/tmp/test-backups-modellnavn')
+
+def _testmappe() -> Path:
+    """Per prosess, så `--parallel` ikke deler den — `core.test_helpers.prosessmappe`."""
+    return prosessmappe('modellnavn')
 
 
 class TabellenInneholderFlyttingeneTests(SimpleTestCase):
@@ -151,11 +155,10 @@ class GammelFilLastesTests(TestCase):
 
     def setUp(self) -> None:
         registrer_alle_moduler()
-        TEST_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        for f in TEST_BACKUP_DIR.glob('*'):
+        for f in _testmappe().glob('*'):
             if f.is_file():
                 f.unlink(missing_ok=True)
-        self.miljo = patch.dict(os.environ, {'BACKUP_DIR': str(TEST_BACKUP_DIR)})
+        self.miljo = patch.dict(os.environ, {'BACKUP_DIR': str(_testmappe())})
 
     def test_fil_med_gammelt_modellnavn_gjenopprettes(self) -> None:
         from patients.models import Patient
@@ -170,7 +173,7 @@ class GammelFilLastesTests(TestCase):
 
         # Skriv fila om til den «gamle» formen, som om pasienten ble dumpet
         # av en versjon der modellen bodde et annet sted.
-        sti = TEST_BACKUP_DIR / backup.filename
+        sti = _testmappe() / backup.filename
         objekter = json.loads(gzip.open(sti, 'rb').read())
         antall = 0
         for objekt in objekter:
@@ -202,7 +205,7 @@ class GammelFilLastesTests(TestCase):
         with self.miljo:
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
 
-        sti = TEST_BACKUP_DIR / backup.filename
+        sti = _testmappe() / backup.filename
         objekter = json.loads(gzip.open(sti, 'rb').read())
         for objekt in objekter:
             if objekt['model'] == 'patients.patient':

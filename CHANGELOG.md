@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Testtida, fase 2: `core` parallelt, `manage.py rask_sjekk`, CI i tre jobber  `#core/tester`
+
+**`core` tåler `--parallel`** (punktet «`core/tests_backup.py` tåler ikke `--parallel`» er slettet
+fra TODO). Begrunnelsen for at `core` måtte kjøres serielt var at testene «rører det globale
+handlerregisteret» — men `--parallel` bruker prosesser, og hver arbeider har sitt eget register og
+sin egen testbase. Det eneste de delte var de faste mappene `/tmp/test-backups-fase4`,
+`-gjenopprett`, `-modellnavn`, `-verifiser`, `-vaktliste` og `-kontokorps`, som hver test tømmer i
+`setUp`: én prosess slettet filene en annen var midt i. `core.test_helpers.prosessmappe(navn)` gir
+én mappe per prosess, regnet ut ved kall og ikke ved import (arbeiderne forkes etter at
+testmodulene er lastet). **`core` 206 s serielt → om lag 75 s med `--parallel 4`**, grønn tre
+ganger av tre mot PostgreSQL. Mutant: én delt mappe igjen → 21 røde under `--parallel`.
+
+**`python manage.py rask_sjekk`** — testene for det du har endret, med testbasen beholdt
+(`--keepdb`, om lag 17 s spart per kjøring) og uten testene merket `@tag('treg')`.
+`core/rask_sjekk.py` utleder valget: en fil i en app gir appen, en mal i `templates/<app>/` gir
+appen, og **en JS- eller CSS-fil gir appene med en mal som laster den** — `oppdrag-kort.js` gir
+både `oppdrag` og `ko` uten at noen har skrevet det ned. Er det tvil, kjøres alt: `core`, delte
+maler, `portal-utils.js`, en statisk fil ingen mal laster, `requirements.txt`. Bare `.md` gir
+dokumenttestene. `--vis` viser utvalget, `--mot staging` tar hele grenen. **Hva den ikke dekker:**
+de tverrgående skannerne i `core` kjøres bare når `core` er med, og kommandoen sier det hver gang.
+Testene kjøres i en underprosess, fordi `settings.py` bare slår på MD5-hasheren og test-broene når
+`sys.argv[1] == 'test'`.
+
+**`@tag('treg')`** på de tre tregeste klassene: `core.tests_verifiser_backup.VerifiserBackupTests`
+(45 s), `oppdrag.tests_runde_e.SeedMigrasjonTests` (24 s) og
+`core.tests_inline_stiler.EkteSvarTests` (13 s). CI kjører dem som før.
+
+**CI er tre jobber side om side** (`tester (moduler)`, `tester (core)`, `tester (prover)`), ikke tre
+steg i serie: veggtida er den tregeste av dem. `check`, `makemigrations --check` og `pip-audit`
+står i `prover`. `fail-fast: false`, så en rød `core` ikke skjuler modulene. Sjekkene har fått nye
+navn — **følg med på at Railway ikke venter på et navn som ikke finnes lenger.**
+
+CLAUDE.md: kommandoblokka har `rask_sjekk`, `collectstatic` i oppsettet («testene leser
+manifestet» — uten fila gir suiten 667 feil, `Missing staticfiles manifest entry`), `core` med
+`--parallel 4`, og de målte tidene. `core.tests_rask_sjekk` står i dokumenttestene, fordi den leser
+CLAUDE.md gjennom `core/rask_sjekk.py` — `tests_testkommandoen` sa fra. To setninger som gjentok
+setningen foran (i «Migrasjoner» og «Mutasjonstesting») er strøket for å holde tegntaket.
+
+Tester: 13 i `core/tests_rask_sjekk.py`. Mutasjoner, 5 av 5 drept: mal i `core` regnet som en app,
+tomt utvalg for en fil ingen mal laster, `core/` som ikke utløser hele suiten, en delt mal som
+hoppes over i stedet for å utløse alt, og den delte backupmappa.
+
 ## 2026-10-19 — Testtida, fase 1: `verifiser_backup` migrerer én gang, dokumenttestene cacher parsingen  `#core/tester`
 
 André bestilte en analyse av testoppsettet: «mål kjøretid per testtype og de tregeste testene», og

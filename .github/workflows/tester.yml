@@ -9,8 +9,14 @@
 # så det er der CI svarer — før noe går videre til main. CI stopper ikke Railway
 # av seg selv; «vent på grønne sjekker» for main er en innstilling i Railway.
 #
-# Stegene er de samme som kommandoblokka i CLAUDE.md, og skal holdes like:
-# `core` for seg (tests_backup tåler ikke --parallel), resten delt.
+# Stegene er de samme som kommandoblokka i CLAUDE.md, og skal holdes like.
+#
+# **Tre jobber side om side, ikke tre steg etter hverandre** (19. okt. 2026).
+# Stegene var 143 s + 329 s + 83 s i serie mot lokal PostgreSQL; veggtida er nå
+# den tregeste av de tre. `core` kjøres parallelt som resten siden testene fikk
+# én backupmappe per prosess (`core.test_helpers.prosessmappe`). Prisen er at
+# PostgreSQL og avhengighetene settes opp tre ganger, om lag ett minutt hver.
+# `fail-fast: false`: en rød `core` skal ikke skjule hvordan modulene gikk.
 name: Tester
 
 on:
@@ -25,8 +31,19 @@ concurrency:
 
 jobs:
   tester:
+    name: tester (${{ matrix.del }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - del: moduler
+            kommando: python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog park myproject --noinput -v 1 --parallel 4
+          - del: core
+            kommando: python manage.py test core --noinput -v 1 --parallel 4
+          - del: prover
+            kommando: python manage.py verifiser_migrasjoner
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
@@ -91,6 +108,7 @@ jobs:
         run: pip install --require-hashes -r requirements.txt -r requirements-ci.txt
 
       - name: Django-sjekk og manglende migrasjoner
+        if: matrix.del == 'prover'
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
@@ -98,14 +116,8 @@ jobs:
       - name: Statiske filer (manifestet noen tester leser)
         run: python manage.py collectstatic --noinput -v 0
 
-      - name: Testene utenom core
-        run: python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog park myproject --noinput -v 1 --parallel 4
-
-      - name: core, serielt
-        run: python manage.py test core --noinput -v 1
-
-      - name: Migrasjonsprøvene mot PostgreSQL
-        run: python manage.py verifiser_migrasjoner
+      - name: ${{ matrix.del }}
+        run: ${{ matrix.kommando }}
 
       # Kjente sårbarheter i de låste avhengighetene (sikkerhetsgjennomgangen
       # 28. sep. 2026). Sist, så en ny CVE ikke skjuler testresultatene — og rød,
@@ -115,6 +127,7 @@ jobs:
       # pip-audit selv installeres uten hasher: den er et CI-verktøy med et stort
       # avhengighetstre, den kjøres ikke i prod, og versjonen er festet.
       - name: Kjente sårbarheter (pip-audit)
+        if: matrix.del == 'prover'
         run: |
           pip install pip-audit==2.10.1
           pip-audit -r requirements.txt --require-hashes --disable-pip --progress-spinner off

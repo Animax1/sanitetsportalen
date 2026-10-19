@@ -34,6 +34,7 @@ from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler, rest
 from . import services
 from .models import Kontokorps, Korps, Mannskap
 from accounts.test_helpers import gi_modultilgang
+from core.test_helpers import prosessmappe
 
 
 def _bruker(navn, nivaa=None, *, admin=False, epost=''):
@@ -235,7 +236,9 @@ class RegelenTests(_Basis):
             Kontokorps(user=ola, korps=self.hgsd).save()
 
 
-TEST_BACKUP_DIR = Path('/tmp/test-backups-kontokorps')
+def _testmappe() -> Path:
+    """Per prosess, så `--parallel` ikke deler den — `core.test_helpers.prosessmappe`."""
+    return prosessmappe('kontokorps')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -243,10 +246,9 @@ class BackupTests(TestCase):
 
     def setUp(self):
         registrer_alle_moduler()
-        TEST_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        for f in TEST_BACKUP_DIR.glob('*'):
+        for f in _testmappe().glob('*'):
             f.unlink(missing_ok=True)
-        self.env = patch.dict(os.environ, {'BACKUP_DIR': str(TEST_BACKUP_DIR)})
+        self.env = patch.dict(os.environ, {'BACKUP_DIR': str(_testmappe())})
         self.env.start()
         self.hgsd = lag_korps(navn='Haugesund')
         lag_mannskap(navn='Hanne', korps=self.hgsd)
