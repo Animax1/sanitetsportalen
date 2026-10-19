@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Bilskjermen viser «Sist sendt» for løpende posisjon  `#oppdrag/enhetsskjerm`
+
+André, fra staging på `4d67ef9`: «Joda den gir posisjon bil enhet ser ikke når sist ble sendt».
+Linja under «Posisjon sendes til KO …» sier nå **«Sist sendt 14:39:54.»** etter hver løpende
+sending kartet tok imot, og «KO hentet posisjonen 14:36.» etter en henting, på samme linje.
+**Med sekunder**: på akutt sendes det hvert 30. sekund, og et klokkeslett som står stille i ett
+minutt ser ut som om ingenting skjer. Tom før første sending, og en sending som ikke kom fram
+endrer den ikke. `sistSendtTekst()`, `posisjonStatusTekst()`. Test gjennom `lopendeTikk()`;
+mutant uten tegningen etter sendingen → to røde. Sett i Chromium mot en testserver før push.
+
+---
+
 ## 2026-10-19 — Bilen så ikke oppdragene: «Laster…» etter løpende posisjon  `#oppdrag/enhetsskjerm`
 
 André, fra staging på `1ad517d` (Lege 02): «Nå ser jeg ikke lenger oppdrag.» Skjermen sto på

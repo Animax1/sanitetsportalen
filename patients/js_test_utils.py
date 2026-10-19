@@ -58,7 +58,7 @@ KORT_HENTING = ('hentVenterMs', 'hentVisesMs', 'hentingTilstand', 'hentingLinje'
                 'planleggHentingTegning')
 BIL_LOPENDE = ('posisjonIntervallS', 'notePosisjonHeadere', 'lopendeNyttForsokMs',
                'lopendeSkalSende', 'posisjonForLopende', 'lopendeTikk',
-               'posisjonOversiktTekst', 'koHentetTekst')
+               'posisjonOversiktTekst', 'koHentetTekst', 'sistSendtTekst', 'posisjonStatusTekst')
 #: **KO er seks filer** (18. sep. 2026, tavla 22. sep., hodet 19. okt.): rutenettet,
 #: hendelsene, hodet i hendelsen, tavla, planleggeren, og loggen med den ene
 #: `DOMContentLoaded`-kroken sist. Tuppel, som de andre delte sidene.

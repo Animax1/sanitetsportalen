@@ -1377,8 +1377,9 @@ async function lopendeTikk() {
       if (data.onsket) {
         globalThis.posisjonOnsket = false;
         globalThis.koHentetTid = data.sendt_at || new Date().toISOString();
-        tegnPosisjonLinje();
       }
+      // «Sist sendt» (André, 19. okt. 2026: «bil enhet ser ikke når sist ble sendt»).
+      tegnPosisjonLinje();
     } else if (res.status === 429 || res.status === 409) {
       // Serveren sier «ikke nå» — vent et intervall, ikke et nytt forsøk om 30 s.
       globalThis.lopendeSendtMs = Date.now();
@@ -1432,6 +1433,22 @@ function koHentetTekst() {
   return tid ? `KO hentet posisjonen ${tid}.` : '';
 }
 
+/** «Sist sendt 14:36:12.» — når kartet sist tok imot en løpende posisjon fra
+ *  denne skjermen (André, 19. okt. 2026: «bil enhet ser ikke når sist ble sendt»).
+ *  Med sekunder: på akutt sendes det hvert 30. sekund, og et klokkeslett som står
+ *  stille i ett minutt ser ut som om ingenting skjer. Tom før første sending. */
+function sistSendtTekst() {
+  const ms = Number(globalThis.lopendeSendtMs) || 0;
+  if (!ms) return '';
+  const tid = new Date(ms).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return `Sist sendt ${tid}.`;
+}
+
+/** Linja under: «Sist sendt …» og «KO hentet …», det som finnes av dem. */
+function posisjonStatusTekst() {
+  return [sistSendtTekst(), koHentetTekst()].filter(Boolean).join(' ');
+}
+
 /** Bryteren er grå når den ikke kan virke: av vakt, eller uten GPS. */
 function bryterSperret() {
   return !erPaVakt() || globalThis.bilensPosisjonStatus === 'utilgjengelig';
@@ -1444,8 +1461,9 @@ function tegnPosisjonLinje() {
   document.getElementById('posisjon-tekst').textContent = posisjonLinjeTekst();
   const hentet = document.getElementById('posisjon-ko-hentet');
   if (hentet) {
-    hentet.textContent = koHentetTekst();
-    hentet.classList.toggle('d-none', !koHentetTekst());
+    const status = posisjonStatusTekst();
+    hentet.textContent = status;
+    hentet.classList.toggle('d-none', !status);
   }
   const bryter = document.getElementById('del-posisjon');
   bryter.checked = delerPosisjon();

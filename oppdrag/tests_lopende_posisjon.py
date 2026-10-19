@@ -617,6 +617,19 @@ class KlokkaIBilenTests(unittest.TestCase):
             console.log(JSON.stringify({ gps: gpsKall, lat: kartkall[0].posisjon.lat }));""")
         self.assertEqual(ut, {'gps': 1, 'lat': 60.1})
 
+    def test_sist_sendt_vises_etter_en_sending_og_ikke_foer(self):
+        """André: «bil enhet ser ikke når sist ble sendt». Gjennom den ekte sendingen."""
+        (ut,) = _kjor_klokke("""
+            globalThis.lopendeIntervallS = 30; globalThis.bilensPosisjon = fix(5);
+            tegnPosisjonLinje();
+            const foer = [el['posisjon-ko-hentet'].textContent, el['posisjon-ko-hentet'].klasser.has('d-none')];
+            await lopendeTikk();
+            const etter = [el['posisjon-ko-hentet'].textContent, el['posisjon-ko-hentet'].klasser.has('d-none')];
+            console.log(JSON.stringify({ foer, etter }));""")
+        self.assertEqual(ut['foer'], ['', True])
+        self.assertRegex(ut['etter'][0], r'^Sist sendt \d\d:\d\d:\d\d\.$')
+        self.assertFalse(ut['etter'][1])
+
     def test_nektet_sender_ingenting_og_venter(self):
         (ut,) = _kjor_klokke("""
             globalThis.lopendeIntervallS = 30;
@@ -639,7 +652,7 @@ class KlokkaIBilenTests(unittest.TestCase):
               synlig: !el['posisjon-ko-hentet'].klasser.has('d-none') }));""")
         self.assertEqual(ut['kall'], 1)
         self.assertFalse(ut['onsket'])
-        self.assertRegex(ut['hentet'], r'^KO hentet posisjonen \d\d:\d\d\.$')
+        self.assertRegex(ut['hentet'], r'^Sist sendt \d\d:\d\d:\d\d\. KO hentet posisjonen \d\d:\d\d\.$')
         self.assertTrue(ut['synlig'])
 
     def test_feil_og_nei_fra_serveren(self):
