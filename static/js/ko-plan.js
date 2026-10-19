@@ -9,7 +9,7 @@
 // ruller tavla med — «hvis jeg går frem i tid på planlegger tidslinjen skjer
 // det samme med tavlen». Døgnknappene er borte; Liste viser alle døgnene.
 //
-// Fjerde av KOs fem filer (`KO_JS` i patients/js_test_utils.py), lastet etter
+// Femte av KOs seks filer (`KO_JS` i patients/js_test_utils.py), lastet etter
 // ko-tavle.js — den bruker `koTavleDognnokkel`, `koTavleHHMM`, `koTavleTilEtter`
 // og tidsvinduet derfra.
 // Ingenting kjører på toppnivå her: `koPlanStart()` kalles fra

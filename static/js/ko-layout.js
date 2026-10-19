@@ -3,7 +3,7 @@
 // konsertplanleggeren deler plass), bytte av plass og størrelse, og et vindu
 // åpnet for seg (`?vindu=`).
 //
-// Første av KOs fem filer (`KO_JS` i patients/js_test_utils.py). Ingen
+// Første av KOs seks filer (`KO_JS` i patients/js_test_utils.py). Ingen
 // bundler, ett globalt navnerom, og **ingenting kjører på toppnivå her** —
 // `koOppsettStart()` kalles fra `DOMContentLoaded`-kroken i ko.js, som er
 // den siste fila.

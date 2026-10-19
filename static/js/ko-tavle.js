@@ -3,7 +3,7 @@
 // plassert i rutene (André, 22. sep. 2026, etter skissene som ble avtalt før
 // koden).
 //
-// Tredje av KOs fem filer (`KO_JS` i patients/js_test_utils.py). Ingenting
+// Fjerde av KOs seks filer (`KO_JS` i patients/js_test_utils.py). Ingenting
 // kjører på toppnivå her — `koTavleStart()` kalles fra `DOMContentLoaded` i
 // ko.js, som er den siste fila.
 //

@@ -276,6 +276,11 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # `hendelse__varslinger`.
         'hendelse_melder': oppdrag.hendelse.melder_tekst() if oppdrag.hendelse_id else '',
         'hendelse_varslet': oppdrag.hendelse.varslet() if oppdrag.hendelse_id else [],
+        # Talegruppa (TG) i Nødnett (KO, 19. okt. 2026). Bilen ser den bare
+        # når KO valgte å dele den; sentralbordet ser den alltid.
+        'hendelse_talegruppe': ((oppdrag.hendelse.talegruppe
+                                 if not for_enhet or oppdrag.hendelse.talegruppe_delt else '')
+                                if oppdrag.hendelse_id else ''),
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if (skjul_fritekst or utlopt) else oppdrag.fritekst

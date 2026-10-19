@@ -448,7 +448,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **236 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **240 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -482,7 +482,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/moderator/` | 7 | `accounts/urls.py`, `core/urls.py` | Moderatorens flate i sin portal: brukerne (5b — listen, én konto, ny konto), vakta (5c — navn og «Avslutt vakt») og portalens innstillinger |
 | `/statistikk/` | 7 | `statistikk/urls.py` | Full statistikk per kilde, og tidligere vakter (frosne tall og arkiver) |
-| `/ko/` | 50 | `ko/urls.py` | Sida, utskriften med service workeren for kopien uten nett, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, beskrivelse, varsling, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder, eksterne aktører) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
+| `/ko/` | 54 | `ko/urls.py` | Sida, utskriften med service workeren for kopien uten nett, sidebaren, ansvarsmerket, loggen (les, skriv, rediger, fjern, fest, løsne, del, angre deling), hendelsene (ny, rediger, beskrivelse, varsling, talegruppe, prioritet, bli med, lesemerket, lag, lukk, gjenåpne, knytt oppdrag), KO-innstillingene (ansvarsområder, eksterne aktører, talegrupper) og nullstilling (oppdrag, hendelser, logg — global admin), og tavla (les, plasser, uten plass, rett/fjern, planlagte pauser med «Pause nå», oppsettet) og programmet (konserter, dekningen per time, plan mot faktisk med historikken, kopier programmet, konserttyper, kjennetegn). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
 | `/backlog/` | 9 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, kommentartråd, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 15 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/`, `/personvern/`, endringsnumrene (`/api/endringer/`, `core/endringer.py`) og videresendingen fra `/api/` |
 
@@ -1534,7 +1534,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 38 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 39 filer i `static/js/`, fordelt
 på ti sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, de to
 grensesnittene under `/oppdrag/`, og de to i park: `/lag/` og parksiden `/lag/r/`.
 
@@ -1555,7 +1555,7 @@ grensesnittene under `/oppdrag/`, og de to i park: `/lag/` og parksiden `/lag/r/
 | `oppdrag-enhet.js` | `/oppdrag/`, **enhetskontoer** | Bilens skjerm, offline-kø, lydvarsel |
 | `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |
 | `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
-| `ko-*.js` (fem) | **kun** `/ko/` | Rutenettet, hendelsene, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
+| `ko-*.js` (seks) | **kun** `/ko/` | Rutenettet, hendelsene, hodet i hendelsen, tavla, planleggeren og loggen — se `templates/ko/CLAUDE.md` |
 | `park-lag.js` | **kun** `/lag/r/`, uten innlogging | Lagets registrering — se `park/CLAUDE.md` |
 | `park-oppsett.js` | **kun** `/lag/`, for `skriv_leder` | Lenkene, slettingen og verdimengdene — se `park/CLAUDE.md` |
 

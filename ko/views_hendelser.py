@@ -220,6 +220,23 @@ def hendelse_varsling_view(request, pk):
 
 @modul_kreves('ko', 'skriv_full', svar='json')
 @require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_talegruppe', rate='60/m', method='POST')
+def hendelse_talegruppe_view(request, pk):
+    """Sett, bytt eller fjern talegruppa (TG), og velg om bilene ser den
+    (`del`, 19. okt. 2026). Navnet må stå i portalens liste; tom fjerner."""
+    hendelse = _hendelse(pk)
+    data = json_body(request)
+    try:
+        services.sett_talegruppe(hendelse, data.get('talegruppe'), bruker=request.user,
+                                 del_med_enhetene=data.get('del') is True)
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
+    hendelse = services.hendelse_med_telling(hendelse)
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
 @rate_limit(group='ko:hendelse_lukk', rate='60/m', method='POST')
 def hendelse_lukk_view(request, pk):
     """Lukk. **409 med antallet** når hendelsen har åpne oppdrag, og gjennom

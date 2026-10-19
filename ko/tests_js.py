@@ -17,7 +17,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
-from patients.js_test_utils import (JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
+from patients.js_test_utils import (KO_HENDELSER_JS, KO_LAYOUT_JS, JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, read_js, run_node)
 
 #: Enhetskortets innmat, delt med sentralbordet (17. sep. 2026). `/ko/` laster
@@ -348,7 +348,7 @@ PRIORITET_PREAMBLE = (
     'let koFolgerSett = 0; let koFolgerViser = null; let koHendelseKanal = null;\n'
     # Nytt siden sist du åpnet hendelsen (27. sep. 2026).
     'let koNyeTall = {}; const koLestSendt = new Map();\n'
-    + _konst(KO_JS[1], 'KO_FOLGER_FRIST_MS')
+    + _konst(KO_HENDELSER_JS, 'KO_FOLGER_FRIST_MS')
 )
 
 HENDELSE_HARNESS = (
@@ -539,7 +539,8 @@ VINDU_HARNESS = HENDELSE_HARNESS + (
              'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett',
              'koMerkLest', 'koSisteLinjeI',
              # Hodet (19. okt. 2026): beskrivelsen og de eksterne aktørene.
-             'koBeskrivelse', 'koBeskrivelseHtml', 'koEksterneValg', 'koEksterneHtml')),
+             'koBeskrivelse', 'koBeskrivelseHtml', 'koEksterneValg', 'koEksterneHtml',
+             'koTalegruppeValg', 'koTalegruppeHtml')),
 )
 
 
@@ -558,7 +559,7 @@ class HendelsenIHendelsesvinduetTests(SimpleTestCase):
 
     def _kjor(self, script, nivaa='skriv_full'):
         preamble = (PRIORITET_PREAMBLE.replace("ko: 'skriv_full'", f"ko: '{nivaa}'")
-                    + _konst(KO_JS[0], 'KO_VINDUER'))
+                    + _konst(KO_LAYOUT_JS, 'KO_VINDUER'))
         ut = run_node(build_harness(VINDU_HARNESS), VINDU_DOM
                       + 'koHendelser = new Map('
                       + json.dumps([[5, self.H5], [6, self.H6], [7, self.H7]]) + ');\n'
@@ -760,7 +761,7 @@ class SidebarBreddenTests(SimpleTestCase):
     vinduet — hendelsen er det man jobber i."""
 
     def test_grensene(self):
-        pre = _konst(KO_JS[1], 'KO_HSIDE_MIN')
+        pre = _konst(KO_HENDELSER_JS, 'KO_HSIDE_MIN')
         ut = run_node(build_harness(((KO_JS, ('koHSideBredde',)),)),
                       'console.log(JSON.stringify([koHSideBredde(10, 1000), koHSideBredde(200, 1000),'
                       ' koHSideBredde(900, 1000), koHSideBredde(200.4, 1000), koHSideBredde("x", 1000),'
@@ -789,7 +790,7 @@ class HendelseKanalenStarterTests(SimpleTestCase):
         self.assertEqual(json.loads(ut[0]), ['koOppsettStart', 'koHendelseVinduStart'])
 
     def _kjor(self, eget):
-        pre = (_konst(KO_JS[1], 'KO_HENDELSE_KANAL') + _konst(KO_JS[1], 'KO_FOLGER_PULS_MS')
+        pre = (_konst(KO_HENDELSER_JS, 'KO_HENDELSE_KANAL') + _konst(KO_HENDELSER_JS, 'KO_FOLGER_PULS_MS')
                + f"let koHendelseKanal = null; let koApenHendelseId = 4; let koEgetVinduAktivt = {json.dumps(eget)};\n"
                + """
             const sendt = []; const pulser = []; const lyttere = [];
@@ -1491,7 +1492,7 @@ class OppsettetTests(SimpleTestCase):
         # som sto her hadde fire vinduer og ville fortsatt vært grønn den dagen
         # tavla kom — mot en side som ikke fantes lenger.
         from oppdrag.tests_runde_d import _konst
-        self.pre = ''.join(_konst(KO_JS[0], n) for n in (
+        self.pre = ''.join(_konst(KO_LAYOUT_JS, n) for n in (
             'KO_VINDUER', 'KO_PLASSER', 'KO_PAR', 'KO_OPPSETT_STANDARD',
             'KO_VINDUSNAVN', 'KO_MIN_PROSENT'))
 

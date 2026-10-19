@@ -1626,6 +1626,9 @@ function hendelseinfoBlokk(o) {
   const melder = String(o.hendelse_melder || '');
   const varslet = Array.isArray(o.hendelse_varslet) ? o.hendelse_varslet : [];
   const deler = [];
+  // Talegruppa (TG) i Nødnett; bilen får den bare når KO delte den.
+  const tg = String(o.hendelse_talegruppe || '');
+  if (tg) deler.push('<span><i class="bi bi-headset me-1"></i>TG: <b>' + escapeHtml(tg) + '</b></span>');
   if (melder) deler.push('<span><i class="bi bi-megaphone me-1"></i>Meldt av: <b>' + escapeHtml(melder) + '</b></span>');
   if (varslet.length) {
     deler.push('<span><i class="bi bi-broadcast me-1"></i>Varslet: '

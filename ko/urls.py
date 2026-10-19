@@ -59,6 +59,8 @@ urlpatterns = [
          name='ko_api_hendelse_beskrivelse'),
     path('api/hendelser/<int:pk>/varsling/', views_hendelser.hendelse_varsling_view,
          name='ko_api_hendelse_varsling'),
+    path('api/hendelser/<int:pk>/talegruppe/', views_hendelser.hendelse_talegruppe_view,
+         name='ko_api_hendelse_talegruppe'),
     path('api/hendelser/<int:pk>/lag/', views_hendelser.hendelse_lag_view,
          name='ko_api_hendelse_lag'),
     # KO-innstillingene: ansvarsområdene (18. sep. 2026).
@@ -98,6 +100,11 @@ urlpatterns = [
     path('api/eksterne/rekkefolge/', views_innstillinger.eksterne_rekkefolge_view,
          name='ko_api_eksterne_rekkefolge'),
     path('api/eksterne/<int:pk>/', views_innstillinger.ekstern_detalj_view, name='ko_api_ekstern_detalj'),
+    path('api/talegrupper/', views_innstillinger.talegrupper_view, name='ko_api_talegrupper'),
+    path('api/talegrupper/rekkefolge/', views_innstillinger.talegrupper_rekkefolge_view,
+         name='ko_api_talegrupper_rekkefolge'),
+    path('api/talegrupper/<int:pk>/', views_innstillinger.talegruppe_detalj_view,
+         name='ko_api_talegruppe_detalj'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views_hendelser.oppdrag_hendelse_view,

@@ -15,13 +15,13 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
-from patients.js_test_utils import (KO_JS, PORTAL_UTILS_JS, build_harness,
+from patients.js_test_utils import (KO_LAYOUT_JS, KO_PLAN_JS, KO_TAVLE_JS, KO_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, run_node)
 
 from .tests_tavle_js import DATA, NAA
 
-LAYOUT_JS = KO_JS[0]
-TAVLE_JS = KO_JS[2]
+LAYOUT_JS = KO_LAYOUT_JS
+TAVLE_JS = KO_TAVLE_JS
 
 HARNESS = (
     (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml')),
@@ -332,7 +332,7 @@ class KonsertplanleggerenFolgerTavlaJsTests(SimpleTestCase):
     tavlen» — prøvd gjennom `koTegnPlan`, og dekningen hentes for vinduet."""
 
     def test_tegningen_bruker_det_felles_vinduet(self):
-        pre = (_konst(KO_JS[3], 'KO_PLAN_TIME') + _konst(KO_JS[3], 'KO_PLAN_DOGN') + """
+        pre = (_konst(KO_PLAN_JS, 'KO_PLAN_TIME') + _konst(KO_PLAN_JS, 'KO_PLAN_DOGN') + """
             const T = 3600000;
             const NAA = new Date(2026, 8, 25, 18, 0).getTime();
             let koTavle = null; let koTidAnker = null; let koTavleKlokkeavvik = 0;

@@ -434,6 +434,14 @@ class Hendelse(models.Model):
     #: Pekeren går til **kjedens rot**, som aldri endres; gjeldende versjon er
     #: den som ikke er rettet (`koLinjer` er nøklet på rot, så klienten slår den
     #: opp uten et kall til). `services.sett_beskrivelse` er den ene skriveren.
+    #: **Talegruppa i Nødnett** hendelsen kjøres på (André, 19. okt. 2026:
+    #: «TG er talegruppe som vi bruker i nødnett»). Frosset navn fra lista
+    #: `Talegruppe`, ikke en peker — en omdøpt eller slettet rad i lista skal
+    #: ikke skrive om hva hendelsen sto på. `talegruppe_delt` sier om bilene
+    #: ser den; valget tas når TG settes (`services.sett_talegruppe`).
+    talegruppe = models.CharField(max_length=40, blank=True, default='', verbose_name='Talegruppe (TG)')
+    talegruppe_delt = models.BooleanField(default=False, verbose_name='TG delt med enhetene')
+
     #: **Ikke `beskrivelse`**: det navnet bar tekstfeltet fra 18. sep., og
     #: KO-filer fra den dagen ligger offsite med det (`UTGAATTE_FELT`).
     beskrivelse_linje = models.ForeignKey(
@@ -973,6 +981,31 @@ class EksternRessurs(PortalEid):
         ordering = ['rekkefolge', Norsk('navn')]
         constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
                                                name='ko_eksternressurs_navn_per_portal')]
+
+    def __str__(self):
+        return self.navn
+
+
+class Talegruppe(PortalEid):
+    """Talegruppene i Nødnett en hendelse kan kjøres på — «SAMVIRKE 2» (19. okt. 2026).
+
+    **En liste, ikke fritekst**: navnet sies på samband og skal være likt
+    overalt, og en skrivefeil i et TG-navn sender folk til feil talegruppe.
+    Satt opp av KO-leder, moderator eller admin (`kan_sette_opp_talegrupper`)
+    — André: «Bør være en innstilling koleder/moderator/admin kan endre».
+    Ingen standardliste: talegruppene er regionale.
+    """
+
+    navn = models.CharField(max_length=40, verbose_name='Talegruppe')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Talegruppe'
+        verbose_name_plural = 'Talegrupper'
+        ordering = ['rekkefolge', Norsk('navn')]
+        constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
+                                               name='ko_talegruppe_navn_per_portal')]
 
     def __str__(self):
         return self.navn

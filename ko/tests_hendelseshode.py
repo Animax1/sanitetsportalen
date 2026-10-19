@@ -24,7 +24,7 @@ from django.utils import timezone
 from core import endringer
 from core.vakt import hent_aktiv_vakt
 from ko import services
-from ko.models import KILDE_OPERATOR, EksternRessurs, Hendelse, HendelseVarsling, Logglinje
+from ko.models import KILDE_OPERATOR, EksternRessurs, Hendelse, HendelseVarsling, Logglinje, Talegruppe
 from ko.tests_hendelseslogg import _bruker, _gi
 from oppdrag import choices
 from oppdrag.models import Enhet, Lokasjon
@@ -263,6 +263,88 @@ class OppdragetTests(_Grunnlag):
         self.assertEqual(len(en), len(fire))
 
 
+class TalegruppeTests(_Grunnlag):
+    """TG i Nødnett (André, 19. okt. 2026): fra lista, en linje per endring,
+    og bilene ser den bare når den er delt."""
+
+    def setUp(self):
+        super().setUp()
+        Talegruppe.objects.get_or_create(navn='SAMVIRKE 2')
+        Talegruppe.objects.get_or_create(navn='SAMVIRKE 3')
+
+    def _tg_linjer(self, h):
+        return list(Logglinje.objects.filter(hendelse=h, kilde=KILDE_OPERATOR, tekst__startswith='TG')
+                    .order_by('id').values_list('tekst', 'delt_at'))
+
+    def test_intern_tg_er_en_intern_linje_og_bilen_ser_den_ikke(self):
+        h = self._hendelse()
+        o = self._oppdrag(h)
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per)
+        h.refresh_from_db()
+        self.assertEqual((h.talegruppe, h.talegruppe_delt), ('SAMVIRKE 2', False))
+        self.assertEqual([t for t, _ in self._tg_linjer(h)], ['TG: SAMVIRKE 2'])
+        self.assertIsNone(self._tg_linjer(h)[0][1], 'intern')
+        self.assertEqual(oppdrag_til_dict(o, for_enhet=True)['hendelse_talegruppe'], '')
+        self.assertEqual(oppdrag_til_dict(o)['hendelse_talegruppe'], 'SAMVIRKE 2', 'sentralbordet ser den')
+        self.assertIn('per', list(h.deltakere.values_list('brukernavn', flat=True)))
+
+    def test_delt_tg_naar_bilen_som_felt_og_linje(self):
+        h = self._hendelse()
+        o = self._oppdrag(h)
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per, del_med_enhetene=True)
+        d = oppdrag_til_dict(o, for_enhet=True)
+        self.assertEqual(d['hendelse_talegruppe'], 'SAMVIRKE 2')
+        self.assertEqual([t['tekst'] for t in d['delte_linjer']], ['TG: SAMVIRKE 2'])
+
+    def test_uendret_gir_ingen_linje_men_ny_deling_gjor(self):
+        h = self._hendelse()
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per)
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per)
+        self.assertEqual(len(self._tg_linjer(h)), 1)
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per, del_med_enhetene=True)
+        linjer = self._tg_linjer(h)
+        self.assertEqual(len(linjer), 2)
+        self.assertIsNotNone(linjer[-1][1], 'nå delt')
+
+    def test_fjerning_av_en_delt_tg_deles_ogsaa(self):
+        h = self._hendelse()
+        o = self._oppdrag(h)
+        services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per, del_med_enhetene=True)
+        # «Sett og del» med «— ingen TG —» valgt: en tom TG er aldri «delt».
+        services.sett_talegruppe(h, '', bruker=self.per, del_med_enhetene=True)
+        h.refresh_from_db()
+        self.assertEqual((h.talegruppe, h.talegruppe_delt), ('', False))
+        self.assertIsNotNone(self._tg_linjer(h)[-1][1], 'bilen skal se at den ikke gjelder lenger')
+        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=True)['delte_linjer']],
+                         ['TG: SAMVIRKE 2', 'TG fjernet'])
+        h2 = self._hendelse()
+        services.sett_talegruppe(h2, 'SAMVIRKE 3', bruker=self.per)
+        services.sett_talegruppe(h2, '', bruker=self.per)
+        self.assertIsNone(self._tg_linjer(h2)[-1][1], 'en intern TG fjernes internt')
+
+    def test_ukjent_inaktiv_annen_portal_og_lukket_avvises(self):
+        from core.models import Vaktportal
+        annen = Vaktportal.objects.create(navn='Brannkorpset', slug='brannkorpset')
+        Talegruppe.objects.create(navn='FREMMED', portal=annen)
+        Talegruppe.objects.filter(navn='SAMVIRKE 3').update(er_aktiv=False)
+        h = self._hendelse()
+        for navn in ('TULL', 'SAMVIRKE 3', 'FREMMED'):
+            with self.subTest(navn=navn), self.assertRaises(services.Ugyldig):
+                services.sett_talegruppe(h, navn, bruker=self.per)
+        services.lukk_hendelse(h, bruker=self.per)
+        with self.assertRaises(services.Ugyldig):
+            services.sett_talegruppe(h, 'SAMVIRKE 2', bruker=self.per)
+        self.assertEqual(self._tg_linjer(h), [])
+
+    def test_en_deaktivert_tg_kan_beholdes_naar_bare_delingen_endres(self):
+        h = self._hendelse()
+        services.sett_talegruppe(h, 'SAMVIRKE 3', bruker=self.per)
+        Talegruppe.objects.filter(navn='SAMVIRKE 3').update(er_aktiv=False)
+        services.sett_talegruppe(h, 'SAMVIRKE 3', bruker=self.per, del_med_enhetene=True)
+        h.refresh_from_db()
+        self.assertTrue(h.talegruppe_delt)
+
+
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PorteneTests(_Grunnlag):
 
@@ -318,6 +400,47 @@ class PorteneTests(_Grunnlag):
         for sti, kropp in (('beskrivelse', {'tekst': 'x'}), ('varsling', {'ressurs_id': self.brann.pk})):
             with self.subTest(sti=sti):
                 self.assertEqual(self._post(self.per, f'/ko/api/hendelser/{h.pk}/{sti}/', kropp).status_code, 404)
+
+    def test_tg_krever_skriv_full_og_del_maa_vaere_sann(self):
+        Talegruppe.objects.get_or_create(navn='SAMVIRKE 2')
+        h = self._hendelse()
+        sti = f'/ko/api/hendelser/{h.pk}/talegruppe/'
+        self.assertEqual(self._post(self.leser, sti, {'talegruppe': 'SAMVIRKE 2'}).status_code, 403)
+        svar = self._post(self.per, sti, {'talegruppe': 'SAMVIRKE 2', 'del': 'ja'})
+        self.assertEqual(svar.status_code, 200, svar.content)
+        self.assertEqual((svar.json()['data']['talegruppe'], svar.json()['data']['talegruppe_delt']),
+                         ('SAMVIRKE 2', False), '«del» må være true, ikke bare noe')
+        svar = self._post(self.per, sti, {'talegruppe': 'SAMVIRKE 2', 'del': True})
+        self.assertTrue(svar.json()['data']['talegruppe_delt'])
+        self.assertEqual(self._post(self.per, sti, {'talegruppe': 'TULL'}).status_code, 400)
+
+    def test_tg_lista_settes_opp_av_ko_leder_moderator_og_admin(self):
+        from accounts.models import PortalRolle, Portaltilgang
+        sti = '/ko/api/talegrupper/'
+        self.assertEqual(self._post(self.per, sti, {'navn': 'X1'}).status_code, 403, 'skriv_full holder ikke')
+        moderator = _gi(_bruker('moderator'), 'ko', 'les')
+        Portaltilgang.objects.update_or_create(bruker=moderator, portal=self.vakt.portal,
+                                               defaults={'rolle': PortalRolle.MODERATOR})
+        leder = _gi(_bruker('leder'), 'ko', 'skriv_leder')
+        admin = _bruker('sjef', role='admin')
+        for i, hvem in enumerate((moderator, leder, admin)):
+            with self.subTest(hvem=hvem.username):
+                svar = self._post(hvem, sti, {'navn': f'SAMVIRKE {i + 10}'})
+                self.assertIn(svar.status_code, (200, 201), svar.content)
+        self.assertEqual(self._post(moderator, '/ko/api/eksterne/', {'navn': 'Kystvakt'}).status_code, 403,
+                         'moderator får TG-lista, ikke resten av KO-innstillingene')
+
+    def test_tg_fanen_vises_for_moderator_alene(self):
+        from accounts.models import PortalRolle, Portaltilgang
+        moderator = _gi(_bruker('moderator'), 'ko', 'les')
+        Portaltilgang.objects.update_or_create(bruker=moderator, portal=self.vakt.portal,
+                                               defaults={'rolle': PortalRolle.MODERATOR})
+        for hvem, ventet in ((self.per, []), (moderator, ['talegrupper'])):
+            c = Client()
+            c.force_login(hvem)
+            faner = [f['slug'] for f in c.get('/ko/').context['verdifaner_ekstra']]
+            with self.subTest(hvem=hvem.username):
+                self.assertEqual(faner, ventet)
 
     def test_aktorlista_settes_opp_av_ko_leder(self):
         sti = '/ko/api/eksterne/'
@@ -480,6 +603,52 @@ class HodetINettleserenTests(TestCase):
         ])
 
 
+class TalegruppeINettleserenTests(TestCase):
+    """Hodets TG-rad: valgene, knappene og escapingen."""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml',)),
+                                      (KO_JS, ('koTalegruppeValg', 'koTalegruppeHtml', 'koSettTalegruppe'))))
+
+    def test_knappene_bare_for_den_som_kan_paa_en_aapen_hendelse(self):
+        run_node(self.harness, """
+            globalThis.window = { KO_TALEGRUPPER: ['SAMVIRKE 2', 'TG <x>'] };
+            const h = {id: 4, status: 'apen', talegruppe: 'GAMMEL', talegruppe_delt: true};
+            const kan = koTalegruppeHtml(h, true);
+            assert(kan.includes('data-id="4:intern"') && kan.includes('data-id="4:del"'), kan);
+            assert(kan.includes('TG &lt;x&gt;') && !kan.includes('TG <x>'), 'escapet');
+            assert(kan.includes('<option value="GAMMEL" selected>'), 'den den står på, også utenfor lista');
+            assert(kan.includes('Delt med bilene'));
+            for (const html of [koTalegruppeHtml(h, false), koTalegruppeHtml({...h, status: 'lukket'}, true)]) {
+              assert(!html.includes('koSettTalegruppe') && html.includes('GAMMEL'), html);
+            }
+            assert(koTalegruppeHtml({id: 4, status: 'apen', talegruppe: ''}, false) === '', 'ingenting å vise');
+            window.KO_TALEGRUPPER = [];
+            assert(koTalegruppeHtml({id: 4, status: 'apen', talegruppe: ''}, true) === '', 'tom liste');
+        """)
+
+    def test_knappen_sender_valget_og_delingen(self):
+        ut = run_node(self.harness, """
+            const sendt = [];
+            async function _koHendelsehandling(sti, kropp) { sendt.push([sti, kropp]); return { res: { ok: true }, data: {} }; }
+            async function koHentLogg() {}
+            function koHentOppdragPaaNytt() {}
+            globalThis.document = { getElementById: (id) => (id === 'ko-tg-valg' ? { value: 'SAMVIRKE 2' } : null) };
+            (async () => {
+              await koSettTalegruppe('4:del');
+              await koSettTalegruppe('4:intern');
+              console.log(JSON.stringify(sendt));
+            })();
+        """)
+        linje = [l for l in ut.splitlines() if l.startswith('[')][-1]
+        self.assertEqual(json.loads(linje), [
+            ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': 'SAMVIRKE 2', 'del': True}],
+            ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': 'SAMVIRKE 2', 'del': False}],
+        ])
+
+
 class OppdragetINettleserenTests(TestCase):
     """«Meldt av» og «Varslet» i bilen og hos sentralbordet, escapet."""
 
@@ -492,9 +661,11 @@ class OppdragetINettleserenTests(TestCase):
             with self.subTest(navn=navn):
                 harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml', 'klokke')), (fil, (navn,))))
                 run_node(harness, f"""
-                    const o = {{hendelse_id: 5, hendelse_melder: 'AMK, Andre (<script>)',
+                    const o = {{hendelse_id: 5, hendelse_melder: 'AMK, Andre (<script>)', hendelse_talegruppe: 'SAMV <2>',
                                hendelse_varslet: [{{navn: 'Brann <x>', tid: '2026-10-19T12:00:00Z'}}]}};
                     const html = {navn}(o);
+                    assert(html.includes('TG: <b>SAMV &lt;2&gt;</b>'), html);
+                    assert({navn}({{hendelse_id: 5, hendelse_talegruppe: 'S1'}}).includes('S1'), 'TG alene');
                     assert(html.includes('Meldt av: <b>AMK, Andre (&lt;script&gt;)</b>'), html);
                     assert(html.includes('Brann &lt;x&gt;') && !html.includes('<script>'), html);
                     assert({navn}({{hendelse_id: null, hendelse_melder: 'AMK'}}) === '', 'uten hendelse');
@@ -520,17 +691,18 @@ class KallstedeneTests(TestCase):
         t.H5 = h5
         ut = t._kjor("""
             window.KO_EKSTERNE = [{id: 1, navn: 'Brann'}, {id: 2, navn: 'Politi'}];
+            window.KO_TALEGRUPPER = ['SAMVIRKE 2'];
             koLinjer.set(2, {id: 2, rot: 2, kilde: 'operator', hendelse_id: 5, systemkode: '',
                              tekst: 'Røyk fra telt B', forfatter: 'kari', tidspunkt: '2026-10-19T12:00:00Z'});
             koApneHendelse('5');
             const d = el('ko-hendelse-detalj').innerHTML;
             const besk = d.indexOf('Røyk fra telt B'), varsle = d.indexOf('data-action="koVarsle"'),
-                  lag = d.indexOf('Lag:'), sted = d.indexOf('bi-geo-alt');
-            console.log(JSON.stringify([sted < besk, besk < varsle, varsle < lag,
+                  lag = d.indexOf('Lag:'), sted = d.indexOf('bi-geo-alt'), tg = d.indexOf('koSettTalegruppe');
+            console.log(JSON.stringify([sted < tg && tg < besk, besk < varsle, varsle < lag,
                                         d.includes('h-beskrivelse-merke'), (d.match(/koVarsle/g) || []).length]));
         """)
         self.assertEqual(json.loads(ut[-1]), [True, True, True, True, 2],
-                     'sted, så beskrivelse, så varslet, så lag — og linja i tråden merket')
+                     'sted, TG, beskrivelse, varslet, lag — og linja i tråden merket')
 
     def test_bilens_kort_viser_melder_og_varslede(self):
         from oppdrag.tests_xss import EnhetEscapingOppforselTests as E

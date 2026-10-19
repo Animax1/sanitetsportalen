@@ -705,7 +705,7 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-38 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
+39 filer i `static/js/` (ingen bundler), på ti sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/`, server-status, og de to under
 både `/oppdrag/` og `/lag/`.
 

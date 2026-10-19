@@ -14,7 +14,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
-from patients.js_test_utils import (KO_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
+from patients.js_test_utils import (KO_TAVLE_JS, KO_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, read_js, run_node)
 
 HARNESS = ((PORTAL_UTILS_JS, ('endringSkalHente', 'fanenErSkjult', 'folgEndringer', 'sjekkEndringer')),)
@@ -136,7 +136,7 @@ class KallstedeneTests(SimpleTestCase):
         self.assertIn(['folgEndringer', 'oppdrag', 'lastAlt'], kall)
 
     def test_tavla_bare_mens_den_staar_framme(self):
-        pre = _konst(KO_JS[2], 'KO_TAVLE_MS') + """
+        pre = _konst(KO_TAVLE_JS, 'KO_TAVLE_MS') + """
             const kall = [];
             globalThis.setInterval = () => {};
             globalThis.document = { getElementById: () => ({}) };

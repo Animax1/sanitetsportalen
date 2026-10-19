@@ -58,7 +58,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import (
-    er_global_admin, har_tilgang, modul_kreves, nivaa_for,
+    er_global_admin, er_moderator, har_tilgang, modul_kreves, nivaa_for,
 )
 from core.jsonkropp import json_body, json_feil
 from core.jsdata import js_json
@@ -66,7 +66,7 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
-from .models import MELDER_VALG, PRIORITET_VALG, EksternRessurs, Hendelse, Logglinje
+from .models import MELDER_VALG, PRIORITET_VALG, EksternRessurs, Hendelse, Logglinje, Talegruppe
 from .tilstede import tilstede
 from .utskrift import KOPI_MINUTTER, kan_lagres_lokalt
 
@@ -177,6 +177,9 @@ def _hendelse_til_dict(h):
         # alle linjene nøklet på rot (`koLinjer`), så gjeldende versjon er et
         # oppslag der og ikke en spørring per hendelse her.
         'beskrivelse_rot': h.beskrivelse_linje_id,
+        # Talegruppa i Nødnett, og om bilene ser den (19. okt. 2026).
+        'talegruppe': h.talegruppe,
+        'talegruppe_delt': h.talegruppe_delt,
         # De eksterne ressursene som er varslet (19. okt. 2026).
         'varslinger': [{'ressurs_id': v.ressurs_id, 'navn': v.navn,
                         'tid': v.varslet_at.isoformat(), 'av': v.av_navn}
@@ -227,6 +230,12 @@ def index_view(request):
         {'slug': 'eksterne', 'navn': 'Eksterne ressurser', 'ny': 'Ny ekstern aktør',
          'url': '/ko/api/eksterne/'},
     ] if _kan_lede_ko(request) else []
+    # Talegruppene (19. okt. 2026) har sin egen dør: KO-leder, moderator i
+    # portalen eller admin. En moderator uten `skriv_leder` i KO ser bare denne
+    # fanen — ikke resten av KO-innstillingene.
+    if kan_sette_opp_talegrupper(request.user):
+        verdifaner_ekstra.append({'slug': 'talegrupper', 'navn': 'Talegrupper (TG)',
+                                  'ny': 'Ny talegruppe', 'url': '/ko/api/talegrupper/'})
     if er_global_admin(request.user):
         # «Nullstill» (André, 18. sep. 2026) — for test og utvikling; i prod
         # står admin ansvarlig. Ingen liste: fanen tegnes av
@@ -270,6 +279,9 @@ def index_view(request):
         # på en hendelse, vises uansett: de bærer navnet selv.
         'eksterne_json': js_json([{'id': r.pk, 'navn': r.navn}
                                   for r in EksternRessurs.objects.i_portal().filter(er_aktiv=True)]),
+        # Talegruppene (19. okt. 2026): navnene til nedtrekket i hodet.
+        'talegrupper_json': js_json(list(Talegruppe.objects.i_portal().filter(er_aktiv=True)
+                                         .values_list('navn', flat=True))),
         # KO-innstillingene — ansvarsområdene — settes opp av KOs
         # `skriv_leder` eller global admin. Sentralbordets valglister har
         # sin egen gate (`kan_lede`, oppdragsmodulens); de to vises i samme
@@ -288,6 +300,12 @@ def kan_lede_ko(user) -> bool:
     i verdilistefabrikken. Global admin trenger ingen egen `or`: `nivaa_for`
     gir toppen av stigen."""
     return har_tilgang(user, 'ko', 'skriv_leder')
+
+
+def kan_sette_opp_talegrupper(user) -> bool:
+    """Talegruppelista: KO-leder, moderator i portalen, eller global admin
+    (André, 19. okt. 2026). Admin er med gjennom `kan_lede_ko` (`nivaa_for`)."""
+    return kan_lede_ko(user) or er_moderator(user)
 
 
 def _kan_lede_ko(request) -> bool:

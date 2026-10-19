@@ -15,8 +15,8 @@ from core.vakt import hent_aktiv_vakt
 from core.verdilister import Verdiliste, lag_views
 
 from . import services
-from .models import Ansvarsmerke, Ansvarsomraade, EksternRessurs, Kjennetegn, Konserttype
-from .views import kan_lede_ko
+from .models import Ansvarsmerke, Ansvarsomraade, EksternRessurs, Hendelse, Kjennetegn, Konserttype, Talegruppe
+from .views import kan_lede_ko, kan_sette_opp_talegrupper
 
 
 # ── KO-innstillingene: ansvarsområdene (18. sep. 2026) ───────────────────────
@@ -40,13 +40,19 @@ VERDILISTER = {
     # Eksterne ressurser (19. okt. 2026). I bruk = hendelser der den står som
     # varslet, i alle vakter — en rad fjorårets hendelser bærer, slettes ikke.
     'eksterne': Verdiliste(EksternRessurs, i_bruk=lambda r: r.varslinger.count()),
+    # Talegruppene (19. okt. 2026). I bruk = hendelser som står på den nå, i
+    # alle vakter i portalen: navnet er frosset på hendelsen, men en rad som
+    # står i bruk skal ikke forsvinne fra lista under hendene på KO.
+    'talegrupper': Verdiliste(Talegruppe, i_bruk=lambda r: Hendelse.objects.filter(
+        vakt__portal=r.portal, talegruppe=r.navn).count()),
 }
 
 
-def _views(slug):
+def _views(slug, kan_lede=kan_lede_ko,
+           nekt='Å sette opp KO-innstillingene er skriv_leder i KO.'):
     return lag_views(modul='ko', liste=VERDILISTER[slug], slug=slug,
-                     kan_lede=kan_lede_ko,
-                     nekt='Å sette opp KO-innstillingene er skriv_leder i KO.',
+                     kan_lede=kan_lede,
+                     nekt=nekt,
                      gruppe='ko:', skille='_')
 
 
@@ -55,6 +61,9 @@ ansvarsomraader_view, ansvarsomraade_detalj_view, ansvarsomraader_rekkefolge_vie
 konserttyper_view, konserttype_detalj_view, konserttyper_rekkefolge_view = _views('konserttyper')
 kjennetegn_view, kjennetegn_detalj_view, kjennetegn_rekkefolge_view = _views('kjennetegn')
 eksterne_view, ekstern_detalj_view, eksterne_rekkefolge_view = _views('eksterne')
+talegrupper_view, talegruppe_detalj_view, talegrupper_rekkefolge_view = _views(
+    'talegrupper', kan_lede=kan_sette_opp_talegrupper,
+    nekt='Talegruppene settes opp av KO-leder, moderator eller admin.')
 
 
 # ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────

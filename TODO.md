@@ -718,19 +718,6 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
-- [ ] **«Alternativ TG (samvup/samvirke)» i hendelsen — hva er ment?** Fra Andrés
-      forbedringsliste for hendelsesloggen 19. okt. 2026; resten av lista er bygget (se
-      CHANGELOG samme dag: beskrivelsen i hodet, eksterne aktører, melderen på oppdraget).
-      To lesninger: (a) TG Samvirke er én av de eksterne aktørene som krysses av som varslet —
-      da er det bare en rad under KO-innstillinger → Eksterne ressurser, ingen kode; (b)
-      hendelsen skal bære **hvilken talegruppe** som brukes for samvirke (f.eks. «SAMVIRKE 2»),
-      som et eget felt i hodet som også vises på oppdraget og i bilen. (b) er et nytt felt og
-      en migrasjon; ikke bygget på en gjetning.
-- [ ] **Del `ko-hendelser.js` før neste endring i den.** 1 798 av 1 800 linjer etter
-      19. okt. 2026 (`test_hver_del_er_mindre_enn_den_var`). Naturlige snitt langs
-      seksjonsmarkørene: hodet (beskrivelse, eksterne aktører, prioritet, lag) eller
-      skjemaet («Ny hendelse»/«Rediger») i egen fil — ny rad i `KO_JS`, i malen og i
-      `tallfasit`.
 - [ ] **Eksterne aktører i «Ny hendelse»-skjemaet?** I dag krysses de av i hodet etter at
       hendelsen er opprettet. Er det vanlig at Brann alt er varslet når hendelsen føres, kan
       avkryssingen også stå i skjemaet — samme `services.varsle`, kalt etter opprettelsen.

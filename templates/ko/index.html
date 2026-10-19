@@ -47,6 +47,7 @@
   window.KO_PRIORITETER = {{ prioriteter_json }};
   window.KO_MELDER_VALG = {{ melder_valg_json }};
   window.KO_EKSTERNE = {{ eksterne_json }};
+  window.KO_TALEGRUPPER = {{ talegrupper_json }};
   window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
 </script>
 
@@ -655,12 +656,13 @@
 {% include "oppdrag/_sentralbord_skript.html" %}
 {% endif %}
 {% comment %}
-  KOs fem filer, i lasterekkefølge (`KO_JS` i patients/js_test_utils.py):
-  oppsettet, hendelsene, tavla, planleggeren, og til slutt loggen med den ene
+  KOs seks filer, i lasterekkefølge (`KO_JS` i patients/js_test_utils.py):
+  oppsettet, hendelsene, hodet i hendelsen, tavla, planleggeren, og til slutt loggen med den ene
   `DOMContentLoaded`-kroken — alt som kjører på toppnivå står i den siste.
 {% endcomment %}
 <script src="{% static 'js/ko-layout.js' %}"></script>
 <script src="{% static 'js/ko-hendelser.js' %}"></script>
+<script src="{% static 'js/ko-hode.js' %}"></script>
 <script src="{% static 'js/ko-tavle.js' %}"></script>
 <script src="{% static 'js/ko-plan.js' %}"></script>
 <script src="{% static 'js/ko.js' %}"></script>

@@ -146,7 +146,7 @@ import unittest  # noqa: E402
 from django.test import SimpleTestCase  # noqa: E402
 
 from oppdrag.tests_runde_d import _konst  # noqa: E402
-from patients.js_test_utils import KO_JS, build_harness, node_available, run_node  # noqa: E402
+from patients.js_test_utils import KO_LAYOUT_JS, KO_JS, build_harness, node_available, run_node  # noqa: E402
 
 from . import tests_js  # noqa: E402
 from .tests_js import PRIORITET_PREAMBLE, VINDU_DOM, VINDU_HARNESS  # noqa: E402
@@ -172,7 +172,7 @@ class MerketINettleserenTests(SimpleTestCase):
     """Tallet i tabellen og sidebaren, og lesemerket som sendes."""
 
     def _kjor(self, script):
-        preamble = PRIORITET_PREAMBLE + _konst(KO_JS[0], 'KO_VINDUER')
+        preamble = PRIORITET_PREAMBLE + _konst(KO_LAYOUT_JS, 'KO_VINDUER')
         ut = run_node(build_harness(HARNESS), VINDU_DOM + FORSPILL
                       + 'koHendelser = new Map('
                       + json.dumps([[5, _H5], [6, _H6], [7, _H7]]) + ');\n'

@@ -22,7 +22,7 @@ from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
     Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, HendelseLest, HendelseVarsling,
-    Linjedeling, Logglinje,
+    Linjedeling, Logglinje, Talegruppe,
 )
 
 
@@ -904,6 +904,45 @@ def varsle(hendelse, ressurs, *, bruker, tidspunkt=None, naa=None) -> HendelseVa
         hendelse=hendelse, ressurs=ressurs, navn=ressurs.navn, varslet_at=linje.tidspunkt,
         av=bruker if bruker and getattr(bruker, 'is_authenticated', False) else None,
         av_navn=getattr(bruker, 'username', '') or '', linje=linje)
+
+
+# ── Talegruppa (TG) i Nødnett (19. okt. 2026) ───────────────────────────────
+#
+# «TG er talegruppe som vi bruker i nødnett … Når den settes bør de kunne
+# velge å om å dele til bil enheter» (André). Hver endring er en operatørlinje
+# i hendelsen — «TG: SAMVIRKE 2» — så loggen viser når hendelsen byttet
+# talegruppe; delt når hun valgte det, og da ser bilene både linja og TG-en
+# fast på oppdraget (`hendelse_talegruppe`).
+
+MAKS_TALEGRUPPE = 40
+
+
+@transaction.atomic
+def sett_talegruppe(hendelse, raa, *, bruker, del_med_enhetene=False, naa=None) -> Hendelse:
+    """Sett, bytt eller fjern TG. Navnet må stå i portalens liste og være
+    aktivt — med ett unntak: det hendelsen alt står på, kan beholdes når bare
+    delingen endres. Tom tekst fjerner. Uendret (samme TG, samme deling) er
+    ingen endring og gir ingen linje."""
+    if hendelse.er_lukket:
+        raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
+    navn = (raa or '').strip()
+    delt = bool(del_med_enhetene) and bool(navn)
+    if navn and navn != hendelse.talegruppe and not Talegruppe.objects.i_portal(
+            hendelse.vakt.portal).filter(navn=navn, er_aktiv=True).exists():
+        raise Ugyldig('Ukjent talegruppe — den settes opp under KO-innstillinger.')
+    if navn == hendelse.talegruppe and delt == hendelse.talegruppe_delt:
+        return hendelse
+    # Var den delt, ser bilene at den fjernes — ellers står de med en TG som
+    # ikke gjelder.
+    del_linja = delt or (not navn and hendelse.talegruppe_delt)
+    hendelse.talegruppe = navn
+    hendelse.talegruppe_delt = delt
+    hendelse.save(update_fields=['talegruppe', 'talegruppe_delt'])
+    linje = skriv_linje(hendelse.vakt, f'TG: {navn}' if navn else 'TG fjernet',
+                        bruker=bruker, hendelse=hendelse, naa=naa)
+    if del_linja:
+        del_linje(linje, bruker=bruker, naa=naa)
+    return hendelse
 
 
 @transaction.atomic

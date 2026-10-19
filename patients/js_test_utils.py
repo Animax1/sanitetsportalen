@@ -47,16 +47,19 @@ OPPDRAG_SENTRAL_JS = (
     JS_DIR / 'oppdrag-sentral-lasting.js',
 )
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
-#: **KO er fire filer** (18. sep. 2026, tavla 22. sep.): rutenettet, hendelsene,
-#: tavla, og loggen med den ene `DOMContentLoaded`-kroken sist. Tuppel, som de
-#: andre delte sidene.
-KO_JS = (
-    JS_DIR / 'ko-layout.js',
-    JS_DIR / 'ko-hendelser.js',
-    JS_DIR / 'ko-tavle.js',
-    JS_DIR / 'ko-plan.js',
-    JS_DIR / 'ko.js',
-)
+#: **KO er seks filer** (18. sep. 2026, tavla 22. sep., hodet 19. okt.): rutenettet,
+#: hendelsene, hodet i hendelsen, tavla, planleggeren, og loggen med den ene
+#: `DOMContentLoaded`-kroken sist. Tuppel, som de andre delte sidene.
+#: Hver fil har et navn, og testene bruker navnet — ikke plassen i tuppelen.
+#: `KO_JS[3]` var planleggeren til hodet kom inn foran tavla 19. okt. 2026, og
+#: da pekte femten tester på feil fil.
+KO_LAYOUT_JS = JS_DIR / 'ko-layout.js'
+KO_HENDELSER_JS = JS_DIR / 'ko-hendelser.js'
+KO_HODE_JS = JS_DIR / 'ko-hode.js'
+KO_TAVLE_JS = JS_DIR / 'ko-tavle.js'
+KO_PLAN_JS = JS_DIR / 'ko-plan.js'
+KO_LOGG_JS = JS_DIR / 'ko.js'
+KO_JS = (KO_LAYOUT_JS, KO_HENDELSER_JS, KO_HODE_JS, KO_TAVLE_JS, KO_PLAN_JS, KO_LOGG_JS)
 #: **Vaktlistesiden er sju filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),
 #: og `vaktliste-oversikt.js` skilt ut fra tegningsfila 15. sep. 2026 da den
 #: passerte 1 800 linjer. `vaktliste-overnatting.js` kom 25. sep. 2026.

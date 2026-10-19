@@ -13,10 +13,10 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
-from patients.js_test_utils import (KO_JS, PORTAL_UTILS_JS, build_harness,
+from patients.js_test_utils import (KO_TAVLE_JS, KO_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, run_node)
 
-TAVLE_JS = KO_JS[2]
+TAVLE_JS = KO_TAVLE_JS
 
 HARNESS = (
     (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml',)),

@@ -110,6 +110,7 @@ def hendelser_del(vakt) -> list[dict]:
         rad.update(opprettet=lokal(h.opprettet_at),
                    prioritet_navn=PRIORITET_NAVN.get(h.prioritet, h.prioritet),
                    beskrivelse_tekst=besk.tekst if besk is not None and not besk.er_fjernet else '',
+                   talegruppe_tekst=h.talegruppe + (' (delt)' if h.talegruppe_delt else ''),
                    varslet_tekst=', '.join(f'{v.navn} {lokal(v.varslet_at):%H:%M}'
                                            for v in h.varslinger.all()))
         ut.append(rad)

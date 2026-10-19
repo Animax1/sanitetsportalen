@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — KO-hendelsen: talegruppa (TG) i Nødnett, satt i hodet og delt med bilene når KO vil  `#ko/hendelseslogg`
+
+André: «TG er talegruppe som vi bruker i nødnett. Bør være en innstilling koleder/moderator/admin
+kan endre. Når den settes bør de kunne velge å om å dele til bil enheter.» Svaret på det åpne
+punktet fra samme morgen («Alternativ TG (samvup/samvirke)»), som er slettet fra TODO.
+
+**Lista er en innstilling.** Ny verdiliste `ko.Talegruppe` under KO-innstillinger → «Talegrupper
+(TG)», per portal, uten standardrader — talegruppene er regionale. **Egen dør:** KO-leder
+(`skriv_leder`), **moderator i portalen** eller admin (`kan_sette_opp_talegrupper` i
+`ko/views.py`). En moderator uten `skriv_leder` i KO får bare denne fanen, ikke resten av
+KO-innstillingene — `kan_lede_ko` er ikke utvidet. En talegruppe som en hendelse står på, kan
+ikke slettes fra lista.
+
+**Hendelsen bærer TG-en** (`Hendelse.talegruppe`, frosset navn, og `talegruppe_delt`), satt i
+hodet mellom stedet og beskrivelsen: nedtrekk fra lista og to knapper, **«Sett»** og **«Sett og del
+med bilene»**. To knapper og ikke en avkrysning, fordi hodet tegnes om ved hver poll og en
+avkrysning ville blitt nullstilt mens hun valgte. Hver endring er en operatørlinje i hendelsen —
+«TG: SAMVIRKE 2», «TG fjernet» — delt når hun valgte det; fjernes en TG som var delt, deles
+fjerningen også, så bilen ikke står igjen med en talegruppe som ikke gjelder. Uendret valg gir
+ingen linje. `services.sett_talegruppe`, `POST /ko/api/hendelser/<pk>/talegruppe/` (`skriv_full`;
+`del` må være `true`, ikke bare noe). Navnet må stå aktivt i portalens liste, men det hendelsen
+alt står på, kan beholdes når bare delingen endres.
+
+**På oppdraget:** `hendelse_talegruppe` — sentralbordet ser den alltid, **bilen bare når den er
+delt** (`for_enhet`). «TG: SAMVIRKE 2» står først i hendelsesinfoen i oppdragsvinduet og på bilens
+kort. Utskriften har kolonnen «TG».
+
+**`ko-hendelser.js` er delt**: hodet (TG, beskrivelsen, de eksterne aktørene) står i
+`static/js/ko-hode.js`. Den sto på 1 798 av 1 800 linjer. KO er nå seks filer, og
+`patients/js_test_utils.py` gir hver av dem et navn (`KO_TAVLE_JS`, `KO_PLAN_JS` …): seksten
+tester pekte på filene med indeks (`KO_JS[3]`), og alle pekte på feil fil i det øyeblikket en ny
+kom inn foran.
+
+Tester: 11 nye i `ko/tests_hendelseshode.py` — tjenestelaget, portene (også at moderator får
+TG-lista og *ikke* eksterne aktører, og at fanen vises for moderator alene), og i node byggeren,
+knappene og bilens/sentralbordets visning. Mutanter: 21, alle drept. Én overlevde første runde: «Sett og del med bilene» med «— ingen TG —» lagret en tom TG som delt. Regelen sto der, men testen prøvde den ikke.
+
 ## 2026-10-19 — KO-hendelsen: beskrivelsen fast i hodet, eksterne aktører som varslet, og melderen på oppdraget  `#ko/hendelseslogg`
 
 André, om hendelsesloggen: «Beskrivelse av hendelse: Kunne oppdatere hendelse. Samt at
@@ -47,7 +84,7 @@ oppdrag), endringsnummeret `oppdrag` og `logg` øker for varslingene, og ETag-en
 svaret. Utskriften har fått kolonnen «Varslet» og beskrivelsen under hver åpen hendelse.
 
 **Ikke bygget:** «Alternativ TG (samvup/samvirke)» — uklart om det er en aktør til (en rad i
-lista) eller hvilken talegruppe hendelsen bruker (et felt). Står i TODO.
+lista) eller hvilken talegruppe hendelsen bruker (et felt). Besvart og bygget samme dag — se TG over.
 
 Tester: `ko/tests_hendelseshode.py`, 32 — tjenestelaget, portene, migrasjonsutfyllingen, og i node
 byggerne pluss de ekte kallstedene (`koTegnDetalj`, bilens `renderAktivt`/`renderVentende`).
