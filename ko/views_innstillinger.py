@@ -15,7 +15,7 @@ from core.vakt import hent_aktiv_vakt
 from core.verdilister import Verdiliste, lag_views
 
 from . import services
-from .models import Ansvarsmerke, Ansvarsomraade, Kjennetegn, Konserttype
+from .models import Ansvarsmerke, Ansvarsomraade, EksternRessurs, Kjennetegn, Konserttype
 from .views import kan_lede_ko
 
 
@@ -37,6 +37,9 @@ VERDILISTER = {
     # dit, i alle vakter: en type fjorårets program står med, slettes ikke.
     'konserttyper': Verdiliste(Konserttype, i_bruk=lambda r: r.poster.count()),
     'kjennetegn': Verdiliste(Kjennetegn, i_bruk=lambda r: r.poster.count()),
+    # Eksterne ressurser (19. okt. 2026). I bruk = hendelser der den står som
+    # varslet, i alle vakter — en rad fjorårets hendelser bærer, slettes ikke.
+    'eksterne': Verdiliste(EksternRessurs, i_bruk=lambda r: r.varslinger.count()),
 }
 
 
@@ -51,6 +54,7 @@ ansvarsomraader_view, ansvarsomraade_detalj_view, ansvarsomraader_rekkefolge_vie
     _views('ansvarsomraader')
 konserttyper_view, konserttype_detalj_view, konserttyper_rekkefolge_view = _views('konserttyper')
 kjennetegn_view, kjennetegn_detalj_view, kjennetegn_rekkefolge_view = _views('kjennetegn')
+eksterne_view, ekstern_detalj_view, eksterne_rekkefolge_view = _views('eksterne')
 
 
 # ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────

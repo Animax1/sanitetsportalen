@@ -265,6 +265,18 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 .h-hode.h-gronn { border-left-color: #16a34a; }
 .h-hode.h-drift { border-left-color: #3b82f6; }
 .h-hode.h-plassering { border-left-color: #a855f7; }
+/* Beskrivelsen og de eksterne ressursene i hodet (19. okt. 2026). Beskrivelsen
+   er «tidskritisk informasjon» (André): egen flate med gul kant, og teksten
+   beholder linjeskiftene den ble skrevet med. */
+.h-beskrivelse { border-left: 3px solid #eab308; padding: 0.35rem 0.6rem; background: rgba(234, 179, 8, 0.08); border-radius: 4px; }
+.h-beskrivelse-tom { border-left-color: var(--border-color); background: transparent; padding: 0.15rem 0.6rem; }
+.h-beskrivelse-tekst { white-space: pre-wrap; color: var(--text-main); font-size: 0.95rem; margin-top: 0.15rem; }
+.h-beskrivelse-merke { background: rgba(234, 179, 8, 0.25); color: #fde68a; font-weight: 500; }
+.h-ekstern { display: inline-flex; align-items: center; gap: 0.15rem; padding: 0.1rem 0.5rem; border: 1px solid var(--border-color);
+             border-radius: 999px; font-size: 0.85rem; color: var(--text-muted); cursor: pointer; }
+.h-ekstern.varslet { border-color: #15803d; background: rgba(21, 128, 61, 0.15); color: var(--text-main); }
+.h-ekstern .tid { color: #86efac; font-variant-numeric: tabular-nums; }
+.h-ekstern-tid { width: 110px; }
 .h-hode-tittel { font-weight: 700; font-size: 1rem; }
 .h-felt { font-size: 0.82rem; color: var(--text-muted); }
 .h-felt b { color: var(--text-main); font-weight: 600; }

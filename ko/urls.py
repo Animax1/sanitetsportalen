@@ -55,6 +55,10 @@ urlpatterns = [
     path('api/hendelser/<int:pk>/lest/', views_hendelser.hendelse_lest_view,
          name='ko_api_hendelse_lest'),
     # Lagene på hendelsen (19. sep. 2026): hele lista, differansen logges.
+    path('api/hendelser/<int:pk>/beskrivelse/', views_hendelser.hendelse_beskrivelse_view,
+         name='ko_api_hendelse_beskrivelse'),
+    path('api/hendelser/<int:pk>/varsling/', views_hendelser.hendelse_varsling_view,
+         name='ko_api_hendelse_varsling'),
     path('api/hendelser/<int:pk>/lag/', views_hendelser.hendelse_lag_view,
          name='ko_api_hendelse_lag'),
     # KO-innstillingene: ansvarsområdene (18. sep. 2026).
@@ -90,6 +94,10 @@ urlpatterns = [
     path('api/kjennetegn/rekkefolge/', views_innstillinger.kjennetegn_rekkefolge_view,
          name='ko_api_kjennetegn_rekkefolge'),
     path('api/kjennetegn/<int:pk>/', views_innstillinger.kjennetegn_detalj_view, name='ko_api_kjennetegn_detalj'),
+    path('api/eksterne/', views_innstillinger.eksterne_view, name='ko_api_eksterne'),
+    path('api/eksterne/rekkefolge/', views_innstillinger.eksterne_rekkefolge_view,
+         name='ko_api_eksterne_rekkefolge'),
+    path('api/eksterne/<int:pk>/', views_innstillinger.ekstern_detalj_view, name='ko_api_ekstern_detalj'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views_hendelser.oppdrag_hendelse_view,

@@ -52,7 +52,7 @@ from oppdrag import endringer as oppdrag_endringer
 
 from . import endringer as ko_endringer
 from . import systemlinjer
-from .models import (HENDELSE_APEN, Hendelse, HendelseDeltaker, HendelseLag, Linjedeling, Logglinje,
+from .models import (HENDELSE_APEN, Hendelse, HendelseDeltaker, HendelseLag, HendelseVarsling, Linjedeling, Logglinje,
                      PlanlagtPause, Programbehov, Programpost, Tavleplassering)
 from .services import systemlinje
 
@@ -403,6 +403,8 @@ def tavleinnstilling_endret(sender, instance=None, **kwargs):
 @receiver(post_delete, sender=HendelseLag)
 @receiver(post_save, sender=HendelseDeltaker)
 @receiver(post_delete, sender=HendelseDeltaker)
+@receiver(post_save, sender=HendelseVarsling)
+@receiver(post_delete, sender=HendelseVarsling)
 @receiver(post_save, sender=Oppdrag)
 @receiver(post_delete, sender=Oppdrag)
 @ikke_under_loaddata
@@ -412,7 +414,7 @@ def loggen_endret(sender, instance=None, **kwargs):
 
 
 # **`oppdrag` for det KO skriver på oppdragene i sentralbordets liste**:
-# hendelsens prioritet (H-merket), lagene og de delte linjene står på raden
+# hendelsens prioritet (H-merket), lagene, varslingene, melderen og de delte linjene står på raden
 # (`oppdrag_til_dict`), men lagres i KO — oppdragsmodulens egne mottakere ser
 # dem ikke. En linje utenfor en hendelse står aldri på et oppdrag, og øker
 # ikke tallet: ellers ville hver linje i loggstrømmen fått sentralbordet til å
@@ -422,6 +424,8 @@ def loggen_endret(sender, instance=None, **kwargs):
 @receiver(post_delete, sender=Hendelse)
 @receiver(post_save, sender=HendelseLag)
 @receiver(post_delete, sender=HendelseLag)
+@receiver(post_save, sender=HendelseVarsling)
+@receiver(post_delete, sender=HendelseVarsling)
 @receiver(post_save, sender=Linjedeling)
 @receiver(post_delete, sender=Linjedeling)
 @receiver(post_save, sender=Logglinje)

@@ -103,8 +103,15 @@ def hendelser_del(vakt) -> list[dict]:
         if h.status != HENDELSE_APEN:
             continue
         rad = _hendelse_til_dict(h)
+        # Beskrivelsen og varslingene står i hodet på skjermen (19. okt. 2026),
+        # og skal stå på papiret: skjermen slår beskrivelsen opp i linjene den
+        # alt har, her hentes den gjeldende versjonen — én spørring per åpen hendelse.
+        besk = services.gjeldende_i_kjeden(h.beskrivelse_linje)
         rad.update(opprettet=lokal(h.opprettet_at),
-                   prioritet_navn=PRIORITET_NAVN.get(h.prioritet, h.prioritet))
+                   prioritet_navn=PRIORITET_NAVN.get(h.prioritet, h.prioritet),
+                   beskrivelse_tekst=besk.tekst if besk is not None and not besk.er_fjernet else '',
+                   varslet_tekst=', '.join(f'{v.navn} {lokal(v.varslet_at):%H:%M}'
+                                           for v in h.varslinger.all()))
         ut.append(rad)
     return ut
 

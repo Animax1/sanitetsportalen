@@ -715,9 +715,13 @@ function koDetaljLinjeHtml(linje) {
     : koDelingKnapper(linje) + koRettFjernKnapper(linje.id);
   const delt = (system || linje.fjernet) ? '' : koDeltMerke(linje);
   const posisjon = system && linje.systemkode === 'posisjon_delt' ? ' posisjon' : '';
+  // Beskrivelsen står også i hodet; merket sier at det er den samme.
+  const h = koHendelser.get(linje.hendelse_id);
+  const besk = h && h.beskrivelse_rot === linje.rot && !linje.fjernet
+    ? ' <span class="badge h-beskrivelse-merke">Beskrivelse</span>' : '';
   return '<div class="h-linje' + (system ? ' system' : '') + posisjon + (koErDelt(linje) ? ' delt' : '') + '">'
     + '<span class="tid">' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span>'
-    + tekst + hvem + delt + verktoy + '</div>';
+    + tekst + besk + hvem + delt + verktoy + '</div>';
 }
 
 // ── Deling med enhetene, og lagene på hendelsen (19. sep. 2026) ──────────────
@@ -973,13 +977,141 @@ function koBevarFelter(ider) {
   });
 }
 
+// ── Beskrivelsen og de eksterne aktørene i hodet (19. okt. 2026) ───────────
+// Beskrivelsen er en logglinje; hodet viser gjeldende versjon av kjeden
+// `beskrivelse_rot` peker på, og «Oppdater» er en retting (`ko/CLAUDE.md`).
+
+let koBeskrivelseRedigeres = null;   // hendelsen der beskrivelsen står åpen
+
+// Den gjeldende beskrivelsen, eller null. `koLinjer` er nøklet på rot og
+// holder alltid nyeste ledd, så dette er et oppslag og ikke et søk.
+function koBeskrivelse(h) {
+  if (!h || !h.beskrivelse_rot) return null;
+  const linje = koLinjer.get(h.beskrivelse_rot);
+  return linje && !linje.fjernet ? linje : null;
+}
+
+function koBeskrivelseHtml(h, kan) {
+  const besk = koBeskrivelse(h);
+  if (koBeskrivelseRedigeres === h.id && kan) {
+    return '<div class="h-beskrivelse h-beskrivelse-rediger mt-2">'
+      + '<textarea id="ko-beskrivelse-tekst" class="form-control form-control-sm" rows="3"'
+      + ' data-linje="' + escapeHtml(besk ? besk.id : '') + '"'
+      + ' placeholder="Hva har skjedd, hvor, hvem — det alle må vite">' + escapeHtml(besk ? besk.tekst : '') + '</textarea>'
+      + '<div class="d-flex gap-2 mt-1">'
+      + '<button type="button" class="btn btn-sm btn-primary" id="ko-beskrivelse-lagre" data-action="koBeskrivelseLagre"'
+      + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-check2 me-1"></i>Lagre</button>'
+      + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koBeskrivelseAvbryt"'
+      + ' data-id="' + escapeHtml(h.id) + '">Avbryt</button>'
+      + '<span class="text-muted small align-self-center">Lagres som en retting — loggen viser hva som sto før.</span>'
+      + '</div><div class="text-danger small mt-1 d-none" id="ko-beskrivelse-feil" role="alert"></div></div>';
+  }
+  const knapp = kan
+    ? '<button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-action="koBeskrivelseRediger"'
+      + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-pencil me-1"></i>' + (besk ? 'Oppdater' : 'Legg til beskrivelse') + '</button>'
+    : '';
+  if (!besk) {
+    return knapp ? '<div class="h-beskrivelse h-beskrivelse-tom mt-2 d-flex">' + knapp + '</div>' : '';
+  }
+  const hvem = escapeHtml(besk.forfatter || '') + ' ' + escapeHtml(koKlokke(besk.registrert_at || besk.tidspunkt))
+    + (besk.korrigerer ? ' · oppdatert' : '');
+  return '<div class="h-beskrivelse mt-2">'
+    + '<div class="d-flex align-items-center gap-2"><span class="h-felt"><i class="bi bi-card-text"></i> Beskrivelse</span>'
+    + '<span class="text-muted small">' + hvem + '</span>' + koDeltMerke(besk) + knapp + '</div>'
+    + '<div class="h-beskrivelse-tekst">' + escapeHtml(besk.tekst) + '</div></div>';
+}
+
+// Lista fra KO-innstillinger, pluss varslede som er tatt ut av den siden.
+function koEksterneValg(h) {
+  const varslet = new Map((h.varslinger || []).map((v) => [v.ressurs_id, v]));
+  const ut = (window.KO_EKSTERNE || []).map((r) => ({ id: r.id, navn: r.navn, varslet: varslet.get(r.id) || null }));
+  const kjente = new Set(ut.map((r) => r.id));
+  (h.varslinger || []).forEach((v) => {
+    if (!kjente.has(v.ressurs_id)) ut.push({ id: v.ressurs_id, navn: v.navn, varslet: v });
+  });
+  return ut;
+}
+
+// **`value` er tilstanden et trykk gir**: delegeringen sender `el.value`, ikke
+// `checked` (`hendelseArgumenter`) — uavkrysset bærer «1», avkrysset «0».
+function koEksterneHtml(h, kan) {
+  const valg = koEksterneValg(h);
+  if (!valg.length) return '';
+  const aktiv = kan && h.status === 'apen';
+  const bokser = valg.map((r) => {
+    const v = r.varslet;
+    // En varsling uten ressurs (raden er slettet) kan ikke angres herfra.
+    const laast = !aktiv || r.id === null || r.id === undefined;
+    return '<label class="h-ekstern' + (v ? ' varslet' : '') + '"' + (v && v.av ? ' title="Krysset av av ' + escapeHtml(v.av) + '"' : '') + '>'
+      + '<input type="checkbox" class="form-check-input me-1" data-action="koVarsle" data-hendelse="change"'
+      + ' data-felt="varslet" data-id="' + escapeHtml(r.id) + '" value="' + (v ? '0' : '1') + '"'
+      + (v ? ' checked' : '') + (laast ? ' disabled' : '') + '>'
+      + escapeHtml(r.navn) + (v ? ' <span class="tid">' + escapeHtml(koKlokke(v.tid)) + '</span>' : '')
+      + '</label>';
+  }).join('');
+  const tid = aktiv
+    ? '<input type="time" id="ko-varsling-tid" class="form-control form-control-sm h-ekstern-tid"'
+      + ' title="Når de ble varslet — blank er nå" aria-label="Varslet klokka">'
+    : '';
+  return '<div class="d-flex align-items-center gap-2 flex-wrap mt-2">'
+    + '<span class="h-felt"><i class="bi bi-broadcast"></i> Varslet:</span>' + bokser + tid + '</div>';
+}
+
+function koBeskrivelseRediger(id) {
+  koBeskrivelseRedigeres = Number(id);
+  koTegnDetalj();
+  const felt = document.getElementById('ko-beskrivelse-tekst');
+  if (felt) felt.focus();
+}
+
+function koBeskrivelseAvbryt() {
+  koBeskrivelseRedigeres = null;
+  koTegnDetalj();
+}
+
+async function koBeskrivelseLagre(id) {
+  const felt = document.getElementById('ko-beskrivelse-tekst');
+  const feil = document.getElementById('ko-beskrivelse-feil');
+  if (!felt) return;
+  await withSubmitGuard('ko-beskrivelse-lagre', async () => {
+    const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/beskrivelse/',
+      { tekst: felt.value, linje: (felt.dataset || {}).linje || null });
+    if (!res.ok) {
+      if (feil) { feil.textContent = data.message || 'Beskrivelsen ble ikke lagret.'; feil.classList.remove('d-none'); }
+      // 409: noen andre oppdaterte den. Hent den nye; teksten hun skrev står i feltet.
+      if (res.status === 409) koHentLogg();
+      return;
+    }
+    if (data.linje) koLinjer.set(data.linje.rot, data.linje);
+    if (data.data) koHendelser.set(data.data.id, data.data);
+    koBeskrivelseRedigeres = null;
+    koTegnDetalj();
+    // En delt beskrivelse står i bilen; rettingen skal fram dit også.
+    koHentOppdragPaaNytt();
+  });
+}
+
+async function koVarsle(ressursId, felt, verdi) {
+  const id = koApenHendelseId;
+  if (id === null) return;
+  const tid = (document.getElementById('ko-varsling-tid') || {}).value || '';
+  const kropp = { ressurs_id: ressursId, varslet: verdi === '1' };
+  if (kropp.varslet && tid) kropp.tidspunkt = koTidspunktISO(tid);
+  const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/varsling/', kropp);
+  if (!res.ok) window.alert(data.message || 'Varslingen ble ikke lagret.');
+  await koHentLogg();
+  koHentOppdragPaaNytt();
+}
+
 function koTegnDetalj() {
   const boks = document.getElementById('ko-hendelse-detalj');
   const h = koHendelser.get(koApenHendelseId);
   if (!boks || !h) { koApenHendelseId = null; koVisDetaljen(false); return; }
   koMerkLest();
   const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid',
-                                     'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
+                                     'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg',
+                                     'ko-beskrivelse-tekst', 'ko-varsling-tid']);
+  if (koBeskrivelseRedigeres !== null && koBeskrivelseRedigeres !== h.id) koBeskrivelseRedigeres = null;
   koVisDetaljen(true);
   koTegnHSide();
   const kan = koKanSkrive();
@@ -1052,6 +1184,8 @@ function koTegnDetalj() {
     + '<span class="h-felt"><i class="bi bi-megaphone"></i> Melder: <b>' + escapeHtml(h.melder_tekst || '—') + '</b></span>'
     + '<span class="h-felt"><i class="bi bi-person"></i> Opprettet av <b>' + escapeHtml(h.opprettet_av || '—') + '</b> '
     + escapeHtml(koKlokke(h.opprettet_at)) + '</span></div>'
+    + koBeskrivelseHtml(h, kan)
+    + koEksterneHtml(h, kan)
     + '<div class="d-flex align-items-center gap-2 flex-wrap mt-2"><span class="h-felt"><i class="bi bi-people"></i> Lag:</span>'
     + lagBrikker + lagVelger + '</div>'
     + '</div>'
@@ -1148,7 +1282,16 @@ function _koFyllSkjema(h, fraLinjeId, forslag) {
   sett('ko-h-fra-linje', fraLinjeId || '');
   sett('ko-h-tittel', h ? h.tittel : (forslag || ''));
   sett('ko-h-melder', h ? h.melder : '');
-  sett('ko-h-beskrivelse', '');
+  // Beskrivelsen (19. okt. 2026, «kunne oppdatere hendelse»): ved redigering
+  // står den gjeldende versjonen i feltet, og lagres som en retting bare når
+  // teksten er endret. `data-linje` er versjonen skjemaet ble åpnet med.
+  const besk = h ? koBeskrivelse(h) : null;
+  sett('ko-h-beskrivelse', besk ? besk.tekst : '');
+  const beskFelt = document.getElementById('ko-h-beskrivelse');
+  if (beskFelt && beskFelt.dataset) {
+    beskFelt.dataset.linje = besk ? String(besk.id) : '';
+    beskFelt.dataset.original = besk ? String(besk.tekst) : '';
+  }
   koFyllLokasjoner(h ? h.lokasjon_id : null);
   koVelgPrioritet(h ? h.prioritet : '');
   const typer = new Set(h ? (h.melder_typer || []) : []);
@@ -1157,10 +1300,6 @@ function _koFyllSkjema(h, fraLinjeId, forslag) {
   });
   koMelderAndreEndret();
   koFyllLagvalg(h);
-  // Beskrivelsen er den første linja i loggen: ved redigering står den i
-  // hendelsen og rettes der, og blokka her skjules.
-  const besk = document.getElementById('ko-h-beskrivelse-blokk');
-  if (besk) besk.classList.toggle('d-none', Boolean(h));
   const tittel = document.getElementById('ko-hendelse-modal-tittel');
   if (tittel) tittel.innerHTML = '<i class="bi bi-flag me-2"></i>' + (h ? 'Rediger ' + escapeHtml(h.kode) : 'Ny hendelse');
   const lagre = document.getElementById('ko-h-lagre-tekst');
@@ -1264,6 +1403,27 @@ async function koLagreHendelse() {
     const verdier = _koSkjemaverdier();
     let svar;
     if (id) {
+      // Beskrivelsen først, og bare når den er endret: den har sin egen sti
+      // (en retting i loggen), og hodet sin egen `versjon`. Går den gjennom og
+      // hodet får 409, er den lagret — og neste trykk sender den ikke på nytt.
+      const beskFelt = document.getElementById('ko-h-beskrivelse');
+      const ds = (beskFelt && beskFelt.dataset) || {};
+      const nyBesk = String(verdier.beskrivelse || '').trim();
+      if (nyBesk && nyBesk !== String(ds.original || '').trim()) {
+        const b = await _koHendelsehandling('/ko/api/hendelser/' + id + '/beskrivelse/',
+          { tekst: nyBesk, linje: ds.linje || null });
+        if (!b.res.ok) {
+          if (feil) { feil.textContent = b.data.message || 'Beskrivelsen ble ikke lagret.'; feil.classList.remove('d-none'); }
+          if (b.res.status === 409) koHentLogg();
+          return;
+        }
+        if (b.data.linje) {
+          koLinjer.set(b.data.linje.rot, b.data.linje);
+          ds.linje = String(b.data.linje.id);
+          ds.original = nyBesk;
+        }
+      }
+      delete verdier.beskrivelse;
       verdier.versjon = Number((document.getElementById('ko-h-versjon') || {}).value);
       svar = await _koHendelsehandling('/ko/api/hendelser/' + id + '/rediger/', verdier);
     } else {
@@ -1493,10 +1653,15 @@ function koHastegradForHendelse(h) {
   return (h && tabell[h.prioritet]) || '';
 }
 
-// Oppdragsnotatet arver hendelsens beskrivelse — den første linja i loggen —
-// «men som kan endres av operatør». Tom uten hendelse eller uten linjer.
+// Oppdragsnotatet arver hendelsens beskrivelse — den gjeldende versjonen,
+// også etter en oppdatering (19. okt. 2026) — «men som kan endres av
+// operatør». En hendelse fra før beskrivelsen fikk en peker, arver den første
+// linja i loggen som før. Tom uten hendelse eller uten linjer.
 function koNotatForHendelse(h) {
   if (!h) return '';
+  const besk = koBeskrivelse(h);
+  if (besk) return String(besk.tekst || '');
+  if (h.beskrivelse_rot) return '';
   const forste = koOperatorlinjer(h)[0];
   return forste ? String(forste.tekst || '') : '';
 }

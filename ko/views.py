@@ -66,7 +66,7 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
-from .models import MELDER_VALG, PRIORITET_VALG, Hendelse, Logglinje
+from .models import MELDER_VALG, PRIORITET_VALG, EksternRessurs, Hendelse, Logglinje
 from .tilstede import tilstede
 from .utskrift import KOPI_MINUTTER, kan_lagres_lokalt
 
@@ -173,6 +173,14 @@ def _hendelse_til_dict(h):
         'lag': [{'id': l.pk, 'ressurs_id': l.ressurs_id, 'navn': l.ressurs_navn,
                  'fra': l.fra.isoformat(), 'av': l.av_navn} for l in h.lag.all()],
         'deltakere': [d.brukernavn for d in h.deltakere.all()],
+        # Beskrivelsen i hodet (19. okt. 2026): roten i kjeden. Klienten har
+        # alle linjene nøklet på rot (`koLinjer`), så gjeldende versjon er et
+        # oppslag der og ikke en spørring per hendelse her.
+        'beskrivelse_rot': h.beskrivelse_linje_id,
+        # De eksterne ressursene som er varslet (19. okt. 2026).
+        'varslinger': [{'ressurs_id': v.ressurs_id, 'navn': v.navn,
+                        'tid': v.varslet_at.isoformat(), 'av': v.av_navn}
+                       for v in h.varslinger.all()],
     }
 
 
@@ -214,6 +222,10 @@ def index_view(request):
          'url': '/ko/api/konserttyper/'},
         {'slug': 'kjennetegn', 'navn': 'Kjennetegn', 'ny': 'Nytt kjennetegn',
          'url': '/ko/api/kjennetegn/'},
+        # Eksterne ressurser (19. okt. 2026): hvem hendelsen kan krysse av
+        # som varslet.
+        {'slug': 'eksterne', 'navn': 'Eksterne ressurser', 'ny': 'Ny ekstern aktør',
+         'url': '/ko/api/eksterne/'},
     ] if _kan_lede_ko(request) else []
     if er_global_admin(request.user):
         # «Nullstill» (André, 18. sep. 2026) — for test og utvikling; i prod
@@ -252,6 +264,12 @@ def index_view(request):
         'prioriteter_json': js_json([list(p) for p in PRIORITET_VALG]),
         'melder_valg': MELDER_VALG,
         'melder_valg_json': js_json([list(m) for m in MELDER_VALG]),
+        # Eksterne ressurser (19. okt. 2026): de aktive, til avkryssingen i
+        # hodet. Lest ved sidelasting, som ansvarsområdene — en ny rad under
+        # KO-innstillinger vises etter neste lasting. Varslinger som alt står
+        # på en hendelse, vises uansett: de bærer navnet selv.
+        'eksterne_json': js_json([{'id': r.pk, 'navn': r.navn}
+                                  for r in EksternRessurs.objects.i_portal().filter(er_aktiv=True)]),
         # KO-innstillingene — ansvarsområdene — settes opp av KOs
         # `skriv_leder` eller global admin. Sentralbordets valglister har
         # sin egen gate (`kan_lede`, oppdragsmodulens); de to vises i samme

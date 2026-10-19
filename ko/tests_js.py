@@ -340,6 +340,8 @@ PRIORITET_PREAMBLE = (
     "['gronn','Grønn'],['drift','Drift'],['plassering','Plassering']], MODUL_TILGANG: { ko: 'skriv_full' } };\n"
     "let koHendelser = new Map(); let koApenHendelseId = null; let koVisLukkede = true; let koSok = '';\n"
     'let koLinjer = new Map(); let oppdragsliste = [];\n'
+    # Beskrivelsen i hodet (19. okt. 2026): ingen står åpen.
+    'let koBeskrivelseRedigeres = null;\n'
     # Loggfilteret (21. sep. 2026): `koLoggHodeTekst()` teller det filtrerte.
     "let koLoggfilter = 'alle';\n"
     # Skjerm 2 (24. sep. 2026): raden som er merket, er den skjerm 2 viser.
@@ -535,7 +537,9 @@ VINDU_HARNESS = HENDELSE_HARNESS + (
              'koDetaljLinjeHtml', 'koHendelseOppdragHtml', 'koPrioKnapperHtml', 'koLagBrikkeHtml',
              'koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koMittBrukernavn', 'koSiden',
              'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett',
-             'koMerkLest', 'koSisteLinjeI')),
+             'koMerkLest', 'koSisteLinjeI',
+             # Hodet (19. okt. 2026): beskrivelsen og de eksterne aktørene.
+             'koBeskrivelse', 'koBeskrivelseHtml', 'koEksterneValg', 'koEksterneHtml')),
 )
 
 
@@ -1376,7 +1380,7 @@ class DelingOgLagTests(SimpleTestCase):
         hastegrad, og et arvet notat tas bort, et selvskrevet står."""
         harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml',)),
-            (KO_JS, ('koHendelsevalgEndret', 'koHastegradForHendelse', 'koNotatForHendelse',
+            (KO_JS, ('koHendelsevalgEndret', 'koHastegradForHendelse', 'koNotatForHendelse', 'koBeskrivelse',
                      'koOperatorlinjer', 'koHendelseLinjer', 'koNullstillHendelsevalg')),
         ))
         ut = run_node(harness, self.PRE + '''

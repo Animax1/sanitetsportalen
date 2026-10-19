@@ -392,7 +392,7 @@ def sentralbord_liste(vakt) -> list[dict]:
     qs = list(fritekstfrist.med_siste_aktivitet(
                   Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True))
               .select_related('lokasjon', 'hendelse')
-              .prefetch_related('enheter__enhet', 'hendelse__lag')
+              .prefetch_related('enheter__enhet', 'hendelse__lag', 'hendelse__varslinger')
               .order_by('-created_at'))
     gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
     status_tid = status_tidspunkt_for(qs, gjeldende)
@@ -1469,7 +1469,7 @@ def historikk_liste_view(request):
     qs = (fritekstfrist.med_siste_aktivitet(Oppdrag.objects)
           .filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False)
           .select_related('lokasjon', 'hendelse')
-          .prefetch_related('enheter__enhet', 'hendelse__lag')
+          .prefetch_related('enheter__enhet', 'hendelse__lag', 'hendelse__varslinger')
           .order_by('-historikk_fra'))
 
     sok = (request.GET.get('sok') or '').strip()

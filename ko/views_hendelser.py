@@ -7,6 +7,7 @@ utskriften og stiene her bruker den. Tilgangstabellen står i docstringen til
 """
 from __future__ import annotations
 
+from django.db import IntegrityError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
@@ -17,8 +18,8 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services
-from .models import Hendelse, Logglinje
-from .views import _hendelse_til_dict
+from .models import EksternRessurs, Hendelse, Logglinje
+from .views import _heltall_eller_none, _hendelse_til_dict, _til_dict, _tid
 
 
 # ── Hendelsene (pulje 5) ─────────────────────────────────────────────────────
@@ -157,6 +158,62 @@ def hendelse_lag_view(request, pk):
         services.sett_lag(hendelse, json_body(request).get('lag'), bruker=request.user)
     except services.Ugyldig as feil:
         return json_feil(str(feil))
+    hendelse = services.hendelse_med_telling(hendelse)
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_beskrivelse', rate='60/m', method='POST')
+def hendelse_beskrivelse_view(request, pk):
+    """Skriv eller oppdater beskrivelsen i hodet (19. okt. 2026).
+
+    `linje` er versjonen klienten så; er den rettet av noen andre siden, er
+    det **409**, som hodets `versjon`. Svarer med hendelsen og linja, så
+    klienten kan tegne hodet med det samme uten å vente på pollen."""
+    hendelse = _hendelse(pk)
+    data = json_body(request)
+    try:
+        linje = services.sett_beskrivelse(hendelse, data.get('tekst'), bruker=request.user,
+                                          sett_linje=data.get('linje'))
+    except services.AlleredeKorrigert as feil:
+        return json_feil(str(feil), status=409)
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
+    except IntegrityError:
+        # Unikhetskravet på `korrigerer` holder når to trykker i samme sekund.
+        return json_feil('Beskrivelsen er oppdatert av noen andre — les den nye før du endrer.',
+                         status=409)
+    hendelse = services.hendelse_med_telling(hendelse)
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse),
+                         'linje': _til_dict(linje)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_varsling', rate='60/m', method='POST')
+def hendelse_varsling_view(request, pk):
+    """Kryss av (`varslet: true`) eller av igjen (`false`) at en ekstern
+    ressurs er varslet (19. okt. 2026). `tidspunkt` er valgfritt; blank er nå.
+    Ressursen slås opp i portalen hendelsen står i — en id fra en annen
+    portal er 400, ikke en varsling."""
+    hendelse = _hendelse(pk)
+    data = json_body(request)
+    ressurs_id = _heltall_eller_none(data.get('ressurs_id'))
+    if ressurs_id is None:
+        return json_feil('«ressurs_id» må være et tall.')
+    try:
+        if data.get('varslet') is False:
+            services.angre_varsling(hendelse, ressurs_id, bruker=request.user)
+        else:
+            ressurs = EksternRessurs.objects.i_portal().filter(pk=ressurs_id).first()
+            services.varsle(hendelse, ressurs, bruker=request.user,
+                            tidspunkt=_tid(data.get('tidspunkt')))
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
+    except IntegrityError:
+        # To som krysser av i samme sekund: den første står.
+        pass
     hendelse = services.hendelse_med_telling(hendelse)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 

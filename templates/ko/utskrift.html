@@ -85,7 +85,7 @@
   {% if hendelser %}
   <table>
     <thead><tr><th class="nr">Nr.</th><th>Tittel</th><th>Sted</th><th>Prioritet</th><th>Melder</th>
-               <th>Lag</th><th>Oppdrag</th><th>Opprettet</th></tr></thead>
+               <th>Varslet</th><th>Lag</th><th>Oppdrag</th><th>Opprettet</th></tr></thead>
     <tbody>
     {% for h in hendelser %}
       <tr>
@@ -94,10 +94,12 @@
         <td>{{ h.lokasjon_navn|default:"–" }}</td>
         <td>{{ h.prioritet_navn }}</td>
         <td>{{ h.melder_tekst|default:"–" }}</td>
+        <td>{{ h.varslet_tekst|default:"–" }}</td>
         <td>{% for l in h.lag %}{{ l.navn }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
         <td>{{ h.apne_oppdrag }} åpne av {{ h.antall_oppdrag }}</td>
         <td class="tid">{{ h.opprettet|date:"j.n. H:i" }}<br><span class="dempet">{{ h.opprettet_av }}</span></td>
       </tr>
+      {% if h.beskrivelse_tekst %}<tr class="beskrivelse"><td></td><td colspan="8">{{ h.beskrivelse_tekst|linebreaksbr }}</td></tr>{% endif %}
     {% endfor %}
     </tbody>
   </table>

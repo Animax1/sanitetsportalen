@@ -100,11 +100,16 @@ class KoBackupHandler(BaseBackupHandler):
     #: `oppdrag`, ressursgruppa i behovet mot `vaktliste`, og begge navnene står
     #: frosset. Konserttypen og kjennetegnene er KOs egne og beholdes, og det
     #: gjør `Tavleplassering.folger` også — den peker innad i settet.
+    #:
+    #: **Varslingene** (19. okt. 2026): `av` er en brukerpeker som de andre,
+    #: med navnet frosset. `ressurs` og `linje` peker innad i settet og
+    #: beholdes, som `Hendelse.beskrivelse_linje` — roten i beskrivelsens kjede.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av', 'delt_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],
+        'ko.HendelseVarsling': ['av'],
         'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
         'ko.PlanlagtPause': ['ressurs', 'av', 'fra_vaktliste', 'lokasjon'],
         'ko.Programpost': ['lokasjon', 'endret_av'],

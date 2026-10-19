@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — KO-hendelsen: beskrivelsen fast i hodet, eksterne aktører som varslet, og melderen på oppdraget  `#ko/hendelseslogg`
+
+André, om hendelsesloggen: «Beskrivelse av hendelse: Kunne oppdatere hendelse. Samt at
+beskrivelsen står som fast oversikt i hendelsen. Tidskritisk informasjon», «Andre Ressurser:
+Legge inn andre eksterne ressurser, samt avkryssing på om og når de er varslet. Beskrivelse kan
+stå under plassering og over hvilke lag … Automatisk loggføres og deles til aktuelle ressurser»,
+og «av krysning på hendelser som varslet av AMK. Må komme frem i hendelsen og oppdraget».
+Fire valg ble avklart med ham før koden (19. okt.): beskrivelsen er **fortsatt en logglinje**,
+aktørlista er en **verdiliste i KO-innstillinger**, en varsling er en **logglinje delt
+automatisk**, og «varslet av AMK» betyr **AMK meldte hendelsen** (melderen, som alt fantes).
+
+**Beskrivelsen i hodet.** `Hendelse.beskrivelse_linje` peker på roten i beskrivelsens kjede, og
+hodet viser gjeldende versjon under stedet — gul kant, linjeskiftene beholdt, «oppdatert» og
+«Delt» når det gjelder. «Oppdater» (i hodet, og i «Rediger» — feltet var skjult der før) er en
+**retting** (`services.sett_beskrivelse`): det som sto før kan leses, og en delt beskrivelse
+forblir delt, så bilen får den nye teksten. Klienten sender versjonen den så; er den utdatert,
+er det **409** og ikke en stille overskriving. Uten beskrivelse — eller etter at den er fjernet
+— blir det en ny linje og ny peker. Linja er merket «Beskrivelse» i tråden. «Nytt oppdrag» arver
+nå den gjeldende versjonen som notat, ikke den første. Migrasjonen `ko/0027` fyller pekeren for
+hendelsene som alt finnes: første operatørlinje fra den som opprettet, innen ti sekunder, ikke
+linja hendelsen ble laget *fra*. **Feltet heter ikke `beskrivelse`**: det navnet bar tekstfeltet
+fra 18. sep. 2026, og `GamleFilerTests` sa fra — en KO-fil fra den dagen ville lagt teksten i en
+fremmednøkkel ved gjenoppretting.
+
+**Eksterne aktører — «Varslet:» i hodet.** Ny verdiliste `ko.EksternRessurs` under
+KO-innstillinger → «Eksterne ressurser» (`skriv_leder`), seedet med Brann, Politi, AMK og LSKO i
+hver portal. En avkryssing (`services.varsle`) gir en `HendelseVarsling` med hvem og når — tid
+valgfri, blank er nå — og en **operatørlinje «Varslet Brann» i hennes navn, delt med alle enheter
+på hendelsens oppdrag med en gang**. Ikke en systemlinje: de deles ikke, og «Brann er varslet»
+ser bilen ellers aldri. Av igjen (`angre_varsling`) sletter raden og **retter** linja til
+«Varsling av Brann angret» — rettingen arver delingen, så bilen ser at det ikke stemmer lenger.
+Idempotent (to som krysser av samtidig gir én linje), lukket hendelse tar ikke imot, inaktiv
+aktør avvises, og en id fra en annen portal er 400. Lista leses ved sidelasting.
+
+**Melderen og varslingene på oppdraget.** `oppdrag_til_dict` sender `hendelse_melder` («AMK,
+Politi») og `hendelse_varslet`, lest gjennom `Hendelse.melder_tekst()` og `varslet()` — regelen
+for melderteksten flyttet fra `ko.services` til modellen, så oppdragsmodulen fortsatt ikke
+importerer `ko`. «Meldt av: AMK · Varslet: Brann 14:32» står i sentralbordets oppdragsvindu og på
+bilens kort (aktivt og ventende). Listene prefetcher `hendelse__varslinger` (ingen spørring per
+oppdrag), endringsnummeret `oppdrag` og `logg` øker for varslingene, og ETag-en hasher hele
+svaret. Utskriften har fått kolonnen «Varslet» og beskrivelsen under hver åpen hendelse.
+
+**Ikke bygget:** «Alternativ TG (samvup/samvirke)» — uklart om det er en aktør til (en rad i
+lista) eller hvilken talegruppe hendelsen bruker (et felt). Står i TODO.
+
+Tester: `ko/tests_hendelseshode.py`, 32 — tjenestelaget, portene, migrasjonsutfyllingen, og i node
+byggerne pluss de ekte kallstedene (`koTegnDetalj`, bilens `renderAktivt`/`renderVentende`).
+Avkryssingen prøves gjennom `hendelseArgumenter`, fordi delegeringen sender `el.value` og ikke
+`checked`: boksen bærer tilstanden et trykk gir. Mutanter: 41, alle drept til slutt. Fire overlevde første runde, og alle fire sa noe: «tom beskrivelse» og standardlista i hver portal hadde for svake tester (den første krever nå meldingen, den andre tømmer lista først — testbasen var alt seedet); `varsle` validerte tida to ganger (raden får nå linjas tidspunkt), og migrasjonens `exclude` av linja hendelsen ble laget fra var død — tidsvinduet utelukker den alt. De to døde reglene er fjernet.
+
 ## 2026-10-18 — Pasienttavla: dra og slipp pasientene mellom soner og senger, som på KO-tavla
 
 André: «I /pasienter/ tavlen kan vi få den til å være drag/drop slik vi har i /ko/ tavlen?»

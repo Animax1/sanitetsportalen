@@ -270,6 +270,12 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # verken lagmodellen eller loggen, og skal ikke gjøre det.
         'hendelse_prioritet': oppdrag.hendelse.prioritet if oppdrag.hendelse_id else '',
         'hendelse_lag': oppdrag.hendelse.lag_navn() if oppdrag.hendelse_id else [],
+        # Hvem som meldte hendelsen og hvilke eksterne ressurser som er varslet
+        # (KO, 19. okt. 2026: «Må komme frem i hendelsen og oppdraget»). Lest
+        # gjennom to metoder til, som lagene; kalleren prefetcher
+        # `hendelse__varslinger`.
+        'hendelse_melder': oppdrag.hendelse.melder_tekst() if oppdrag.hendelse_id else '',
+        'hendelse_varslet': oppdrag.hendelse.varslet() if oppdrag.hendelse_id else [],
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if (skjul_fritekst or utlopt) else oppdrag.fritekst

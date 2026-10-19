@@ -116,6 +116,22 @@ function _oppdragRadHtml(o) {
 // oppdraget (`delte_linjer`). På `/ko/` tegner KO blokka selv gjennom
 // `koDelteLinjerHtml()` — der står også de interne linjene, med «Del» —
 // og kallet går gjennom en vakt fordi `ko.js` er betinget lastet.
+// Hvem som meldte hendelsen, og hvilke eksterne ressurser KO har varslet
+// (19. okt. 2026: «Må komme frem i hendelsen og oppdraget»). Samme innhold
+// som bilens `hendelseinfoBlokk` i oppdrag-enhet.js, som ikke laster denne.
+function _hendelseinfoHtml(o) {
+  if (!o.hendelse_id) return '';
+  const melder = String(o.hendelse_melder || '');
+  const varslet = Array.isArray(o.hendelse_varslet) ? o.hendelse_varslet : [];
+  const deler = [];
+  if (melder) deler.push('<span><i class="bi bi-megaphone me-1"></i>Meldt av: <b>' + escapeHtml(melder) + '</b></span>');
+  if (varslet.length) {
+    deler.push('<span><i class="bi bi-broadcast me-1"></i>Varslet: '
+      + varslet.map((v) => escapeHtml(v.navn) + ' ' + escapeHtml(klokke(v.tid))).join(', ') + '</span>');
+  }
+  return deler.length ? '<div class="oppdrag-meta oppdrag-hendelseinfo mb-2 d-flex flex-wrap gap-3">' + deler.join('') + '</div>' : '';
+}
+
 function _delteLinjerHtml(o) {
   if (!o.hendelse_id) return '';
   if (typeof koDelteLinjerHtml === 'function') return koDelteLinjerHtml(o);
@@ -488,6 +504,7 @@ async function visOppdrag(id) {
   const lagBlokk = lagNavn
     ? `<div class="oppdrag-meta oppdrag-lag mb-2"><i class="bi bi-people me-1"></i>Lag: ${escapeHtml(lagNavn)}</div>`
     : '';
+  const hendelseinfo = _hendelseinfoHtml(o);
   const beskrivelse = _delteLinjerHtml(o);
   const slettKnapp = o.kan_slettes
     ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
@@ -501,6 +518,7 @@ async function visOppdrag(id) {
     <div class="oppdrag-verdier mb-2" id="oppdrag-verdier">${_verdierHtml(o, null, OPPDRAG_TILGANG.kanSkrive)}</div>
     <div class="text-danger small mb-2 d-none" id="verdi-feil"></div>
     ${hendelseValg}
+    ${hendelseinfo}
     ${lagBlokk}
     ${beskrivelse}
     <div id="oppdrag-notat">${_notatHtml(o, false, OPPDRAG_TILGANG.kanSkrive)}</div>

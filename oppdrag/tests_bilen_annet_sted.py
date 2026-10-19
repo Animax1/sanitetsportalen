@@ -26,7 +26,7 @@ class AnnetStedOverleverPollingenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
         (OPPDRAG_ENHET_JS, ('lastMine', 'renderAlt', 'renderAktivt', 'stedfeltetErApent',
-                            'harNyDelt', 'erNyDelt', 'delteLinjerBlokk',
+                            'harNyDelt', 'erNyDelt', 'delteLinjerBlokk', 'hendelseinfoBlokk',
                             'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel',
                             'tidslinjeEnhetHtml', 'hastegradKlasse', '_stedvalg',
                             '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',

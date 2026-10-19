@@ -1530,7 +1530,7 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('velgTekst', 'velgValg', 'escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  'tidslinjeHtml', 'enhetshendelseTekst', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
+                                  'tidslinjeHtml', 'enhetshendelseTekst', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml', '_hendelseinfoHtml',
                                   'flyttFraEnheter', 'enhetAvventer',
                                   '_flyttValg', '_verdierHtml', '_verdiBrikke', '_verdiKanEndres',
                                   '_verdiTekst', '_notatHtml', 'endringTekst')),

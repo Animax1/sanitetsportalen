@@ -488,6 +488,7 @@ function renderAktivt() {
     const lagBlokk = lagNavn
       ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
       : '';
+    const hendelseinfo = hendelseinfoBlokk(o);
     // Linjene KO har delt fra loggen i hendelsen, med hvem og når. Det som
     // er delt det siste minuttet står gult (`erNyDelt`). Rader bygget før
     // mal-strengen (skanneren ser ikke inn i en nøstet).
@@ -539,6 +540,7 @@ function renderAktivt() {
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
       ${udefinert}
       ${_varsledeRad(o)}
+      ${hendelseinfo}
       ${lagBlokk}
       ${beskrivelseBlokk}
       ${fritekstBlokk}
@@ -580,6 +582,7 @@ function renderVentende() {
     const lagBlokk = lagNavn
       ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
       : '';
+    const hendelseinfo = hendelseinfoBlokk(o);
     // Linjene KO har delt fra loggen i hendelsen, med hvem og når. Det som
     // er delt det siste minuttet står gult (`erNyDelt`). Rader bygget før
     // mal-strengen (skanneren ser ikke inn i en nøstet).
@@ -606,6 +609,7 @@ function renderVentende() {
       </div>
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
       ${_varsledeRad(o)}
+      ${hendelseinfo}
       ${lagBlokk}
       ${beskrivelseBlokk}
       ${fritekstBlokk}
@@ -1611,6 +1615,23 @@ function erNyDelt(deltAt, naa) {
   const t = Date.parse(deltAt || '');
   if (isNaN(t)) return false;
   return (naa === undefined ? Date.now() : naa) - t < NY_DELT_MS;
+}
+
+// Hvem som meldte hendelsen, og hvilke eksterne ressurser KO har varslet
+// (19. okt. 2026: «Må komme frem i hendelsen og oppdraget»). Tom uten
+// hendelse, eller når ingen av delene er ført. Sentralbordet har sin egen
+// (`_hendelseinfoHtml`): denne sida laster ikke `oppdrag-kort.js`.
+function hendelseinfoBlokk(o) {
+  if (!o.hendelse_id) return '';
+  const melder = String(o.hendelse_melder || '');
+  const varslet = Array.isArray(o.hendelse_varslet) ? o.hendelse_varslet : [];
+  const deler = [];
+  if (melder) deler.push('<span><i class="bi bi-megaphone me-1"></i>Meldt av: <b>' + escapeHtml(melder) + '</b></span>');
+  if (varslet.length) {
+    deler.push('<span><i class="bi bi-broadcast me-1"></i>Varslet: '
+      + varslet.map((v) => escapeHtml(v.navn) + ' ' + escapeHtml(klokke(v.tid))).join(', ') + '</span>');
+  }
+  return deler.length ? '<div class="oppdrag-meta oppdrag-hendelseinfo mb-1 d-flex flex-wrap gap-3">' + deler.join('') + '</div>' : '';
 }
 
 function delteLinjerBlokk(o, naa) {

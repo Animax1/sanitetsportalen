@@ -21,8 +21,8 @@ from .kartkobling import meld_lag
 from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
-    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, HendelseLest, Linjedeling,
-    Logglinje,
+    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, HendelseLest, HendelseVarsling,
+    Linjedeling, Logglinje,
 )
 
 
@@ -685,15 +685,9 @@ def rens_melder(typer, tekst) -> tuple[list[str], str]:
 
 
 def melder_tekst(hendelse) -> str:
-    """«Egen ressurs, Andre (arrangørvakt)» — slik melderen leses. Bygges
-    her og ikke i nettleseren, så utskriften og skjermen sier det samme."""
-    deler = []
-    for kode in hendelse.melder_typer or []:
-        navn = MELDER_NAVN.get(kode, kode)
-        if kode == MELDER_ANDRE and hendelse.melder:
-            navn += f' ({hendelse.melder})'
-        deler.append(navn)
-    return ', '.join(deler)
+    """«Egen ressurs, Andre (arrangørvakt)». Regelen står på modellen
+    (`Hendelse.melder_tekst`) fra 19. okt. 2026, så oppdraget leser den samme."""
+    return hendelse.melder_tekst()
 
 
 def lag_som_kan_velges(vakt, hendelse=None):
@@ -820,9 +814,116 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     if lagene:
         sett_lag(hendelse, [r.pk for r in lagene], bruker=bruker, logg=False)
     if beskrivelse:
-        skriv_linje(vakt, beskrivelse, bruker=bruker, hendelse=hendelse)
+        hendelse.beskrivelse_linje = skriv_linje(vakt, beskrivelse, bruker=bruker, hendelse=hendelse)
+        hendelse.save(update_fields=['beskrivelse_linje'])
     bli_med(hendelse, bruker)
     return hendelse
+
+
+# ── Beskrivelsen i hodet (19. okt. 2026) ─────────────────────────────────────
+#
+# «Kunne oppdatere … beskrivelsen står som fast oversikt i hendelsen.
+# Tidskritisk informasjon» (André). Beskrivelsen er fortsatt en logglinje —
+# valget fra 19. sep. står, og André bekreftet det 19. okt.: en oppdatering er
+# en **retting** i kjeden, så hvem som endret hva og når kan leses etterpå, og
+# en delt beskrivelse forblir delt (rettingen arver delingen).
+
+def gjeldende_i_kjeden(rot):
+    """Kjedens gjeldende ledd: det som ikke er rettet. `None` uten rot."""
+    if rot is None:
+        return None
+    return (Logglinje.objects.filter(_kjeden_q(rot), korrigert_av__isnull=True)
+            .order_by('-id').first())
+
+
+@transaction.atomic
+def sett_beskrivelse(hendelse, raa_tekst, *, bruker, sett_linje=None) -> Logglinje:
+    """Skriv eller oppdater beskrivelsen. Returnerer linja slik den nå står.
+
+    Har hendelsen ingen (eller er den fjernet med sletteinngangen), blir det
+    en ny linje som hodet peker på. Ellers rettes det gjeldende leddet.
+
+    **`sett_linje` er linja klienten så**, som `versjon` i hodet: er
+    beskrivelsen oppdatert av noen andre siden, er det 409 og ikke en stille
+    overskriving — tidskritisk tekst er nøyaktig den som ikke skal forsvinne.
+    Utelatt betyr «rett det som står», som API-et ellers.
+    """
+    tekst = _rens_kort(raa_tekst, MAKS_BESKRIVELSE, 'Beskrivelsen')
+    if not tekst:
+        raise Ugyldig('Beskrivelsen kan ikke være tom.')
+    gjeldende = gjeldende_i_kjeden(hendelse.beskrivelse_linje)
+    if gjeldende is None or gjeldende.er_fjernet:
+        ny = skriv_linje(hendelse.vakt, tekst, bruker=bruker, hendelse=hendelse)
+        hendelse.beskrivelse_linje = ny
+        hendelse.save(update_fields=['beskrivelse_linje'])
+        return ny
+    if sett_linje not in (None, '') and str(sett_linje) != str(gjeldende.pk):
+        raise AlleredeKorrigert('Beskrivelsen er oppdatert av noen andre — '
+                                'les den nye før du endrer.')
+    ny = korriger(gjeldende, bruker=bruker, tekst=tekst)
+    bli_med(hendelse, bruker)
+    return ny
+
+
+# ── Eksterne ressurser: varslet eller ikke (19. okt. 2026) ───────────────────
+#
+# «Legge inn andre eksterne ressurser, samt avkryssing på om og når de er
+# varslet … Automatisk loggføres og deles til aktuelle ressurser» (André).
+# Raden er tilstanden; linja er det loggen og bilene ser. Linja er en
+# **operatørlinje** i hennes navn og ikke en systemlinje: det er det hun ville
+# skrevet selv, den skal kunne deles (systemlinjer deles ikke — bilene ser
+# statusene sine selv, mens «Brann varslet» ser de ellers aldri), og den kan
+# rettes som alt annet hun skriver.
+
+def _varslingstekst(navn) -> str:
+    return f'Varslet {navn}'
+
+
+def _angretekst(navn) -> str:
+    return f'Varsling av {navn} angret'
+
+
+@transaction.atomic
+def varsle(hendelse, ressurs, *, bruker, tidspunkt=None, naa=None) -> HendelseVarsling:
+    """Kryss av at `ressurs` er varslet. Idempotent: er den alt varslet,
+    står den første avkryssingen — to operatører som trykker samtidig skal
+    ikke få to linjer i loggen."""
+    if hendelse.er_lukket:
+        raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
+    if ressurs is None or not ressurs.er_aktiv:
+        raise Ugyldig('Ukjent eller inaktiv ekstern aktør.')
+    finnes = hendelse.varslinger.filter(ressurs=ressurs).first()
+    if finnes is not None:
+        return finnes
+    # Tida prøves av `skriv_linje` (`vurder_tidspunkt`), og raden får linjas:
+    # én regel for hva som er lov, og raden og loggen sier det samme.
+    linje = skriv_linje(hendelse.vakt, _varslingstekst(ressurs.navn), bruker=bruker,
+                        tidspunkt=tidspunkt, hendelse=hendelse, naa=naa)
+    del_linje(linje, bruker=bruker, naa=naa)
+    return HendelseVarsling.objects.create(
+        hendelse=hendelse, ressurs=ressurs, navn=ressurs.navn, varslet_at=linje.tidspunkt,
+        av=bruker if bruker and getattr(bruker, 'is_authenticated', False) else None,
+        av_navn=getattr(bruker, 'username', '') or '', linje=linje)
+
+
+@transaction.atomic
+def angre_varsling(hendelse, ressurs_id, *, bruker) -> bool:
+    """Ta avkryssingen bort. Raden slettes, og linja **rettes** til «…
+    angret»: rettingen arver delingen, så bilen som så «Varslet Brann» ser at
+    det ikke stemmer lenger — en slettet linje ville bare forsvunnet fra
+    skjermen hennes. Returnerer om noe ble gjort."""
+    if hendelse.er_lukket:
+        raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
+    rad = hendelse.varslinger.filter(ressurs_id=ressurs_id).first()
+    if rad is None:
+        return False
+    gjeldende = gjeldende_i_kjeden(rad.linje)
+    if gjeldende is not None and not gjeldende.er_fjernet \
+            and gjeldende.tekst != _angretekst(rad.navn):
+        korriger(gjeldende, bruker=bruker, tekst=_angretekst(rad.navn))
+    rad.delete()
+    bli_med(hendelse, bruker)
+    return True
 
 
 @transaction.atomic
@@ -1136,7 +1237,7 @@ def hendelser_for(vakt):
               apne_oppdrag=models.Count(
                   'oppdrag', distinct=True,
                   filter=~Q(oppdrag__status=choices.TERMINAL)))
-          .prefetch_related('deltakere', 'lag')
+          .prefetch_related('deltakere', 'lag', 'varslinger')
           .order_by('-hendelsesnummer'))
     return list(qs)
 
@@ -1151,7 +1252,7 @@ def hendelse_med_telling(hendelse):
                 apne_oppdrag=models.Count(
                     'oppdrag', distinct=True,
                     filter=~Q(oppdrag__status=choices.TERMINAL)))
-            .prefetch_related('deltakere', 'lag')
+            .prefetch_related('deltakere', 'lag', 'varslinger')
             .get())
 
 

@@ -78,7 +78,7 @@ HTML_BUILDERS_PER_FIL = {
         # «Fra loggen i H14» (KO, 19. sep. 2026): linjene KO har delt, med
         # hvem og når, i detaljmodalen. Lagene står som en const i raden og i
         # `visOppdrag`, som notatet.
-        '_delteLinjerHtml',
+        '_delteLinjerHtml', '_hendelseinfoHtml',
         # «Flytt» (19. sep. 2026): fra/til, bare enheter på vakt.
         '_flyttValg',
         'flyttFraEnheter',
@@ -92,7 +92,7 @@ HTML_BUILDERS_PER_FIL = {
         'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
         'renderAvsluttet',
         # «Fra loggen i H14» i bilen (19. sep. 2026), gul i ett minutt.
-        'delteLinjerBlokk',
+        'delteLinjerBlokk', 'hendelseinfoBlokk',
         '_varsledeRad',
     ),
 }
@@ -115,6 +115,8 @@ REVIEWED_INTERPOLATIONS = {
     # «Fra loggen i H14» (19. sep. 2026): blokka i bilen bygges av
     # `delteLinjerBlokk()`, som skannes for seg.
     'beskrivelseBlokk': 'ferdig markup fra delteLinjerBlokk(), som skannes for seg',
+    # Melder og varslede eksterne aktører (KO, 19. okt. 2026).
+    'hendelseinfo': 'ferdig markup fra hendelseinfoBlokk()/_hendelseinfoHtml(), som skannes for seg',
     # «Flytt» (19. sep. 2026): de to fragmentene bygges rett over med
     # escapeHtml/escHtmlValue inni, og `flyttValg` er ferdig markup fra
     # `_flyttValg()`, som skannes for seg.
@@ -548,7 +550,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'hendelseinfoBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )
@@ -796,7 +798,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         INNLOGGET,
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'stedfeltetErApent', 'delteLinjerBlokk', 'hendelseinfoBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall',

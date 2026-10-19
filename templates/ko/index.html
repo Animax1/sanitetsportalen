@@ -46,6 +46,7 @@
   window.KO_KOPI_MS = {{ ko_kopi_minutter }} * 60 * 1000;
   window.KO_PRIORITETER = {{ prioriteter_json }};
   window.KO_MELDER_VALG = {{ melder_valg_json }};
+  window.KO_EKSTERNE = {{ eksterne_json }};
   window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
 </script>
 
@@ -606,7 +607,7 @@
           <div class="mb-3" id="ko-h-beskrivelse-blokk">
             <label class="form-label" for="ko-h-beskrivelse">Beskrivelse</label>
             <textarea id="ko-h-beskrivelse" class="form-control" rows="3" maxlength="{{ ko_maks_tekst }}"></textarea>
-            <div class="form-text">Blir første linje i loggen i hendelsen, og oppdragsnotatet i nye oppdrag. Intern til den deles.</div>
+            <div class="form-text">Står fast i hodet og er første linje i loggen i hendelsen. En endring lagres som en retting, så loggen viser hva som sto før. Blir oppdragsnotatet i nye oppdrag. Intern til den deles.</div>
           </div>
           <div class="mb-3">
             <div class="form-label">Prioritet</div>

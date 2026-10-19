@@ -427,6 +427,19 @@ class Hendelse(models.Model):
         Logglinje, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='hendelser_opprettet_fra', verbose_name='Opprettet fra linje')
 
+    #: **Beskrivelsen står fast i hodet** (André, 19. okt. 2026: «beskrivelsen
+    #: står som fast oversikt i hendelsen … tidskritisk informasjon»). Den er
+    #: fortsatt en logglinje — valget fra 19. sep. står: en oppdatering er en
+    #: retting i kjeden, og «hva er nytt, og hvem skrev det» kan besvares.
+    #: Pekeren går til **kjedens rot**, som aldri endres; gjeldende versjon er
+    #: den som ikke er rettet (`koLinjer` er nøklet på rot, så klienten slår den
+    #: opp uten et kall til). `services.sett_beskrivelse` er den ene skriveren.
+    #: **Ikke `beskrivelse`**: det navnet bar tekstfeltet fra 18. sep., og
+    #: KO-filer fra den dagen ligger offsite med det (`UTGAATTE_FELT`).
+    beskrivelse_linje = models.ForeignKey(
+        Logglinje, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Beskrivelse (kjedens første linje)')
+
     lukket_at = models.DateTimeField(null=True, blank=True, verbose_name='Lukket')
     lukket_av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -505,6 +518,27 @@ class Hendelse(models.Model):
                         if l.hendelse_id == hendelse_id
                         and (l.delt_at is not None or l.pk in mine)]
         return ut
+
+    def melder_tekst(self) -> str:
+        """«AMK, Andre (arrangørvakt)» — slik melderen leses. Bygges på
+        serveren og ikke i nettleseren, så utskriften, KO og oppdraget sier det
+        samme. På modellen (19. okt. 2026) fordi oppdragsmodulen leser den
+        gjennom `Oppdrag.hendelse` og ikke kjenner `ko.services`."""
+        deler = []
+        for kode in self.melder_typer or []:
+            navn = MELDER_NAVN.get(kode, kode)
+            if kode == MELDER_ANDRE and self.melder:
+                navn += f' ({self.melder})'
+            deler.append(navn)
+        return ', '.join(deler)
+
+    def varslet(self) -> list[dict]:
+        """De eksterne ressursene som er varslet, i den rekkefølgen de ble det:
+        `[{navn, tid}]` — rekkefølgen er `HendelseVarsling.Meta.ordering`, som
+        også gjelder en prefetch. Frosset navn, som `lag_navn`. Leses av
+        oppdragsmodulen gjennom `Oppdrag.hendelse`; kalleren prefetcher
+        `hendelse__varslinger`."""
+        return [{'navn': v.navn, 'tid': v.varslet_at.isoformat()} for v in self.varslinger.all()]
 
     def lag_navn(self) -> list[str]:
         """Navnene på lagene som er på hendelsen, i den rekkefølgen de kom.
@@ -916,6 +950,76 @@ class Kjennetegn(PortalEid):
 
     def __str__(self):
         return self.navn
+
+
+class EksternRessurs(PortalEid):
+    """Andre etater og ressurser KO kan varsle — Brann, Politi, AMK, TG
+    (Samvirke) … (André, 19. okt. 2026).
+
+    **En verdiliste KO-leder setter opp, ikke en fast tuppel** som `MELDER_VALG`:
+    hvem man samvirker med, varierer fra arrangement til arrangement (svaret
+    på spørsmålet, 19. okt.). Samme form som `Kjennetegn`. Varslingen fryser
+    navnet (`HendelseVarsling.navn`), så en omdøpt rad skriver ikke om
+    historikken.
+    """
+
+    navn = models.CharField(max_length=60, verbose_name='Ekstern aktør')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Ekstern aktør'
+        verbose_name_plural = 'Eksterne ressurser'
+        ordering = ['rekkefolge', Norsk('navn')]
+        constraints = [models.UniqueConstraint(fields=['portal', 'navn'],
+                                               name='ko_eksternressurs_navn_per_portal')]
+
+    def __str__(self):
+        return self.navn
+
+
+class HendelseVarsling(models.Model):
+    """At en ekstern ressurs **er varslet** om hendelsen, og når (19. okt. 2026).
+
+    Avkryssingen i hodet. Raden er tilstanden («Brann er varslet 14:32»), og
+    `linje` er logglinja som ble skrevet og **delt med enhetene** i samme
+    lagring — det er den bilene ser i «Fra KO», og den står i loggen etter at
+    raden er borte. Fjernes avkryssingen, slettes raden og linja **rettes**
+    til «… angret»: en retting arver delingen, så bilen ser at det ikke
+    stemte lenger, og loggen viser begge. `services.varsle`/`angre_varsling`.
+
+    Én rad per ressurs per hendelse. Navnet fryses, som `HendelseLag`.
+    """
+
+    hendelse = models.ForeignKey(
+        Hendelse, on_delete=models.CASCADE, related_name='varslinger',
+        verbose_name='Hendelse')
+    ressurs = models.ForeignKey(
+        EksternRessurs, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='varslinger', verbose_name='Ekstern aktør')
+    navn = models.CharField(max_length=60, verbose_name='Ressurs (navn)')
+    varslet_at = models.DateTimeField(verbose_name='Varslet')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_varslinger',
+        verbose_name='Krysset av')
+    av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Krysset av (navn)')
+    linje = models.ForeignKey(
+        Logglinje, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Logglinja')
+
+    class Meta:
+        verbose_name = 'Varsling på hendelse'
+        verbose_name_plural = 'Varslinger på hendelser'
+        ordering = ['varslet_at', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['hendelse', 'ressurs'],
+                                    name='en_varsling_per_ressurs_per_hendelse'),
+        ]
+
+    def __str__(self):
+        return f'{self.navn} varslet på H{self.hendelse.hendelsesnummer}'
 
 
 class Programpost(models.Model):
