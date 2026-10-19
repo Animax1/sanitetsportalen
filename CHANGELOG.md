@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Testtida, fase 1: `verifiser_backup` migrerer én gang, dokumenttestene cacher parsingen  `#core/tester`
+
+André bestilte en analyse av testoppsettet: «mål kjøretid per testtype og de tregeste testene», og
+en nivådelt plan. Målt mot lokal PostgreSQL 16 samme morgen: **hele suiten serielt 840 s**,
+CI-formen **143 s parallelt + 329 s `core` serielt + 83 s migrasjonsprøver ≈ 9 min**. 38 tester
+(0,6 %) sto for 24 % av tida, og to av dem var hele forskjellen:
+
+- **`core.tests_verifiser_backup`: 141 s → 47 s.** Hver av de ti testene kjørte `migrate` mot sin
+  egen engangsbase i en underprosess (om lag 17 s), og de lå i `core` — CI-steget som går
+  serielt. Nå migreres én mal i `setUpClass`, og kommandoens `migrate`-steg kopierer den.
+  Gjenopprettingen, tellingen og opprydningen er like ekte som før. **Én test går hele veien**
+  (`EKTE_MIGRATE`), og en annen krever at kommandoen ba om migreringen nøyaktig én gang.
+  Prodkoden er urørt. Punktet «`verifiser_backup` er 47 sekunder» er slettet fra TODO.
+- **`core.tests_testkommandoen`: 36 s → 3 s, dokumenttestene 51 s → 21 s veggtid** (5 s tester,
+  resten er testbasen). `_leser_markdown` ble kalt 2 963 ganger for om lag 500 filer: hver
+  prosjektmodul en testfil importerer ble parset på nytt for hver testfil. Svaret caches nå
+  per fil, med `mtime` i nøkkelen. Den tregeste testen i «den raske kjøringen» var vakten som
+  holder den rask.
+- **`patients/tests_backup.py` rører ikke en ekte `BACKUP_DIR` lenger.** Tre klasser brukte
+  `os.environ.get('BACKUP_DIR', '/tmp/test-backups-…')`, så på en maskin med variabelen satt
+  slettet tearDown `backup-*.json.gz` i den ekte mappa. Nå en fersk `mkdtemp` per test.
+- **`sleep(1.1)` fjernet** fra `test_endring_gir_ny_auto_backup`. Den skulle gi unike filnavn
+  med sekundoppløsning, men filnavnet har hatt mikrosekunder (`%f`) en stund — søvnen var død.
+
+Mutasjoner, 2 av 2 drept: kommandoen slutter å kalle `migrate` (7 tester røde), og en
+dokumenttest fjernet fra kommandoen i CLAUDE.md (rød).
+
 ## 2026-10-19 — KO-hendelsen: talegruppa (TG) i Nødnett, satt i hodet og delt med bilene når KO vil  `#ko/hendelseslogg`
 
 André: «TG er talegruppe som vi bruker i nødnett. Bør være en innstilling koleder/moderator/admin

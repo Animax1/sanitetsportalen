@@ -1215,11 +1215,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 ### Løse punkter
 
-- [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
-      (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er
-      riktig for det den prøver, men prisen betales av hver eneste kjøring. Vurder et
-      tag-skille så den bare kjøres når backupkoden endres. **Ikke bare slett den:** den
-      er den ene testen som svarer på om *innholdet* i backupfilene duger.
 - [ ] **`core/tests_backup.py` tåler ikke `--parallel`.** Testene skriver ekte filer til
       én backupmappe og rører det globale handlerregisteret. Feilen kommer ut som
       «cannot pickle 'traceback' object», som ikke ligner det den er. Så lenge den står,

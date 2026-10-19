@@ -8,17 +8,27 @@ annet spørsmål: en backup ingen har gjenopprettet er en hypotese.
 Testene her kjører kommandoen med ekte underprosesser mot en ekte
 engangs-SQLite-fil. Det gjør dem tregere enn resten av suiten, og det er
 poenget — det er nettopp underprosessen og filstien som skal prøves.
+
+**Men `migrate` kjøres én gang per klasse, ikke per test** (19. okt. 2026). Hver
+test migrerte sin egen engangsbase, om lag 17 s, og de ti sto for 141 av 329
+sekunder i `core` — CI-steget som går serielt. Nå migreres én mal i
+`setUpClass`, og kommandoens `migrate`-steg kopierer den. Gjenopprettingen,
+tellingen og opprydningen er like ekte som før. **Én test går hele veien**
+(`EKTE_MIGRATE`): ellers kunne kommandoen sluttet å migrere uten at noe ble rødt.
 """
 from __future__ import annotations
 
 import gzip
 import json
 import os
+import shutil
+import tempfile
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
 from django.core.management import call_command
+from core.management.commands.verifiser_backup import Command as VerifiserBackup
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
@@ -37,13 +47,43 @@ def _backup_dir() -> Path:
     return TEST_BACKUP_DIR
 
 
+_EKTE_UNDERPROSESS = VerifiserBackup._underprosess
+
+#: Testen som kjører kommandoens egen `migrate`. Resten får malen.
+EKTE_MIGRATE = 'test_modulfilene_lastes_og_radene_stemmer'
+
+
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class VerifiserBackupTests(TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        mappe = Path(tempfile.mkdtemp(prefix='verifiser-mal-'))
+        cls.addClassCleanup(shutil.rmtree, mappe, ignore_errors=True)
+        cls.malbase = mappe / 'mal.sqlite3'
+        miljo = VerifiserBackup.engangsmiljo(os.environ, basefil=cls.malbase,
+                                             backup_dir=mappe)
+        _EKTE_UNDERPROSESS(VerifiserBackup(), miljo,
+                           ['migrate', '--noinput', '-v', '0'], 'migrate av malen')
+
+    def _underprosess_med_mal(self, kommando, miljo, argumenter, hva):
+        if argumenter[0] != 'migrate':
+            return _EKTE_UNDERPROSESS(kommando, miljo, argumenter, hva)
+        self.migreringer.append(miljo['DATABASE_URL'])
+        shutil.copyfile(self.malbase, miljo['DATABASE_URL'].removeprefix('sqlite:///'))
+        return ''
 
     def setUp(self) -> None:
         registrer_alle_moduler()
         self.backup_dir = _backup_dir()
         self.miljo = patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)})
+        self.migreringer: list[str] = []
+        if self._testMethodName != EKTE_MIGRATE:
+            mal = patch.object(VerifiserBackup, '_underprosess', autospec=True,
+                               side_effect=self._underprosess_med_mal)
+            mal.start()
+            self.addCleanup(mal.stop)
 
     def _kall(self, *args):
         ut = StringIO()
@@ -155,6 +195,8 @@ class VerifiserBackupTests(TestCase):
         ut = self._kall()
         self.assertIn('Ingen fil for:', ut)
         self.assertIn('samme antall rader', ut)
+        # Malen ble kopiert inn i stedet for at kommandoen migrerte — én gang.
+        self.assertEqual(len(self.migreringer), 1)
 
     def test_rorer_ikke_den_ekte_backupmappa(self) -> None:
         """Gjenopprettingen lager pre-restore-øyeblikksbilder. De skal havne i

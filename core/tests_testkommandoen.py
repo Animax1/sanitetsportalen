@@ -19,6 +19,7 @@ skal lete er alltid et sted færre enn der koden er.**
 from __future__ import annotations
 
 import ast
+import functools
 import re
 from pathlib import Path
 
@@ -115,8 +116,17 @@ def _leser_markdown(sti: Path) -> bool:
     Docstringene teller ikke: `patients.tests_choices` *nevner*
     personverndokumentet uten å lese det.
     """
+    return _leser_markdown_cachet(str(sti), sti.stat().st_mtime_ns)
+
+
+#: **Svaret caches per fil** (19. okt. 2026). En prosjektmodul som `core/changelog.py`
+#: importeres av mange testfiler, og ble parset på nytt for hver av dem: 2 963 kall for
+#: om lag 500 filer, 18 s per test og 36 s for klassen — mer enn resten av
+#: dokumenttestene til sammen. `mtime` er med i nøkkelen, så en endret fil leses på nytt.
+@functools.lru_cache(maxsize=None)
+def _leser_markdown_cachet(sti: str, _mtime: int) -> bool:
     try:
-        tre = ast.parse(sti.read_text(encoding='utf-8'))
+        tre = ast.parse(Path(sti).read_text(encoding='utf-8'))
     except (SyntaxError, UnicodeDecodeError):
         return False
     docs = _uten_docstrings(tre)
@@ -125,9 +135,16 @@ def _leser_markdown(sti: Path) -> bool:
                for n in ast.walk(tre))
 
 
-def _prosjektimporter(sti: Path) -> list[Path]:
+def _prosjektimporter(sti: Path) -> tuple[Path, ...]:
     """Prosjektfilene en testfil importerer, som `core/changelog.py` —
     `tests_changelog` leser CHANGELOG gjennom den, ikke selv."""
+    return _prosjektimporter_cachet(str(sti), sti.stat().st_mtime_ns)
+
+
+@functools.lru_cache(maxsize=None)
+def _prosjektimporter_cachet(sti: str, _mtime: int) -> tuple[Path, ...]:
+    """Tuppel, ikke liste: svaret deles mellom alle som spør."""
+    sti = Path(sti)
     rot = Path(settings.BASE_DIR)
     ut = []
     for node in ast.walk(ast.parse(sti.read_text(encoding='utf-8'))):
@@ -142,7 +159,7 @@ def _prosjektimporter(sti: Path) -> list[Path]:
                 kandidat = rot / f"{navn.name.replace('.', '/')}.py"
                 if kandidat.is_file():
                     ut.append(kandidat)
-    return ut
+    return tuple(ut)
 
 
 def _dokumenttestene_utledet() -> set[str]:

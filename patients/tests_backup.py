@@ -5,6 +5,8 @@ Kjør med: python manage.py test patients.tests_backup
 import gzip
 import json
 import os
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,6 +20,18 @@ from core.models import Backup
 from core.backup import create_backup as _core_create_backup, enforce_cap
 from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
+
+
+def _egen_mappe(test) -> Path:
+    """En fersk mappe per test, slettet etterpå (19. okt. 2026).
+
+    Var `os.environ.get('BACKUP_DIR', '/tmp/test-backups-…')`: med `BACKUP_DIR`
+    satt på maskinen slettet tearDown `backup-*.json.gz` i den ekte mappa, og
+    de faste stiene ble delt av alle prosessene under `--parallel`.
+    """
+    mappe = Path(tempfile.mkdtemp(prefix='test-backups-'))
+    test.addCleanup(shutil.rmtree, mappe, ignore_errors=True)
+    return mappe
 
 
 
@@ -56,8 +70,7 @@ class BackupServiceTests(TestCase):
         )
         gi_standardtilgang(self.admin, 'admin')
         # Bruk en unik testmappe for backupfiler
-        self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-backup'))
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.backup_dir = _egen_mappe(self)
 
     def tearDown(self):
         """Rydd opp testfiler etter testen."""
@@ -277,8 +290,7 @@ class BackupResetIntegrationTests(TestCase):
             must_change_password=False,
         )
         gi_standardtilgang(self.admin, 'admin')
-        self.backup_dir = Path('/tmp/test-backups-reset')
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.backup_dir = _egen_mappe(self)
         sett_aktiv_vakt(2026)
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026))
 
@@ -316,8 +328,7 @@ class BackupContentHashSkipTests(TestCase):
             must_change_password=False,
         )
         gi_standardtilgang(self.admin, 'admin')
-        self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-hash'))
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.backup_dir = _egen_mappe(self)
 
     def tearDown(self):
         for f in self.backup_dir.glob('backup-*.json.gz'):
@@ -349,7 +360,6 @@ class BackupContentHashSkipTests(TestCase):
 
     def test_endring_gir_ny_auto_backup(self):
         """Etter dataendring skal neste auto-backup lagres som vanlig."""
-        import time as _time
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             first = create_backup(kind='auto', note='Før endring')
             self.assertIsNotNone(first)
@@ -358,11 +368,8 @@ class BackupContentHashSkipTests(TestCase):
             Patient.objects.create(pasientnummer=42, vakt=vakt_for_year(2026),
                                     problemstilling='Ny pasient for hash-test')
 
-            # Sov 1.1 s slik at filnavn-tidsstemplet (med sekund-uppløsning)
-            # blir unikt mellom de to backupene. I prod er intervallet alltid
-            # mye større, så dette er kun en test-artefakt.
-            _time.sleep(1.1)
-
+            # Ingen søvn: filnavnet har mikrosekunder siden `%f` kom inn i
+            # `core/backup/service.py`, så to backuper i samme sekund er to filer.
             second = create_backup(kind='auto', note='Etter endring')
 
         self.assertIsNotNone(second, 'Etter endring skal ny auto-backup lagres')
