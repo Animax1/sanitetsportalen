@@ -718,6 +718,11 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
+- [ ] **Løpende posisjon fra bilene, og «Hent posisjon» fra KO** — planen står i
+      [`docs/PLAN_LOPENDE_POSISJON.md`](./docs/PLAN_LOPENDE_POSISJON.md) (19. okt. 2026).
+      Akutt og haster hvert 30. sekund, ellers hvert 5. minutt, justerbart per hastegrad og
+      «uten oppdrag» av admin; KO henter én eller alle. Fire spørsmål til André i §6 før steg 1,
+      og personvern A.6 skrives om (og DPIA vurderes) før hovedbryteren slås på i prod.
 - [ ] **Eksterne aktører i «Ny hendelse»-skjemaet?** I dag krysses de av i hodet etter at
       hendelsen er opprettet. Er det vanlig at Brann alt er varslet når hendelsen føres, kan
       avkryssingen også stå i skjemaet — samme `services.varsle`, kalt etter opprettelsen.
