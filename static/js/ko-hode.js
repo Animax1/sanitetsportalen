@@ -146,11 +146,33 @@ function koEksterneHtml(h, kan) {
     + '<span class="h-felt"><i class="bi bi-broadcast"></i> Varslet:</span>' + bokser + tid + '</div>';
 }
 
+// **Markøren på en ny linje under det som står** (André, 19. okt. 2026: «skal
+// begynne på en ny setning når du trykker på oppdater»). Står det ingenting,
+// står feltet tomt.
+function koBeskrivelseStart(tekst) {
+  const t = String(tekst || '').replace(/\s+$/, '');
+  return t ? t + '\n' : '';
+}
+
+// **Et linjeskift er ingen endring** («den skal ikke akseptere at linjen
+// skiftet ned uten noe nye tegn»): teksten trimmes, og er den lik den som står,
+// er svaret `null` — da lagres ingenting, og det blir ingen tom linje og ingen
+// «oppdatert» i loggen fordi noen ombestemte seg. Tom tekst sendes: serveren
+// sier fra at beskrivelsen ikke kan være tom.
+function koBeskrivelseTilLagring(gammel, raa) {
+  const ny = String(raa || '').trim();
+  return gammel && ny === String(gammel).trim() ? null : ny;
+}
+
 function koBeskrivelseRediger(id) {
   koBeskrivelseRedigeres = Number(id);
   koTegnDetalj();
   const felt = document.getElementById('ko-beskrivelse-tekst');
-  if (felt) felt.focus();
+  if (!felt) return;
+  const besk = koBeskrivelse(koHendelser.get(Number(id)));
+  felt.value = koBeskrivelseStart(besk ? besk.tekst : '');
+  felt.focus();
+  if (typeof felt.setSelectionRange === 'function') felt.setSelectionRange(felt.value.length, felt.value.length);
 }
 
 function koBeskrivelseAvbryt() {
@@ -162,9 +184,12 @@ async function koBeskrivelseLagre(id) {
   const felt = document.getElementById('ko-beskrivelse-tekst');
   const feil = document.getElementById('ko-beskrivelse-feil');
   if (!felt) return;
+  const besk = koBeskrivelse(koHendelser.get(Number(id)));
+  const tekst = koBeskrivelseTilLagring(besk ? besk.tekst : '', felt.value);
+  if (tekst === null) { koBeskrivelseAvbryt(); return; }
   await withSubmitGuard('ko-beskrivelse-lagre', async () => {
     const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/beskrivelse/',
-      { tekst: felt.value, linje: (felt.dataset || {}).linje || null });
+      { tekst: tekst, linje: (felt.dataset || {}).linje || null });
     if (!res.ok) {
       if (feil) { feil.textContent = data.message || 'Beskrivelsen ble ikke lagret.'; feil.classList.remove('d-none'); }
       // 409: noen andre oppdaterte den. Hent den nye; teksten hun skrev står i feltet.

@@ -810,3 +810,88 @@ class KallstedeneTests(TestCase):
                     console.log(el.innerHTML.includes('Meldt av: <b>AMK</b>'), el.innerHTML.includes('Brann'));
                 """)
                 self.assertIn('true true', ut)
+
+
+class BeskrivelsesfeltetTests(TestCase):
+    """«Tekstmarkøren skal begynne på en ny setning når du trykker på oppdater,
+    den skal ikke akseptere at linjen skiftet ned uten noe nye tegn som en
+    endring» (André, 19. okt. 2026). Gjennom `koBeskrivelseRediger` og
+    `koBeskrivelseLagre`, de ekte inngangene."""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml',)),
+                                      (KO_JS, ('koBeskrivelse', 'koBeskrivelseStart', 'koBeskrivelseTilLagring',
+                                               'koBeskrivelseRediger', 'koBeskrivelseAvbryt', 'koBeskrivelseLagre'))))
+
+    def _kjor(self, snippet):
+        ut = run_node(self.harness, """
+            const sendt = []; let tegnet = 0;
+            async function _koHendelsehandling(sti, kropp) { sendt.push(kropp); return { res: { ok: true }, data: {} }; }
+            async function withSubmitGuard(id, f) { await f(); }
+            function koHentLogg() {} function koHentOppdragPaaNytt() {}
+            function koTegnDetalj() { tegnet++; }
+            let koBeskrivelseRedigeres = null;
+            let koLinjer = new Map([[2, {id: 9, rot: 2, tekst: 'Røyk fra telt B  '}]]);
+            let koHendelser = new Map([[5, {id: 5, beskrivelse_rot: 2}]]);
+            const felt = { value: '', dataset: { linje: '9' }, valgt: null, focus() {},
+                           setSelectionRange(a, b) { this.valgt = [a, b]; } };
+            globalThis.document = { getElementById: (id) => (id === 'ko-beskrivelse-tekst' ? felt : null) };
+        """ + snippet)
+        return json.loads([l for l in ut.splitlines() if l.startswith('{')][-1])
+
+    def test_markoren_staar_paa_en_ny_linje_under_teksten(self):
+        r = self._kjor("""
+            koBeskrivelseRediger(5);
+            console.log(JSON.stringify({verdi: felt.value, valgt: felt.valgt, tom: koBeskrivelseStart('')}));
+        """)
+        self.assertEqual(r['verdi'], 'Røyk fra telt B\n')
+        self.assertEqual(r['valgt'], [16, 16], 'markøren sist')
+        self.assertEqual(r['tom'], '', 'ingen beskrivelse: tomt felt, ingen linje')
+
+    def test_bare_linjeskift_er_ingen_endring_og_lagrer_ingenting(self):
+        r = self._kjor("""
+            (async () => {
+              koBeskrivelseRediger(5);
+              felt.value += '\\n\\n  ';
+              await koBeskrivelseLagre(5);
+              const etterTom = {sendt: sendt.length, redigeres: koBeskrivelseRedigeres};
+              koBeskrivelseRediger(5);
+              felt.value += 'Åpen flamme\\n\\n';
+              await koBeskrivelseLagre(5);
+              console.log(JSON.stringify({etterTom, sendt}));
+            })();
+        """)
+        self.assertEqual(r['etterTom'], {'sendt': 0, 'redigeres': None}, 'lukket uten å lagre')
+        self.assertEqual(r['sendt'], [{'tekst': 'Røyk fra telt B\nÅpen flamme', 'linje': '9'}],
+                         'trimmet, uten de tomme linjene')
+
+
+class BesetningenIToKolonnerTests(TestCase):
+    """«Hvis man viser ressurser i flere kolonner, og trykker på en ressurs blir
+    plasseringen feil» (André, 19. okt. 2026). Den åpne besetningen må stå i
+    samme celle som kortet, ellers blir den sin egen rute i rutenettet."""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+
+    def test_aapen_besetning_i_samme_celle_lukket_som_foer(self):
+        from oppdrag.tests_posisjonsdeling import KORT_HARNESS
+        ut = run_node(build_harness(KORT_HARNESS), """
+            globalThis.window = { OPPDRAG_TILGANG: { kanSeBesetning: true } };
+            globalThis.OPPDRAG_KART_KOBLING = false;
+            globalThis.besetninger = { 1: { mannskap: [] } };
+            const e = {id: 1, navn: 'Haugesund 56', status: 'ledig', status_navn: 'Ledig',
+                       kan_passiv_vakt: false, passiv_vakt: false, posisjonsdeling: 'ukjent'};
+            globalThis.apenBesetning = null;
+            const lukket = _enhetskort(e).trim();
+            globalThis.apenBesetning = 1;
+            const apen = _enhetskort(e).trim();
+            console.log(JSON.stringify([lukket.startsWith('<div class="enhet-kort'), lukket.includes('enhet-kort-celle'),
+                                        apen.startsWith('<div class="enhet-kort-celle">'), apen.endsWith('</div></div>'),
+                                        apen.indexOf('class="besetning') > apen.indexOf('enhet-kort ')]));
+        """)
+        self.assertEqual(json.loads([l for l in ut.splitlines() if l.startswith('[')][-1]),
+                         [True, False, True, True, True])

@@ -111,6 +111,29 @@ CI-formen **143 s parallelt + 329 s `core` serielt + 83 s migrasjonsprøver ≈ 
 Mutasjoner, 2 av 2 drept: kommandoen slutter å kalle `migrate` (7 tester røde), og en
 dokumenttest fjernet fra kommandoen i CLAUDE.md (rød).
 
+## 2026-10-19 — KO: markøren på ny linje i beskrivelsen, og besetningen på riktig sted i to kolonner  `#ko/hendelseslogg` `#ko/ressursbildet`
+
+André: «Jeg vil at tekstmarkøren skal begynne på en ny setning når du trykker på oppdater, den
+skal ikke akseptere at linjen skiftet ned uten noe nye tegn som en endring … Da blir det ikke
+flere tomme linjer hvis en ombestemmer seg og lagrer med uhell», og om ressursoversikten: «Mer
+info på ressurs viser på feil sted: Hvis man viser ressurser i flere kolonner, og trykker på en
+ressurs blir plasseringen feil i forhold til hvilken ressurs man har trykket på.»
+
+**Beskrivelsen:** «Oppdater» setter teksten med et linjeskift etter og markøren sist
+(`koBeskrivelseStart`). Ved lagring trimmes teksten (`koBeskrivelseTilLagring`); er den lik den
+som står — bare linjeskift og mellomrom lagt til — lukkes feltet uten et kall, og det blir
+verken en tom linje, en retting eller «beskrivelsen oppdatert» i loggen. Serveren stripper og
+avviser «Ingenting er endret» også, men nå kommer kallet aldri dit.
+
+**Besetningen i to kolonner:** bilkortet (`_enhetskort` i `oppdrag-kort.js`) la det åpne
+besetningspanelet *etter* kortet som et søsken. I rutenettet med to kolonner
+(`.ko-to-kolonner .enhet-gruppe-blokk`) ble panelet sin egen rute og havnet i nabokolonnen eller
+under en annen bil. Åpent står det nå i samme celle som kortet (`.enhet-kort-celle`); lukket er
+markupen som før. Lagkortene (`koRessurskort`) hadde panelet inni kortet og var aldri rammet.
+
+Tester gjennom `koBeskrivelseRediger`/`koBeskrivelseLagre` og den ekte `_enhetskort`. Mutanter: 6,
+alle drept.
+
 ## 2026-10-19 — KO-hendelsen: «Talegruppen ble ikke satt», «Lukk hendelse» som av og til ikke gjorde noe, og beskrivelsen ut til bilene  `#ko/hendelseslogg`
 
 André på staging (`3b6728a`): «Jeg får feilmelding når jeg skal sette talegruppe. Talegruppen ble

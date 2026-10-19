@@ -226,6 +226,8 @@ REVIEWED_INTERPOLATIONS = {
     'klokke(o.opprettet)': 'klokkeslett fra en Date, i ren tekst som escapes ved innsetting',
     'apner': 'markup bygget lokalt, enhets-id escapet inni',
     'besetning': 'markup bygget lokalt av mkBesetning(), som selv skannes her',
+    # Kort og åpen besetning i én celle (19. okt. 2026, `_enhetskort`).
+    'kort': 'markup bygget rett over i _enhetskort, innmaten fra enhetskortInnmat(), som selv skannes her',
     'merke': 'hardkodet markup fra en ternær, ingen data i seg',
     'rolle': 'markup bygget lokalt, rollenavnet escapet inni',
     'kontakt': 'markup bygget lokalt av _besetningKontakt(), som selv skannes her',

@@ -264,10 +264,17 @@ function _enhetskort(e) {
   // inne i en `${...}` er usynlig for XSS-skanneren.
   const innmat = enhetskortInnmat(e);
   const besetning = mkBesetning(e.id);
-  return `
+  const kort = `
       <div class="enhet-kort${klikkbar}" ${apner}>
         ${innmat}
-      </div>${besetning}`;
+      </div>`;
+  // **Åpen besetning står i samme celle som kortet** (André, 19. okt. 2026:
+  // «hvis man viser ressurser i flere kolonner … blir plasseringen feil»). Som
+  // søsken ble panelet sin egen rute i rutenettet med to kolonner
+  // (`.ko-to-kolonner`), og havnet i nabokolonnen eller under en annen bil.
+  // Lukket er markupen som før.
+  if (!besetning) return kort;
+  return `<div class="enhet-kort-celle">${kort}${besetning}</div>`;
 }
 
 
