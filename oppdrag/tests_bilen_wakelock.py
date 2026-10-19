@@ -151,7 +151,7 @@ class WakeLockTests(SimpleTestCase):
                         kilde.index('\n});', start) + 2]
         ut = self._kjor("""
             for (const navn of ['tegnPosisjonLinje', 'startPosisjon', 'visUsendt', '_lydHintTegn',
-                                'lydTikk', 'lastBilinnstillinger', 'synk', 'pollOgSynk']) {
+                                'lydTikk', 'lastBilinnstillinger', 'synk', 'pollOgSynk', 'lopendeTikk']) {
               globalThis[navn] = () => {};
             }
             globalThis.lastMine = async () => {}; globalThis._lydKlar = async () => false;

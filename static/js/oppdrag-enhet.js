@@ -1277,7 +1277,159 @@ function posisjonLinjeTekst() {
       + 'Android: hengelåsen i adressefeltet → Tillatelser → Posisjon.';
   }
   if (status === 'utilgjengelig') return 'Posisjon er ikke tilgjengelig på denne enheten.';
-  return 'Posisjon sendes til kartet ved stempling. KO ser at den deles.';
+  // «KO», ikke «kartet» (André, 19. okt. 2026: «Det er lettere å forstå») —
+  // mannskapet forholder seg til KO, ikke til hvilket system KO ser det i.
+  const lop = bilinnstillinger().posisjon || {};
+  if (lop.aktiv !== true) return 'Posisjon sendes til KO ved stempling. KO ser at den deles.';
+  const oversikt = posisjonOversiktTekst(lop.sekunder || {});
+  if (!(posisjonIntervallS() > 0) || !oversikt) {
+    return 'Posisjon sendes til KO ved stempling, ikke løpende nå. KO ser at den deles.';
+  }
+  return `Posisjon sendes til KO ${oversikt}. KO ser at den deles.`;
+}
+
+// ── Løpende posisjon (André, 19. okt. 2026, docs/PLAN_LOPENDE_POSISJON.md) ──
+//
+// **Regelen bor på serveren** (`oppdrag/posisjon.py`): pollen bærer
+// `X-Posisjon-Intervall` — sekundene bilen skal sende med *nå*, 0 for ingen —
+// og `X-Posisjon-Onsket` når KO har trykket «Hent posisjon». Skjermen regner
+// ikke ut intervallet selv; en kopi her ville glidd fra serverens brems. Den
+// avgjør bare *når* den skal sende, og det gjør `lopendeSkalSende()`.
+//
+// **Ingen kø.** En gammel posisjon er verdiløs; neste intervall sender den nye.
+// Tilstanden står på `globalThis` av samme grunn som `bilensPosisjon`.
+
+function posisjonIntervallS() {
+  const s = Number(globalThis.posisjonIntervallS);
+  return Number.isFinite(s) && s > 0 ? s : 0;
+}
+
+/** Headerne fra pollen — de følger også 304. Et KO-ønske sendes med en gang. */
+function notePosisjonHeadere(intervall, onsket) {
+  if (intervall === null || intervall === undefined) return;
+  const foer = posisjonIntervallS();
+  globalThis.posisjonIntervallS = Number(intervall) || 0;
+  globalThis.posisjonOnsket = onsket === '1';
+  if (foer !== posisjonIntervallS()) tegnPosisjonLinje();
+  if (globalThis.posisjonOnsket) lopendeTikk();
+}
+
+//: Etter en sending som ikke kom fram, venter klokka så lenge før neste forsøk.
+function lopendeNyttForsokMs() {
+  return 30 * 1000;
+}
+
+/** `'onsket'`, `'intervall'` eller `null` — skal skjermen sende en posisjon nå?
+ *
+ *  Samme vilkår som posisjonen i stemplingen: koblingen, på vakt, og bryteren
+ *  «Del posisjon». Et ønske fra KO går foran klokka, men aldri forbi bryteren. */
+function lopendeSkalSende(naa) {
+  if (!kartKoblingAktiv() || !erPaVakt() || !delerPosisjon()) return null;
+  if (globalThis.lopendePagar === true) return null;
+  if (naa - (Number(globalThis.lopendeFeiletMs) || 0) < lopendeNyttForsokMs()) return null;
+  if (globalThis.posisjonOnsket === true) return 'onsket';
+  const intervall = posisjonIntervallS();
+  if (!(intervall > 0)) return null;
+  if (naa - (Number(globalThis.lopendeSendtMs) || 0) < intervall * 1000) return null;
+  return 'intervall';
+}
+
+/** Fixen i minnet om den er fersk nok for en løpende sending: yngre enn
+ *  intervallet, og aldri over stemplingens 120 s. */
+function posisjonForLopende(siste, naa, intervallS) {
+  const grense = Math.min(intervallS > 0 ? intervallS * 1000 : posisjonMaksAlderMs(), posisjonMaksAlderMs());
+  if (!siste || !Number.isFinite(siste.lat) || !Number.isFinite(siste.lon)) return null;
+  const alder = naa - Date.parse(siste.tid);
+  if (!(Math.abs(alder) < grense)) return null;
+  return { lat: siste.lat, lon: siste.lon, tid: siste.tid };
+}
+
+async function lopendeTikk() {
+  const naa = Date.now();
+  const grunn = lopendeSkalSende(naa);
+  if (!grunn) return;
+  globalThis.lopendePagar = true;
+  try {
+    // En telefon som står stille, melder ofte ingen ny fix til `watchPosition`;
+    // da spørres den én gang, innenfor samme frist som knappen.
+    let pos = posisjonForLopende(globalThis.bilensPosisjon || null, naa, posisjonIntervallS());
+    const status = globalThis.bilensPosisjonStatus;
+    if (!pos && status !== 'nektet' && status !== 'utilgjengelig') {
+      try { pos = await medFrist(_hentPosisjonEnGang(), posisjonFristMs()); } catch (e) { pos = null; }
+    }
+    if (!pos) {
+      globalThis.lopendeFeiletMs = Date.now();
+      return;
+    }
+    let res;
+    try {
+      res = await apiFetch('/oppdrag/api/posisjon/lopende/', {
+        method: 'POST', body: JSON.stringify({ posisjon: pos }),
+      });
+    } catch (e) {
+      globalThis.lopendeFeiletMs = Date.now();
+      return;
+    }
+    if (res.ok) {
+      const data = (await res.json()).data || {};
+      globalThis.lopendeSendtMs = Date.now();
+      globalThis.lopendeFeiletMs = 0;
+      if (data.onsket) {
+        globalThis.posisjonOnsket = false;
+        globalThis.koHentetTid = data.sendt_at || new Date().toISOString();
+        tegnPosisjonLinje();
+      }
+    } else if (res.status === 429 || res.status === 409) {
+      // Serveren sier «ikke nå» — vent et intervall, ikke et nytt forsøk om 30 s.
+      globalThis.lopendeSendtMs = Date.now();
+      if (res.status === 409) globalThis.posisjonOnsket = false;
+    } else {
+      globalThis.lopendeFeiletMs = Date.now();
+    }
+  } finally {
+    globalThis.lopendePagar = false;
+  }
+}
+
+/** «hvert 30. sekund på akutt og haster, hvert 5. minutt ellers» — tallene fra
+ *  admins innstillinger, aldri fra malen (personverndokumentet A.6). Tom streng
+ *  når ingenting sendes løpende. */
+function posisjonOversiktTekst(sekunder) {
+  const navn = { Akutt: 'akutt', Haster: 'haster', Vanlig: 'vanlig', Drift: 'drift',
+    Plassering: 'plassering', uten: 'uten oppdrag' };
+  const hvert = (s) => {
+    if (s % 60 === 0) return s === 60 ? 'hvert minutt' : `hvert ${s / 60}. minutt`;
+    return `hvert ${s}. sekund`;
+  };
+  const tilstander = Object.keys(navn);
+  const verdi = (t) => (Number(sekunder[t]) > 0 ? Number(sekunder[t]) : 0);
+  const grupper = new Map();
+  tilstander.forEach((t) => {
+    const s = verdi(t);
+    if (!grupper.has(s)) grupper.set(s, []);
+    grupper.get(s).push(t);
+  });
+  const sendes = [...grupper.entries()].filter(([s]) => s > 0);
+  if (!sendes.length) return '';
+  if (sendes.length === 1 && !grupper.has(0)) return hvert(sendes[0][0]);
+  const liste = (ts) => {
+    const ord = ts.map((t) => navn[t]);
+    return ord.length > 1 ? ord.slice(0, -1).join(', ') + ' og ' + ord[ord.length - 1] : ord[0];
+  };
+  // «Ellers» bare når ingen tilstand står på 0 — ellers ville «ellers» lovet en
+  // sending i en tilstand der ingenting sendes.
+  sendes.sort((a, b) => b[1].length - a[1].length || b[0] - a[0]);
+  const ellers = grupper.has(0) ? null : sendes[0];
+  const deler = sendes.filter((g) => g !== ellers).sort((a, b) => a[0] - b[0])
+    .map(([s, ts]) => `${hvert(s)} på ${liste(ts)}`);
+  if (ellers) deler.push(`${hvert(ellers[0])} ellers`);
+  return deler.join(', ');
+}
+
+/** «KO hentet posisjonen 21:14» (B2) — til neste henting. Tom uten henting. */
+function koHentetTekst() {
+  const tid = globalThis.koHentetTid ? klokke(globalThis.koHentetTid) : '';
+  return tid ? `KO hentet posisjonen ${tid}.` : '';
 }
 
 /** Bryteren er grå når den ikke kan virke: av vakt, eller uten GPS. */
@@ -1290,6 +1442,11 @@ function tegnPosisjonLinje() {
   if (!linje) return;
   linje.classList.toggle('d-none', !kartKoblingAktiv());
   document.getElementById('posisjon-tekst').textContent = posisjonLinjeTekst();
+  const hentet = document.getElementById('posisjon-ko-hentet');
+  if (hentet) {
+    hentet.textContent = koHentetTekst();
+    hentet.classList.toggle('d-none', !koHentetTekst());
+  }
   const bryter = document.getElementById('del-posisjon');
   bryter.checked = delerPosisjon();
   bryter.disabled = bryterSperret();
@@ -1667,6 +1824,10 @@ async function lastMine() {
   // Om bilen er på vakt kommer i en header, så det følger også 304 — 113
   // setter flagget, og det endrer ikke ETag-en.
   notePaVakt(res.headers && res.headers.get ? res.headers.get('X-Enhet-Pa-Vakt') : null);
+  // Løpende posisjon (19. okt. 2026): intervallet nå, og om KO har bedt om den.
+  if (res.headers && res.headers.get) {
+    notePosisjonHeadere(res.headers.get('X-Posisjon-Intervall'), res.headers.get('X-Posisjon-Onsket'));
+  }
   if (res.status === 304) {
     if (harNyDelt(mineOppdrag)) renderAlt();
     return;
@@ -1710,6 +1871,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   startVaakenLaas();
   setInterval(() => lydTikk(), 5000);
   setInterval(lastBilinnstillinger, 5 * 60 * 1000);
+  // Løpende posisjon: klokka ser etter hvert 5. sekund; intervallet er serverens.
+  setInterval(lopendeTikk, 5000);
 
   // Køen kan ha overlevd at fanen ble lukket midt i en vakt.
   if (koLes().length) await synk();

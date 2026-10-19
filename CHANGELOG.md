@@ -4,6 +4,90 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Løpende posisjon fra bilene, og «Hent posisjon» fra KO  `#oppdrag/enhetsskjerm` `#core/kartkobling` `#ko/ressursbildet` `#core/personvern`
+
+André: «Oppdatering posisjon: Ha løpende oppdatering fra bare stempling til regelmessig
+oppdateringer av posisjon … hver 5 min og på haste og akutt oppdrag så skal det være hver 30
+sekund. Og så må KO kunne hente posisjon i kartet på enkelt ressurs og alle ressurser … Det
+skal kunne endres av admin, både slå det helt av til slik det er nå og justere dem på
+individuelt nivå … Ikke glem å oppdater personvern dokumentasjon». Planen og avvikene fra den:
+`docs/PLAN_LOPENDE_POSISJON.md` §0. **Bygget med hovedbryteren av** — ingenting endres for
+bilene før admin slår den på, og det skal ikke skje i prod før DPIA-delen er skrevet.
+
+**Innstillingene** — «Valglister → Bilen», global admin: «Løpende posisjon fra bilene er på»
+(av som standard, `oppdrag_posisjon_lopende`) og sekunder for Akutt, Haster, Vanlig, Drift,
+Plassering og «Uten oppdrag» (standard 30/30/300/300/300/300, 15–3600, 0 = ikke løpende i den
+tilstanden). «Gruppere» er «Fyll alle»: samme tall i alle feltene, lagret som ett tall per
+tilstand. Sekundene ligger i **én** JSON-nøkkel — seks nøkler ville vært opptil tolv spørringer
+på hvert poll fra hver bil. Auditlogget av `core/signals.py`, som alle `AppSetting`.
+
+**Regelen bor på serveren, ikke i bilen** (`oppdrag/posisjon.py`). Pollen bærer
+`X-Posisjon-Intervall` — sekundene bilen skal sende med *nå*, også på 304 — og den samme
+funksjonen er bremsen i `POST /oppdrag/api/posisjon/lopende/`. Planen sa en `intervallFor()` i
+JS; to kopier av samme regel glir fra hverandre, og da sender bilen oftere enn serveren tar
+imot eller sjeldnere enn admin bestemte. Intervallet følger det bilen har **rykket ut på** (ikke
+varslet på), det korteste vinner, uten påbegynt oppdrag gjelder «Uten oppdrag». **Passiv vakt
+sender ikke** — med mindre bilen har rykket ut på Akutt, Haster, Vanlig eller Drift (André:
+«ikke plassering», og om Vanlig: «nei jeg glemte den ut»). Av vakt, «Del posisjon» av eller
+kartkoblingen av: ingenting, som før. Sendingen går til kartets **vanlige** bilmarkør
+(`send_enhet`), ikke til «OBS: Posisjon delt» — en bil på akutt skal ikke stå oransje.
+
+**Bremsen måler mot intervallet *nå***: den husker tidspunktet for siste sending, ikke en sperre
+med levetid. Ellers ville en sending på «uten oppdrag» (5 min) holdt igjen neste i fire minutter
+etter at bilen rykket ut på akutt. 80 % av intervallet, aldri under 10 s; 429 innenfor.
+
+**Bilskjermen** (`lopendeTikk` hvert 5. s, `lopendeSkalSende` er regelen for når): fersk fix fra
+`watchPosition`, ellers spørres telefonen én gang — en telefon som står stille melder ingen ny
+fix. **Ingen kø**: en gammel posisjon er verdiløs. Uten dekning nytt forsøk om 30 s; 429/409
+venter et helt intervall. Linja nederst sier **«KO», ikke «kartet»** (André: «Det er lettere å
+forstå»): «Posisjon sendes til KO hvert 30. sekund på akutt og haster, hvert 5. minutt ellers.
+KO ser at den deles.» — tallene fra innstillingene. Av: «Posisjon sendes til KO ved stempling».
+Etter en henting: **«KO hentet posisjonen 21:14»** (skisse B2).
+
+**«Hent posisjon» i KO** (skisse A): knappen (sikte-ikonet) ved posisjonsikonet på hvert bilkort,
+og **«Hent posisjon fra alle»** i gruppehodet, for `skriv_full` i oppdragsmodulen. Knappen står
+bare når serveren sier at hentingen kan virke (`posisjon_kan_hentes`): på vakt, konto, deling
+ikke av/nektet/uten GPS, bryteren på. «Ikke hørt fra bilskjermen» stopper den ikke — André:
+«det er risiko at bilens mobil/nettbrett ikke er på nettsiden». Merket er tre felt på `Enhet`
+(`posisjon_bedt_at`, `_bedt_av`, `_mottatt_at`, `oppdrag/0038`), ikke cachen: prod kan gå med
+cache per prosess. Bilen ser `X-Posisjon-Onsket` på neste poll og svarer med en gang, forbi
+bremsen og også i passiv vakt; frist 2 min. Kortet sier «Henter posisjon — venter på bilen…»,
+«✓ Posisjon mottatt 21:14 — se kartet», eller etter 45 s «Kom ikke fram — skjermen er trolig
+ikke åpen. Meld på samband.» Lista tegnes på nytt når «venter» går ut, fordi det er en endring
+bare klokka vet om.
+
+**KO-loggen (C3)**: `POSISJON_HENTET`, «Hent posisjon: Haugesund 56» med operatøren som forfatter,
+i hendelsen også når bilen står på et oppdrag der; «fra alle» er **én** linje: «Hent posisjon fra
+alle i Ambulanse: 4 av 5 biler kan svare». Skrives når KO ber — svaret står på kortet. Aldri
+koordinater. Signalet `oppdrag.posisjon.posisjon_hentet`; oppdragsmodulen kjenner ikke KO.
+
+**Personvern** — A.6 er **skrevet om, ikke utvidet**: avveiningen bygget på «hendelsesstyrt,
+ingen løpende sending». Interessen er sterkere på akutt og haster, nødvendigheten er grunnen til
+at frekvensen følger hastegraden, inngrepet er større og derfor åpent begge veier; «Hent
+posisjon» vurdert for seg. A.7, A.9 og A.12 rettet: **med bryteren på er punkt 7 på
+Datatilsynets liste (lokasjonsdata) og «systematisk monitorering» trolig utløst**, og DPIA-delen
+for posisjon skrives før den slås på i prod. `/personvern/` har et eget punkt med tabellen over
+intervallene **fra innstillingene** — `core/personvern.registrer_kontekst()`, fordi `core` ikke
+får importere oppdragsmodulen.
+
+**Tester**: `oppdrag/tests_lopende_posisjon.py` (65), `ko/tests_posisjon_hentet.py`
+(7). Regelen prøves gjennom pollen, ikke ved å kalle funksjonen; bilens klokke gjennom
+`lastMine` → headerne → `lopendeTikk`. Harnessene som henter `lastMine`, linja eller kortet får
+de nye funksjonene gjennom `BIL_LOPENDE` og `KORT_HENTING` i `patients/js_test_utils.py`, så neste
+funksjon ikke må føres inn i ti filer. **Mutanter: 60, alle drept til slutt.** Første runde 52 av 60; de åtte
+som overlevde var hull, ikke støy: et nytt «Hent posisjon» etter et tidligere svar ble sett
+som besvart (svaret ble ikke sammenlignet med forespørselen), `False` som sekunder ble ikke
+prøvd, et svar på en henting som sto åpen da admin slo av bryteren ble ikke prøvd,
+`posisjon_kan_hentes` hadde ingen test, 429-grenen i bilen kunne vært «prøv om 30 s», og tre
+kallsteder — linja på kortet, ny tegning av lista og `posisjon` i «Lagre» — gikk ingen test
+gjennom. Alle åtte har nå en test som går gjennom den ekte inngangen.
+
+**Ikke gjort**: kartet viser fortsatt «stemplet … siden» (steg 6, kart-sanitet), og DPIA-delen.
+`oppdrag-enhet.js` er 1 900 linjer — grensen på 1 800 håndheves bare for de delte sidene, men
+fila er moden for en deling langs seksjonsmarkørene.
+
+---
+
 ## 2026-10-19 — Testtida, fase 3: én kommentarfjerner, fire klokketester, `setUpTestData`, skyggede tester  `#core/tester`
 
 **`uten_js_kommentarer()` i `patients/js_test_utils.py` erstatter seks kopier** — i

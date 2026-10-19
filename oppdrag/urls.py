@@ -6,7 +6,7 @@ ville fanget ``/api/...``.
 """
 from django.urls import path
 
-from . import views, views_arkiv, views_verdier
+from . import views, views_arkiv, views_posisjon, views_verdier
 
 urlpatterns = [
     # Én URL, to grensesnitt. Hvilket avgjøres av om kontoen er knyttet til en
@@ -40,6 +40,13 @@ urlpatterns = [
     path('api/bilinnstillinger/', views_verdier.bilinnstillinger_view, name='oppdrag_api_bilinnstillinger'),
     # «Send posisjon» fra bilen (7. okt. 2026) — ingen stempling, bare kartet.
     path('api/posisjon/', views.posisjon_view, name='oppdrag_api_posisjon'),
+    # Løpende posisjon fra bilen, og «Hent posisjon» fra KO (19. okt. 2026).
+    path('api/posisjon/lopende/', views_posisjon.posisjon_lopende_view,
+         name='oppdrag_api_posisjon_lopende'),
+    path('api/enheter/hent-posisjon/', views_posisjon.hent_posisjon_alle_view,
+         name='oppdrag_api_hent_posisjon_alle'),
+    path('api/enheter/<int:pk>/hent-posisjon/', views_posisjon.hent_posisjon_view,
+         name='oppdrag_api_hent_posisjon'),
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),

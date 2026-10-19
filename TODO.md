@@ -718,13 +718,16 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
-- [ ] **Løpende posisjon fra bilene, og «Hent posisjon» fra KO** — planen står i
-      [`docs/PLAN_LOPENDE_POSISJON.md`](./docs/PLAN_LOPENDE_POSISJON.md) (19. okt. 2026).
-      Akutt og haster hvert 30. sekund, ellers hvert 5. minutt, justerbart per hastegrad og
-      «uten oppdrag» av admin; KO henter én eller alle; passiv vakt bare på påbegynt Akutt,
-      Haster og Drift; «Hent posisjon» logges hver gang, og bilskjermen sier «KO hentet». To
-      spørsmål står igjen i §6 før steg 1 (Vanlig i passiv vakt, henting på passiv vakt). Personvern A.6 skrives om, og DPIA-delen for
-      posisjon (§7) skrives, før hovedbryteren slås på i prod.
+- [ ] **Løpende posisjon: kartet viser kilden** — steg 6 i
+      [`docs/PLAN_LOPENDE_POSISJON.md`](./docs/PLAN_LOPENDE_POSISJON.md). Portalen sender
+      løpende posisjon og svar på «Hent posisjon» til kartets vanlige bilmarkør, og tipset i
+      kartet sier fortsatt «stemplet 4 min siden». Kartet (kart-sanitet) får et valgfritt felt
+      `kilde` (`stempling`, `lopende`, `forespurt`) og ordet «posisjon … siden»; portalen
+      sender feltet først når kartet tar imot det — sjekk hvor streng valideringen der er.
+- [ ] **Løpende posisjon: DPIA-delen før hovedbryteren slås på i prod** — §7 i planen, og
+      A.12 i personverndokumentasjonen sier at punkt 7 på Datatilsynets liste trolig utløses
+      når den er på. Bygget 19. okt. 2026 med bryteren **av**. Prosedyren for mannskapet skal
+      si det samme som bilskjermen («Posisjon sendes til KO hvert …», «KO hentet posisjonen»).
 - [ ] **Eksterne aktører i «Ny hendelse»-skjemaet?** I dag krysses de av i hodet etter at
       hendelsen er opprettet. Er det vanlig at Brann alt er varslet når hendelsen føres, kan
       avkryssingen også stå i skjemaet — samme `services.varsle`, kalt etter opprettelsen.

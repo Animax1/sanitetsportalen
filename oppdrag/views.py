@@ -34,7 +34,7 @@ from core.ratelimit import rate_limit
 from core.sortering import Norsk
 from core.vakt import hent_aktiv_vakt
 
-from . import choices, fritekstfrist, services, verdier
+from . import choices, fritekstfrist, posisjon, services, verdier
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Oppdragsendring, Statusmelding
 from .views_common import (
@@ -482,6 +482,14 @@ def oppdrag_liste_view(request):
             # nådd skjermen når et oppdrag kom. Av vakt melder bilen ingen
             # posisjonsdeling og legger ingen posisjon i køraden.
             svar['X-Enhet-Pa-Vakt'] = '1' if request.user.enhet.pa_vakt else '0'
+            # **Løpende posisjon** (19. okt. 2026): sekundene bilen skal sende
+            # med nå, 0 for ingen — og om KO har bedt om posisjonen. Samme
+            # grep som over: headere, så de følger 304, og regelen står bare på
+            # serveren (`oppdrag/posisjon.py`), som også er bremsen.
+            enhet = request.user.enhet
+            svar['X-Posisjon-Intervall'] = str(posisjon.intervall_for(enhet, vakt) or 0)
+            svar['X-Posisjon-Onsket'] = ('1' if enhet.pa_vakt and posisjon.lopende_aktiv()
+                                         and posisjon.er_onsket(enhet) else '0')
         return svar
 
     # POST — kun sentralbordet oppretter oppdrag. Ikke en enhetskonto, uansett

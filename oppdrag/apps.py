@@ -46,6 +46,12 @@ class OppdragConfig(AppConfig):
         # feiingen går gjennom `purge_old_logs`, feltet på portalinnstillingene.
         from .opprydding import register_handlers as register_opprydding
         register_opprydding()
+
+        # Personvernerklæringen (19. okt. 2026): intervallene for løpende
+        # posisjon hentes fra innstillingene, aldri skrevet inn i malen.
+        from core.personvern import registrer_kontekst
+        from .posisjon import personvern_kontekst
+        registrer_kontekst(personvern_kontekst)
         from .portalinnstillinger import register_handlers as register_innstillinger
         register_innstillinger()
 

@@ -14,6 +14,7 @@ import re
 
 from django.test import SimpleTestCase
 
+from patients.js_test_utils import KORT_HENTING
 from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import uten_js_kommentarer as _uten_kommentarer
 from patients.js_test_utils import (
@@ -43,6 +44,8 @@ HTML_BUILDERS_PER_FIL = {
         '_enhetskort', 'enhetskortInnmat',
         # Hvem deler posisjon (4. okt. 2026): ikonet helt til høyre på kortet.
         'posisjonsdelingIkon',
+        # «Hent posisjon» på kortet og i gruppehodet (19. okt. 2026).
+        'hentingLinje', 'hentPosisjonKnapp', 'hentAlleKnapp',
         # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
         # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
         'fyllProblemstillinger', 'problemstillingEtterBytte', 'visFoerStatus',
@@ -52,7 +55,7 @@ HTML_BUILDERS_PER_FIL = {
         '_verdiBrikke', '_verdiVelgerHtml', '_verdierHtml', '_notatHtml', 'endringTekst',
         # Nedtellingen under notatet (10. okt. 2026, `oppdrag/fritekstfrist.py`).
         'notatSlettesHtml',
-        'visRettTid', '_lydvarselSkjema', 'fyllNedtrekk', 'renderArkiv',
+        'visRettTid', '_lydvarselSkjema', '_posisjonSkjema', 'fyllNedtrekk', 'renderArkiv',
         # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
         # fritekst fra et annet moduls register, og escapes her som alt annet.
         'mkBesetning',
@@ -145,7 +148,11 @@ REVIEWED_INTERPOLATIONS = {
     # oppdrag-kort.js, som står først i OPPDRAG_SENTRAL_JS og altså leses av
     # samme skanner, og `mkBesetning` lenger nede i denne fila.
     'innmat': 'ferdig markup fra enhetskortInnmat(), som skannes for seg',
+    'posisjonDel': 'ferdig markup fra _posisjonSkjema() (løpende posisjon, 19. okt. 2026), som skannes for seg',
     'posdeling': 'ferdig markup fra posisjonsdelingIkon(), som skannes for seg',
+    'hent': 'ferdig markup fra hentPosisjonKnapp(), som skannes for seg',
+    'henting': 'ferdig markup fra hentingLinje(), som skannes for seg',
+    'knapp': 'ferdig markup fra hentAlleKnapp(), som skannes for seg',
     'besetning': 'ferdig markup fra mkBesetning(), som skannes for seg',
     # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
     # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter
@@ -164,6 +171,7 @@ REVIEWED_INTERPOLATIONS = {
     "(siste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
     "(forste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
     "n <= 1 ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    "venter ? ' disabled' : ''": 'hardkodet attributt fra en ternær («Hent posisjon» mens den venter)',
     'opp': 'knapp bygget med escHtmlValue i `_verdirad`',
     'ned': 'knapp bygget med escHtmlValue i `_verdirad`',
     'knappAktiv': 'knapp bygget med escHtmlValue i `_verdirad`',
@@ -451,7 +459,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
+                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING,
                               '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
     )
 

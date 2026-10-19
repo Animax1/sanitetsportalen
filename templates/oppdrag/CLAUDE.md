@@ -27,6 +27,7 @@ det ble en tom side stående etter én feilet henting, og den så ut som en vakt
 | Posisjon til kartet (30. sep.) | Bare når `OPPDRAG_KART_KOBLING` er sann — ellers spørres nettleseren aldri, og **bare da får siden `geolocation=(self)`** (resten av portalen har `()`). `watchPosition` holder siste fix i minnet; `posisjonForStempling()` gir den bare om den er under 120 s. `_stemple` legger den i **køraden**, så den som sendes er fra trykket. Bryteren «Del posisjon» per skjerm (`delerPosisjon`), på som standard. Stemplingen venter aldri på GPS |
 | Hvem deler posisjon (4. okt.) | `posisjonsdelingTilstand()` er regelen — `null` uten kobling eller av vakt, ellers `av` før nettleserens `nektet`/`utilgjengelig`, ellers `deler` (gammel fix er ikke en tilstand). Rir på `lastMine` som header og ligger i køraden fra trykket. `erPaVakt()` leses fra `X-Enhet-Pa-Vakt`; **overgangen av → på nullstiller bryteren til på** (`notePaVakt`), fordi `localStorage` overlever fra forrige vakt. Linja sier at KO ser tilstanden, og hvor «nektet» rettes; bryteren er grå av vakt og uten GPS (`bryterSperret`) |
 | «Send posisjon» (7. okt.) | Knappen under enhetsnavnet — «her er jeg, hvor skal jeg?» — står med og uten oppdrag. `sendPosisjon()` bruker fixen i minnet om den er under 30 s (`posisjonForKnapp`), ellers `getCurrentPosition` **innenfor en egen frist** (`medFrist`, 20 s) — nettleserens `timeout` teller først når tilgangen er gitt, og uten fristen hang knappen på et spørsmål som aldri ble vist. Et nei som alt er gitt (`posisjonstilgang()`) sies med en gang; etter fristen brukes en fix under 120 s. **Bryteren «Del posisjon» styrer den ikke** (et trykk er et valg); av vakt er den grå (`sendPosisjonSperret`). Ingen kø: uten dekning sier den fra. Kvitteringen er «Delt kl. … KO ser bilen i kartet til kl. …» (`sendPosisjonKvittering`), med `utloper` fra serveren. Vises og gråes gjennom `tegnPosisjonLinje()` → `tegnSendPosisjon()` |
+| Løpende posisjon (19. okt.) | **Skjermen regner ikke ut intervallet** — `notePosisjonHeadere()` leser `X-Posisjon-Intervall` og `X-Posisjon-Onsket` fra `lastMine`, og `lopendeSkalSende(naa)` er regelen for *når*: kobling, på vakt og «Del posisjon», ikke midt i en sending, 30 s etter en feil (`lopendeNyttForsokMs`), KO-ønsket foran klokka. `lopendeTikk()` hvert 5. s; fixen under intervallet (høyst 120 s, `posisjonForLopende`), ellers `getCurrentPosition` én gang innenfor `medFrist`. **Ingen kø.** 409/429 venter et helt intervall. Linja: «Posisjon sendes til KO …» med tallene fra `bilinnstillinger().posisjon` (`posisjonOversiktTekst`) og «KO hentet posisjonen 21:14» (`koHentetTekst`, `#posisjon-ko-hentet`). «KO», ikke «kartet» (André) |
 | «Annet sted»-feltet (7. okt.) | Pollingen hvert 15. s tegner kortet med `innerHTML`, og byttet feltet ut midt i skrivingen. `stedfeltetErApent()` lar kortet stå så lenge feltet i DOM-en (`data-oppdrag`) gjelder et oppdrag som fortsatt venter på «Avreist». Fokus tilbake hjelper ikke: iOS åpner ikke tastaturet uten et trykk |
 | Skjermen holdes våken (9. okt.) | Screen Wake Lock, ellers sovner telefonen i holderen og pollingen og lyden stopper. `skjermSkalHoldesVaaken(synlig, trykket, holder)` er regelen; `startVaakenLaas()` henter låsen ved trykk **og på nytt på `visibilitychange`** — nettleseren slipper den ved hvert appbytte og hver samtale. Avslaget (iOS i strømsparing) er stille, så `#vaaken-linje` sier fra. Kaster aldri. `Permissions-Policy` må ikke få `screen-wake-lock=()` |
 | Tida det måles fra | Bilens `varslet_at` — og **et usendt trykk i køen teller som svart**, ellers ville bilen pipt om et oppdrag mannskapet nettopp kvitterte ut uten dekning |
@@ -51,6 +52,16 @@ streng når `OPPDRAG_KART_KOBLING` er usann — da melder ingen bil noe, og et �
 hadde sagt at noe var galt som ikke var det. Fargeforklaringen i KO får de fire radene fra
 `posisjonsdelingLegende()` med samme gate. Mappingen står inne i funksjonen, fordi harnessene
 henter funksjoner alene. Stilen i `oppdrag.css` (`.posdeling-*`).
+
+**«Hent posisjon» på kortet** (19. okt. 2026): knappen (`hentPosisjonKnapp`) står ved
+posisjonsikonet når `OPPDRAG_TILGANG.kanSkrive` og serveren sier `posisjon_kan_hentes`;
+«Hent posisjon fra alle» står i gruppehodet (`hentAlleKnapp`, `data-arg="type:<id>"`, tom for
+gruppa uten type). `hentingTilstand(e, naa)` avgjør linja under oppdraget — venter (45 s),
+mottatt, kom ikke fram — og et svar eldre enn forespørselen er ikke et svar.
+`planleggHentingTegning()` tegner lista på nytt når «venter» blir «kom ikke fram», fordi det
+er en endring bare klokka vet om. Handlerne (`hentPosisjon`, `hentPosisjonAlle`) står i
+`oppdrag-sentral-kjerne.js`. Testharnessene tar dem med gjennom `KORT_HENTING` og
+`BIL_LOPENDE` i `patients/js_test_utils.py`.
 
 **Hele ressurslista er delt med `/ko/`** (18. sep. 2026). Serversiden:
 `services.enhetskort()` er den ene serialiseringen, og både `views.enheter_view` og

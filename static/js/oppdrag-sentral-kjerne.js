@@ -235,6 +235,37 @@ async function avventOppdrag(arg) {
 }
 
 
+async function hentPosisjon(enhetId) {
+  // «Hent posisjon» på én bil (André, 19. okt. 2026). Svaret står på kortet når
+  // lista hentes på nytt — endringsnummeret er økt av serveren.
+  const res = await apiFetch(`/oppdrag/api/enheter/${enhetId}/hent-posisjon/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke hente posisjonen.');
+    return;
+  }
+  etagEnheter = null;
+  await lastAlt();
+}
+
+
+async function hentPosisjonAlle(arg) {
+  // `arg` er «type:<id>», og «type:» for gruppa uten type — klikkdelegeringen
+  // sender ett argument, og `data-id` ville blitt et tall.
+  const type = String(arg || '').replace(/^type:/, '');
+  const res = await apiFetch('/oppdrag/api/enheter/hent-posisjon/', {
+    method: 'POST', body: JSON.stringify({ type: type === '' ? null : Number(type) }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke hente posisjonene.');
+    return;
+  }
+  etagEnheter = null;
+  await lastAlt();
+}
+
+
 async function kvitterAvbrutt(oppdragId) {
   // Den andre veien — å sende en ny enhet — kvitterer av seg selv på
   // serveren. Denne finnes for tilfellet der ingen skal sendes.

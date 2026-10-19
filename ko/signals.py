@@ -49,6 +49,7 @@ from oppdrag.models import (
 from vaktliste.models import Pause, Ressurs, Vaktpost
 
 from oppdrag import endringer as oppdrag_endringer
+from oppdrag import posisjon as oppdrag_posisjon
 
 from . import endringer as ko_endringer
 from . import systemlinjer
@@ -499,3 +500,33 @@ def posisjon_delt(sender, type_, navn, utloper, kilde_id=None, **kwargs):
         tidspunkt=naa,
         hendelse=_hendelse_for_delt(type_, kilde_id, vakt),
     )
+
+
+# ── «Hent posisjon» fra KO (19. okt. 2026) ──────────────────────────────────
+#
+# C3 (André: «jeg vil ha det logget»): hver henting, med hvem — én bil som én
+# linje, og «fra alle» i en gruppe som **én** linje med antallet, så loggen ikke
+# fylles i den travle stunden. Linja skrives når KO ber, ikke når bilen svarer:
+# det er spørsmålet som er handlingen, og svaret står på kortet.
+
+@receiver(oppdrag_posisjon.posisjon_hentet)
+@ikke_under_loaddata
+@_trygt('posisjon_hentet')
+def posisjon_hentet(sender, enheter, bruker, gruppe=None, antall_totalt=None, **kwargs):
+    """I strømmen alltid; i hendelsen også når én bil står på et oppdrag som hører
+    til en — samme regel som `posisjon_delt`. Ingen linje når KO er slått av."""
+    from core.models import ModuleSettings
+    from core.vakt import hent_aktiv_vakt
+
+    if 'ko' not in ModuleSettings.get_enabled_slugs():
+        return
+    vakt = hent_aktiv_vakt()
+    if antall_totalt is None:
+        enhet = enheter[0]
+        systemlinje(vakt, systemlinjer.POSISJON_HENTET, {'navn': _enhetsnavn(enhet)},
+                    bruker=bruker, hendelse=_hendelse_for_delt('enhet', enhet.pk, vakt))
+        return
+    systemlinje(vakt, systemlinjer.POSISJON_HENTET,
+                {'alle': True, 'gruppe': gruppe or '', 'antall': len(enheter),
+                 'totalt': antall_totalt},
+                bruker=bruker)

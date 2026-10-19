@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from core.vakt import hent_aktiv_vakt
 from oppdrag.models import Enhet
-from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_available, run_node
+from patients.js_test_utils import BIL_LOPENDE, OPPDRAG_ENHET_JS, build_harness, node_available, run_node
 
 from .tests_views import StemplingBasis, _bruker, _klient
 
@@ -133,7 +133,7 @@ HARNESS = ((OPPDRAG_ENHET_JS, ('kartKoblingAktiv', 'erPaVakt', 'paVaktNokkel',
                                'posisjonLinjeTekst', 'bryterSperret', 'tegnPosisjonLinje',
                                'posisjonFristMs', 'medFrist', 'posisjonstilgang', 'sendPosisjonKvittering',
                                'sendPosisjonFeiltekst', 'posisjonMaksAlderMs',
-                               'posisjonForStempling')),)
+                               'posisjonForStempling', 'bilinnstillinger', *BIL_LOPENDE)),)
 
 FORSPILL = """
 globalThis.localStorage = (() => { const m = {}; return {

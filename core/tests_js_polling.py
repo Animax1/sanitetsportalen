@@ -21,6 +21,7 @@ UNNTAK = {
     ('oppdrag-enhet.js', '() => lydTikk()'): 'bilens lydvarsel — skal pipe med skjermen av',
     ('oppdrag-enhet.js', 'lastBilinnstillinger'): 'tersklene lydvarselet bruker, hvert femte minutt',
     ('oppdrag-enhet.js', 'pollOgSynk'): 'bilens henting og kø — nye oppdrag skal gi lyd',
+    ('oppdrag-enhet.js', 'lopendeTikk'): 'løpende posisjon og svar på «Hent posisjon» — sender, og skal gå så lenge nettleseren lar den',
     ('patients-app.js', 'doAutoRefresh'): 'stoppes og startes av egen visibilitychange-lytter',
     ('park-lag.js', 'parkTegnKvitteringer'): 'nedtellingen på «Angre», ingen nett',
     ('portal-clock.js', 'updateClock'): 'klokka i toppen, ingen nett',

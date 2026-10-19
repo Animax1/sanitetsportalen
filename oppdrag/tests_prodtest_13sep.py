@@ -13,6 +13,7 @@ from django.test import SimpleTestCase
 
 from oppdrag.tests_offline_ko import FORSPILL
 from oppdrag.tests_runde_d import _konst
+from patients.js_test_utils import KORT_HENTING
 from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
 from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
@@ -31,7 +32,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     settes selv om oppstarten kastet."""
 
     HARNESS = ((OPPDRAG_SENTRAL_JS, ('_trygt', 'lastAlt', 'oppstart', '_visLastefeil', 'lastEnheter',
-                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste', 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode',
+                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste', *KORT_HENTING, 'gruppeErSkjult', '_skjulteGrupper', 'gruppehode',
                                      'settEnhetslisteKilde', 'renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr')),)
 
     FORSPILL = '''
@@ -243,7 +244,7 @@ class DenDelteListaLeserDenLevendeEnhetslistaTests(SimpleTestCase):
                               'tegnEnhetslistePaaNytt',
                               'settEnhetslisteKilde', '_grupperEnheter',
                               '_typeRekkefolge', '_enhetskort',
-                              'enhetskortInnmat', 'posisjonsdelingIkon', 'kanSeBesetning',
+                              'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING, 'kanSeBesetning',
                               'mkBesetning', '_besetningKontakt', 'tidSiden',
                               'hastegradKlasse', '_grovMerke',
                               '_problemMedAntall', '_medAntall')),

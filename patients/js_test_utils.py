@@ -47,6 +47,18 @@ OPPDRAG_SENTRAL_JS = (
     JS_DIR / 'oppdrag-sentral-lasting.js',
 )
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
+#: Løpende posisjon i bilen (19. okt. 2026). `lastMine` og linja nederst kaller
+#: dem, så en harness med en av de to trenger dem — samlet her, så neste
+#: funksjon i klokka ikke må føres inn i seks testfiler.
+#: «Hent posisjon» på enhetskortet (19. okt. 2026, `oppdrag-kort.js`). Kortet og
+#: lista kaller dem, så en harness med `enhetskortInnmat` eller `tegnEnhetsliste`
+#: trenger dem.
+KORT_HENTING = ('hentVenterMs', 'hentVisesMs', 'hentingTilstand', 'hentingLinje',
+                'hentPosisjonKnapp', 'hentAlleKnapp', 'nesteHentingOvergangMs',
+                'planleggHentingTegning')
+BIL_LOPENDE = ('posisjonIntervallS', 'notePosisjonHeadere', 'lopendeNyttForsokMs',
+               'lopendeSkalSende', 'posisjonForLopende', 'lopendeTikk',
+               'posisjonOversiktTekst', 'koHentetTekst')
 #: **KO er seks filer** (18. sep. 2026, tavla 22. sep., hodet 19. okt.): rutenettet,
 #: hendelsene, hodet i hendelsen, tavla, planleggeren, og loggen med den ene
 #: `DOMContentLoaded`-kroken sist. Tuppel, som de andre delte sidene.

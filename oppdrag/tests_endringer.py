@@ -97,6 +97,7 @@ class OppdragEndringerFangesTests(SimpleTestCase):
         'oppdrag/fritekstfrist.py: Oppdrag.update': 'feiingen av fritekst kaller oppdrag_endret() selv',
         'oppdrag/fritekstfrist.py: Statusmelding.update': 'samme feiing, samme kall',
         'oppdrag/sladding.py: Statusmelding.update': '_tom_sted kaller oppdrag_endret() selv',
+        'oppdrag/views_posisjon.py: Enhet.update': '«Hent posisjon fra alle» kaller oppdrag_endret() selv',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):

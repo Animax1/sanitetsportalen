@@ -89,6 +89,7 @@ TAVLE_FLYTTET = 'tavle_flyttet'
 TAVLE_RETTET = 'tavle_rettet'
 PROGRAM_ENDRET = 'program_endret'
 POSISJON_DELT = 'posisjon_delt'
+POSISJON_HENTET = 'posisjon_hentet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -173,6 +174,11 @@ KODER: dict[str, str] = {
         '«OBS: Lag 3 delte posisjon» sier at noen sto og trengte veien, og svarer '
         'i etterkant på hvorfor laget brukte tjue minutter. KO ser det uten å ha '
         'kartet oppe.',
+    POSISJON_HENTET:
+        '«Hent posisjon» sender en posisjon uten at mannskapet trykker, og er bare '
+        'forsvarlig fordi den er åpen begge veier (personverndokumentet A.6): bilen '
+        'ser «KO hentet posisjonen», og loggen svarer på hvem som så etter hvem '
+        '(André, 19. okt. 2026: «jeg vil ha det logget»). Aldri koordinatene.',
 }
 
 
@@ -333,6 +339,12 @@ def tegn(kode: str, data: dict) -> str:
         if data.get('til'):
             linje += f' · vises i kartet til {data["til"]}'
         return linje
+    if kode == POSISJON_HENTET:
+        if data.get('alle'):
+            hvor = f'alle i {data["gruppe"]}' if data.get('gruppe') else 'alle biler på vakt'
+            return (f'Hent posisjon fra {hvor}: {data.get("antall", 0)} av '
+                    f'{data.get("totalt", 0)} biler kan svare')
+        return f'Hent posisjon: {data.get("navn") or "Ukjent"}'
     if kode == OPPDRAG_KNYTTET:
         fra = data.get('fra_hendelsesnummer')
         til = data.get('hendelsesnummer')

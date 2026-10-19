@@ -44,6 +44,7 @@ class AnnetStedOverleverPollingenTests(SimpleTestCase):
         globalThis.projiser = (d) => d; globalThis.koLes = () => [];
         globalThis.nyeOppdrag = () => [];
         globalThis.posisjonsdelingTilstand = () => null; globalThis.notePaVakt = () => {};
+        globalThis.notePosisjonHeadere = () => {};
         const kort = { innerHTML: '' };
         // «Oppdatert hh:mm» settes av `renderAlt` — beviset på at pollingen
         // faktisk kom fram til tegningen. Uten det går «kortet står» grønt

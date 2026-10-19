@@ -17,6 +17,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from oppdrag.tests_runde_d import _konst
+from patients.js_test_utils import KORT_HENTING
 from patients.js_test_utils import (KO_HENDELSER_JS, KO_LAYOUT_JS, JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
                                     node_available, read_js, run_node)
 
@@ -1869,7 +1870,7 @@ class SynlighetsmenyTests(SimpleTestCase):
                     'vippSeksjon', 'visAlleGrupper', 'synlighetsSeksjoner', 'skjultTall',
                     '_synlighetsvalg', 'synlighetsmenyHtml', 'oppdaterSynlighetsmeny',
                     'gruppehode', 'tegnEnhetsliste', '_grupperEnheter',
-                    '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
+                    '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING,
                     'tidSiden', 'hastegradKlasse', '_grovMerke', '_problemMedAntall',
                     '_medAntall', 'oppdragsnr')
 

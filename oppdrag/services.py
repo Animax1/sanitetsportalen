@@ -527,7 +527,10 @@ def enhetskort_liste(enheter, vakt=None, ledig_siden=None) -> list:
     meldinger = Statusmelding.objects.gjeldende_bulk(
         {i['koblingsrad'].oppdrag_id for i in status.values() if i['koblingsrad']})
     ledig_siden = ledig_siden or {}
-    return [_enhetskort(e, status[e.pk], ledig_siden.get(e.pk), meldinger) for e in enheter]
+    from . import posisjon
+    lopende = posisjon.lopende_aktiv()
+    return [_enhetskort(e, status[e.pk], ledig_siden.get(e.pk), meldinger, lopende=lopende)
+            for e in enheter]
 
 
 def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
@@ -548,7 +551,8 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
     return _enhetskort(enhet, enhet_status(enhet, vakt), ledig_siden, None)
 
 
-def _enhetskort(enhet, info, ledig_siden, meldinger) -> dict:
+def _enhetskort(enhet, info, ledig_siden, meldinger, *, lopende=None) -> dict:
+    from . import posisjon
     rad = info['koblingsrad']
     return {
         'id': enhet.pk,
@@ -564,6 +568,17 @@ def _enhetskort(enhet, info, ledig_siden, meldinger) -> dict:
         'posisjonsdeling': enhet.posisjonsdeling,
         'posisjonsdeling_at': (enhet.posisjonsdeling_at.isoformat()
                                if enhet.posisjonsdeling_at else None),
+        # «Hent posisjon» fra KO (19. okt. 2026): når det ble bedt om, av hvem,
+        # og når kartet tok imot svaret. Kortet regner ut «venter» og «kom ikke
+        # fram» selv, fra tidspunktene — aldri koordinater.
+        'posisjon_bedt_at': (enhet.posisjon_bedt_at.isoformat()
+                             if enhet.posisjon_bedt_at else None),
+        'posisjon_bedt_av': enhet.posisjon_bedt_av,
+        'posisjon_mottatt_at': (enhet.posisjon_mottatt_at.isoformat()
+                                if enhet.posisjon_mottatt_at else None),
+        # Om knappen skal stå — serverens svar, så kortet aldri tilbyr en
+        # henting som gir 409 (CLAUDE.md: en knapp mot en vegg er verre enn ingen).
+        'posisjon_kan_hentes': posisjon.kan_hentes(enhet, lopende=lopende),
         'er_aktiv': enhet.er_aktiv,
         'username': getattr(enhet.user, 'username', '') or '',
         'type': enhet.enhetstype_id,

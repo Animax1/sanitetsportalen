@@ -24,6 +24,7 @@ from datetime import timedelta
 
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
+from patients.js_test_utils import KORT_HENTING
 from patients.js_test_utils import (
     OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node)
 from django.utils import timezone
@@ -656,7 +657,7 @@ class PassivmerketTegnesTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', 'mkBesetning', 'kanSeBesetning', '_grovMerke',
+        (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING, 'mkBesetning', 'kanSeBesetning', '_grovMerke',
                               '_problemMedAntall', 'hastegradKlasse', 'tidSiden')),
     )
 

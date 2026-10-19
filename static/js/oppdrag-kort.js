@@ -175,12 +175,85 @@ function enhetskortInnmat(e) {
   // oppdragslinja står der de står. Ferdig markup fra en bygger som skannes
   // for seg; tom streng uten kobling.
   const posdeling = posisjonsdelingIkon(e);
+  // «Hent posisjon» (André, 19. okt. 2026, skisse A): knappen, og svaret på kortet.
+  const hent = hentPosisjonKnapp(e);
+  const henting = hentingLinje(e, Date.now());
   return `<span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}${passiv}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
           ${oppdragslinje}
-        </div>${posdeling}`;
+          ${henting}
+        </div>${hent}${posdeling}`;
+}
+
+
+// ── «Hent posisjon» fra KO (André, 19. okt. 2026, docs/PLAN_LOPENDE_POSISJON.md) ──
+//
+// KO trykker; bilen ser ønsket på sitt neste poll (innen 15 s) og sender en fersk
+// posisjon til kartet. Svaret står på kortet — **aldri koordinatene**, bare
+// når og om det kom fram. Hvorvidt knappen står, avgjør serveren
+// (`posisjon_kan_hentes`), så den aldri fører til en 409.
+
+//: Så lenge kortet sier «venter» før det sier «kom ikke fram». Tre poll fra bilen.
+function hentVenterMs() {
+  return 45 * 1000;
+}
+
+//: Så lenge svaret står på kortet etterpå.
+function hentVisesMs() {
+  return 10 * 60 * 1000;
+}
+
+/** `'venter'`, `'mottatt'`, `'kom_ikke'` eller `null` — det ene stedet som avgjør
+ *  hva kortet sier om en henting. Et svar eldre enn forespørselen er ikke et svar. */
+function hentingTilstand(e, naa) {
+  const bedt = e.posisjon_bedt_at ? Date.parse(e.posisjon_bedt_at) : NaN;
+  if (!Number.isFinite(bedt)) return null;
+  const mottatt = e.posisjon_mottatt_at ? Date.parse(e.posisjon_mottatt_at) : NaN;
+  if (Number.isFinite(mottatt) && mottatt >= bedt) {
+    return naa - mottatt < hentVisesMs() ? 'mottatt' : null;
+  }
+  if (naa - bedt < hentVenterMs()) return 'venter';
+  return naa - bedt < hentVisesMs() ? 'kom_ikke' : null;
+}
+
+function hentingLinje(e, naa) {
+  const tilstand = hentingTilstand(e, naa);
+  if (tilstand === 'mottatt') {
+    return `<div class="enhet-henting henting-mottatt">✓ Posisjon mottatt ${escapeHtml(klokke(e.posisjon_mottatt_at))} — se kartet</div>`;
+  }
+  if (tilstand === 'venter') {
+    return '<div class="enhet-henting henting-venter">Henter posisjon — venter på bilen…</div>';
+  }
+  if (tilstand === 'kom_ikke') {
+    // André: «det er risiko at bilens mobil/nettbrett ikke er på nettsiden».
+    return '<div class="enhet-henting henting-kom-ikke">Kom ikke fram — skjermen er trolig ikke åpen. Meld på samband.</div>';
+  }
+  return '';
+}
+
+/** Knappen på kortet, for den som kan skrive i oppdragsmodulen. Grå mens den venter. */
+function hentPosisjonKnapp(e) {
+  if (globalThis.window?.OPPDRAG_TILGANG?.kanSkrive !== true || e.posisjon_kan_hentes !== true) return '';
+  const venter = hentingTilstand(e, Date.now()) === 'venter';
+  return `<button type="button" class="btn btn-sm enhet-hent-posisjon" data-action="hentPosisjon" data-id="${escHtmlValue(e.id)}" title="Hent posisjon" aria-label="Hent posisjon fra ${escHtmlValue(e.navn)}"${venter ? ' disabled' : ''}><i class="bi bi-crosshair"></i></button>`;
+}
+
+/** «Hent posisjon fra alle» i gruppehodet — når minst én i gruppa kan svare. */
+function hentAlleKnapp(g) {
+  if (globalThis.window?.OPPDRAG_TILGANG?.kanSkrive !== true) return '';
+  if (!g.enheter.some((e) => e.posisjon_kan_hentes === true)) return '';
+  return `<button type="button" class="btn btn-sm btn-outline-success enhet-hent-alle" data-action="hentPosisjonAlle" data-arg="type:${escHtmlValue(g.type)}">Hent posisjon fra alle</button>`;
+}
+
+/** Når neste henting på lista skifter fra «venter» til «kom ikke fram», i ms fra
+ *  `naa` — eller `null`. Lista tegnes bare når serveren melder en endring, og
+ *  «kom ikke fram» er en endring bare klokka vet om. */
+function nesteHentingOvergangMs(liste, naa) {
+  const igjen = liste.filter((e) => hentingTilstand(e, naa) === 'venter')
+    .map((e) => Date.parse(e.posisjon_bedt_at) + hentVenterMs() - naa);
+  return igjen.length ? Math.max(0, Math.min(...igjen)) : null;
 }
 
 
@@ -524,8 +597,19 @@ function oppdaterSynlighetsmeny() {
   document.getElementById('ressurs-vis-knapp')?.classList.toggle('aktiv', ressurser > 0);
 }
 
-function gruppehode(navn) {
-  return `<div class="enhet-gruppe">${escapeHtml(navn)}</div>`;
+function gruppehode(navn, knapp = '') {
+  // `knapp` er ferdig markup fra `hentAlleKnapp()`, som skannes for seg.
+  return `<div class="enhet-gruppe">${escapeHtml(navn)}${knapp}</div>`;
+}
+
+
+/** Tegn lista på nytt når en henting går fra «venter» til «kom ikke fram». Én
+ *  tidtaker: en ny tegning erstatter den forrige planen. */
+function planleggHentingTegning(liste) {
+  clearTimeout(globalThis.hentingTidtaker);
+  const ms = nesteHentingOvergangMs(liste, Date.now());
+  if (ms === null) return;
+  globalThis.hentingTidtaker = setTimeout(() => tegnEnhetsliste(sisteEnhetsliste), ms + 500);
 }
 
 
@@ -547,12 +631,20 @@ function tegnEnhetsliste(liste) {
     // skjult gruppe tas ikke med i det hele tatt — tallet står på «Vis».
     const grupper = _grupperEnheter(paVakt);
     const synlige = grupper.filter((g) => !gruppeErSkjult('type:' + g.type));
+    // «Hent posisjon fra alle» står i gruppehodet (skisse A). Med én gruppe er
+    // det ingen overskrift, så knappen står alene.
+    const hode = (g) => {
+      const knapp = hentAlleKnapp(g);
+      if (grupper.length > 1) return gruppehode(g.navn, knapp);
+      return knapp ? `<div class="enhet-gruppe enhet-gruppe-kun-knapp">${knapp}</div>` : '';
+    };
     el.innerHTML = synlige.length
       ? synlige.map((g) => '<div class="enhet-gruppe-blokk">'
-          + (grupper.length > 1 ? gruppehode(g.navn) : '')
+          + hode(g)
           + g.enheter.map((e) => _enhetskort(e)).join('') + '</div>').join('')
       : '<div class="tom-melding">Alle bilene er skjult — se «Vis».</div>';
   }
+  planleggHentingTegning(paVakt);
 
   const teller = document.getElementById('av-vakt-teller');
   if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';

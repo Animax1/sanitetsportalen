@@ -21,7 +21,7 @@ from __future__ import annotations
 from core.sortering import Norsk, norsk_nokkel
 
 
-from . import choices
+from . import choices, posisjon
 from .models import Enhetstype, Lydvarsel, Problemstilling
 
 
@@ -148,6 +148,9 @@ def bilinnstillinger() -> dict:
         'nytt_oppdrag': lyd_ved_nytt_oppdrag(),
         'lyd_aktiv': lyd_aktiv(),
         'krev_grov_avreist': krev_grov_for_avreist(),
+        # Løpende posisjon (19. okt. 2026) — `oppdrag/posisjon.py`. Bilen leser
+        # tallene for linja i bunnen; intervallet *nå* får den fra serveren.
+        'posisjon': posisjon.innstillinger(),
     }
 
 

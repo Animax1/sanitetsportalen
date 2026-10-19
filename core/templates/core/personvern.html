@@ -219,16 +219,34 @@
       ingenting annet. «Del posisjon» på skjermen slår av sendingen ved stempling; KO ser da at
       den er av, men ikke hvor bilen er. I kartet står bare siste posisjon, og den slettes
       24 timer etter siste melding.</li>
+    {% if lopende_posisjon %}
+    <li id="lopende-posisjon"><strong>Løpende posisjon fra bilene</strong> er
+      {% if lopende_posisjon.aktiv %}<strong>slått på</strong>{% else %}slått av nå{% endif %}.
+      Når den er på, sender bilskjermen posisjonen med jevne mellomrom mens bilen er på vakt og
+      siden er åpen, hyppigst når bilen har rykket ut på et akutt oppdrag:
+      <table class="table table-sm w-auto mt-1 mb-1">
+        <tbody>
+          {% for tilstand, intervall in lopende_posisjon.rader %}
+          <tr><td>{% if tilstand == 'Uten oppdrag' %}På vakt, uten oppdrag{% else %}Rykket ut på {{ tilstand|lower }}{% endif %}</td><td>{{ intervall }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      I passiv vakt sendes det bare mens bilen har rykket ut på et oppdrag som ikke er plassering.
+      KO kan også trykke «Hent posisjon» og få én posisjon uten at mannskapet trykker; skjermen
+      sier da «KO hentet posisjonen» med klokkeslett, og KO-loggen noterer hvem som hentet.
+      «Del posisjon» av stopper begge deler. Det lagres fortsatt bare siste posisjon, uten
+      historikk.</li>
+    {% endif %}
     <li><strong>Lag:</strong> lagregistreringen sender lagets posisjon bare når noen trykker «Send
       posisjon til KO». Den vises i kartet i {{ delt_posisjon_min }} minutter og slettes så.
       Ellers sendes bare stedsnavnet der KO har plassert laget — ingen koordinater.</li>
-    <li>KO-loggen noterer <em>at</em> en posisjon ble delt, og til når — aldri <em>hvor</em>.</li>
+    <li>KO-loggen noterer <em>at</em> en posisjon ble delt eller hentet, og av hvem — aldri <em>hvor</em>.</li>
     <li>Ingen helseopplysninger går til kartet.</li>
   </ul>
   <p>
-    Formålet er oversikt over egne ressurser under vakt, og mannskapets sikkerhet: en bil som
-    ikke svarer på sambandet kan finnes der den sist stemplet. Grunnlaget er berettiget
-    interesse (art. 6 nr. 1 bokstav f).
+    Formålet er oversikt over egne ressurser under vakt — å sende nærmeste bil når minuttene
+    teller — og mannskapets sikkerhet: en bil som ikke svarer på sambandet kan finnes der den
+    sist var. Grunnlaget er berettiget interesse (art. 6 nr. 1 bokstav f).
   </p>
 
   <h2 id="lag">6. Lagregistreringen</h2>

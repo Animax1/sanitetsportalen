@@ -703,6 +703,14 @@ button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
   flex-wrap: wrap;
 }
 
+/* «KO hentet posisjonen 21:14» (B2, 19. okt. 2026) — egen linje under, i blått som
+   skissen: åpent uten å forstyrre, og ikke en advarsel. */
+.posisjon-ko-hentet {
+  flex-basis: 100%;
+  order: 3;
+  color: #93c5fd;
+}
+
 /* Hvem deler posisjon (4. okt. 2026) — ikonet helt til høyre på enhetskortet,
    i KO og på sentralbordet. Tilstandene skiller seg på form og lysstyrke, ikke
    bare farge: strek over for «av», utropstegn for «kan ikke», spørsmålstegn og
@@ -754,3 +762,29 @@ button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
 /* Skjermen holdes våken (Wake Lock, 9. okt. 2026). Et stille avslag fra iOS i
    strømsparing er det vanlige problemet; da skal linja synes fra førersetet. */
 .vaaken-linje.vaaken-problem { color: #f59e0b; font-weight: 600; }
+
+/* «Hent posisjon» fra KO (19. okt. 2026, skisse A). Knappen står ved posisjonsikonet,
+   svaret som en linje under oppdraget: grønt mottatt, gult venter, rødt kom ikke fram —
+   og teksten bærer det alene, fargen bare forsterker (WCAG 1.4.1). */
+.enhet-hent-posisjon {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0.1rem 0.35rem;
+  line-height: 1;
+  color: var(--portal-text-muted, #94a3b8);
+  border: 1px solid var(--portal-border, #475569);
+  background: transparent;
+}
+.enhet-hent-posisjon:hover:not(:disabled) { color: #e2e8f0; }
+.enhet-henting { font-size: 0.75rem; margin-top: 0.15rem; }
+.henting-mottatt { color: #86efac; }
+.henting-venter { color: #fcd34d; }
+.henting-kom-ikke { color: #fca5a5; }
+.enhet-gruppe .enhet-hent-alle {
+  margin-left: 0.5rem;
+  padding: 0 0.5rem;
+  font-size: 0.72rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.enhet-gruppe-kun-knapp { text-align: right; }

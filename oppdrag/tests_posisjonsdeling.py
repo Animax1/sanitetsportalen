@@ -26,7 +26,9 @@ from django.utils import timezone
 
 from oppdrag import choices
 from oppdrag.models import Enhet
+from patients.js_test_utils import KORT_HENTING
 from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
+from patients.js_test_utils import BIL_LOPENDE
 from patients.js_test_utils import (
     KO_JS, OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available,
     run_node)
@@ -252,7 +254,7 @@ POS = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAktiv', 'delPo
 
 BIL_HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil', 'koFjern',
                                    'projiser', 'synk', '_stemple', 'lastMine', 'harNyDelt', 'erNyDelt',
-                                   'nyeOppdrag', *POS)),)
+                                   'nyeOppdrag', *POS, *BIL_LOPENDE)),)
 
 BIL_FORSPILL = """
 const STEMPEL_LAAS_MS = 0; const NY_DELT_MS = 60000;
@@ -375,7 +377,7 @@ class BilskjermensTilstandTests(unittest.TestCase):
 
 KORT_HARNESS = (
     (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
-    (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', 'mkBesetning',
+    (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING, 'mkBesetning',
                           'kanSeBesetning', '_grovMerke', '_problemMedAntall', 'hastegradKlasse', 'tidSiden')),
 )
 

@@ -113,6 +113,17 @@ class Enhet(BaseTimeStampedModel):
         default=choices.POSISJONSDELING_UKJENT, verbose_name='Deler posisjon')
     posisjonsdeling_at = models.DateTimeField(
         null=True, blank=True, verbose_name='Posisjonsdeling sist endret')
+    # **«Hent posisjon» fra KO** (19. okt. 2026, `oppdrag/posisjon.py`). Når KO
+    # ba om posisjonen, hvem, og når den kom fram til kartet — **aldri hvor**.
+    # På enheten og ikke i cachen: prod kan gå med en cache per prosess, og da
+    # ville bilens poll truffet en annen prosess enn den KO ba i. Nåtilstand
+    # som `posisjonsdeling`; hvem som hentet når står i KO-loggen (C3).
+    posisjon_bedt_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Posisjon bedt om')
+    posisjon_bedt_av = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Posisjon bedt om av')
+    posisjon_mottatt_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Posisjon mottatt')
 
     class Meta:
         verbose_name = 'Enhet'

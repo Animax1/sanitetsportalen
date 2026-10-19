@@ -28,7 +28,7 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 from core.verdilister import Verdiliste, lag_views
 
-from . import choices, verdier
+from . import choices, posisjon, verdier
 from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
 from .views_common import kan_lede
 
@@ -123,7 +123,8 @@ enhetstyper_view, enhetstype_detalj_view, enhetstyper_rekkefolge_view = _views('
 @rate_limit(group='oppdrag:bilinnstillinger', rate='30/m', method='PUT')
 def bilinnstillinger_view(request):
     """Lydvarselets terskler per hastegrad, om lyden er på i det hele tatt,
-    om nytt oppdrag skal pipe, og om grovsortering kreves før Avreist.
+    om nytt oppdrag skal pipe, og om grovsortering kreves før Avreist — og
+    løpende posisjon (`posisjon`, 19. okt. 2026, `oppdrag/posisjon.py`).
 
     GET for alle med `les` — bilen henter dem hvert femte minutt, så en
     endring når fram uten at siden lastes på nytt. PUT er **global admin**
@@ -134,6 +135,13 @@ def bilinnstillinger_view(request):
     if not er_global_admin(request.user):
         return json_feil('Bilinnstillingene settes av global admin.', 403)
     data = json_body(request)
+    # Løpende posisjon valideres først: alt i kroppen skal godtas før noe
+    # lagres, ellers står halve skjemaet lagret bak en feilmelding.
+    nye_posisjon = None
+    if 'posisjon' in data:
+        nye_posisjon, feil = posisjon.valider(data['posisjon'])
+        if feil:
+            return json_feil(feil)
     terskler = data.get('terskler') or {}
     if not isinstance(terskler, dict):
         return json_feil('Send `terskler` som {hastegrad: [første, gjenta]}.')
@@ -163,4 +171,6 @@ def bilinnstillinger_view(request):
                          ('krev_grov_avreist', verdier.KREV_GROV_AVREIST_NOKKEL)):
         if felt in data:
             AppSetting.set_i_portal(nokkel, '1' if data[felt] else '0')
+    if nye_posisjon:
+        posisjon.lagre(nye_posisjon)
     return JsonResponse({'status': 'ok', 'data': verdier.bilinnstillinger()})

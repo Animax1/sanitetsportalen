@@ -17,7 +17,7 @@ from django.utils import timezone
 from oppdrag import choices
 from oppdrag.models import Oppdrag, Statusmelding
 from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
-from patients.js_test_utils import OPPDRAG_ENHET_JS, build_harness, node_available, run_node
+from patients.js_test_utils import BIL_LOPENDE, OPPDRAG_ENHET_JS, build_harness, node_available, run_node
 
 from .tests_views import StemplingBasis, _bruker, _klient
 
@@ -191,7 +191,8 @@ POS_FUNKSJONER = ('posisjonMaksAlderMs', 'posisjonForStempling', 'kartKoblingAkt
                   'posisjonsdelingTilstand', 'erPaVakt', 'paVaktNokkel', 'notePaVakt', 'bryterSperret')
 
 HARNESS = (INNLOGGET, (OPPDRAG_ENHET_JS, ('lagNokkel', 'koNokkel', 'koLes', 'koSkriv', 'koLeggTil',
-                               'koFjern', 'projiser', 'synk', '_stemple', *POS_FUNKSJONER)),)
+                               'koFjern', 'projiser', 'synk', '_stemple', 'bilinnstillinger',
+                               *POS_FUNKSJONER, *BIL_LOPENDE)),)
 
 FORSPILL = """
 const STEMPEL_LAAS_MS = 0;
@@ -289,7 +290,8 @@ class PosisjonForStemplingTests(unittest.TestCase):
             localStorage.setItem(delPosisjonNokkel(), '0'); t.push(posisjonLinjeTekst());
             console.log(JSON.stringify(t));""")
         self.assertEqual(ut[0], '')
-        self.assertTrue(ut[1].startswith('Posisjon sendes til kartet ved stempling'), ut[1])
+        # «KO», ikke «kartet» (André, 19. okt. 2026: «Det er lettere å forstå»).
+        self.assertTrue(ut[1].startswith('Posisjon sendes til KO ved stempling'), ut[1])
         self.assertIn('KO ser at den deles', ut[1])
         self.assertTrue(ut[2].startswith('Nettleseren har ikke gitt tilgang til posisjon'), ut[2])
         self.assertIn('Innstillinger', ut[2], 'nektet kan ikke rettes fra siden — teksten sier hvor')

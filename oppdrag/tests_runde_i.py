@@ -262,7 +262,7 @@ class UthevingHosOperatorJsTests(SimpleTestCase):
 class LydvarselSkjemaJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (OPPDRAG_SENTRAL_JS, ('_lydvarselSkjema',)),
+        (OPPDRAG_SENTRAL_JS, ('_lydvarselSkjema', '_posisjonSkjema', 'posisjonTilstander')),
     )
 
     def setUp(self):

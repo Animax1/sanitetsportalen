@@ -105,6 +105,8 @@ class TavleEndringerFangesTests(SimpleTestCase):
         'oppdrag/fritekstfrist.py: Oppdrag.update': 'tømmer bare fritekst — tavla viser den ikke',
         'oppdrag/fritekstfrist.py: Statusmelding.update': 'tømmer bare sted_tekst — tavla viser den ikke',
         'oppdrag/sladding.py: Statusmelding.update': 'sladder bare sted_tekst — tavla viser den ikke',
+        # «Hent posisjon fra alle» (19. okt. 2026): når KO ba om posisjonen — tavla viser det ikke.
+        'oppdrag/views_posisjon.py: Enhet.update': 'skriver bare posisjon_bedt_* — tavla viser dem ikke',
     }
 
     def test_hver_skriving_utenom_signalene_er_vurdert(self):

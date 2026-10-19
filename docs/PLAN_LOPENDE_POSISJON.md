@@ -1,6 +1,6 @@
 # Plan: løpende posisjon fra bilene, og «Hent posisjon» fra KO
 
-*Utkast 19. okt. 2026, oppdatert samme dag med Andrés svar (§6). Ikke bygget. Bestilt av André:*
+*Utkast 19. okt. 2026, oppdatert samme dag med Andrés svar (§6). **Steg 1–5 bygget samme dag** (§0); steg 6 (kartet) og DPIA-delen (§7) står igjen. Bestilt av André:*
 
 > «Oppdatering posisjon: Ha løpende oppdatering fra bare stempling til regelmessig
 > oppdateringer av posisjon. Fra en går inn på /oppdrag/ så skal oppdateres hver 5 min og på
@@ -11,7 +11,29 @@
 > dem. Og endre den om de ikke er på noe heller. Ikke glem å oppdater personvern
 > dokumentasjon, vi gjør dette på grunn av operativ hensyn med berettiget interesse.»
 
-## 1. Hva som finnes i dag (lest i koden 19. okt.)
+## 0. Bygget 19. okt. 2026 — og der det ble annerledes enn planen
+
+Steg 1–5 i §5 er bygget, med **hovedbryteren av**. Regelen står i `oppdrag/posisjon.py`,
+endepunktene i `oppdrag/views_posisjon.py`, klokka i `static/js/oppdrag-enhet.js`
+(`lopendeTikk`), kortet i `static/js/oppdrag-kort.js` (`hentingTilstand`). Fem avvik fra
+planen, hvert med grunnen:
+
+| Planen sa | Bygget | Hvorfor |
+|---|---|---|
+| `intervallFor(oppdrag, innstillinger)` som egen funksjon i bilens JS | **Serveren regner ut intervallet** og sender det i header `X-Posisjon-Intervall` på pollen (også 304) | Serveren er bremsen og må ha regelen uansett. To kopier av samme regel glir fra hverandre — og da sender bilen enten oftere enn serveren tar imot, eller sjeldnere enn admin bestemte. Bonus: en endring i innstillingene, eller at 113 setter bilen i passiv, virker innen 15 s, ikke 5 min |
+| Merket for «Hent posisjon» i cachen, TTL 2 min | **Tre felt på `Enhet`**: `posisjon_bedt_at`, `posisjon_bedt_av`, `posisjon_mottatt_at` (`oppdrag/0038`) | Prod kan gå med en cache per prosess (`LocMemCache`, `WEB_WORKERS`); da kunne KO ha bedt i én prosess og bilen pollet en annen. På enheten følger feltene ETag-en og endringsnummeret, så kortet i KO oppdateres av seg selv. Aldri koordinater |
+| «Fra alle»: én linje med «hvor mange som svarte» | Linja skrives **når KO ber**: «Hent posisjon fra alle i Ambulanse: 4 av 5 biler kan svare» | Svarene kommer opptil 15 s senere og hver for seg; en linje som ventet på dem måtte vært rettet etterpå. Handlingen som logges er spørsmålet — svaret står på kortet. «Kan svare» er de som er på vakt med deling på |
+| «Hent alle» i hodet på ressursoversikten | **«Hent posisjon fra alle» per gruppe** (enhetstype), som skisse A André valgte | Skissen viste den i gruppehodet. Med bare én gruppe står knappen alene øverst |
+| Sendingen i `on_commit` eller som 202 | **Direkte**, med kartkoblingens 3 s tidsavbrudd og pause etter feil | Ingenting skrives før kartet har svart, og KO skal bare se «mottatt» når kartet tok imot. Et kart som er nede holder en tråd i høyst 3 s i minuttet (`PAUSE_S`) |
+
+**Bremsen måler mot intervallet *nå*** (funnet under byggingen): planen sa «cache-nøkkel per
+enhet», og en sperre med levetid ville stått i fire minutter etter en sending på «uten
+oppdrag» — også etter at bilen rykket ut på akutt. Nøkkelen holder derfor tidspunktet.
+
+**Ikke gjort ennå:** steg 6 (kartets `kilde` og «posisjon … siden»), og DPIA-delen for
+posisjon (§7), som skal være skrevet **før hovedbryteren slås på i prod**.
+
+## 1. Hva som fantes (lest i koden 19. okt.)
 
 | Hva | Hvor | Merk |
 |---|---|---|
@@ -39,7 +61,8 @@ uten en stempling, en vei for KO til å be om en fix, og et sted admin setter in
   de har trykket rykker ut på som ikke er plassering. Det vil si Akutt, Haster, Drift.» Regelen:
   en bil i passiv vakt sender bare mens den har et **påbegynt** oppdrag (Rykker ut og videre,
   til Ledig) med hastegrad Akutt, Haster eller Drift — og da med det intervallet hastegraden
-  har. Varslet, avventet eller på Plassering: ingenting. (Vanlig er ikke nevnt — spørsmål 5.)
+  har. Varslet, avventet eller på Plassering: ingenting. **Vanlig er med** (André, svar 5: «nei
+  jeg glemte den ut») — altså Akutt, Haster, Vanlig og Drift.
   Modusen leses som i dag (`gjeldende_modus`), så det er den bilen *står* i nå som avgjør.
 - **Bare når det allerede sendes i dag:** koblingen er satt opp, bilen er **på vakt**, og
   bryteren «Del posisjon» er på. Av vakt eller bryteren av: ingenting, som nå.
@@ -158,10 +181,12 @@ må stå på egne bein:
 
 | # | Spørsmål | Svar |
 |---|---|---|
-| 1 | Passiv vakt | **Ikke løpende**, med mindre bilen har trykket Rykker ut på et oppdrag som ikke er Plassering: Akutt, Haster, Drift (§2.1) |
+| 1 | Passiv vakt | **Ikke løpende**, med mindre bilen har trykket Rykker ut på et oppdrag som ikke er Plassering: Akutt, Haster, Drift — og Vanlig (svar 5) (§2.1) |
 | 2 | Wake Lock | «Ja ideelt sett» — **finnes alt** på `/oppdrag/` fra 9. okt. (§1, §3) |
 | 3 | Ser mannskapet at KO hentet, står det i loggen? | Valgt fra skissene (Artifact «Hent posisjon — skisser»): **A** (knappen per bil og «fra alle», svaret på kortet), **B2** (klokkeslett i bunnlinja på bilskjermen) og **C3** (hver henting logges) — se under |
 | 4 | Knappene i KO, ikke i kartet | **Ja** |
+| 5 | Vanlig i passiv vakt | **Med** — «nei jeg glemte den ut». Passiv vakt sender på påbegynt Akutt, Haster, Vanlig og Drift |
+| 6 | «Hent posisjon» på en bil i passiv vakt | **Ja** — «men det er risiko at bilens mobil/nettbrett ikke er på nettsiden». Kortet sier da «Kom ikke fram — skjermen er trolig ikke åpen. Meld på samband» etter 45 s |
 
 **Svaret på 3, slik det bygges:**
 
@@ -174,14 +199,11 @@ må stå på egne bein:
   alle og hver enkelt, og jeg vil ha det logget»). En systemlinje med hvem i KO, aldri
   koordinatene. **I loggstrømmen alltid, og i hendelsen i tillegg** når bilen står på et oppdrag
   som hører til en — samme regel som «OBS: Posisjon delt» (`POSISJON_DELT`). «Fra alle» gir
-  **én** linje med hvor mange som svarte, ikke én per bil: «Posisjon hentet fra alle biler
-  (9 av 11) — kari». Ny kode i `ko/systemlinjer.py`, med begrunnelse i `KODER`.
+  **én** linje, ikke én per bil. Ny kode i `ko/systemlinjer.py`, `POSISJON_HENTET`, med
+  begrunnelse i `KODER`. *Bygget:* «Hent posisjon: Haugesund 56» og «Hent posisjon fra alle i
+  Ambulanse: 4 av 5 biler kan svare», med operatøren som forfatter — antallet er de som *kan*
+  svare, ikke de som svarte (§0).
 
-**Står igjen før steg 1:**
-
-5. **Vanlig i passiv vakt.** Svaret listet Akutt, Haster og Drift. Er det med vilje at en bil i
-   passiv vakt som rykker ut på et *Vanlig* oppdrag ikke sender — eller glapp det?
-6. **«Hent posisjon» på en bil i passiv vakt** — skisse A sier ja (KO spør, ikke en klokke).
 
 ## 7. DPIA
 

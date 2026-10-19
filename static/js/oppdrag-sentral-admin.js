@@ -388,6 +388,8 @@ function _lydvarselSkjema(d) {
                    id="lyd-gjenta-${escHtmlValue(h)}" value="${escHtmlValue(gjenta)}" aria-label="Gjenta hvert"></td>
       </tr>`;
   }).join('');
+  // Hoistet ut av mal-strengen: et kall inne i `${...}` er usynlig for XSS-skanneren.
+  const posisjonDel = _posisjonSkjema(d.posisjon || {});
   return `
     <h6 class="mb-2">Lydvarsel</h6>
     <div class="form-check mb-2">
@@ -408,8 +410,73 @@ function _lydvarselSkjema(d) {
       <input class="form-check-input" type="checkbox" id="krev-grov-avreist"${d.krev_grov_avreist ? ' checked' : ''}>
       <label class="form-check-label" for="krev-grov-avreist">Krev grovsortering også før Avreist</label>
     </div>
+    ${posisjonDel}
     <button type="button" class="btn btn-sm btn-primary" id="lyd-lagre" data-action="lagreLydvarsel">Lagre</button>
     <span class="form-text ms-2">Gjelder alle biler; bilen henter innstillingene innen fem minutter.</span>`;
+}
+
+
+//: Tilstandene i skjemaets rekkefølge, med navnet admin ser. `uten` er «på vakt,
+//: men ikke på noe» — samme nøkkel som `oppdrag/posisjon.py`.
+function posisjonTilstander() {
+  return [...HASTEGRAD_REKKEFOLGE.map((h) => [h, h]), ['uten', 'Uten oppdrag']];
+}
+
+
+function _posisjonSkjema(p) {
+  // Løpende posisjon (André, 19. okt. 2026): hovedbryteren og sekunder per
+  // tilstand. «Gruppere» er en hjelp, ikke en regel: «Fyll alle» skriver samme
+  // tall i feltene, og det som lagres er alltid ett tall per tilstand.
+  const sek = p.sekunder || {};
+  const paa = p.aktiv === true;
+  const rader = posisjonTilstander().map(([nokkel, navn]) => `
+      <tr>
+        <td>${escapeHtml(navn)}</td>
+        <td><input type="number" class="form-control form-control-sm lyd-felt posisjon-sek" min="0" max="3600" step="5"
+                   id="posisjon-sek-${escHtmlValue(nokkel)}" value="${escHtmlValue(sek[nokkel] ?? '')}"
+                   aria-label="Sekunder mellom hver posisjon, ${escHtmlValue(navn)}"></td>
+      </tr>`).join('');
+  return `
+    <h6 class="mb-2">Løpende posisjon</h6>
+    <p class="form-text mt-0 mb-2">Av: posisjon bare ved stempling og «Send posisjon», og KO kan ikke
+      hente den. På: bilen sender til KO med intervallet under, og KO kan trykke «Hent posisjon».
+      Passiv vakt sender bare på oppdrag bilen har rykket ut på, ikke Plassering.
+      Slå på først når personverndokumentasjonen (A.6) og DPIA-delen for posisjon er klar.</p>
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" id="posisjon-aktiv"${paa ? ' checked' : ''}>
+      <label class="form-check-label" for="posisjon-aktiv">Løpende posisjon fra bilene er på</label>
+    </div>
+    <table class="table table-sm mb-2 lyd-tabell">
+      <thead><tr><th>Tilstand</th><th>Sekunder mellom hver (15–3600, 0 = ikke løpende)</th></tr></thead>
+      <tbody>${rader}</tbody>
+    </table>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <input type="number" class="form-control form-control-sm lyd-felt" id="posisjon-fyll" min="0" max="3600" step="5"
+             aria-label="Samme tall for alle">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-action="fyllPosisjonAlle">Fyll alle</button>
+      <span class="form-text">Samme for alle — lagres med «Lagre».</span>
+    </div>`;
+}
+
+
+function fyllPosisjonAlle() {
+  const verdi = document.getElementById('posisjon-fyll')?.value;
+  if (verdi === undefined || verdi === '') return;
+  posisjonTilstander().forEach(([nokkel]) => {
+    const felt = document.getElementById(`posisjon-sek-${nokkel}`);
+    if (felt) felt.value = verdi;
+  });
+}
+
+
+/** `{aktiv, sekunder}` fra skjemaet. Et tomt felt sendes ikke — da står tallet. */
+function posisjonFraSkjema() {
+  const sekunder = {};
+  posisjonTilstander().forEach(([nokkel]) => {
+    const raa = document.getElementById(`posisjon-sek-${nokkel}`)?.value;
+    if (raa !== undefined && raa !== '') sekunder[nokkel] = Number(raa);
+  });
+  return { aktiv: !!document.getElementById('posisjon-aktiv')?.checked, sekunder };
 }
 
 
@@ -427,6 +494,7 @@ async function lagreLydvarsel() {
     nytt_oppdrag: !!document.getElementById('lyd-nytt')?.checked,
     lyd_aktiv: !!document.getElementById('lyd-aktiv')?.checked,
     krev_grov_avreist: !!document.getElementById('krev-grov-avreist')?.checked,
+    posisjon: posisjonFraSkjema(),
   };
   await withSubmitGuard('lyd-lagre', async () => {
     if (await _verdiKall('/oppdrag/api/bilinnstillinger/',

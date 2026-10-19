@@ -486,11 +486,13 @@ den sterkeste formen for dataminimering som finnes, og den reduserer risikoen re
 designet antar at opplæring forvitrer under press, og har derfor en sletteinngang. Se A.9
 for oppbevaringstid, sletteinngangen og forbeholdet om backupene.
 
-### Posisjon og sted til kart.sanitet.net (kartkoblingen) — 30. september 2026
+### Posisjon og sted til kart.sanitet.net (kartkoblingen) — 30. september 2026, løpende posisjon 19. oktober 2026
 
-Portalen sender fire ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
-`docs/archived/PLAN_KARTKOBLING.md`). **Portalen lagrer ingenting av det** — ingen tabell, ingen
-revisjonsrad; den videresender og glemmer.
+Portalen sender seks ting til korpsets eget kart, kart.sanitet.net (`core/kartkobling.py`,
+`docs/archived/PLAN_KARTKOBLING.md`, `docs/PLAN_LOPENDE_POSISJON.md`). **Portalen lagrer ingen
+posisjon** — ingen tabell, ingen revisjonsrad; den videresender og glemmer. Det portalen lagrer
+om «Hent posisjon», er *når* KO ba om den, *hvem*, og *når* den kom fram (tre felt på enheten,
+nåtilstand som overskrives) — aldri hvor.
 
 | Hva | Innhold | Når | Kategori |
 |---|---|---|---|
@@ -498,28 +500,42 @@ revisjonsrad; den videresender og glemmer.
 | **Lagenes sted** | Lagnavnet og stedsnavnet der KO har plassert laget, eller hendelsens sted — **ingen koordinater** | Når KO flytter laget, setter det på eller av en hendelse | Vanlig personopplysning på samme måte, i grovere form |
 | **Bilens posisjon på knappen «Send posisjon»** (7. okt. 2026) | Som ved stempling: enhetens navn, bredde- og lengdegrad, tidspunktet, og når markøren skal bort | Bare når mannskapet trykker knappen under enhetsnavnet — «her er jeg, hvor skal jeg?». Står oransje under «OBS: Posisjon delt» like lenge som lagenes, så vanlig bilmarkør | Som ved stempling |
 | **Lagets posisjon, «Send posisjon til KO»** (7. okt. 2026) | Lagnavnet, bredde- og lengdegrad, tidspunktet, og når markøren skal bort | Bare når laget trykker den oransje knappen på lagregistreringen. Står i kartet under «OBS: Posisjon delt» i 15 minutter (admin endrer «Delt posisjon vises i kartet», 1–120 min; kartet godtar høyst 3 timer) | Vanlig personopplysning: posisjonen er telefonens, og lagnavnet peker sammen med vaktlista på mannskapet |
+| **Bilens løpende posisjon** (19. okt. 2026) | Som ved stempling: enhetens navn, bredde- og lengdegrad, tidspunktet | **Bare når admin har slått det på** (av som standard), bilen er på vakt, bryteren «Del posisjon» er på og bilskjermen er åpen. Intervallet følger det bilen har rykket ut på — standard hvert 30. sekund på akutt og haster, hvert 5. minutt ellers og uten oppdrag; admin setter det per hastegrad og «uten oppdrag», 15 sekunder til 60 minutter, eller av per tilstand. **Passiv vakt sender ikke**, med mindre bilen har rykket ut på et oppdrag som ikke er Plassering | Som ved stempling — men nå med jevne mellomrom, se avveiningen |
+| **«Hent posisjon» fra KO** (19. okt. 2026) | Én posisjon, som over | Når en KO-operatør med skriv-tilgang i oppdragsmodulen trykker «Hent posisjon» på én bil eller «fra alle» i en gruppe. Bilen sender på neste poll (innen 15 sekunder) — også i passiv vakt, men aldri når «Del posisjon» er av, og bare når løpende posisjon er slått på | Som ved stempling |
 
 **Det som ikke sendes:** status, oppdragsnummer, hendelsesnummer, hastegrad,
 problemstilling, fritekst, nøyaktighet. Ingen helseopplysning går til kartet.
 
-**Formål:** koordinering under vakt — hvor bilene sist var, og hvor lagene står — og
-mannskapets egen sikkerhet: en bil som ikke svarer på samband, kan finnes der den sist
-stemplet.
+**Formål:** koordinering under vakt — hvor bilene er, og hvor lagene står, så KO kan sende
+nærmeste bil når minuttene teller — og mannskapets egen sikkerhet: en bil som ikke svarer på
+samband, kan finnes der den sist var.
 
 **Rettslig grunnlag:** berettiget interesse, GDPR art. 6 nr. 1 bokstav f.
 
-**Avveiningen:**
+**Avveiningen** (skrevet om 19. okt. 2026: den bygget på at behandlingen var hendelsesstyrt,
+«ingen løpende sending» — det er ikke lenger sant når admin slår løpende posisjon på):
 
 - *Interessen* er reell og korpsets egen: operativ oversikt over egne ressurser under et
-  arrangement, og sikkerheten til mannskapet som kjører.
-- *Nødvendigheten*: det som sendes er det minste som gir oversikten — siste posisjon ved en
-  handling mannskapet selv gjør, ikke et spor. Lagene sendes som stedsnavn, ikke koordinater.
-- *Den registrertes forventning og inngrep*: behandlingen er **hendelsesstyrt** (ved
-  stempling, ingen løpende sending), **bare siste posisjon** (én rad per enhet som
-  overskrives), **ingen historikk**, og raden slettes i kartet **24 timer** etter siste
-  melding. Den er **synlig for mannskapet**: bilskjermen sier «Posisjon sendes til kartet
-  ved stempling. KO ser at den deles». Nettleseren spør om lov før den gir posisjon, og et
-  nei stopper ingenting annet enn posisjonen. Stemplingen venter aldri på posisjonen.
+  arrangement, og sikkerheten til mannskapet som kjører. **For akutt og haster er den
+  sterkere enn før**: å sende nærmeste bil, og å finne en bil som ikke svarer på samband,
+  avhenger av hvor bilen er *nå*, ikke av hvor den sist stemplet (André, 19. okt. 2026:
+  «vi gjør dette på grunn av operativ hensyn med berettiget interesse»).
+- *Nødvendigheten* er grunnen til at frekvensen følger hastegraden: oftest der minuttene
+  teller, sjeldent ellers, og admin kan slå hver tilstand av eller hele funksjonen av — av
+  betyr nøyaktig slik det var før 19. okt. **Passiv vakt sender ikke** løpende: bakvakten
+  sover, og der er det ingen operativ grunn før bilen har rykket ut. Det som sendes er
+  fortsatt det minste som gir oversikten — **bare siste posisjon** (én rad per enhet som
+  overskrives), **ingen historikk**, ingenting om oppdraget, og raden slettes i kartet
+  **24 timer** etter siste melding. Lagene sendes fortsatt som stedsnavn, ikke koordinater.
+- *Den registrertes forventning og inngrep*: inngrepet er **større enn før** — en bil på
+  akutt kan følges med et halvt minutts mellomrom så lenge oppdraget varer. Det er derfor
+  åpent hele veien: bilskjermen sier «Posisjon sendes til KO hvert 30. sekund på akutt og
+  haster, hvert 5. minutt ellers. KO ser at den deles», med **tallene hentet fra
+  innstillingene**, og erklæringen på `/personvern/` oppgir de samme tallene fra koden. Er
+  løpende posisjon av, sier linja «Posisjon sendes til KO ved stempling». Nettleseren spør om
+  lov før den gir posisjon, og et nei stopper ingenting annet enn posisjonen. Stemplingen
+  venter aldri på posisjonen. **Nettleseren sender bare mens siden er åpen og skjermen på** —
+  en telefon i lomma sender ikke, og det er ingen sporing i bakgrunnen.
 - *Deling er forventet på vakt* (André, 4. okt. 2026). Bryteren «Del posisjon» står på
   bilskjermen, men den er for unntak — privat kjøring, en bil som ikke er på vakt — ikke et
   fritt valg under tjeneste. Fram til 4. okt. sto bryteren her som et argument for at
@@ -539,6 +555,15 @@ stemplet.
   fra portalen» ser noe. Meldingene er signert (HMAC) og går over TLS; kartet returnerer
   aldri data til portalen.
 
+**«Hent posisjon» fra KO (19. okt. 2026) er en ny handling, og vurdert for seg.** Den sender
+én posisjon uten at mannskapet trykker. Det er forsvarlig fordi den bare virker når løpende
+posisjon er slått på, bilen er på vakt og «Del posisjon» er på; fordi posisjonen går dit de
+løpende alt går; **og fordi den er åpen begge veier**: bilskjermen sier «KO hentet
+posisjonen 21:14», og hver henting står i KO-loggen som en systemlinje med hvem som hentet —
+«Hent posisjon: Haugesund 56», eller én linje med antallet for «fra alle» i en gruppe — men
+**aldri koordinatene** (André, 19. okt. 2026: «jeg vil ha det logget»). Den virker også i
+passiv vakt: det er KO som spør, for én bil, i et konkret øyeblikk — ikke en klokke.
+
 **De to knappene (7. okt. 2026) er en utvidelse, og vurdert for seg.** Begge sender én
 posisjon på et uttrykkelig trykk — ikke ved en annen handling, og ikke løpende — og begge
 har formålet i navnet: mannskapet deler hvor de står, for eksempel for å få veibeskrivelse. Lagenes knapp er **første gang
@@ -556,9 +581,13 @@ koordinater** — bare navnet, at posisjonen ble delt, klokkeslettet og til når
 med loggens vanlige lagringstid (730 dager, A.9). En logg over *hvor* noen har vært ville vært
 en historikk over posisjoner; en logg over *at* et lag ba om veien er det KO-loggen er til for.
 
-Samlet veier korpsets interesse tyngre enn inngrepet, gitt grensene over.
+Samlet veier korpsets interesse tyngre enn inngrepet, gitt grensene over. **Men løpende
+posisjon er nærmere Datatilsynets liste over behandlinger som krever DPIA** (punkt 7,
+lokasjonsdata, og kriteriet systematisk monitorering — se A.12), og **hovedbryteren skal
+ikke slås på i prod før DPIA-delen for posisjon er skrevet** (`docs/PLAN_LOPENDE_POSISJON.md`
+§7). Prosedyren for mannskapet skal si det samme som bilskjermen.
 **Historikk over posisjoner er en ny behandling og krever ny vurdering.** Det samme gjelder
-løpende deling av posisjon, og enhver utvidelse av feltene som sendes.
+enhver utvidelse av feltene som sendes.
 
 ### Varsler (Notification)
 
@@ -621,7 +650,7 @@ Key-prefiks `pasientregistrering:` brukes for å isolere applikasjonens nøkler 
 | Mottakerlista for vaktlista som fil (satt av global admin) | Tjenestlig behov, reserve ved bortfall (A.6, A.11) | Navn, korps, rolle, skift, telefon, ISSI og overnatting |
 | AhaSend (databehandler) | Databehandleravtale, art. 28 | E-post portalen sender: invitasjoner, «Glemt passord», vaktlista som fil, feilvarsler (A.2) |
 | Proton AG (databehandler) | Databehandleravtale, art. 28 | E-post til `@sanitet.net`: henvendelser fra de registrerte, brukerstøtte, og feilvarsler og vaktlista som fil når adressene står som mottakere (A.2) |
-| kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling og på «Send posisjon»; lagets navn og stedsnavn, og lagets posisjon på «Send posisjon til KO». Ingen helseopplysninger |
+| kart.sanitet.net (korpsets eget kart, samme behandlingsansvarlige) | Berettiget interesse, art. 6(1)(f) — se A.6, «Posisjon og sted til kart.sanitet.net» | Enhetens navn og posisjon ved stempling, på «Send posisjon», løpende når admin har slått det på, og på «Hent posisjon» fra KO; lagets navn og stedsnavn, og lagets posisjon på «Send posisjon til KO». Ingen helseopplysninger |
 
 Det foretas **ingen videreformidling** til tredjeparter, kommersielle aktører, offentlige myndigheter (med unntak av eventuelle lovpålagte utleveringer) eller andre organisasjoner.
 
@@ -661,7 +690,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | **Lagregistreringer (`park.Registrering`, `/lag/`)** | **730 dager (2 år)** fra registreringen, også for rader merket slettet | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Tid, sted, lag, problemstilling, antall og utfall — ingen identifikator, men en sjelden problemstilling på et bestemt sted og klokkeslett kan peke på en person. To hele sesonger til sammenligning, som arkivene. Fristen er fast i koden og ikke en innstilling, så den ikke kan flyttes uten at dette dokumentet følger med. Lenkene, verdimengdene og de skjulte stedene står; frosne statistikktall (`core.VaktStatistikk`) har foreløpig ingen frist |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | **E-post i Proton-innboksene** (personvern@, admin@, support@, catch-all) | **Vaktlista som fil til admin@: 30 dager. Feilvarsler til admin@: 90 dager. Henvendelser til personvern@: til saken er avsluttet** (fastsatt 15. okt. 2026) | Systemposten: Proton, med Sieve-filteret i merknaden under. Henvendelsene og alt annet: manuelt, kontrollert i C.4 | Feilvarsler og vaktlista som fil har ingen verdi etter at feilen er rettet eller vakta er over. Henvendelser etter A.14 beholdes til saken er avsluttet og så lenge det trengs for å dokumentere svaret |
-| **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen.** I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
+| **Posisjon og lagsted til kart.sanitet.net** | **Lagres ikke i portalen** — heller ikke den løpende. «Hent posisjon» etterlater tre felt på enheten (når KO ba, hvem, når den kom fram), som overskrives ved neste henting; at det skjedde står i KO-loggen (730 dager), aldri hvor. I kartet: én rad per enhet og per lag, overskrevet, **slettet 24 timer** etter siste melding. **Delt posisjon («Send posisjon», bil og lag): slettet når tiden går ut** — 15 minutter som standard, høyst 3 timer | Kartet – ved mottak, ved visning og i kartets `rydd` | Siste kjente posisjon er formålet; en historikk ville vært en ny behandling (A.6) |
 | **Oppdragsnotat og «Annet sted» (`Oppdrag.fritekst`, `Statusmelding.sted_tekst`)** | **3 dager etter siste aktivitet** på oppdraget, justerbart 1–30 av global admin | Skjules i serverens svar straks fristen er ute; tømmes av `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Fritt tekstfelt der identifikatorer kan havne (A.6). Oppdraget står igjen til vakta avsluttes. Teksten ligger fortsatt i backupene (730 og 90 dager hos Scaleway) — fristen er ikke en sletterett |
 | **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
@@ -1036,17 +1065,20 @@ kriteriene**, og det er der terskelen ligger for denne behandlingen.
    ikke nevnt. Nærmest er **punkt 7, «Behandling av lokasjonsdata i følge med minst ett annet
    kriterium»**, med eksempelet systematisk sammenstilling av lokasjons- og trafikkdata fra
    teleoperatører. Bilenes og lagenes posisjon er personopplysninger om mannskapet, men de
-   sendes bare ved stempling og «Send posisjon», overskrives uten historikk og slettes etter
-   24 timer i kartet (A.6). Det er ikke systematisk monitorering, og punktet regnes som **ikke
-   utløst** — men det er den nærmeste grensen, og løpende posisjonsdeling eller historikk
-   ville krysset den.
+   sendes ved stempling og «Send posisjon», overskrives uten historikk og slettes etter
+   24 timer i kartet (A.6). **Løpende posisjon (19. okt. 2026) endrer det:** når admin slår
+   den på, sendes bilens posisjon med jevne mellomrom under hele vakta, og det er nærmere
+   systematisk monitorering enn noe portalen har gjort før. Vurderingen her — punktet
+   **ikke utløst** — gjelder derfor bare så lenge hovedbryteren er av, som den er som
+   standard. **Før den slås på i prod skrives DPIA-delen for posisjon**
+   (`docs/PLAN_LOPENDE_POSISJON.md` §7), og denne linja erstattes med en lenke dit.
 2. **De ni kriteriene** (Datatilsynet, «Når er det høy risiko?», oppdatert 27.07.2023):
 
 | Kriterium | Her |
 |---|---|
 | Evaluering eller poengsetting | Nei. Triage er en klinisk vurdering for å gi hjelp, ikke profilering |
 | Automatiske beslutninger med rettslig eller tilsvarende betydelig virkning | Nei |
-| Systematisk monitorering | Nei. Posisjonene er hendelsesstyrt og uten historikk (over) |
+| Systematisk monitorering | Nei, så lenge løpende posisjon er av (standard). **På: trolig ja** — jevnlig posisjon under hele vakta, selv uten historikk. Derfor DPIA før den slås på i prod (punkt 1 over) |
 | **Særlige kategorier eller opplysninger av svært personlig karakter** | **Ja.** Helseopplysninger, også `Rus`, `Psykiatri`, `Vold` og `Mistanke overgrep` i verdimengdene |
 | Stor skala | Nei. Ett arrangement i året, et begrenset antall pasienter, ett geografisk område |
 | Matching eller sammenstilling av datasett | Nei. Kartkoblingen har samme behandlingsansvarlige og samme formål |

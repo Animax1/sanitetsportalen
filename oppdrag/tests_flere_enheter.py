@@ -1105,6 +1105,7 @@ class SentralbordetsMatriseTests(TestCase):
             OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
+        from patients.js_test_utils import KORT_HENTING
         from .tests_runde_d import _konst
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
             OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + _konst(
@@ -1113,7 +1114,7 @@ class SentralbordetsMatriseTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', 'enhetAvventer', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  '_statusvalg', '_nesteStatus', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon',
+                                  '_statusvalg', '_nesteStatus', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat', 'posisjonsdelingIkon', *KORT_HENTING,
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 

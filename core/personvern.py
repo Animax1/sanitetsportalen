@@ -22,6 +22,11 @@ verre enn en som ikke oppgir noen. Fristene en modul eier — lagregistreringene
 overnattingen — leses gjennom `core/opprydding.py`, samme register
 `purge_old_logs` håndhever dem med: `core` får ikke importere en modul, og
 registeret svarer med nøyaktig den fristen som faktisk slettes etter.
+
+**Det en modul eier som ikke er en frist, meldes inn som kontekst** (19. okt. 2026):
+intervallene for bilenes løpende posisjon er oppdragsmodulens innstillinger.
+`registrer_kontekst()` tar en funksjon som svarer med nøkler til malen; den kalles
+ved hver visning, og en som feiler, utelates — siden tegnes likevel.
 """
 from django.shortcuts import render
 from django.views.decorators.cache import cache_control
@@ -44,6 +49,25 @@ BEHANDLINGSANSVARLIG = 'Kverneland Røde Kors'
 #: Eier og driver portalen og kartet; behandler på oppdrag fra korpset (André, 12. okt. 2026:
 #: «Korpset eier ikke sanitetsportalen eller kart.sanitet. Det gjør jeg.»). Se A.1.
 EIER = 'André Eritsland'
+
+
+_KONTEKST: list = []
+
+
+def registrer_kontekst(fn) -> None:
+    """En modul melder inn `fn() -> dict` med nøkler til erklæringen. Idempotent."""
+    if fn not in _KONTEKST:
+        _KONTEKST.append(fn)
+
+
+def modulkontekst() -> dict:
+    kontekst: dict = {}
+    for fn in _KONTEKST:
+        try:
+            kontekst.update(fn())
+        except Exception:
+            continue
+    return kontekst
 
 
 def modulfrister() -> dict[str, int]:
@@ -84,6 +108,7 @@ def personvern_kontekst() -> dict:
         'delt_posisjon_min': delt_posisjon_min(),
         'frister': modulfrister(),
         'pasientarkiv_mnd': arkivmaaneder('patients'),
+        **modulkontekst(),
     }
 
 
