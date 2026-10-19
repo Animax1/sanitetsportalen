@@ -1,6 +1,6 @@
 # Plan: løpende posisjon fra bilene, og «Hent posisjon» fra KO
 
-*Utkast 19. okt. 2026. Ikke bygget. Bestilt av André samme dag:*
+*Utkast 19. okt. 2026, oppdatert samme dag med Andrés svar (§6). Ikke bygget. Bestilt av André:*
 
 > «Oppdatering posisjon: Ha løpende oppdatering fra bare stempling til regelmessig
 > oppdateringer av posisjon. Fra en går inn på /oppdrag/ så skal oppdateres hver 5 min og på
@@ -22,6 +22,7 @@
 | KO ser **tilstanden** (deler / av / nektet / utilgjengelig), aldri koordinatene | `Enhet.posisjonsdeling`, `services.noter_posisjonsdeling` | Header `X-Posisjonsdeling` på pollet |
 | Bilen poller **hvert 15. sekund** og får `X-Enhet-Pa-Vakt` også på 304 | `pollOgSynk`, `lastMine()` | Her kan en forespørsel fra KO ri — ingen ny forbindelse |
 | Bilinnstillingene hentes hvert 5. minutt, redigeres av admin i «Valglister → Bilen» | `lastBilinnstillinger`, `oppdrag.verdier.bilinnstillinger()`, `bilinnstillinger_view` | Lydvarselets terskler per hastegrad bor her i dag |
+| **Skjermen holdes alt våken** (Screen Wake Lock, 9. okt. 2026) — hentes på nytt ved hvert appbytte og hver samtale, og skjermen sier fra når iOS nekter | `startVaakenLaas()`, `skjermSkalHoldesVaaken()`; `oppdrag/tests_bilen_wakelock.py` | Første utkast av denne planen foreslo Wake Lock som noe nytt — det fantes. Rettet etter at André spurte |
 | Kartet: **én rad per enhet som overskrives**, nyeste vinner, slettes 24 t etter siste melding | `portal/lagring.py` i kart-sanitet (`lagre`, `BEHOLD`) | Ingen historikk. Kartet poller hvert 30. s; en bil er «fersk» i 15 min og grå i 6 t |
 
 **Det som mangler er altså tre ting, ingen ny mekanisme:** en klokke i bilskjermen som sender
@@ -34,6 +35,12 @@ uten en stempling, en vei for KO til å be om en fix, og et sted admin setter in
 - **Intervallet velges av bilens tilstand** — det høyeste av de påbegynte oppdragene hennes
   avgjør: Akutt, Haster, Vanlig, Plassering, Drift, eller **uten oppdrag** (på vakt, men ikke
   på noe). Standard: **Akutt og Haster 30 s, alt annet 5 min.**
+- **Passiv vakt sender ikke løpende** (André, 19. okt.): «med mindre de har fått et oppdrag
+  de har trykket rykker ut på som ikke er plassering. Det vil si Akutt, Haster, Drift.» Regelen:
+  en bil i passiv vakt sender bare mens den har et **påbegynt** oppdrag (Rykker ut og videre,
+  til Ledig) med hastegrad Akutt, Haster eller Drift — og da med det intervallet hastegraden
+  har. Varslet, avventet eller på Plassering: ingenting. (Vanlig er ikke nevnt — spørsmål 5.)
+  Modusen leses som i dag (`gjeldende_modus`), så det er den bilen *står* i nå som avgjør.
 - **Bare når det allerede sendes i dag:** koblingen er satt opp, bilen er **på vakt**, og
   bryteren «Del posisjon» er på. Av vakt eller bryteren av: ingenting, som nå.
 - **Ny sti, ikke «Send posisjon»:** `POST /oppdrag/api/posisjon/lopende/` (`skriv_handling`,
@@ -100,10 +107,10 @@ stanser JavaScript og GPS i en fane som ligger i bakgrunnen eller når skjermen 
 der telefonen ligger i lomma, sender ikke — den viser siste posisjon, og blir grå etter
 15 minutter. Det er ikke en feil i planen, det er hva en nettside kan; en app er en annen sak.
 
-To ting kan hjelpe og bør vurderes:
+**Skjermen holdes alt våken** (Wake Lock, 9. okt. — se §1), og det er det som gjør planen
+gjennomførbar: klokka kjører så lenge låsen holder. Det som gjenstår er når den *ikke* holder
+(iOS i strømsparing, telefonen lagt bort), og der hjelper:
 
-- **Screen Wake Lock** (`navigator.wakeLock`, iOS 16.4+, Chrome): holder skjermen på mens
-  bilen er på vakt og har et påbegynt oppdrag. Koster batteri; bilene står ofte i lader.
 - **Tilstanden «gammel»:** KO-kortet kan vise «sist 12 min siden» når en bil på akutt ikke har
   sendt på lenge — samme idé som tilstandsordene i dag, uten koordinater.
 
@@ -147,12 +154,44 @@ må stå på egne bein:
 | 5 | Personvern A.6, erklæringen, prosedyren — **før** hovedbryteren slås på i prod | |
 | 6 | Kartet: `kilde` og «posisjon … siden» | Egen push i kart-sanitet |
 
-## 6. Spørsmål til André før steg 1
+## 6. Andrés svar (19. okt. 2026), og det som står igjen
 
-1. **Uten oppdrag og passiv vakt:** skal en bil i passiv vakt (bakvakt, sover) sende hvert
-   5. minutt, eller ikke løpende i det hele tatt? Forslag: egen rad «passiv vakt», standard av.
-2. **Wake Lock:** skal bilskjermen holde skjermen på mens bilen har et påbegynt oppdrag?
-3. **«Hent posisjon»:** skal mannskapet se at KO hentet posisjonen, og skal det stå i
-   KO-loggen («KO hentet posisjon fra Haugesund 56»)?
-4. **Knappene i KO, ikke i kartet** — greit, eller er en knapp i kartet viktig nok til å åpne
-   en vei fra kartet til portalen?
+| # | Spørsmål | Svar |
+|---|---|---|
+| 1 | Passiv vakt | **Ikke løpende**, med mindre bilen har trykket Rykker ut på et oppdrag som ikke er Plassering: Akutt, Haster, Drift (§2.1) |
+| 2 | Wake Lock | «Ja ideelt sett» — **finnes alt** på `/oppdrag/` fra 9. okt. (§1, §3) |
+| 3 | Ser mannskapet at KO hentet, står det i loggen? | Usikker — **skisser laget** (Artifact «Hent posisjon — skisser»): A KO-kortet, B1–B3 bilskjermen (stille / klokkeslett i bunnlinja / stripe øverst), C1–C3 KO-loggen (ingen / bare «fra alle» / hver henting). Anbefaling: **B2 og C2** |
+| 4 | Knappene i KO, ikke i kartet | **Ja** |
+
+**Står igjen før steg 1:**
+
+5. **Vanlig i passiv vakt.** Svaret listet Akutt, Haster og Drift. Er det med vilje at en bil i
+   passiv vakt som rykker ut på et *Vanlig* oppdrag ikke sender — eller glapp det?
+6. **Spørsmål 3**, valgt fra skissene.
+7. **«Hent posisjon» på en bil i passiv vakt** — skisse A sier ja (KO spør, ikke en klokke).
+
+## 7. DPIA
+
+André, 19. okt.: «Vi skal skrive en DPIA, vi har personverndokumentasjonen som vi skal bygge
+DPIA fra, det er vel lurt?» — **Ja.** `docs/NOTAT_DPIA_OG_FRITEKST.md` §1 sa det samme
+14. sep.: dokumentasjonen er ikke en DPIA, men den er det meste av grunnlaget for en.
+
+**Hva personverndokumentasjonen alt dekker av art. 35(7):**
+
+| Art. 35(7) | Krav | Hvor det står i dag |
+|---|---|---|
+| a | Systematisk beskrivelse: behandlingene, formålene, den berettigede interessen | A.3–A.7, A.9 — protokollen etter art. 30 |
+| b | Nødvendighet og forholdsmessighet | Spredt: avveiningene i A.4 og under kartkoblingen i A.6 |
+| c | **Risiko for de registrertes rettigheter og friheter** | **A.12 er en risikovurdering for *systemet*** (sikkerhet, tilgjengelighet), ikke for *den registrerte*. Det er hovedgapet |
+| d | Tiltak, garantier, sikkerhetsmekanismer | A.10, A.11, A.14, A.15 |
+
+**Forslag til form:** én DPIA for portalen og kartet samlet, i `docs/DPIA.md`, med én del per
+behandling — pasientregistreringen (helseopplysninger, art. 9), oppdrag og fritekst, KO-loggen,
+mannskap og vaktliste, og **posisjonen** — fordi risikoen ligger i *sammenstillingen*: posisjon
+alene er en bil, posisjon og vaktliste sammen er en navngitt person. Hver del: beskrivelse (lenke
+til A.x, ikke kopi), nødvendighet, **risikoene sett fra den registrerte** (sannsynlighet ×
+konsekvens), tiltakene, restrisiko, og om forhåndsdrøfting med Datatilsynet (art. 36) trengs.
+Til slutt konklusjon, hvem som har vurdert, og når den skal revideres (C.4).
+
+**Rekkefølge:** posisjonsdelen skrives før hovedbryteren slås på i prod (steg 5 i §5); resten
+kan følge. A.12 får en lenke dit, og den gamle vurderingen «DPIA ikke påkrevd» erstattes.
