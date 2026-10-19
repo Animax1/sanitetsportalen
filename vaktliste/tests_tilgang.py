@@ -58,36 +58,44 @@ def _klient(bruker):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class TilgangsBasis(TestCase):
-    """De fire kontoene, to korps, og et oppsett å bryne dem på."""
+    """De fire kontoene, to korps, og et oppsett å bryne dem på.
 
-    def setUp(self):
-        self.hgsd = lag_korps(navn='Haugesund', kortnavn='HGSD')
-        self.karmoy = lag_korps(navn='Karmøy')
-        self.rolle = lag_rolle('Lagleder')
-        self.komp = Kompetanse.objects.create(navn='Sykepleier')
+    **Radene lages én gang per klasse** (`setUpTestData`, 19. okt. 2026): 198
+    tester arvet et oppsett på tjue rader. Hver test får sin egen kopi av
+    objektene (Django deepcopier dem) og rulles tilbake som før. Klientene står
+    i `setUp`: `force_login` skriver en sesjon, og den skal være testens egen.
+    """
 
-        self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.res_hgsd = lag_ressurs(
-            vaktliste=self.vl, navn='Lag HGSD', gruppe=gruppe(LAG), korps=self.hgsd)
-        self.res_karmoy = lag_ressurs(
-            vaktliste=self.vl, navn='Lag Karmøy', gruppe=gruppe(LAG),
-            korps=self.karmoy)
-        self.res_fri = lag_ressurs(
-            vaktliste=self.vl, navn='KO', gruppe=gruppe(KO))
+    @classmethod
+    def setUpTestData(cls):
+        cls.hgsd = lag_korps(navn='Haugesund', kortnavn='HGSD')
+        cls.karmoy = lag_korps(navn='Karmøy')
+        cls.rolle = lag_rolle('Lagleder')
+        cls.komp = Kompetanse.objects.create(navn='Sykepleier')
 
-        self.p_hgsd = lag_mannskap(navn='Kari', korps=self.hgsd)
-        self.p_karmoy = lag_mannskap(navn='Ola', korps=self.karmoy)
+        cls.vl = services.opprett_planlagt_vakt('Vakta')
+        cls.res_hgsd = lag_ressurs(
+            vaktliste=cls.vl, navn='Lag HGSD', gruppe=gruppe(LAG), korps=cls.hgsd)
+        cls.res_karmoy = lag_ressurs(
+            vaktliste=cls.vl, navn='Lag Karmøy', gruppe=gruppe(LAG),
+            korps=cls.karmoy)
+        cls.res_fri = lag_ressurs(
+            vaktliste=cls.vl, navn='KO', gruppe=gruppe(KO))
 
-        self.leser = _bruker('leser', 'les')
-        self.korpsbruker = _bruker('kb', 'skriv_handling')
-        self.p_hgsd.user = self.korpsbruker
-        self.p_hgsd.save()
-        self.vaktleder = _bruker('vl', 'skriv_full')
+        cls.p_hgsd = lag_mannskap(navn='Kari', korps=cls.hgsd)
+        cls.p_karmoy = lag_mannskap(navn='Ola', korps=cls.karmoy)
+
+        cls.leser = _bruker('leser', 'les')
+        cls.korpsbruker = _bruker('kb', 'skriv_handling')
+        cls.p_hgsd.user = cls.korpsbruker
+        cls.p_hgsd.save()
+        cls.vaktleder = _bruker('vl', 'skriv_full')
         # `skriv_leder` kom 30. aug. 2026 og er trinnet over: den som *setter
         # opp* vakta framfor den som bemanner den.
-        self.leder = _bruker('leder', 'skriv_leder')
-        self.admin = _bruker('adm', admin=True)
+        cls.leder = _bruker('leder', 'skriv_leder')
+        cls.admin = _bruker('adm', admin=True)
 
+    def setUp(self):
         self.c_leser = _klient(self.leser)
         self.c_kb = _klient(self.korpsbruker)
         self.c_vl = _klient(self.vaktleder)

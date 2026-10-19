@@ -11,6 +11,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase
+from patients.js_test_utils import uten_js_kommentarer as _uten_kommentarer
 
 JS_MAPPE = Path(settings.BASE_DIR) / 'static' / 'js'
 
@@ -24,14 +25,21 @@ HJELPER = 'trustedHtml'
 I_MALSTRENG = re.compile(r'\$\{[^}]*\b' + HJELPER + r'\(')
 MED_PLUSS = re.compile(r'(\+\s*' + HJELPER + r'\(|' + HJELPER + r'\([^;]*?\)\s*\+)')
 
-# `//`-kommentarer og `/* */`. Samme grep som `oppdrag/tests_xss.py`: en regel
-# som leser sin egen prosa måler at noen har skrevet om begrunnelsen.
-_LINJE = re.compile(r'(?<!:)//[^\n]*')
-_BLOKK = re.compile(r'/\*.*?\*/', re.S)
+class KommentarfjerningenTests(SimpleTestCase):
+    """`uten_js_kommentarer()` er den ene alle JS-skannerne bruker. Faller den
+    tilbake til «bare linjer som begynner med `//`», ser ingen skanner det."""
 
+    def test_kommentar_bak_kode_fjernes(self):
+        self.assertEqual(_uten_kommentarer("let a = 1;  // kall('x')"), 'let a = 1;  ')
 
-def _uten_kommentarer(kilde: str) -> str:
-    return _LINJE.sub('', _BLOKK.sub('', kilde))
+    def test_blokkommentar_fjernes_og_linjene_blir(self):
+        ut = _uten_kommentarer("a();\n/* kall('x')\n   og mer */\nb();")
+        self.assertNotIn('kall', ut)
+        self.assertEqual(ut.count('\n'), 3, 'linjenumrene i funnene skal stemme')
+
+    def test_url_og_strek_i_blokk(self):
+        self.assertEqual(_uten_kommentarer("fetch('https://x.no/a');"), "fetch('https://x.no/a');")
+        self.assertEqual(_uten_kommentarer('/* a // b */c();'), 'c();')
 
 
 class TrustedHtmlBrukesIkkeIMalstrengTests(SimpleTestCase):

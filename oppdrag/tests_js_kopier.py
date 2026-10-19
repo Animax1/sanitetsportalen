@@ -22,6 +22,13 @@ from patients.js_test_utils import (
     JS_DIR, OPPDRAG_ENHET_JS, build_harness, extract_function, node_available,
     read_js, run_node,
 )
+from patients.js_test_utils import uten_js_kommentarer
+
+
+def _uten_kommentarer(kropp):
+    """Koden alene: kommentarer og tomme linjer teller ikke som glidning."""
+    return '\n'.join(l.rstrip() for l in uten_js_kommentarer(kropp).splitlines() if l.strip())
+
 
 KORT_JS = JS_DIR / 'oppdrag-kort.js'
 SENTRAL_OPPDRAG_JS = JS_DIR / 'oppdrag-sentral-oppdrag.js'
@@ -29,10 +36,6 @@ SENTRAL_OPPDRAG_JS = JS_DIR / 'oppdrag-sentral-oppdrag.js'
 
 def _toppfunksjoner(kilde):
     return set(re.findall(r'^(?:async )?function (\w+)\(', kilde, re.M))
-
-
-def _uten_kommentarer(kropp):
-    return '\n'.join(l for l in kropp.splitlines() if not l.strip().startswith('//'))
 
 
 class KopieneErLikeTests(SimpleTestCase):

@@ -218,8 +218,10 @@ class DekningsendepunktetTests(PorteneTests):
     def test_endepunktet_trekker_fra_pausene_i_aktiv_vakt(self):
         naa = timezone.now()
         start = timezone.localtime(naa).replace(hour=0, minute=0, second=0, microsecond=0)
-        timen = int((naa - start).total_seconds() // 3600)
-        midt = start + timedelta(hours=timen) + program.MIDT_I_TIMEN
+        # Inneværende klokketime, ikke timer siden midnatt: de to er én time fra
+        # hverandre på dagene sommertiden begynner og slutter (19. okt. 2026).
+        midt = (timezone.localtime(naa).replace(minute=0, second=0, microsecond=0)
+                + program.MIDT_I_TIMEN)
         Pause.objects.create(ressurs=self.lag1, fra=midt - timedelta(minutes=5), til=midt + timedelta(minutes=5))
         # Døgnet timen hører til: før døgnstarten er det gårsdagens.
         from ko.tavle import dognstart

@@ -593,7 +593,7 @@ class HjelperneOgStedeneTests(TestCase):
 
     def test_ko_kopierer_ikke_til_en_annen_portals_sted(self):
         """Stedet finnes på id, ellers på navnet — begge i portalen (mutantene 3 og 4)."""
-        from datetime import date, timedelta
+        from datetime import timedelta
 
         from django.utils import timezone
 
@@ -608,13 +608,13 @@ class HjelperneOgStedeneTests(TestCase):
                                    navn='Band', fra=fra, til=fra + timedelta(hours=1))
         with aktiver_portal(self.brann):
             svar = program.kopier_program(fjor, self.vakt, bruker=self.kari,
-                                          forste_dogn=date.today() + timedelta(days=1))
+                                          forste_dogn=timezone.localdate() + timedelta(days=1))
         self.assertEqual(svar['kopiert'], 0, svar)
         # Motprøve: med portalens eget sted går den samme konserten gjennom.
         Programpost.objects.filter(vakt=fjor).update(lokasjon=self.sted_b, lokasjon_navn='Scene B')
         with aktiver_portal(self.brann):
             svar = program.kopier_program(fjor, self.vakt, bruker=self.kari,
-                                          forste_dogn=date.today() + timedelta(days=1))
+                                          forste_dogn=timezone.localdate() + timedelta(days=1))
         self.assertEqual(svar['kopiert'], 1, svar)
 
     def test_park_stedene(self):

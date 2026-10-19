@@ -16,6 +16,7 @@ from patients.js_test_utils import (
     PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness,
     extract_function, node_available, read_js, run_node,
 )
+from patients.js_test_utils import uten_js_kommentarer as _uten_kommentarer
 
 #: `_dag()` leser konstantene på toppnivå, som `build_harness` ikke henter.
 MND_OG_DAGER = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -298,11 +299,6 @@ REVIEWED_INTERPOLATIONS = {
     'bruk': 'markup bygget lokalt, tallet escapet inni',
     'park': 'knapp bygget lokalt fra en ternær, ID-en escapet inni',
 }
-
-
-def _uten_kommentarer(kilde: str) -> str:
-    return '\n'.join(
-        linje for linje in kilde.splitlines() if not linje.lstrip().startswith('//'))
 
 
 class VaktlisteEscapingKildeTests(SimpleTestCase):

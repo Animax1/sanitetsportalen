@@ -25,6 +25,7 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import JS_DIR, extract_function
+from patients.js_test_utils import uten_js_kommentarer as _uten_kommentarer
 
 #: Gjennomgått, med grunn: (fil, funksjon, uttrykk). Skal ikke vokse uten
 #: begrunnelse — foretrekk å escape i koden.
@@ -46,12 +47,6 @@ _BYGGER = re.compile(r"'[^']*<\w[^']*'\s*\+")
 #: klassen** — uten den backtracker `\w+` til et halvt navn for å tilfredsstille
 #: lookaheaden, og funnet blir «rader.ma».
 _DATAFELT = re.compile(r'\+\s*([a-z]\w*(?:\.\w+)+)(?![\w(.\[])')
-
-
-def _uten_kommentarer(kropp: str) -> str:
-    # En test som leser sin egen prosa måler at noen har skrevet om
-    # begrunnelsen, ikke at koden gjør det den sier (CLAUDE.md).
-    return '\n'.join(l for l in kropp.splitlines() if not l.lstrip().startswith('//'))
 
 
 def byggere(katalog=JS_DIR):

@@ -1215,6 +1215,38 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 ### Løse punkter
 
+- [ ] **Testene som påstår ordlyden i kildekoden: om lag 40–50 igjen** (talt 19. okt. 2026).
+      CLAUDE.md sier «påstå ikke at en literal kodelinje står der» — men
+      `assertIn('const drift = iDrift();', kropp)` i `vaktliste/tests_xss.py`,
+      `'async function withSubmitGuard('` i `patients/tests.py` og
+      `"addEventListener('hide.bs.modal'"` i `core/tests_modalfokus.py` gjør det. Skriv dem om
+      til oppførsel (tabellen i CLAUDE.md) **én modul om gangen, når modulen likevel røres** —
+      ikke som en egen pulje, der hver omskriving er en ny test uten en endring å prøve den mot.
+- [ ] **`vaktliste/tests_xss.py` er 6 400 linjer, og om lag 90 % er ikke XSS.** Rundt 55 klasser
+      prøver tegning og oppførsel (`BemanningskurveTests`, `PlanleggerfanenTests` …). Navnet
+      skjuler hva fila dekker, og den som leter etter planleggerens tester finner dem ikke.
+      Del etter fane når fila røres neste gang; XSS-skanningen blir igjen.
+- [ ] **XSS-skanneren og URL-gjennomgangen finnes i flere kopier.** Skanneren av mal-strenger
+      står i `vaktliste/tests_xss.py`, `oppdrag/tests_xss.py` og `patients/tests_xss_stats.py`
+      med samme `ESCAPING_CALLS`; bare oppdrag utleder byggerne (`_byggerkandidater`). Den
+      rekursive `get_resolver()`-gjennomgangen står fem steder (`tests_modul_dekorator`,
+      `tests_sikkerhet_runde2`, `tests_sikkerhet_pulje4`, `tests_moderator`, `tests_urls_admin`).
+      Påstandene er ulike og skal være det; motoren bør være én, som `uten_js_kommentarer()`
+      ble 19. okt. 2026. Utledningen fra oppdrag er den som skal vinne.
+- [ ] **Ugyldige escape-sekvenser i fire testfiler** (`'\`'`, `'\d'`, `'\s'` i vanlige strenger):
+      `ko/tests_plan_js.py`, `oppdrag/tests_xss.py`, `vaktliste/tests_pauser_js.py`, `vaktliste/tests_xss.py`.
+      Python 3.12 gir `SyntaxWarning`, en senere versjon `SyntaxError` — da faller hele fila
+      ut av suiten som én importfeil. `r''`-strenger gir samme mønster; `core/tests_skyggede_tester.py`
+      viser hvor (den demper advarselen for å kunne lese filene).
+- [ ] **Flere tunge `setUp` kan bli `setUpTestData`.** `TilgangsBasis` ga −27 % på 689 tester
+      19. okt. 2026. Neste i køen: `KoOgParkTests` og `HjelperneOgStedeneTests` i
+      `core/tests_portalisolasjon.py`, og `OppdragBasis` i `oppdrag/tests_views.py` (arvet av 29
+      klasser). **Ikke** det som rører filer, cache eller `ModuleSettings` — det må stå i `setUp`.
+- [ ] **Noe å se på: en ukentlig kjøring med falsk klokke.** Suiten kjører alltid «nå», så en
+      test som bare feiler på sommertidsdagen, 29. februar eller kl. 23:59 sees først den dagen.
+      Fire slike ble rettet 19. okt. 2026. En planlagt CI-jobb med `libfaketime` på de datoene
+      ville funnet resten — men vil gi støy først, og den støyen må noen rydde.
+
 - [ ] **Rate-limit GET på pasient- og oppdragsarkivet.** `arkiv_detalj_view` i
       `patients/views_arkiv.py` og `oppdrag/views_arkiv.py` regner full statistikk ved
       GET, men bøtta der gjelder bare DELETE. Statistikkens arkivendepunkt fikk sin

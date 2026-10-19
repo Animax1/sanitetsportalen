@@ -22,6 +22,8 @@ løse lufta, og testen er rød fordi svaret er 201/200 og ikke 400.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from .models import Ressurs, Vaktpost
 from .tests_tilgang import TilgangsBasis
 
@@ -63,7 +65,7 @@ class UkjentePekereTests(TilgangsBasis):
 
     def test_plass_endret_til_ukjent_rolle(self):
         plass = Vaktpost.objects.create(
-            ressurs=self.res_fri, fra_tid=self.na, til_tid=self.na.replace(year=self.na.year + 1))
+            ressurs=self.res_fri, fra_tid=self.na, til_tid=self.na + timedelta(days=365))
         res = self.c_adm.put(f'/vaktliste/api/vaktposter/{plass.pk}/',
                              data={'rolle_id': UKJENT}, content_type='application/json')
         self.assertEqual(self._feilmelding(res), 'Ukjent rolle.')

@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Testtida, fase 3: én kommentarfjerner, fire klokketester, `setUpTestData`, skyggede tester  `#core/tester`
+
+**`uten_js_kommentarer()` i `patients/js_test_utils.py` erstatter seks kopier** — i
+`core/tests_js_regler.py`, `core/tests_js_konkatenering.py`, `oppdrag/tests_xss.py`,
+`oppdrag/tests_js_kopier.py`, `vaktliste/tests_xss.py` og `patients/tests.py`. De var ulike: fire
+fjernet bare linjer som *begynte* med `//`, så `/* … */` og `// …` bak kode ble stående. I en test
+som krever at et kall *finnes* (`'_plancellene('`, `'const drift = iDrift();'`), kunne en
+kommentar dermed vært beviset — en regel som leser sin egen prosa. Ingen test sto grønt på en
+kommentar i dag (alle 557 berørte er grønne med den strenge varianten), så hullet var i
+mekanismen, ikke i et resultat. Linjeskiftene blir stående, også i blokkommentarer, så
+linjenumrene i funnene stemmer. Tre egne tester; mutant tilbake til den gamle oppførselen gir 3
+av 3 røde. `oppdrag/tests_js_kopier.py` ser bort fra tomme linjer når den sammenligner kopiene.
+
+**Fire tester som avhang av klokka:**
+- `test_now_local_str_uses_django_timezone` sammenlignet `now_local_str()` med sitt eget uttrykk
+  regnet ut på nytt — rød over et minuttskifte, og grønn uansett tidssone. Nå fast UTC-tid:
+  22:30 UTC 1. juli skal bli `02.07.2026 00:30`.
+- `DekningsendepunktetTests` regnet «timer siden midnatt» som klokketimen, og de to er én time
+  fra hverandre på dagene sommertiden begynner og slutter.
+- `core/tests_portalisolasjon.py` brukte `date.today()` (containerens UTC-dato) der vakta regner i
+  Oslo-tid: uenige mellom kl. 00 og 02. Nå `timezone.localdate()`.
+- `vaktliste/tests_ukjente_pekere.py`: `replace(year=+1)` kaster 29. februar. Nå `+ 365 dager`.
+
+Analysen pekte på to til som ikke holdt: `RapportToOppdragTests` (+40 s) prøver toleransen for at
+nettleserens klokke går foran — det er testens poeng — og utskriftstesten bruker absolutte
+tidspunkter innenfor vinduet.
+
+**`TilgangsBasis` lager radene i `setUpTestData`**: 198 tester arvet tjue rader per test. De 689
+testene i de 18 filene som bruker den: **100 s → 73 s**, grønne også med `--reverse`.
+
+**`core/tests_skyggede_tester.py`**: to `def test_x` i samme klasse er gyldig Python, og den første
+kjøres aldri. Sveipet fant ingen — analysens «`test_uten_next_gaar_til_forsiden` står to ganger»
+var to ulike klasser — og vakten holder det slik. Mutant: en skygge i `backlog/tests.py` → rød.
+
+Ført i TODO som løpende arbeid, ikke gjort: ordlydstestene (40–50), delingen av
+`vaktliste/tests_xss.py`, kopiene av XSS-skanneren og URL-gjennomgangen, ugyldige
+escape-sekvenser i fire testfiler, flere `setUpTestData`, og en ukentlig kjøring med falsk klokke.
+
 ## 2026-10-19 — Testtida, fase 2: `core` parallelt, `manage.py rask_sjekk`, CI i tre jobber  `#core/tester`
 
 **`core` tåler `--parallel`** (punktet «`core/tests_backup.py` tåler ikke `--parallel`» er slettet

@@ -124,6 +124,28 @@ def js_navn(sti):
     return Path(sti).name
 
 
+#: `//` til linjeslutt (ikke etter `:`, så `https://` står) og `/* … */`.
+_JS_LINJEKOMMENTAR = re.compile(r'(?<!:)//[^\n]*')
+_JS_BLOKKOMMENTAR = re.compile(r'/\*.*?\*/', re.S)
+
+
+def uten_js_kommentarer(kilde):
+    """JS-kilden uten kommentarer — **den ene**, for alle testene som leser kilde.
+
+    **Var seks kopier til 19. okt. 2026, og de var ulike.** Fire fjernet bare
+    linjer som *begynte* med `//`, så `/* … */` og `// …` bak kode ble stående.
+    I en skanner som krever at noe *mangler* gir det falsk rødt; i en som
+    krever at et kall *finnes*, gjør det kommentaren til et bevis — en regel
+    som leser sin egen prosa (CLAUDE.md). Rekkefølgen er blokk før linje: en
+    `//` inne i en blokkommentar skal ikke kappe slutten av den.
+
+    **Linjeskiftene blir stående**, også dem inne i en blokkommentar: skannerne
+    melder linjenummer ut fra den rensede kilden.
+    """
+    uten_blokk = _JS_BLOKKOMMENTAR.sub(lambda m: '\n' * m.group(0).count('\n'), kilde)
+    return _JS_LINJEKOMMENTAR.sub('', uten_blokk)
+
+
 def extract_function(source, name):
     """Klipp ut kildekoden til én toppnivåfunksjon.
 

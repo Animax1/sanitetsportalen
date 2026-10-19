@@ -15,6 +15,7 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import INNLOGGET, INNLOGGET_STUBB
+from patients.js_test_utils import uten_js_kommentarer as _uten_kommentarer
 from patients.js_test_utils import (
     js_navn,
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
@@ -308,18 +309,6 @@ REVIEWED_INTERPOLATIONS = {
     '_enhetsmatrise(o)': 'markup fra en bygger som selv skannes her',
     'm.meldt_av': 'brukernavn i ren tekst i `notat`, som escapes ved innsetting',
 }
-
-
-def _uten_kommentarer(kilde: str) -> str:
-    """Fjern `//`-kommentarer før skanningen.
-
-    Uten dette leser gjennomgangen sine egne forklaringer: en kommentar som
-    nevner `${...}` for å beskrive regelen ble selv rapportert som en
-    uescapet interpolasjon. Samme grep som i `JsModulLastingTests`, der en
-    kommentar om `toggleForstehjelper()` ellers hadde telt som et kall.
-    """
-    return '\n'.join(
-        linje for linje in kilde.splitlines() if not linje.lstrip().startswith('//'))
 
 
 class OppdragEscapingKildeTests(SimpleTestCase):

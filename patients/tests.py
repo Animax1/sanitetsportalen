@@ -1396,11 +1396,15 @@ class NowLocalStrTests(TestCase):
         Verifiserer at funksjonen bruker timezone.localtime() som honorerer
         TIME_ZONE='Europe/Oslo' selv om containeren kjører i UTC.
         """
-        from django.utils import timezone as djtz
+        from datetime import datetime, timezone as dt_timezone
+        from unittest.mock import patch
         from core.validators import now_local_str
-        # Sammenlign med direkte localtime-kall – skal være samme minutt
-        expected = djtz.localtime(djtz.now()).strftime('%d.%m.%Y %H:%M')
-        self.assertEqual(now_local_str(), expected)
+        # Fast UTC-tid (19. okt. 2026). Sammenlignet før med sitt eget uttrykk
+        # regnet ut på nytt — rød over et minuttskifte, og grønn uansett sone.
+        # 22:30 UTC 1. juli er 00:30 neste dag i Oslo: både sone og dato prøves.
+        utc = datetime(2026, 7, 1, 22, 30, tzinfo=dt_timezone.utc)
+        with patch('django.utils.timezone.now', return_value=utc):
+            self.assertEqual(now_local_str(), '02.07.2026 00:30')
 
 
 # ── N12: whitelist på GET /api/settings/ ─────────────────────────────────────
@@ -1840,9 +1844,9 @@ class JsModulLastingTests(TestCase):
 
     @staticmethod
     def _uten_kommentarer(kilde):
-        """Strip `//`-linjer. En kommentar som nevner Chart er ikke en bruk."""
-        return '\n'.join(l for l in kilde.splitlines()
-                          if not l.lstrip().startswith('//'))
+        """En kommentar som nevner Chart er ikke en bruk."""
+        from patients.js_test_utils import uten_js_kommentarer
+        return uten_js_kommentarer(kilde)
 
     def _mal(self, navn):
         from pathlib import Path
