@@ -569,7 +569,7 @@ class KlokkaIBilenTests(unittest.TestCase):
     def test_regelen_for_naar_det_sendes(self):
         (ut,) = _kjor_klokke("""
             const t = [];
-            const sett = (intervall, onsket) => { globalThis.posisjonIntervallS = intervall;
+            const sett = (intervall, onsket) => { globalThis.lopendeIntervallS = intervall;
               globalThis.posisjonOnsket = onsket; };
             sett(30, false); t.push(lopendeSkalSende(NAA));
             globalThis.lopendeSendtMs = NAA - 29000; t.push(lopendeSkalSende(NAA));
@@ -611,7 +611,7 @@ class KlokkaIBilenTests(unittest.TestCase):
     def test_gammel_fix_spor_telefonen_en_gang(self):
         """En telefon som står stille melder ingen ny fix til `watchPosition`."""
         (ut,) = _kjor_klokke("""
-            globalThis.posisjonIntervallS = 30;
+            globalThis.lopendeIntervallS = 30;
             globalThis.bilensPosisjon = fix(31);
             await lopendeTikk();
             console.log(JSON.stringify({ gps: gpsKall, lat: kartkall[0].posisjon.lat }));""")
@@ -619,7 +619,7 @@ class KlokkaIBilenTests(unittest.TestCase):
 
     def test_nektet_sender_ingenting_og_venter(self):
         (ut,) = _kjor_klokke("""
-            globalThis.posisjonIntervallS = 30;
+            globalThis.lopendeIntervallS = 30;
             globalThis.bilensPosisjonStatus = 'nektet';
             await lopendeTikk();
             console.log(JSON.stringify({ gps: gpsKall, kall: kartkall.length,
@@ -645,11 +645,11 @@ class KlokkaIBilenTests(unittest.TestCase):
     def test_feil_og_nei_fra_serveren(self):
         (ut,) = _kjor_klokke("""
             const t = [];
-            globalThis.posisjonIntervallS = 30; globalThis.bilensPosisjon = fix(5);
+            globalThis.lopendeIntervallS = 30; globalThis.bilensPosisjon = fix(5);
             kartSvar = 'nett'; await lopendeTikk();
             t.push([kartkall.length, globalThis.lopendeFeiletMs > 0, lopendeSkalSende(Date.now())]);
             globalThis.lopendeFeiletMs = 0; globalThis.lopendeSendtMs = 0;
-            globalThis.posisjonIntervallS = 300; kartSvar = { ok: false, status: 429, data: {} };
+            globalThis.lopendeIntervallS = 300; kartSvar = { ok: false, status: 429, data: {} };
             await lopendeTikk();
             t.push([kartkall.length, lopendeSkalSende(Date.now()), lopendeSkalSende(Date.now() + 31000)]);
             console.log(JSON.stringify(t));""")
@@ -659,8 +659,8 @@ class KlokkaIBilenTests(unittest.TestCase):
     def test_linja_med_tallene_fra_innstillingene(self):
         (ut,) = _kjor_klokke("""
             const t = [];
-            globalThis.posisjonIntervallS = 30; t.push(posisjonLinjeTekst());
-            globalThis.posisjonIntervallS = 0; t.push(posisjonLinjeTekst());
+            globalThis.lopendeIntervallS = 30; t.push(posisjonLinjeTekst());
+            globalThis.lopendeIntervallS = 0; t.push(posisjonLinjeTekst());
             globalThis.OPPDRAG_BILINNSTILLINGER.posisjon.aktiv = false; t.push(posisjonLinjeTekst());
             const o = (s) => posisjonOversiktTekst(s);
             t.push(o({ Akutt: 30, Haster: 30, Vanlig: 300, Drift: 300, Plassering: 300, uten: 300 }));

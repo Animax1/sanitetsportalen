@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Bilen så ikke oppdragene: «Laster…» etter løpende posisjon  `#oppdrag/enhetsskjerm`
+
+André, fra staging på `1ad517d` (Lege 02): «Nå ser jeg ikke lenger oppdrag.» Skjermen sto på
+«Laster…», og linja nederst sa «Posisjon sendes til KO ved stempling, ikke løpende nå».
+
+**Årsaken var min:** `notePosisjonHeadere()` la intervallet fra pollen i
+`globalThis.posisjonIntervallS` — og `posisjonIntervallS` er navnet på en funksjon i samme fil.
+I nettleseren er en toppnivåfunksjon en egenskap på `globalThis`, så første poll overskrev
+funksjonen med et tall, neste kall kastet «posisjonIntervallS is not a function», og
+`lastMine()` døde før den tegnet noe. **Alle biler**, ikke bare de i passiv vakt — og uavhengig
+av om løpende posisjon var slått på, for headeren sendes alltid. Tilstanden heter nå
+`globalThis.lopendeIntervallS`.
+
+**Hvorfor testene var grønne:** harnessene i node henter funksjonene inn i et modul-scope, ikke
+på `globalThis`, så overskrivingen skjedde aldri der. Gjenskapt og bekreftet i en ekte nettleser
+(Chromium, Playwright, mot en testserver): den gamle fila gir nøyaktig feilen og «Laster…», den
+rettede viser oppdraget, og en bil som har rykket ut på akutt sender løpende.
+
+**`GlobalTilstandSkyggerIkkeEnFunksjonTests`** (`core/tests_js_regler.py`) leser alle JS-filene
+samlet — filene på en side deler ett navnerom — og krever at ingen `globalThis.navn = …` treffer
+en toppnivåfunksjon. Mutant: den gamle linja tilbake → rød. Ingen andre forekomster i dag.
+
+---
+
 ## 2026-10-19 — Løpende posisjon fra bilene, og «Hent posisjon» fra KO  `#oppdrag/enhetsskjerm` `#core/kartkobling` `#ko/ressursbildet` `#core/personvern`
 
 André: «Oppdatering posisjon: Ha løpende oppdatering fra bare stempling til regelmessig

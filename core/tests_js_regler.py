@@ -122,3 +122,30 @@ class TrustedHtmlBrukesIkkeIMalstrengTests(SimpleTestCase):
                    if f.name != 'portal-utils.js'
                    and 'trustedHtml(' in _uten_kommentarer(f.read_text(encoding='utf-8'))]
         self.assertTrue(brukere, 'ingen bruker helperen — da måler reglene over ingenting')
+
+
+class GlobalTilstandSkyggerIkkeEnFunksjonTests(SimpleTestCase):
+    """`globalThis.navn = …` der `navn` er en funksjon på toppnivå (19. okt. 2026).
+
+    **I nettleseren er en toppnivåfunksjon en egenskap på `globalThis`**, så
+    tilordningen overskriver funksjonen — og neste kall kaster «is not a function».
+    `posisjonIntervallS` gjorde nøyaktig det: første poll la tallet der funksjonen
+    sto, `lastMine()` døde før den tegnet, og bilen sto på «Laster…» uten oppdrag.
+    Harnessene i node la ikke funksjonene på `globalThis`, så alle testene var
+    grønne. Regelen leser alle filene samlet, fordi filene på en side deler ett
+    navnerom.
+    """
+
+    def test_ingen_tilordning_paa_globalThis_treffer_en_funksjon(self):
+        rot = Path(settings.BASE_DIR, 'static', 'js')
+        filer = {f.name: _uten_kommentarer(f.read_text(encoding='utf-8'))
+                 for f in sorted(rot.glob('*.js'))}
+        funksjoner = {}
+        for navn, kilde in filer.items():
+            for fn in re.findall(r'^(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)', kilde, re.M):
+                funksjoner.setdefault(fn, []).append(navn)
+        funn = [f'{navn}: globalThis.{felt} = … (funksjon i {", ".join(funksjoner[felt])})'
+                for navn, kilde in filer.items()
+                for felt in sorted(set(re.findall(r'globalThis\.([A-Za-z_$][\w$]*)\s*=(?!=)', kilde)))
+                if felt in funksjoner]
+        self.assertEqual(funn, [], 'Gi tilstanden et eget navn — tilordningen overskriver funksjonen i nettleseren')

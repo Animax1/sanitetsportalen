@@ -1300,7 +1300,7 @@ function posisjonLinjeTekst() {
 // Tilstanden står på `globalThis` av samme grunn som `bilensPosisjon`.
 
 function posisjonIntervallS() {
-  const s = Number(globalThis.posisjonIntervallS);
+  const s = Number(globalThis.lopendeIntervallS);
   return Number.isFinite(s) && s > 0 ? s : 0;
 }
 
@@ -1308,7 +1308,7 @@ function posisjonIntervallS() {
 function notePosisjonHeadere(intervall, onsket) {
   if (intervall === null || intervall === undefined) return;
   const foer = posisjonIntervallS();
-  globalThis.posisjonIntervallS = Number(intervall) || 0;
+  globalThis.lopendeIntervallS = Number(intervall) || 0;
   globalThis.posisjonOnsket = onsket === '1';
   if (foer !== posisjonIntervallS()) tegnPosisjonLinje();
   if (globalThis.posisjonOnsket) lopendeTikk();
