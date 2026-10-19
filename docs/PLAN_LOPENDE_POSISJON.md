@@ -128,14 +128,14 @@ må stå på egne bein:
   5 min ellers, og admin kan slå det av. Fortsatt **bare siste posisjon**, ingen historikk,
   24 t i kartet, ingenting lagret i portalen.
 - **Forventning og åpenhet:** bilskjermen må si det. Linja i bunnen blir «Posisjon sendes til
-  kartet hvert 30. sekund på akutt og haster, hvert 5. minutt ellers. KO ser at den deles.» —
-  med tallene **hentet fra innstillingene**, ikke skrevet i malen. Prosedyren for mannskapet
-  må si det samme.
+  KO hvert 30. sekund på akutt og haster, hvert 5. minutt ellers» — med tallene **hentet fra
+  innstillingene**, ikke skrevet i malen — og «KO hentet posisjonen 21:14» etter en henting.
+  Prosedyren for mannskapet må si det samme.
 - **Bryteren** står som før — for unntak. KO ser fortsatt tilstanden, ikke koordinatene.
 - **«Hent posisjon» fra KO** er en ny handling og vurderes for seg: den sender én fix uten at
   mannskapet trykker. Forsvarlig fordi den bare virker på vakt med bryteren på, og fordi
-  posisjonen bare går dit de løpende alt går. Bør skjermen vise «KO hentet posisjon 21:14»?
-  (Spørsmål 3.)
+  posisjonen bare går dit de løpende alt går, **og fordi den er åpen begge veier**: skjermen
+  sier «KO hentet posisjonen 21:14», og hver henting står i KO-loggen med hvem (§6).
 - **Erklæringen på `/personvern/`** henter fristene fra koden (`core/personvern.py`) — de nye
   intervallene skal hentes derfra også, ikke skrives inn.
 - **DPIA bør vurderes før dette går i drift.** Datatilsynets liste over behandlinger som krever
@@ -160,15 +160,28 @@ må stå på egne bein:
 |---|---|---|
 | 1 | Passiv vakt | **Ikke løpende**, med mindre bilen har trykket Rykker ut på et oppdrag som ikke er Plassering: Akutt, Haster, Drift (§2.1) |
 | 2 | Wake Lock | «Ja ideelt sett» — **finnes alt** på `/oppdrag/` fra 9. okt. (§1, §3) |
-| 3 | Ser mannskapet at KO hentet, står det i loggen? | Usikker — **skisser laget** (Artifact «Hent posisjon — skisser»): A KO-kortet, B1–B3 bilskjermen (stille / klokkeslett i bunnlinja / stripe øverst), C1–C3 KO-loggen (ingen / bare «fra alle» / hver henting). Anbefaling: **B2 og C2** |
+| 3 | Ser mannskapet at KO hentet, står det i loggen? | Valgt fra skissene (Artifact «Hent posisjon — skisser»): **A** (knappen per bil og «fra alle», svaret på kortet), **B2** (klokkeslett i bunnlinja på bilskjermen) og **C3** (hver henting logges) — se under |
 | 4 | Knappene i KO, ikke i kartet | **Ja** |
+
+**Svaret på 3, slik det bygges:**
+
+- **Bilskjermen (B2), med «KO» og ikke «kartet»** (André: «det skal stå KO. Det er lettere å
+  forstå»). Bunnlinja blir «Posisjon sendes til KO hvert 30. sekund på akutt og haster, hvert
+  5. minutt ellers», med tallene fra innstillingene, og etter en henting en linje til:
+  «KO hentet posisjonen 21:14». Samme ordbruk i «Send posisjon» og i personverndokumentasjonen
+  — mannskapet forholder seg til KO, ikke til hvilket system KO ser det i.
+- **KO-loggen (C3): hver henting logges** (André: «Vi har jo laget funksjonalitet for å hente fra
+  alle og hver enkelt, og jeg vil ha det logget»). En systemlinje med hvem i KO, aldri
+  koordinatene. **I loggstrømmen alltid, og i hendelsen i tillegg** når bilen står på et oppdrag
+  som hører til en — samme regel som «OBS: Posisjon delt» (`POSISJON_DELT`). «Fra alle» gir
+  **én** linje med hvor mange som svarte, ikke én per bil: «Posisjon hentet fra alle biler
+  (9 av 11) — kari». Ny kode i `ko/systemlinjer.py`, med begrunnelse i `KODER`.
 
 **Står igjen før steg 1:**
 
 5. **Vanlig i passiv vakt.** Svaret listet Akutt, Haster og Drift. Er det med vilje at en bil i
    passiv vakt som rykker ut på et *Vanlig* oppdrag ikke sender — eller glapp det?
-6. **Spørsmål 3**, valgt fra skissene.
-7. **«Hent posisjon» på en bil i passiv vakt** — skisse A sier ja (KO spør, ikke en klokke).
+6. **«Hent posisjon» på en bil i passiv vakt** — skisse A sier ja (KO spør, ikke en klokke).
 
 ## 7. DPIA
 

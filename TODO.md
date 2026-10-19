@@ -722,8 +722,8 @@ enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
       [`docs/PLAN_LOPENDE_POSISJON.md`](./docs/PLAN_LOPENDE_POSISJON.md) (19. okt. 2026).
       Akutt og haster hvert 30. sekund, ellers hvert 5. minutt, justerbart per hastegrad og
       «uten oppdrag» av admin; KO henter én eller alle; passiv vakt bare på påbegynt Akutt,
-      Haster og Drift. Tre spørsmål står igjen i §6 før steg 1 (Vanlig i passiv vakt, skissene
-      for «Hent posisjon», henting på passiv vakt). Personvern A.6 skrives om, og DPIA-delen for
+      Haster og Drift; «Hent posisjon» logges hver gang, og bilskjermen sier «KO hentet». To
+      spørsmål står igjen i §6 før steg 1 (Vanlig i passiv vakt, henting på passiv vakt). Personvern A.6 skrives om, og DPIA-delen for
       posisjon (§7) skrives, før hovedbryteren slås på i prod.
 - [ ] **Eksterne aktører i «Ny hendelse»-skjemaet?** I dag krysses de av i hodet etter at
       hendelsen er opprettet. Er det vanlig at Brann alt er varslet når hendelsen føres, kan
