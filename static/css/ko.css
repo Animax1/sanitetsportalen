@@ -476,15 +476,22 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
    og en tidslinje som ruller vannrett gjemmer nå-streken — det ene tavla skal
    vise. Heller trangt enn skjult; skillelinja gir den mer. */
 .ko-tavle-rutenett { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; }
+/* Tidsaksen og Pause-raden står fast øverst når tavla rulles (19. okt. 2026, André): Pause-raden
+   er den ene raden som gjelder hele vakta, og den forsvant under lokasjonene. Pause-raden står
+   `top` lik tidsaksens høyde, så høyden er fast og delt — målt ville den vært JS ved hver tegning. */
+.ko-tavle-rutenett { --ko-tavle-hode-h: 26px; }
 .ko-tavle-hode {
-  display: flex; position: sticky; top: 0; z-index: 3;
+  display: flex; position: sticky; top: 0; z-index: 3; box-sizing: border-box;
+  height: var(--ko-tavle-hode-h);
   background: var(--portal-surface); border-bottom: 1px solid var(--portal-border);
 }
 .ko-tavle-radnavn {
   width: 120px; flex-shrink: 0; padding: 0.35rem 0.5rem; display: flex; gap: 0.4rem;
   align-items: center; font-size: 0.85rem; font-weight: 600; flex-wrap: wrap;
 }
-.ko-tavle-hode .ko-tavle-radnavn { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.ko-tavle-hode .ko-tavle-radnavn {
+  font-size: 0.72rem; color: var(--text-muted); font-weight: 500; padding-top: 0; padding-bottom: 0;
+}
 .ko-tavle-radtall { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
 .ko-tavle-tidslinje { position: relative; flex-grow: 1; height: 24px; }
 .ko-tavle-time {
@@ -497,7 +504,11 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 }
 .ko-tavle-naa { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; }
 .ko-tavle-rad { display: flex; border-bottom: 1px solid var(--portal-surface-2); }
-.ko-tavle-pause { background: var(--surface-3); }
+/* Under tidsaksen og over stolpene i radene under; nå-streken (`.ko-tavle-naa-lag`, også 2) står
+   etter i DOM-en og tegnes derfor over. Bakgrunnen må være tett, ellers skinner radene gjennom. */
+.ko-tavle-pause {
+  background: var(--surface-3); position: sticky; top: var(--ko-tavle-hode-h); z-index: 2;
+}
 .ko-tavle-spor { position: relative; flex-grow: 1; }
 .ko-tavle-stolpe {
   position: absolute; height: 24px; box-sizing: border-box; border-radius: 5px;

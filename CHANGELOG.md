@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Tavla: Pause-raden står fast under tidsaksen når tavla rulles  `#ko/ressursbildet`
+
+André: «Kan vi fikse en ting på ko tavlen, som er at pauseoversikten følger scrollingen nedover?»
+Pause-raden er den ene raden som gjelder hele vakta, og den forsvant under lokasjonene så snart
+tavla ble rullet. Nå står den `sticky` rett under tidsaksen, som alt sto fast.
+
+- **Tidsaksen har fast høyde** (`--ko-tavle-hode-h`, 26 px med kanten), så Pause-raden kan stå
+  med `top` lik den. Den ble før gitt av radnavnets polstring (ca. 29 px); polstringen loddrett er
+  tatt bort i hodet, og teksten står midt i. Målt i JS ville det vært en måling ved hver tegning.
+- **`z-index: 2`:** over stolpene i radene som ruller under, under tidsaksen (3). Nå-streken står
+  i samme lag og etter i DOM-en, og går derfor fortsatt gjennom Pause-raden.
+- Sett i Chromium på en side med tavlas markup og de ekte stilarkene, rullet 300 px: før var
+  Pause-raden ute av syne; etter står den med toppen nøyaktig på tidsaksens bunn, og er det
+  øverste elementet der. Ingen mutasjonstest — CSS er laget der øyet er raskere (`CLAUDE.md`).
+
+---
+
 ## 2026-10-19 — Utlogging i kartet når noen ikke lenger skal være der  `#core/kartkobling` `#core/tilgang`
 
 André bekreftet «Åpne kartet» på staging («Det funker»), og ba om neste steg: at portalen logger
