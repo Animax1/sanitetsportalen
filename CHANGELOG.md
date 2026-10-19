@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — Utlogging i kartet når noen ikke lenger skal være der  `#core/kartkobling` `#core/tilgang`
+
+André bekreftet «Åpne kartet» på staging («Det funker»), og ba om neste steg: at portalen logger
+ut av kartet med en gang, i stedet for at økten lever ut sine 12 timer.
+
+- **`core.kartkobling.logg_ut_i_kartet(bruker_id)` og `logg_ut_alle_i_kartet()`** sender til
+  kartets `/api/portal/utlogging`, etter commit, og kaster aldri. **Signert med
+  innloggingsnøkkelen**, ikke posisjonsnøkkelen: en lekket posisjonsnøkkel skal ikke kunne logge
+  folk ut, og utloggingen virker selv om kartkoblingen for posisjonene ikke er satt opp.
+- **Fra `accounts.sesjoner.avslutt_alle_sesjoner`** — det ene stedet portalens
+  sikkerhetsoperasjoner går gjennom: frysing, sletting, passord- og MFA-reset, «Avslutt sesjoner».
+- **Fra `accounts/signals.py`** (ny): KO-raden slettet (også når medlemskapet fjernes, CASCADE),
+  eller nivået senket under `skriv_full` — kartet kjenner bare «kan tegne» eller ikke, så
+  `skriv_leder` → `skriv_full` logger ikke ut, og et høyere nivå gjelder fra neste trykk.
+  Signaler og ikke kallsteder, så en ny vei til å endre radene ikke går utenom.
+- **Bryteren av logger ut alle** som kom fra portalen. Av betyr av, ikke bare «ingen nye».
+- **Utloggingen venter ikke på pausen** etter en feilet sending (`_send`): pausen skåner bilene for
+  ventetid, og en utlogging som ble hoppet over i stillhet ville latt økten leve i 12 timer.
+  Funnet av en test, ikke i drift.
+- 22 nye tester (`accounts/tests_kartutlogging.py`). **14 mutanter, alle drept** — tre overlevde
+  først, alle tre doble vakter (`created`, `forrige is None`, en KO-sjekk i både `pre_save` og
+  `post_save`). De ble fjernet i stedet for å dekkes, og en test for en annen moduls senkede rad
+  ble lagt til så den ene vakten som står, kan drepes.
+- Kartets side er `kart-sanitet` `50ef16d`: mottaket, og at en portalkonto uten portalenhet sendes
+  ut fra MFA-siden i stedet for å få sette opp en egen app.
+- TODO: staging-prøven er gjort; prod-steget står igjen hos André.
+
+---
+
 ## 2026-10-19 — «Åpne kartet» fra KO: innlogging i kart.sanitet.net uten egen kartkonto  `#core/kartkobling` `#core/tilgang`
 
 André: «de som har tilgang til /ko har tilgang til kartet og knappen som åpner en ny fane med

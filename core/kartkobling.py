@@ -258,12 +258,17 @@ def _raskt_avslag(kode: int | None) -> bool:
     return kode is not None and 400 <= kode < 500
 
 
-def _send(hva: str, navn: str, bygg) -> bool:
+def _send(hva: str, navn: str, bygg, *, nokkel: str | None = None) -> bool:
     """`bygg` lager kroppen inne i `try`, så også et ugyldig tidspunkt svelges.
-    True bare når kartet svarte 2xx."""
-    if not er_konfigurert():
+    True bare når kartet svarte 2xx. `nokkel` er innloggingsnøkkelen for utloggingen;
+    uten den er det posisjonsnøkkelen og `er_konfigurert()` som gjelder.
+
+    **Utloggingen venter ikke på pausen.** Pausen skåner en bil for `TIMEOUT_S` per trykk; en
+    utlogging kommer fra en admin som fryser en konto, og en som ble hoppet over i stillhet
+    fordi en stempling feilet for et halvt minutt siden, ville latt økten leve i 12 timer."""
+    if nokkel is None and not er_konfigurert():
         return False
-    if _i_pause():
+    if nokkel is None and _i_pause():
         logger.info('Kartkobling: %s %r hoppet over, pause etter feil', hva, navn)
         return False
     kode = None
@@ -279,7 +284,7 @@ def _send(hva: str, navn: str, bygg) -> bool:
             'Content-Type': 'application/json',
             'User-Agent': USER_AGENT,
             'X-Portal-Tid': tid,
-            'X-Portal-Signatur': signer(settings.KART_HMAC_NOKKEL, tid, kropp),
+            'X-Portal-Signatur': signer(nokkel or settings.KART_HMAC_NOKKEL, tid, kropp),
         })
         with request.urlopen(req, timeout=TIMEOUT_S) as svar:
             kode = svar.status
@@ -378,3 +383,39 @@ def lag_billett(*, bruker_id: int, navn: str, portal: str, skriv: bool,
         json.dumps(data, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
     ).rstrip(b'=').decode()
     return f'{innhold}.{signer_billett(nokkel or settings.KART_INNLOGGING_NOKKEL, innhold)}'
+
+
+# ── Utlogging i kartet (19. okt. 2026) ──────────────────────────────────────────────────────
+#
+# En billett kan ikke trekkes tilbake, men økten den ga kan avsluttes. Portalen melder fra når
+# noen ikke lenger skal være i kartet, og kartet sletter øktene til portalkontoen. Dette er
+# **samme retning som posisjonene** (B2): portalen sender, kartet svarer 204 og ingenting mer.
+#
+# **Signert med innloggingsnøkkelen, ikke posisjonsnøkkelen**, og sendt bare når innloggingen
+# er satt opp: det hører til innloggingen, og en lekket posisjonsnøkkel skal ikke kunne logge
+# folk ut av kartet. Den verste en lekket innloggingsnøkkel kan gjøre her, er det samme.
+#
+# **Etter commit, og aldri en feil for kalleren.** En frysing skal ikke stoppe fordi kartet er
+# nede; da er det 12-timersøkten i kartet som setter grensen, som før.
+
+
+def _logg_ut(data: dict, navn: str) -> bool:
+    if not innlogging_satt_opp():
+        return False
+    return _send('utlogging', navn, lambda: data, nokkel=settings.KART_INNLOGGING_NOKKEL)
+
+
+def logg_ut_i_kartet(bruker_id: int) -> None:
+    """Avslutt kartøktene til portalbrukeren, når transaksjonen er committet. Kaster aldri."""
+    from django.db import transaction
+
+    if innlogging_satt_opp():
+        transaction.on_commit(lambda: _logg_ut({'bruker': bruker_id}, f'bruker {bruker_id}'))
+
+
+def logg_ut_alle_i_kartet() -> None:
+    """Avslutt alle øktene som kom fra portalen — når admin slår av «Åpne kartet»."""
+    from django.db import transaction
+
+    if innlogging_satt_opp():
+        transaction.on_commit(lambda: _logg_ut({'alle': True}, 'alle'))

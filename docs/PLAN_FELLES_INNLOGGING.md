@@ -10,12 +10,13 @@
 |---|---|
 | Hvem kommer inn | **Den som har KO (`les`) i portalen de står i nå.** Ingen egen tilgangsrad |
 | Hvor knappen står | **I KO**, åpner kartet i ny fane |
-| Av og på | **Én global bryter for admin** på `/admin/innstillinger/` (KO-kortet), av som standard. Bryteren stenger på serveren, ikke bare knappen. Kartet har sin egen: uten `PORTAL_INNLOGGING_NOKKEL` tar det ikke imot |
+| Av og på | **Én global bryter for admin** på `/admin/innstillinger/` (kortet «Kartet»), av som standard. Bryteren stenger på serveren, ikke bare knappen. Kartet har sin egen: uten `PORTAL_INNLOGGING_NOKKEL` tar det ikke imot |
 | Hva de ser | **Gruppene i kartet som viser portalen de kom fra.** Medlemskapet i grupper med portal settes ved hver innlogging til nøyaktig disse; grupper uten portal røres ikke. Finnes ingen slik gruppe, avvises innloggingen med en forklaring i stedet for et tomt kart |
 | Hva de kan | **KO `les` ser, `skriv_full` og opp kan tegne.** Nivået ligger i økten, ikke på kontoen, og en portalkonto uten nivå i økten kan bare lese |
 | Identitet i kartet | **Egen konto per portalbruker** (`Bruker.portal_bruker_id`), uten passord og uten admin. Kobles ikke til en eksisterende kartkonto i denne runden |
 | Retning | **Bare portal → kart, gjennom nettleseren** (B2 står): portalen lager billetten, nettleseren poster den, kartet ringer aldri tilbake |
-| Økten | **12 timer**, ikke kartets vanlige 7 døgn — den kan ikke trekkes tilbake fra portalen ennå |
+| Økten | **12 timer**, ikke kartets vanlige 7 døgn — som reserve når utloggingen ikke kommer fram |
+| Utlogging | **Portalen melder fra, kartet sletter øktene** (`/api/portal/utlogging`, signert med innloggingsnøkkelen): ved alt som går gjennom `avslutt_alle_sesjoner` (frysing, sletting, passord- og MFA-reset, «Avslutt sesjoner»), når KO-raden forsvinner eller tegneretten mistes (`accounts/signals.py`), og alle når bryteren slås av. Bare portalkontoer i kartet kan treffes |
 
 ## 2. Billetten
 
@@ -52,6 +53,5 @@ testen er rød i begge hvis én side endrer formen.
 
 | Hva | Hvorfor |
 |---|---|
-| Portalen melder «fryst/slettet» til kartet | Økten er 12 timer og ingen ny billett utstedes; meldingen er neste steg (TODO i begge) |
 | Kobling til en eksisterende kartkonto | Der feil i kontokobling gjør skade, og gevinsten er liten når tegningene hører til gruppa |
 | Bryter per portal | Én global holder til det trengs |

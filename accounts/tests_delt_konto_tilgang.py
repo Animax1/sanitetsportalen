@@ -89,6 +89,8 @@ class DirekteLesereTests(TestCase):
         'accounts/forms.py': 'Matrisen leser og skriver radene; sperra står i skjemaet',
         'ko/tilstede.py': 'KO-sidebaren i bulk; utelater delte kontoer',
         'backlog/varsler.py': 'Varselmottakerne i bulk; utelater delte kontoer',
+        'accounts/signals.py': ('Leser forrige nivå på samme rad for å avgjøre utlogging i kartet; '
+                                'gir aldri tilgang — billetten går gjennom `har_tilgang`'),
     }
 
     def test_ingen_ny_direkte_leser_uten_at_noen_har_tatt_stilling(self):

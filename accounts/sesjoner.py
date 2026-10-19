@@ -69,6 +69,10 @@ def avslutt_alle_sesjoner(user):
     overlevende sesjon er hele feilmodusen man vil unngå.
     """
     slett_brukerens_sesjoner(user)
+    # Kartet også (19. okt. 2026): en økt fra «Åpne kartet» er en sesjon som overlever ellers.
+    # Etter commit og uten å kaste — se `core.kartkobling.logg_ut_i_kartet`.
+    from core.kartkobling import logg_ut_i_kartet
+    logg_ut_i_kartet(user.pk)
 
     if user.current_session_key:
         user.current_session_key = None

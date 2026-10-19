@@ -62,7 +62,11 @@ class KartInnstillinger(BasePortalinnstillingHandler):
         if 'delt_posisjon' in verdier:
             AppSetting.set(kartkobling.DELT_VARIGHET_NOKKEL, verdier['delt_posisjon'])
         if 'innlogging' in verdier:
+            var_paa = kartkobling.innlogging_slatt_paa()
             AppSetting.set(kartkobling.INNLOGGING_NOKKEL, 'true' if verdier['innlogging'] else 'false')
+            if var_paa and not verdier['innlogging']:
+                # Av betyr av: også de som alt er inne, ikke bare at ingen nye kommer til.
+                kartkobling.logg_ut_alle_i_kartet()
 
 
 def register_handlers() -> None:
