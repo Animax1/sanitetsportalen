@@ -279,6 +279,20 @@ function koHendelseRadHtml(h) {
     + '</tr>';
 }
 
+// **Tegn bare om når noe er endret** (André, 19. okt. 2026: «når du trykker
+// lukk hendelse så skjer det av og til ingenting»). Tabellen og hendelsen
+// tegnes ved hver poll og hver gang oppdragslista tegnes — og byttes en knapp
+// ut mellom `mousedown` og `mouseup`, sender nettleseren ingen `click`. Uendret
+// markup røres ikke; da står knappen under fingeren. Sist tegnet står på
+// elementet, ikke sammenlignet med `innerHTML`, som nettleseren normaliserer.
+function koSettHtml(el, html) {
+  if (!el) return false;
+  if (el.koSistTegnet === html) return false;
+  el.innerHTML = html;
+  el.koSistTegnet = html;
+  return true;
+}
+
 function koTegnHendelser() {
   const boks = document.getElementById('ko-hendelser-liste');
   if (!boks) return;
@@ -292,13 +306,13 @@ function koTegnHendelser() {
   // der med det samme man går tilbake.
   const rader = koSynligeHendelser();
   if (!rader.length) {
-    boks.innerHTML = '<p class="text-muted small p-2 mb-0">'
-      + (alle.length ? 'Ingen hendelser treffer.' : 'Ingen hendelser ennå.') + '</p>';
+    koSettHtml(boks, '<p class="text-muted small p-2 mb-0">'
+      + (alle.length ? 'Ingen hendelser treffer.' : 'Ingen hendelser ennå.') + '</p>');
   } else {
-    boks.innerHTML = '<table class="h-tabell"><thead><tr>'
+    koSettHtml(boks, '<table class="h-tabell"><thead><tr>'
       + '<th></th><th>Nr</th><th>Tid</th><th>Hendelse</th><th>Prioritet</th><th>Sted</th>'
       + '<th>Lag</th><th>Oppdrag</th><th>Opprettet av</th><th>Status</th>'
-      + '</tr></thead><tbody>' + rader.map(koHendelseRadHtml).join('') + '</tbody></table>';
+      + '</tr></thead><tbody>' + rader.map(koHendelseRadHtml).join('') + '</tbody></table>');
   }
   if (koApenHendelseId !== null) koTegnDetalj(); else koVisDetaljen(false);
 }
@@ -372,8 +386,8 @@ function koTegnHSide() {
   if (!boks) return;
   const apne = koApneHendelser();
   const naa = Date.now();
-  boks.innerHTML = apne.length ? apne.map((h) => koHSideRadHtml(h, naa)).join('')
-    : '<p class="text-muted small p-1 mb-0">Ingen pågående.</p>';
+  koSettHtml(boks, apne.length ? apne.map((h) => koHSideRadHtml(h, naa)).join('')
+    : '<p class="text-muted small p-1 mb-0">Ingen pågående.</p>');
 }
 
 //: Sidebarens bredde når den er dratt, i px — per nettleser, som oppsettet.
@@ -1035,7 +1049,7 @@ function koTegnDetalj() {
       + '</form><div class="text-danger small mt-1 d-none" id="ko-hendelse-feil" role="alert"></div></div>'
     : '';
   const prio = escapeHtml(h.prioritet || 'gronn');
-  boks.innerHTML = '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">'
+  const html = '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">'
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koLukkDetalj">'
     + '<i class="bi bi-arrow-left me-1"></i>Alle hendelser</button>'
     + '<button type="button" class="btn btn-sm btn-outline-secondary ko-h-eget" data-action="koHendelseIEgetVindu"'
@@ -1073,6 +1087,8 @@ function koTegnDetalj() {
     + '<div class="h-traad" id="ko-hendelse-traad">' + (koHendelseLinjer(h).map(koDetaljLinjeHtml).join('')
       || '<span class="text-muted small">Ingen linjer ennå.</span>') + '</div>'
     + skjema;
+  // Uendret: knappene, feltene og rullingen står som de står (`koSettHtml`).
+  if (!koSettHtml(boks, html)) return;
   const form = document.getElementById('ko-hendelse-linje-form');
   if (form) {
     form.addEventListener('submit', (e) => {

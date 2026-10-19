@@ -61,6 +61,7 @@ skjerm i et kommandopunkt.
 | Tavla: reglene, byggerne, dra og slipp | `static/js/ko-tavle.js`; modellen og tjenestene i `ko/tavle.py` |
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Hodet i hendelsen: TG, beskrivelsen, de eksterne aktørene (19. okt. 2026) | `static/js/ko-hode.js` — skilt ut av ko-hendelser.js ved taket på 1 800 linjer |
+| **Tabellen, sidebaren og hendelsen tegnes bare om når markupen er endret** (`koSettHtml`, 19. okt. 2026) | En knapp som byttes ut mellom `mousedown` og `mouseup` får ingen `click` — «Lukk hendelse» virket av og til ikke |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | «Vis»-menyen over ressurslista | `oppdaterSynlighetsmeny()` i `static/js/oppdrag-kort.js`, `templates/oppdrag/_synlighetsmeny.html` |
 | Vaktlistas ressurser uten enhet | `vaktliste.vaktdrift.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |

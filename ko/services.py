@@ -837,11 +837,18 @@ def gjeldende_i_kjeden(rot):
 
 
 @transaction.atomic
-def sett_beskrivelse(hendelse, raa_tekst, *, bruker, sett_linje=None) -> Logglinje:
+def sett_beskrivelse(hendelse, raa_tekst, *, bruker, sett_linje=None, naa=None) -> Logglinje:
     """Skriv eller oppdater beskrivelsen. Returnerer linja slik den nå står.
 
     Har hendelsen ingen (eller er den fjernet med sletteinngangen), blir det
     en ny linje som hodet peker på. Ellers rettes det gjeldende leddet.
+
+    **Den deles med enhetene, og det står i loggen hvem som gjorde det**
+    (André, 19. okt. 2026: «når du oppdaterer beskrivelse så må det og komme
+    frem til bil enheter … Det bør og oppdateres i hendelsesloggen hvem som
+    oppdaterte»). Beskrivelsen fra «Ny hendelse» er fortsatt intern til den
+    deles; det er *oppdateringen* — her, fra hodet eller «Rediger» — som går
+    ut. Systemlinja (`HENDELSE_BESKRIVELSE`) sier hvem, uten teksten.
 
     **`sett_linje` er linja klienten så**, som `versjon` i hodet: er
     beskrivelsen oppdatert av noen andre siden, er det 409 og ikke en stille
@@ -853,14 +860,19 @@ def sett_beskrivelse(hendelse, raa_tekst, *, bruker, sett_linje=None) -> Logglin
         raise Ugyldig('Beskrivelsen kan ikke være tom.')
     gjeldende = gjeldende_i_kjeden(hendelse.beskrivelse_linje)
     if gjeldende is None or gjeldende.er_fjernet:
-        ny = skriv_linje(hendelse.vakt, tekst, bruker=bruker, hendelse=hendelse)
+        ny = skriv_linje(hendelse.vakt, tekst, bruker=bruker, hendelse=hendelse, naa=naa)
         hendelse.beskrivelse_linje = ny
         hendelse.save(update_fields=['beskrivelse_linje'])
-        return ny
-    if sett_linje not in (None, '') and str(sett_linje) != str(gjeldende.pk):
-        raise AlleredeKorrigert('Beskrivelsen er oppdatert av noen andre — '
-                                'les den nye før du endrer.')
-    ny = korriger(gjeldende, bruker=bruker, tekst=tekst)
+    else:
+        if sett_linje not in (None, '') and str(sett_linje) != str(gjeldende.pk):
+            raise AlleredeKorrigert('Beskrivelsen er oppdatert av noen andre — '
+                                    'les den nye før du endrer.')
+        ny = korriger(gjeldende, bruker=bruker, tekst=tekst, naa=naa)
+    del_linje(ny, bruker=bruker, naa=naa)
+    data = _hendelsesdata(hendelse)
+    data.update(av=getattr(bruker, 'username', '') or '', ny=gjeldende is None or gjeldende.er_fjernet)
+    systemlinje(hendelse.vakt, _kode('HENDELSE_BESKRIVELSE'), data,
+                tidspunkt=naa, bruker=bruker, hendelse=hendelse)
     bli_med(hendelse, bruker)
     return ny
 

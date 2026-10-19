@@ -64,14 +64,33 @@ class BeskrivelsenTests(_Grunnlag):
         self.assertEqual(h.beskrivelse_linje_id, linje.pk)
         self.assertIsNone(self._hendelse().beskrivelse_linje_id, 'uten beskrivelse, ingen peker')
 
-    def test_uten_beskrivelse_blir_det_en_ny_intern_linje(self):
+    def test_uten_beskrivelse_blir_det_en_ny_delt_linje(self):
         h = self._hendelse()
         ny = services.sett_beskrivelse(h, 'Røyk', bruker=self.per)
         h.refresh_from_db()
         self.assertEqual(h.beskrivelse_linje_id, ny.pk)
-        self.assertEqual((ny.hendelse_id, ny.tekst, ny.forfatter_navn, ny.delt_at),
-                         (h.pk, 'Røyk', 'per', None))
+        self.assertEqual((ny.hendelse_id, ny.tekst, ny.forfatter_navn), (h.pk, 'Røyk', 'per'))
+        self.assertIsNotNone(ny.delt_at, 'det som settes fra hodet, går til bilene')
         self.assertIn('per', list(h.deltakere.values_list('brukernavn', flat=True)))
+
+    def test_beskrivelsen_fra_ny_hendelse_er_fortsatt_intern(self):
+        h = self._hendelse(beskrivelse='Røyk')
+        self.assertIsNone(h.beskrivelse_linje.delt_at)
+
+    def test_hvem_som_oppdaterte_staar_i_hendelsesloggen(self):
+        """«Det bør og oppdateres i hendelsesloggen hvem som oppdaterte beskrivelse»
+        (André, 19. okt. 2026). En systemlinje i hendelsen, med hvem — ikke teksten."""
+        from ko import systemlinjer
+        h = self._hendelse()
+        services.sett_beskrivelse(h, 'v1', bruker=self.per)
+        services.sett_beskrivelse(h, 'v2 med helseopplysning', bruker=self.kari)
+        linjer = list(Logglinje.objects.filter(hendelse=h, systemkode=systemlinjer.HENDELSE_BESKRIVELSE)
+                      .order_by('id'))
+        tekster = [systemlinjer.tegn(l.systemkode, l.systemdata) for l in linjer]
+        self.assertEqual(tekster, [f'H{h.hendelsesnummer}: beskrivelse lagt til av per',
+                                   f'H{h.hendelsesnummer}: beskrivelsen oppdatert av kari'])
+        self.assertEqual([l.forfatter_navn for l in linjer], ['per', 'kari'])
+        self.assertNotIn('helseopplysning', json.dumps([l.systemdata for l in linjer]))
 
     def test_oppdatering_er_en_retting_og_pekeren_staar_paa_roten(self):
         h = self._hendelse(beskrivelse='v1')
@@ -113,13 +132,17 @@ class BeskrivelsenTests(_Grunnlag):
         self.assertEqual(h.beskrivelse_linje_id, ny.pk)
         self.assertIsNone(ny.korrigerer_id)
 
-    def test_en_delt_beskrivelse_forblir_delt_og_bilen_ser_den_nye(self):
+    def test_en_oppdatering_naar_bilen_ogsaa_naar_den_forste_var_intern(self):
+        """«Når du oppdaterer beskrivelse så må det og komme frem til bil enheter /
+        de som bruker /oppdrag» (André, 19. okt. 2026)."""
         h = self._hendelse(beskrivelse='Røyk')
         o = self._oppdrag(h)
-        services.del_linje(h.beskrivelse_linje, bruker=self.kari)
+        self.assertEqual(oppdrag_til_dict(o, for_enhet=True)['delte_linjer'], [], 'intern før')
         services.sett_beskrivelse(h, 'Åpen flamme', bruker=self.kari)
-        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=True)['delte_linjer']],
-                         ['Åpen flamme'])
+        for for_enhet in (True, False):
+            with self.subTest(for_enhet=for_enhet):
+                self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=for_enhet)['delte_linjer']],
+                                 ['Åpen flamme'])
 
 
 class VarslingTests(_Grunnlag):
@@ -604,48 +627,87 @@ class HodetINettleserenTests(TestCase):
 
 
 class TalegruppeINettleserenTests(TestCase):
-    """Hodets TG-rad: valgene, knappene og escapingen."""
+    """Hodets TG-rad, **gjennom den ekte delegeringen** (19. okt. 2026).
+
+    Første utgave hadde `data-id="5:del"`, og klikkdelegeringen gjør `data-id`
+    om til et tall (`_handlerArgument`): `Number("5:del")` er `NaN`, kallet gikk
+    til `/ko/api/hendelser/NaN/talegruppe/`, og André fikk «Talegruppen ble ikke
+    satt». Testen den gangen kalte handlingen direkte med `'4:del'`, og så aldri
+    det nettleseren sender. Nå plukkes attributtene ut av markupen og går
+    gjennom `hendelseArgumenter`/`_handlerArgument`, som i nettleseren.
+    """
 
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml',)),
-                                      (KO_JS, ('koTalegruppeValg', 'koTalegruppeHtml', 'koSettTalegruppe'))))
+        self.harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml', 'hendelseArgumenter', '_handlerArgument')),
+                                      (KO_JS, ('koTalegruppeValg', 'koTalegruppeHtml', '_koSendTalegruppe',
+                                               'koVelgTalegruppe', 'koDelTalegruppe'))))
 
-    def test_knappene_bare_for_den_som_kan_paa_en_aapen_hendelse(self):
-        run_node(self.harness, """
+    PRE = """
+        const sendt = [];
+        async function _koHendelsehandling(sti, kropp) { sendt.push([sti, kropp]); return { res: { ok: true }, data: {} }; }
+        async function koHentLogg() {}
+        function koHentOppdragPaaNytt() {}
+        let koHendelser = new Map();
+        // Plukk elementet ut av markupen slik delegeringen ser det.
+        function element(html, tagg) {
+          const m = html.match(new RegExp('<' + tagg + '[^>]*>'));
+          if (!m) return null;
+          const ds = {};
+          for (const a of m[0].matchAll(/data-([a-z]+)="([^"]*)"/g)) ds[a[1]] = a[2];
+          return { dataset: ds, value: '' };
+        }
+    """
+
+    def test_raden_bare_for_den_som_kan_paa_en_aapen_hendelse(self):
+        run_node(self.harness, self.PRE + """
             globalThis.window = { KO_TALEGRUPPER: ['SAMVIRKE 2', 'TG <x>'] };
             const h = {id: 4, status: 'apen', talegruppe: 'GAMMEL', talegruppe_delt: true};
             const kan = koTalegruppeHtml(h, true);
-            assert(kan.includes('data-id="4:intern"') && kan.includes('data-id="4:del"'), kan);
+            assert(kan.includes('data-hendelse="change"') && kan.includes('data-action="koVelgTalegruppe"'), kan);
+            assert(!kan.includes('koDelTalegruppe'), 'delt: ingen «Del TG»');
+            assert(kan.includes('Delt med bilene'));
             assert(kan.includes('TG &lt;x&gt;') && !kan.includes('TG <x>'), 'escapet');
             assert(kan.includes('<option value="GAMMEL" selected>'), 'den den står på, også utenfor lista');
-            assert(kan.includes('Delt med bilene'));
+            const intern = koTalegruppeHtml({...h, talegruppe_delt: false}, true);
+            assert(intern.includes('koDelTalegruppe') && intern.includes('Del TG'), intern);
+            assert(!koTalegruppeHtml({...h, talegruppe: ''}, true).includes('koDelTalegruppe'), 'ingen TG, ingenting å dele');
             for (const html of [koTalegruppeHtml(h, false), koTalegruppeHtml({...h, status: 'lukket'}, true)]) {
-              assert(!html.includes('koSettTalegruppe') && html.includes('GAMMEL'), html);
+              assert(!html.includes('<select') && !html.includes('koDelTalegruppe') && html.includes('GAMMEL'), html);
             }
             assert(koTalegruppeHtml({id: 4, status: 'apen', talegruppe: ''}, false) === '', 'ingenting å vise');
             window.KO_TALEGRUPPER = [];
             assert(koTalegruppeHtml({id: 4, status: 'apen', talegruppe: ''}, true) === '', 'tom liste');
         """)
 
-    def test_knappen_sender_valget_og_delingen(self):
-        ut = run_node(self.harness, """
-            const sendt = [];
-            async function _koHendelsehandling(sti, kropp) { sendt.push([sti, kropp]); return { res: { ok: true }, data: {} }; }
-            async function koHentLogg() {}
-            function koHentOppdragPaaNytt() {}
-            globalThis.document = { getElementById: (id) => (id === 'ko-tg-valg' ? { value: 'SAMVIRKE 2' } : null) };
+    def test_nedtrekket_lagrer_selv_og_del_tg_deler(self):
+        ut = run_node(self.harness, self.PRE + """
+            globalThis.window = { KO_TALEGRUPPER: ['SAMVIRKE 2', 'SAMVIRKE 3'] };
             (async () => {
-              await koSettTalegruppe('4:del');
-              await koSettTalegruppe('4:intern');
+              // Intern TG: et valg i nedtrekket lagres internt.
+              let h = {id: 4, status: 'apen', talegruppe: 'SAMVIRKE 2', talegruppe_delt: false};
+              koHendelser.set(4, h);
+              let sel = element(koTalegruppeHtml(h, true), 'select');
+              sel.value = 'SAMVIRKE 3';
+              await koVelgTalegruppe(...hendelseArgumenter(sel));
+              // «Del TG» — gjennom klikkdelegeringen.
+              const knapp = element(koTalegruppeHtml(h, true), 'button');
+              await koDelTalegruppe(_handlerArgument(knapp));
+              // Delt TG: et bytte deles også.
+              h = {...h, talegruppe_delt: true};
+              koHendelser.set(4, h);
+              sel = element(koTalegruppeHtml(h, true), 'select');
+              sel.value = '';
+              await koVelgTalegruppe(...hendelseArgumenter(sel));
               console.log(JSON.stringify(sendt));
             })();
         """)
         linje = [l for l in ut.splitlines() if l.startswith('[')][-1]
         self.assertEqual(json.loads(linje), [
+            ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': 'SAMVIRKE 3', 'del': False}],
             ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': 'SAMVIRKE 2', 'del': True}],
-            ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': 'SAMVIRKE 2', 'del': False}],
+            ['/ko/api/hendelser/4/talegruppe/', {'talegruppe': '', 'del': True}],
         ])
 
 
@@ -697,12 +759,39 @@ class KallstedeneTests(TestCase):
             koApneHendelse('5');
             const d = el('ko-hendelse-detalj').innerHTML;
             const besk = d.indexOf('Røyk fra telt B'), varsle = d.indexOf('data-action="koVarsle"'),
-                  lag = d.indexOf('Lag:'), sted = d.indexOf('bi-geo-alt'), tg = d.indexOf('koSettTalegruppe');
+                  lag = d.indexOf('Lag:'), sted = d.indexOf('bi-geo-alt'), tg = d.indexOf('koVelgTalegruppe');
             console.log(JSON.stringify([sted < tg && tg < besk, besk < varsle, varsle < lag,
                                         d.includes('h-beskrivelse-merke'), (d.match(/koVarsle/g) || []).length]));
         """)
         self.assertEqual(json.loads(ut[-1]), [True, True, True, True, 2],
                      'sted, TG, beskrivelse, varslet, lag — og linja i tråden merket')
+
+    def test_uendret_hendelse_tegnes_ikke_om(self):
+        """«Når du trykker lukk hendelse så skjer det av og til ingenting» (André,
+        19. okt. 2026). Pollen tegnet hendelsen på nytt hvert par sekunder; byttes
+        knappen ut mellom `mousedown` og `mouseup`, kommer det ingen `click`. Uendret
+        markup skal ikke røres — tabellen, sidebaren og hendelsen."""
+        from ko.tests_js import HendelsenIHendelsesvinduetTests as Vindu
+        ut = Vindu()._kjor("""
+            const skrevet = {};
+            for (const id of ['ko-hendelse-detalj', 'ko-hendelser-liste', 'ko-hendelse-sidebar']) {
+              const e = el(id); let v = '';
+              Object.defineProperty(e, 'innerHTML', { get: () => v,
+                set: (x) => { v = x; skrevet[id] = (skrevet[id] || 0) + 1; } });
+            }
+            koApneHendelse('5');
+            const foer = JSON.stringify(skrevet);
+            koTegnHendelser(); koTegnHendelser(); koTegnDetalj();
+            const uendret = JSON.stringify(skrevet);
+            koHendelser.set(5, {...koHendelser.get(5), tittel: 'Ny tittel'});
+            koTegnHendelser();
+            console.log(JSON.stringify([foer === uendret, skrevet['ko-hendelse-detalj'],
+                                        el('ko-hendelse-detalj').innerHTML.includes('Ny tittel')]));
+        """)
+        foer_lik, ganger, ny_tittel = json.loads(ut[-1])
+        self.assertTrue(foer_lik, 'uendret: ingen av de tre skrives på nytt')
+        self.assertEqual(ganger, 2, 'åpnet én gang, tegnet om én gang da tittelen endret seg')
+        self.assertTrue(ny_tittel)
 
     def test_bilens_kort_viser_melder_og_varslede(self):
         from oppdrag.tests_xss import EnhetEscapingOppforselTests as E

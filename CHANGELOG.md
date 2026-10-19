@@ -111,6 +111,43 @@ CI-formen **143 s parallelt + 329 s `core` serielt + 83 s migrasjonsprøver ≈ 
 Mutasjoner, 2 av 2 drept: kommandoen slutter å kalle `migrate` (7 tester røde), og en
 dokumenttest fjernet fra kommandoen i CLAUDE.md (rød).
 
+## 2026-10-19 — KO-hendelsen: «Talegruppen ble ikke satt», «Lukk hendelse» som av og til ikke gjorde noe, og beskrivelsen ut til bilene  `#ko/hendelseslogg`
+
+André på staging (`3b6728a`): «Jeg får feilmelding når jeg skal sette talegruppe. Talegruppen ble
+ikke satt», «det bør være enkelt, ikke en sett knapp … Sett og del med bilene er bare "Del TG"»,
+«når du oppdaterer beskrivelse så må det og komme frem til bil enheter / de som bruker /oppdrag.
+Det bør og oppdateres i hendelsesloggen hvem som oppdaterte beskrivelse», og «når du trykker lukk
+hendelse så skjer det av og til ingenting. så du må trykke en gang til».
+
+**«Talegruppen ble ikke satt» — `NaN` i adressen.** Knappene bar `data-id="5:del"`, og
+klikkdelegeringen gjør `data-id` om til et tall (`_handlerArgument` i `portal-utils.js`):
+`Number("5:del")` er `NaN`, kallet gikk til `/ko/api/hendelser/NaN/talegruppe/`, 404, og svaret
+hadde ingen melding. **Testen kalte handlingen direkte med `'4:del'`** og så aldri det
+nettleseren sender — nøyaktig fella `CLAUDE.md` beskriver («En test som bare leser markupen ser
+ikke dette»). Nå: **nedtrekket lagrer selv** (`data-hendelse="change"`, `koVelgTalegruppe`), og
+**«Del TG»** (`koDelTalegruppe`, `data-id` er bare tallet) står bare når en TG er satt og ikke
+delt; delt står som «Delt med bilene». Bytter hun TG mens den er delt, deles den nye også —
+bilene har den gamle. Testene plukker attributtene ut av den ekte markupen og sender dem gjennom
+`hendelseArgumenter`/`_handlerArgument`.
+
+**«Lukk hendelse» av og til uten virkning — knappen ble byttet ut under fingeren.** Hendelsen,
+tabellen og sidebaren ble tegnet på nytt med `innerHTML` ved hver logg-poll og hver gang
+oppdragslista ble tegnet (`koEtterOppdragTegnet`), uansett om noe var endret. Kom en omtegning
+mellom `mousedown` og `mouseup`, hørte de to til hver sin knapp, og nettleseren sendte ingen
+`click`. Gjaldt alle knappene i hendelsen, ikke bare «Lukk». `koSettHtml()` skriver nå bare når
+markupen er en annen enn sist; uendret står knappen, feltene og rullingen der de sto.
+
+**Beskrivelsen ut til bilene, og hvem i loggen.** En oppdatering — «Oppdater» i hodet eller
+«Rediger» — **deles nå alltid** med enhetene på hendelsens oppdrag (bilen og sentralbordet i
+`/oppdrag/`, «Fra loggen i H14», gul det første minuttet), og gir systemlinja
+**«H14: beskrivelsen oppdatert av kari»** (`HENDELSE_BESKRIVELSE`; «beskrivelse lagt til» når det
+var den første). Teksten står ikke i systemlinja. Beskrivelsen fra «Ny hendelse» er fortsatt
+intern til den deles eller oppdateres. «Oppdater» er en knapp som «Rediger», ikke en lenke.
+
+Tester: `ko/tests_hendelseshode.py` — delingen og systemlinja, TG gjennom delegeringen, og at
+uendret markup ikke skrives (et `innerHTML`-felt som teller). Mutanter: 12, alle drept, også de
+tre kallstedene til `koSettHtml`.
+
 ## 2026-10-19 — KO-hendelsen: talegruppa (TG) i Nødnett, satt i hodet og delt med bilene når KO vil  `#ko/hendelseslogg`
 
 André: «TG er talegruppe som vi bruker i nødnett. Bør være en innstilling koleder/moderator/admin

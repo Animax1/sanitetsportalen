@@ -9,10 +9,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Talegruppa i Nødnett (19. okt. 2026) ─────────────────────────────────────
-// «TG er talegruppe som vi bruker i nødnett … Når den settes bør de kunne
-// velge å om å dele til bil enheter» (André). **To knapper, ikke en
-// avkrysning for deling**: hodet tegnes om ved hver poll, og en avkrysning
-// ville blitt nullstilt mens hun valgte. Nedtrekket bevares (`koBevarFelter`).
+// «TG er talegruppe som vi bruker i nødnett». **Nedtrekket lagrer selv**
+// (André, samme dag: «enkelt, ikke en sett knapp») — `data-hendelse="change"`,
+// så klikket som åpner lista ikke også kaller handlingen (`klikkSkalKjore`).
+// «Del TG» står bare der det er noe å dele. **Bytter hun TG mens den er delt,
+// deles den nye også**: bilene har den gamle, og må få vite at den ikke gjelder.
 
 // Valgene i nedtrekket: lista fra KO-innstillinger, og TG-en hendelsen står på
 // selv om den er tatt ut av lista siden.
@@ -24,36 +25,44 @@ function koTalegruppeValg(h) {
 
 function koTalegruppeHtml(h, kan) {
   const tg = String(h.talegruppe || '');
-  const merke = tg
-    ? '<b>' + escapeHtml(tg) + '</b> <span class="badge ' + (h.talegruppe_delt ? 'delt">Delt med bilene' : 'bg-secondary">Intern')
-      + '</span>'
-    : '<span class="text-muted">ingen</span>';
+  const delt = tg && h.talegruppe_delt ? ' <span class="badge delt">Delt med bilene</span>' : '';
   const valg = koTalegruppeValg(h);
   if (!kan || h.status !== 'apen' || !valg.length) {
     return tg ? '<div class="d-flex align-items-center gap-2 flex-wrap mt-2"><span class="h-felt">'
-      + '<i class="bi bi-headset"></i> TG:</span>' + merke + '</div>' : '';
+      + '<i class="bi bi-headset"></i> TG:</span><b>' + escapeHtml(tg) + '</b>' + delt + '</div>' : '';
   }
   const id = escapeHtml(h.id);
+  const delKnapp = tg && !h.talegruppe_delt
+    ? '<button type="button" class="btn btn-sm btn-outline-success" data-action="koDelTalegruppe" data-id="' + id + '"'
+      + ' title="Bilene på hendelsens oppdrag ser TG-en og linja i loggen"><i class="bi bi-send me-1"></i>Del TG</button>'
+    : '';
   return '<div class="d-flex align-items-center gap-2 flex-wrap mt-2"><span class="h-felt"><i class="bi bi-headset"></i> TG:</span>'
-    + merke
-    + '<select id="ko-tg-valg" class="form-select form-select-sm w-auto" aria-label="Talegruppe">'
+    + '<select id="ko-tg-valg" class="form-select form-select-sm w-auto" aria-label="Talegruppe"'
+    + ' data-action="koVelgTalegruppe" data-hendelse="change" data-id="' + id + '" data-felt="talegruppe">'
     + '<option value="">— ingen TG —</option>'
     + valg.map((n) => '<option value="' + escapeHtml(n) + '"' + (n === tg ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('')
-    + '</select>'
-    + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koSettTalegruppe" data-id="' + id + ':intern">Sett</button>'
-    + '<button type="button" class="btn btn-sm btn-outline-success" data-action="koSettTalegruppe" data-id="' + id + ':del"'
-    + ' title="Bilene på hendelsens oppdrag ser TG-en og linja i loggen"><i class="bi bi-send me-1"></i>Sett og del med bilene</button>'
-    + '</div>';
+    + '</select>' + delt + delKnapp + '</div>';
 }
 
-async function koSettTalegruppe(arg) {
-  const [id, hvordan] = String(arg).split(':');
-  const valgt = (document.getElementById('ko-tg-valg') || {}).value || '';
+async function _koSendTalegruppe(id, talegruppe, del) {
   const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/talegruppe/',
-    { talegruppe: valgt, del: hvordan === 'del' });
-  if (!res.ok) { window.alert(data.message || 'Talegruppen ble ikke satt.'); return; }
+    { talegruppe: talegruppe, del: del });
+  if (!res.ok) window.alert(data.message || 'Talegruppen ble ikke satt.');
   await koHentLogg();
   koHentOppdragPaaNytt();
+}
+
+// Nedtrekket: `(id, felt, verdi)` fra delegeringen (`hendelseArgumenter`).
+async function koVelgTalegruppe(id, felt, verdi) {
+  const h = koHendelser.get(Number(id));
+  if (!h) return;
+  await _koSendTalegruppe(h.id, verdi || '', Boolean(h.talegruppe_delt));
+}
+
+async function koDelTalegruppe(id) {
+  const h = koHendelser.get(Number(id));
+  if (!h || !h.talegruppe) return;
+  await _koSendTalegruppe(h.id, h.talegruppe, true);
 }
 
 // ── Beskrivelsen og de eksterne aktørene i hodet (19. okt. 2026) ───────────
@@ -82,11 +91,12 @@ function koBeskrivelseHtml(h, kan) {
       + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-check2 me-1"></i>Lagre</button>'
       + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koBeskrivelseAvbryt"'
       + ' data-id="' + escapeHtml(h.id) + '">Avbryt</button>'
-      + '<span class="text-muted small align-self-center">Lagres som en retting — loggen viser hva som sto før.</span>'
+      + '<span class="text-muted small align-self-center">Deles med bilene. Loggen viser hva som sto før, og hvem som endret.</span>'
       + '</div><div class="text-danger small mt-1 d-none" id="ko-beskrivelse-feil" role="alert"></div></div>';
   }
+  // Samme knapp som «Rediger» i hodet — ikke en lenke (André, 19. okt. 2026).
   const knapp = kan
-    ? '<button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-action="koBeskrivelseRediger"'
+    ? '<button type="button" class="btn btn-sm btn-outline-secondary ms-auto" data-action="koBeskrivelseRediger"'
       + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-pencil me-1"></i>' + (besk ? 'Oppdater' : 'Legg til beskrivelse') + '</button>'
     : '';
   if (!besk) {

@@ -540,7 +540,7 @@ VINDU_HARNESS = HENDELSE_HARNESS + (
              'koMerkLest', 'koSisteLinjeI',
              # Hodet (19. okt. 2026): beskrivelsen og de eksterne aktørene.
              'koBeskrivelse', 'koBeskrivelseHtml', 'koEksterneValg', 'koEksterneHtml',
-             'koTalegruppeValg', 'koTalegruppeHtml')),
+             'koTalegruppeValg', 'koTalegruppeHtml', 'koSettHtml')),
 )
 
 
@@ -1090,7 +1090,7 @@ class DelingOgLagTests(SimpleTestCase):
         igjen — ellers står et lag som ledig til neste ressurs-poll."""
         harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml',)),
-            (KO_JS, ('koTaImotHendelser', 'koTegnHendelser', 'koFyllHendelsevalg',
+            (KO_JS, ('koTaImotHendelser', 'koTegnHendelser', 'koSettHtml', 'koFyllHendelsevalg',
                      'koSorterHendelser', 'koSynligeHendelser', 'koApneHendelser',
                      'koHendelseTreffer', 'koPrioriteter', 'koPrioritetRang')),
         ))

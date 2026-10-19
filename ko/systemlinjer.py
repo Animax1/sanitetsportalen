@@ -81,6 +81,7 @@ HENDELSE_OPPRETTET = 'hendelse_opprettet'
 HENDELSE_LUKKET = 'hendelse_lukket'
 HENDELSE_GJENAPNET = 'hendelse_gjenapnet'
 HENDELSE_PRIORITET = 'hendelse_prioritet'
+HENDELSE_BESKRIVELSE = 'hendelse_beskrivelse'
 HENDELSE_LAG_PAA = 'hendelse_lag_paa'
 HENDELSE_LAG_AV = 'hendelse_lag_av'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
@@ -135,6 +136,11 @@ KODER: dict[str, str] = {
         '«H14 satt til Viktig av Kari» er en avgjørelse, ikke en feltendring '
         '(18. sep. 2026): det er den man leter etter når man spør hvorfor to '
         'biler ble sendt. Aldri en stille oppdatering.',
+    HENDELSE_BESKRIVELSE:
+        '«H14: beskrivelsen oppdatert av Kari» (André, 19. okt. 2026: «det bør '
+        'og oppdateres i hendelsesloggen hvem som oppdaterte beskrivelse»). '
+        'Beskrivelsen er tidskritisk og deles med bilene; hvem som endret den, '
+        'skal ikke måtte leses ut av rettingskjeden.',
     HENDELSE_LAG_PAA:
         'Lagene får oppdrag muntlig på samband og registreres på hendelsen '
         '(André, 19. sep. 2026). «Lag 2 registrert på H14» er den ene linja '
@@ -272,6 +278,12 @@ def tegn(kode: str, data: dict) -> str:
             linje += f' (var {data["fra_prioritet"]})'
         if data.get('tittel'):
             linje += f' · {data["tittel"]}'
+        return linje
+    if kode == HENDELSE_BESKRIVELSE:
+        hva = 'beskrivelse lagt til' if data.get('ny') else 'beskrivelsen oppdatert'
+        linje = f'{_hendelse(data)}: {hva}'
+        if data.get('av'):
+            linje += f' av {data["av"]}'
         return linje
     if kode == HENDELSE_LUKKET:
         linje = f'{_hendelse(data)} lukket'
