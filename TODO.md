@@ -145,7 +145,21 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       avlesning 25. sep. 2026 var fra **staging** og viste ingen manglende indekser;
       bruken i prod er ikke sett — derfor en runde der, med ekte vakttall.
 
+- [ ] **Prøv «Åpne kartet» fra KO på staging** (19. okt. 2026, `docs/PLAN_FELLES_INNLOGGING.md`).
+      Koden er inert til nøklene står. 1) Lag en **ny** nøkkel (ikke kartkoblingens):
+      `python -c "import secrets; print(secrets.token_hex(32))"`, og legg den i passordbehandleren.
+      2) Railway, staging-portalen: `KART_INNLOGGING_NOKKEL`; testkart: `PORTAL_INNLOGGING_NOKKEL`,
+      samme verdi. 3) I testkartet: en gruppe med portalens slug i «Viser biler og lag fra
+      portalen». 4) `/admin/innstillinger/` → «Kartet» → kryss av «Åpne kartet» fra KO. 5) Trykk
+      knappen med en KO-leser (skal se, ikke tegne) og en som fører (skal tegne)
+
 ## Pågående / neste
+
+### «Åpne kartet» fra KO — neste steg (19. okt. 2026)
+
+- [ ] Portalen melder «konto fryst/slettet» og «KO-tilgang fjernet» til kartet over
+      kartkoblingen, så kartet logger ut med en gang. Til da er grensen kartets 12-timersøkt
+- [ ] Bryter per portal i stedet for én global, hvis en portal skal ha kartet og en annen ikke
 
 ### Flere portaler i én installasjon — se [`docs/BESLUTNING_PORTALER.md`](./docs/BESLUTNING_PORTALER.md)
 

@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-19 — «Åpne kartet» fra KO: innlogging i kart.sanitet.net uten egen kartkonto  `#core/kartkobling` `#core/tilgang`
+
+André: «de som har tilgang til /ko har tilgang til kartet og knappen som åpner en ny fane med
+kart appen bør ligge i ko modulen. Jeg bør en plass som admin få sperre … en av/på knapp.
+Samtidig når de logger inn så kan de få med seg portal slugen». Opphever «Innloggingene forblir
+separate» (17. okt.) for denne ene veien; kartets egen innlogging står. Plan og beslutninger:
+`docs/PLAN_FELLES_INNLOGGING.md`.
+
+- **«Åpne kartet» i KOs verktøylinje** — et skjema med `target="_blank"`, ikke en lenke:
+  `POST /ko/kart/` (`kart_view`, KO `les`) lager en **billett** og svarer med en side som poster
+  den videre til `<KART_URL>/konto/fra-portalen/`. Billetten står aldri i en URL.
+- **Billetten** (`core/kartkobling.lag_billett`): HMAC-SHA256 med **egen nøkkel**
+  `KART_INNLOGGING_NOKKEL` — en lekket posisjonsnøkkel skal ikke kunne logge inn som hvem som
+  helst — 60 sekunder, engangsnummer, kartets vert som `aud`, portalbrukerens ID og navn,
+  **portal-slugen brukeren står i** (inne i signaturen, så den ikke kan byttes) og om man kan
+  tegne: **KO `les` ser, `skriv_full` og opp tegner.**
+- **Av/på for admin** i kortet «Kartet» på `/admin/innstillinger/`, **av som standard**. Global,
+  bare admin (`portalfelt` tom). Bryteren stenger **endepunktet**, ikke bare knappen; uten nøkkel i
+  miljøet finnes knappen ikke, og kortet sier fra.
+- **CSP:** `form-action` får kartets vert **bare på svaret som poster videre**
+  (`core.middleware.csp_med_skjemamaal`); resten av portalen har `'self'` som før.
+- 29 nye tester (`core/tests_kartinnlogging.py`, `ko/tests_kartinnlogging.py`), med **samme
+  testvektor** som kartet: endres formen på én side, er begge røde. **15 mutanter, alle drept** —
+  én ville overlevd (slugen hardkodet til «standard», som også er testportalens) og fikk sin test
+  før kjøringen.
+- `CLAUDE.md` i rota er ikke rørt: den står 5 tegn under taket. `KART_INNLOGGING_NOKKEL` er
+  dokumentert i `settings.py`, i planen og i kartets README.
+- Kartets side (konto per portalbruker, gruppene for portalen, lesesperra, 12-timersøkt) er
+  pushet til `kart-sanitet`; se CHANGELOG der.
+
+---
+
 ## 2026-10-19 — Bilskjermen viser «Sist sendt» for løpende posisjon  `#oppdrag/enhetsskjerm`
 
 André, fra staging på `4d67ef9`: «Joda den gir posisjon bil enhet ser ikke når sist ble sendt».

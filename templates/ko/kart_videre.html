@@ -1,0 +1,22 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Åpner kartet – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  «Åpne kartet» (19. okt. 2026, `docs/PLAN_FELLES_INNLOGGING.md`): billetten postes videre til
+  kartet med det samme. Uten skript står knappen der, og billetten gjelder i ett minutt.
+  CSP-ens `form-action` får kartets vert på akkurat dette svaret (`ko.views.kart_view`).
+{% endcomment %}
+
+{% block content %}
+<div class="container py-4">
+  <form method="post" action="{{ kart_url }}" id="kart-videre">
+    <input type="hidden" name="billett" value="{{ billett }}">
+    <p>Åpner kartet …</p>
+    <button type="submit" class="btn btn-primary btn-sm">Åpne kartet</button>
+  </form>
+</div>
+<script nonce="{{ csp_nonce }}">
+  document.getElementById("kart-videre").submit();
+</script>
+{% endblock %}

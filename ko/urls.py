@@ -20,6 +20,8 @@ urlpatterns = [
     # Service workeren som holder utskriften uten nett. Ingen innlogging —
     # se `sw_view`.
     path('sw.js', views_utskrift.sw_view, name='ko_sw'),
+    # «Åpne kartet» (19. okt. 2026): billett til kart.sanitet.net, postet videre.
+    path('kart/', views.kart_view, name='ko_kart'),
     path('api/tilstede/', views.tilstede_view, name='ko_api_tilstede'),
     # Eget ansvarsmerke (§5.1, pulje 6). Vises, styrer ingenting.
     path('api/ansvar/', views.ansvar_view, name='ko_api_ansvar'),

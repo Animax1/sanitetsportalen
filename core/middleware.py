@@ -169,6 +169,17 @@ _CSP_DIRECTIVES = [
 _CSP_MAL = '; '.join(_CSP_DIRECTIVES)
 
 
+def csp_med_skjemamaal(request, opprinnelse: str) -> str:
+    """Portalens CSP med én vert til i `form-action` — for svaret som skal poste dit.
+
+    Brukes av «Åpne kartet» i KO (19. okt. 2026), som poster en billett til kartet. Viewet setter
+    headeren selv på det ene svaret; resten av portalen beholder `form-action 'self'`, så en
+    HTML-injeksjon et annet sted fortsatt ikke kan sende et skjema ut.
+    """
+    return _CSP_MAL.format(nonce=request.csp_nonce).replace(
+        "form-action 'self'", f"form-action 'self' {opprinnelse}")
+
+
 #: Portalen bruker verken kamera, mikrofon, posisjon eller betaling.
 PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=()'
 #: **Det ene unntaket:** bilskjermen i `/oppdrag/` når kartkoblingen er satt

@@ -77,6 +77,19 @@
            title="Skriv ut alt i KO — hendelser, ressurser, oppdrag, tavlen, konsertplanleggeren og loggen">
           <i class="bi bi-printer me-1"></i>Skriv ut
         </a>
+        {% if kart_innlogging %}
+        {% comment %}
+          «Åpne kartet» (19. okt. 2026): et skjema, ikke en lenke — billetten skal ikke stå i en
+          URL. `target="_blank"` på et skjema brukeren trykker på stoppes ikke av popup-blokkeren.
+        {% endcomment %}
+        <form method="post" action="{% url 'ko_kart' %}" target="_blank" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary btn-sm"
+                  title="Åpner kart.sanitet.net i en ny fane, innlogget, med gruppene for denne portalen">
+            <i class="bi bi-map me-1"></i>Åpne kartet
+          </button>
+        </form>
+        {% endif %}
         <span class="small text-muted align-self-center d-none" id="ko-kopi-status"
               title="Utskriften ligger i nettleseren og kan skrives ut uten nett. «Logg ut» sletter den."></span>
         {% if kan_se_oppdrag and kan_skrive %}

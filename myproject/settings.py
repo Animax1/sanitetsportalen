@@ -500,6 +500,10 @@ OFFSITE_BACKUP_KEY = os.environ.get('OFFSITE_BACKUP_KEY', '')
 # kartet i samme miljø, og skal også ligge i passordbehandleren.
 KART_URL = os.environ.get('KART_URL', '').strip()
 KART_HMAC_NOKKEL = os.environ.get('KART_HMAC_NOKKEL', '').strip()
+# Innlogging i kartet fra KO (`docs/PLAN_FELLES_INNLOGGING.md`). **Egen nøkkel**, ikke den
+# over: en lekket posisjonsnøkkel skal ikke kunne logge inn som hvem som helst. Samme verdi
+# som `PORTAL_INNLOGGING_NOKKEL` i kartet i samme miljø. Tom = ingen knapp.
+KART_INNLOGGING_NOKKEL = os.environ.get('KART_INNLOGGING_NOKKEL', '').strip()
 
 # Rekkefølgen er en prioritering, ikke en tilfeldighet: HTTP-API-et først fordi
 # det er det eneste som faktisk kommer ut av containeren. SMTP beholdes fordi

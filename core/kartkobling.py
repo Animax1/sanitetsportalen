@@ -298,3 +298,83 @@ def _send(hva: str, navn: str, bygg) -> bool:
         return False
     _husk(hva, True, kode)
     return True
+
+
+# ── Innlogging i kartet fra KO (19. okt. 2026, docs/PLAN_FELLES_INNLOGGING.md) ──────────────
+#
+# Ikke en melding som over, men en **billett nettleseren bærer**: portalen lager den, KO-sida
+# poster den til kartet, og kartet ringer aldri tilbake (B2). Den ligger her fordi det er
+# kartkoblingen, og fordi `core` ikke skal kjenne KO — modulen spør, `core` signerer.
+#
+# **Egen nøkkel** (`KART_INNLOGGING_NOKKEL`) og eget prefiks i signaturen: en lekket
+# posisjonsnøkkel skal ikke kunne logge inn som hvem som helst. Kartet sjekker i
+# `konto/portalinnlogging.py`, og `TESTVEKTOR` i begge repoene låser formen.
+
+INNLOGGING_PREFIKS = b'kartinnlogging.v1.'
+#: Sekunder billetten gjelder. Kartet godtar høyst 120; den brukes med en gang.
+INNLOGGING_LEVETID_S = 60
+#: Admins bryter på `/admin/innstillinger/`, kortet «Kartet». Global, av som standard.
+INNLOGGING_NOKKEL = 'kart_innlogging_paa'
+
+
+def innlogging_satt_opp() -> bool:
+    """Har miljøet kartadresse og innloggingsnøkkel? Uten dem finnes ikke knappen."""
+    return bool(getattr(settings, 'KART_URL', '') and getattr(settings, 'KART_INNLOGGING_NOKKEL', ''))
+
+
+def innlogging_slatt_paa() -> bool:
+    """Har admin slått på «Åpne kartet»? Kaster aldri; søppel er av."""
+    from core.models import AppSetting
+
+    try:
+        raa = AppSetting.get(INNLOGGING_NOKKEL, None)
+    except Exception:
+        return False
+    return str(raa).strip().lower() in ('1', 'true', 'ja', 'on')
+
+
+def innlogging_paa() -> bool:
+    """Begge: satt opp i miljøet **og** slått på av admin."""
+    return innlogging_satt_opp() and innlogging_slatt_paa()
+
+
+def kart_opprinnelse() -> str:
+    """``https://vert`` fra `KART_URL` — det CSP-ens `form-action` må tillate."""
+    deler = urlsplit(settings.KART_URL)
+    return f'{deler.scheme}://{deler.netloc}'
+
+
+def innlogging_url() -> str:
+    return settings.KART_URL.rstrip('/') + '/konto/fra-portalen/'
+
+
+def signer_billett(nokkel: str, innhold: str) -> str:
+    return hmac.new(nokkel.encode(), INNLOGGING_PREFIKS + innhold.encode(), hashlib.sha256).hexdigest()
+
+
+def lag_billett(*, bruker_id: int, navn: str, portal: str, skriv: bool,
+                naa: int | None = None, jti: str | None = None,
+                nokkel: str | None = None, aud: str | None = None) -> str:
+    """``<base64url(JSON)>.<hex HMAC>`` for innlogging i kartet. Lagrer ingenting.
+
+    `aud` er kartets vert, så en billett til testkartet ikke virker i prod. `naa`, `jti`,
+    `nokkel` og `aud` er parametre bare så testvektoren kan regnes ut.
+    """
+    import base64
+    import secrets
+
+    naa = int(time.time()) if naa is None else naa
+    data = {
+        'aud': aud if aud is not None else urlsplit(settings.KART_URL).hostname,
+        'bruker': bruker_id,
+        'exp': naa + INNLOGGING_LEVETID_S,
+        'iat': naa,
+        'jti': jti or secrets.token_hex(16),
+        'navn': navn,
+        'portal': portal,
+        'skriv': skriv,
+    }
+    innhold = base64.urlsafe_b64encode(
+        json.dumps(data, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+    ).rstrip(b'=').decode()
+    return f'{innhold}.{signer_billett(nokkel or settings.KART_INNLOGGING_NOKKEL, innhold)}'

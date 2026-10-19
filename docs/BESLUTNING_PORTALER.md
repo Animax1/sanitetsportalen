@@ -67,7 +67,7 @@ endres, ikke vakta.
 | 15 | Sladding av fritekst | **Admin, KO først**, med sladderegister som kjøres på nytt etter gjenoppretting (§4.9) |
 | 16 | Opprydding | **Admin ser «Sist innlogget», portalene, og filtrene «Uten portal» og «Inaktiv 12 mnd»** |
 | 17 | Innstillingene | **Sorteres i system og portal** (§4.7) |
-| 18 | Kartet | **Gruppe → én portal, gruppevelger i kartet, ny vakt tømmer posisjonene** (§4.10). Separate innlogginger står |
+| 18 | Kartet | **Gruppe → én portal, gruppevelger i kartet, ny vakt tømmer posisjonene** (§4.10). Separate innlogginger står — unntatt «Åpne kartet» fra KO (19. okt. 2026, `docs/PLAN_FELLES_INNLOGGING.md`) |
 | 19 | Hvilken vakt er aktiv | **`Vakt.er_aktiv` med en delvis unik indeks per portal**, ikke en peker (§4.1) |
 | 20 | Medlemskap og modulrad | **`ModulTilgang` henger på `Portaltilgang` med `CASCADE`** — én sannhet (§4.2) |
 | 21 | Ingen portal valgt | **Portalregelen** (§4.4): én mulig velges og lagres i sesjonen; flere stopper lesing og skriving til valget er tatt; null er foreldreløs. **Aldri «Standard» som reserve** |
@@ -338,7 +338,7 @@ erstatter den, etter mønsteret fra `oppdrag.test_helpers.lag_oppdrag()`.
 | Hva | Hvorfor |
 |---|---|
 | Backup og gjenoppretting **per portal** | Backup er per modul. Én portal kan ikke rulles tilbake alene; en gjenoppretting gjelder alle |
-| Felles innlogging med kartet | Eget prosjekt |
+| Felles innlogging med kartet | Eget prosjekt — gjort for KO 19. okt. 2026, `docs/PLAN_FELLES_INNLOGGING.md` |
 | Flere aktive vakter i *samme* portal | Samme grunn som i 2026: ett vaktvalg i hver visning |
 | Moderator oppretter korps | Bare admin (beslutning 10) |
 | Statistikk på tvers av portaler for moderator | Admin ser på tvers, moderator sin egen |

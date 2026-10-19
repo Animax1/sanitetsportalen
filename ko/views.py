@@ -61,7 +61,9 @@ from core.auth_decorators import (
     er_global_admin, er_moderator, har_tilgang, modul_kreves, nivaa_for,
 )
 from core.jsonkropp import json_body, json_feil
+from core import kartkobling
 from core.jsdata import js_json
+from core.middleware import csp_med_skjemamaal
 from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
@@ -291,8 +293,48 @@ def index_view(request):
         # generell krok (`verdifaner_ekstra`), så `oppdrag/` ikke kjenner KO.
         'verdifaner_ekstra': verdifaner_ekstra,
         'verdifaner_ekstra_json': js_json(verdifaner_ekstra),
+        # «Åpne kartet» (19. okt. 2026): bare når miljøet har nøkkelen og admin har slått
+        # den på. Gaten står også i `kart_view`, så knappen er ikke den eneste døra.
+        'kart_innlogging': kartkobling.innlogging_paa(),
     })
     return render(request, 'ko/index.html', kontekst)
+
+
+@modul_kreves('ko', 'les')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:kart', rate='30/m', method='POST', on_limit='html')
+def kart_view(request):
+    """«Åpne kartet»: lag en billett og post den videre til kartet (`docs/PLAN_FELLES_INNLOGGING.md`).
+
+    **KO `les` er nok** — den som ser situasjonsbildet, ser kartet. `skriv_full` gir et kart man
+    kan tegne i; nivået står i billetten, og kartet håndhever det.
+
+    **POST, ikke en lenke.** Billetten skal ikke stå i en URL, der den havner i historikk, logger
+    og `Referer`. Svaret er en side som poster videre med det samme, og CSP-ens `form-action`
+    får kartets vert på akkurat dette svaret, ikke på resten av portalen.
+
+    **Portalen er den brukeren står i nå**, og slugen går inne i den signerte billetten: sto den
+    ved siden av, kunne den som har KO i én portal bedt om en annens biler og lag.
+    """
+    from core.portal import gjeldende_portal
+
+    if not kartkobling.innlogging_paa():
+        return render(request, '403.html', {
+            'tittel': 'Kartet er ikke slått på',
+            'melding': 'Innlogging i kartet fra KO er slått av eller ikke satt opp i dette miljøet.',
+        }, status=403)
+    bruker = request.user
+    billett = kartkobling.lag_billett(
+        bruker_id=bruker.pk,
+        navn=(bruker.fullt_navn or bruker.username).strip(),
+        portal=gjeldende_portal().slug,
+        skriv=har_tilgang(bruker, 'ko', 'skriv_full'),
+    )
+    svar = render(request, 'ko/kart_videre.html',
+                  {'kart_url': kartkobling.innlogging_url(), 'billett': billett})
+    svar['Content-Security-Policy'] = csp_med_skjemamaal(
+        request, kartkobling.kart_opprinnelse())
+    return svar
 
 
 def kan_lede_ko(user) -> bool:

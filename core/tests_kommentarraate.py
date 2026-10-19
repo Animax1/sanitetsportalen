@@ -66,6 +66,9 @@ UNNTATT = {
     ('vaktliste/tests_xss.py', '_posterPerGruppe'),           # «Til 26. sep. 2026 ble regelen prøvd i …»
     ('core/tests_dokumentråte.py', 'sti/til/fil.py'),         # eksempel i en docstring
     ('core/kartkobling.py', 'portal/signatur.py'),           # i kartets repo, ikke dette
+    ('core/kartkobling.py', 'konto/portalinnlogging.py'),    # i kartets repo, ikke dette
+    ('core/tests_kartinnlogging.py', 'konto/portalinnlogging.py'),       # samme
+    ('core/tests_kartinnlogging.py', 'konto/tests/test_fra_portalen.py'),  # samme
     ('core/views_portal.py', 'patients/views.py'),            # «samme grep som … fikk i N13.3»
     ('patients/tests_backup.py', 'patients.BackupConfig'),    # testen av at den er slettet
 }

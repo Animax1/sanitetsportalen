@@ -17,5 +17,20 @@ Kortet «Kartet» på /admin/innstillinger/ (7. okt. 2026). Verdiene kommer fra
         minutter, og forsvinner så av seg selv. Gjelder posisjoner sendt etter at den er endret.
         {% if not kart_konfigurert %}<strong>Kartkoblingen er ikke satt opp i dette miljøet</strong>, så knappene vises ikke.{% endif %}
       </div>
+      <div class="form-check mt-3">
+        <input type="hidden" name="kart_innlogging_sendt" value="1">
+        <input class="form-check-input" type="checkbox" id="kart_innlogging"
+               name="kart_innlogging" value="1"{% if kart_innlogging %} checked{% endif %}>
+        <label class="form-check-label" for="kart_innlogging">
+          «Åpne kartet» fra KO
+        </label>
+        <div class="form-text">
+          Den som har KO, får en knapp som åpner kartet i en ny fane, innlogget uten egen
+          kartkonto, med gruppene som viser portalen de står i. KO «lese» kan se kartet, «føre» og
+          opp kan tegne. Innloggingen varer høyst 12 timer. Kartets egen innlogging virker som før.
+          {% if not kart_innlogging_satt_opp %}<strong>Innloggingsnøkkelen er ikke satt i dette miljøet</strong>
+          (<code>KART_INNLOGGING_NOKKEL</code>), så knappen vises ikke selv om den er slått på.{% endif %}
+        </div>
+      </div>
     </div>
   </div>
