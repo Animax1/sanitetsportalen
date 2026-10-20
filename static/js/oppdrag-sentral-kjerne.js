@@ -249,12 +249,10 @@ async function hentPosisjon(enhetId) {
 }
 
 
-async function hentPosisjonAlle(arg) {
-  // `arg` er «type:<id>», og «type:» for gruppa uten type — klikkdelegeringen
-  // sender ett argument, og `data-id` ville blitt et tall.
-  const type = String(arg || '').replace(/^type:/, '');
+async function hentPosisjonAlle() {
+  // Uten `type` spør serveren alle enheter på vakt — se `hentAlleKnapp`.
   const res = await apiFetch('/oppdrag/api/enheter/hent-posisjon/', {
-    method: 'POST', body: JSON.stringify({ type: type === '' ? null : Number(type) }),
+    method: 'POST', body: JSON.stringify({}),
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok || d.status !== 'ok') {

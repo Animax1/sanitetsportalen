@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — «Hent alle»: én knapp for posisjon fra alle enheter, ikke én per gruppe  `#ko/ressursbildet`
+
+André: «Burde det vært ein knapp for spor alle enheter? Va opprinnelig det eg trodde den knappen va
+til, heilt til eg scrolla nedover og såg det va pr gruppe.» Og så: «Jeg mener den skal hente fra
+alle enheter som vi har koblet til. Altså ikke lag. Da hentet vi posisjon fra alle og så kan vi
+pinge individuelle enheter.»
+
+- **Én knapp, «Hent alle»,** i hodet på ressursoversikten foran «Vis» (og ved «Ressurser» på
+  `/oppdrag/`). Den spør **alle enheter på vakt** som kan svare — også de i en gruppe som er skjult
+  med «Vis». Lag er ikke enheter og spørres ikke. **Sikte-knappen på hvert bilkort** står som før:
+  den pinger én.
+- **«Hent posisjon fra alle» i hvert gruppehode er borte.** Den het «alle», men gjaldt gruppa — det
+  var det som lurte. Hodet ruller ikke bort med lista.
+- **Serveren er uendret:** `hent_posisjon_alle_view` spurte alt alle på vakt når kroppen ikke har
+  `type`, med én linje i KO-loggen. Klienten sender nå `{}`. Gruppefilteret (`type`) står igjen i
+  API-et uten noen som bruker det — kan fjernes, men er dekket av tester og koster ingenting.
+- **Prisen: hodet bryter ved 1920 px.** Ressursvinduet er 628 px der, og hodet hadde ingen luft:
+  selv bare sikte-ikonet skjøv en knapp ned (45 → 84 px). Ved 1366 px brøt det alt, ved 2560 px
+  er det plass. Å legge knappen øverst i lista ville kostet en rad alltid — og stått rett over
+  «AMBULANSE», der den lurte. Ført inn i TODO-punktet om vindushodene.
+- `oppdrag/tests_lopende_posisjon.py`: ny prøve gjennom `tegnEnhetsliste()` med to grupper, én skjult
+  og en leser. **6 mutanter, alle drept** — én overlevde først: knappen tilbake i gruppehodet, fordi
+  fiksturen skrev `enhetstype_id` der lista leser `type`, og begge bilene havnet i samme gruppe.
+  Fiksturen bar ikke prod-formen; nå kreves begge gruppehodene som premiss.
+
 ## 2026-10-20 — «Popper opp oppdragsvindu ved deling»: lukket detaljvindu glemmes nå  `#ko/hendelseslogg`
 
 Feilmelding: «Deling med biler: Popper opp oppdragsvindu ved deling av loggføring i hendelse til

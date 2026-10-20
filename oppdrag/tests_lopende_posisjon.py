@@ -739,7 +739,7 @@ class SkjemaetIValglisteneTests(unittest.TestCase):
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class KortetIKoTests(unittest.TestCase):
-    """Skisse A: knappen per bil, «Hent posisjon fra alle» per gruppe, svaret på kortet."""
+    """Knappen per bil, «Hent alle» for hele lista (20. okt. 2026 — var per gruppe), svaret på kortet."""
 
     def _kjor(self, kode):
         from patients.js_test_utils import KORT_HENTING, OPPDRAG_SENTRAL_JS
@@ -801,24 +801,24 @@ class KortetIKoTests(unittest.TestCase):
     def test_fra_alle_knappen_og_kroppen(self):
         (ut,) = self._kjor("""
             const r = {};
-            r.knapp = hentAlleKnapp({ type: '3', enheter: [{ posisjon_kan_hentes: false }, { posisjon_kan_hentes: true }] });
-            r.ingen = hentAlleKnapp({ type: '3', enheter: [{ posisjon_kan_hentes: false }] });
-            await hentPosisjonAlle('type:3');
-            await hentPosisjonAlle('type:');
+            r.knapp = hentAlleKnapp([{ posisjon_kan_hentes: false }, { posisjon_kan_hentes: true }]);
+            r.ingen = hentAlleKnapp([{ posisjon_kan_hentes: false }]);
+            await hentPosisjonAlle();
             await hentPosisjon(7);
             svar = { ok: false, body: { status: 'error', message: 'Haugesund 56 er ikke på vakt.' } };
             await hentPosisjon(8);
             console.log(JSON.stringify({ ...r, kall, lastet, etagEnheter }));""")
-        self.assertIn('data-arg="type:3"', ut['knapp'])
+        self.assertIn('data-action="hentPosisjonAlle"', ut['knapp'])
+        self.assertIn('Hent alle', ut['knapp'])
+        self.assertNotIn('data-arg', ut['knapp'], 'ingen gruppe å avgrense til')
         self.assertEqual(ut['ingen'], '')
-        self.assertEqual([k.get('url') for k in ut['kall'][:3]], [
-            '/oppdrag/api/enheter/hent-posisjon/', '/oppdrag/api/enheter/hent-posisjon/',
-            '/oppdrag/api/enheter/7/hent-posisjon/'])
-        self.assertEqual(json.loads(ut['kall'][0]['body']), {'type': 3})
-        self.assertEqual(json.loads(ut['kall'][1]['body']), {'type': None}, 'gruppa uten type')
+        self.assertEqual([k.get('url') for k in ut['kall'][:2]], [
+            '/oppdrag/api/enheter/hent-posisjon/', '/oppdrag/api/enheter/7/hent-posisjon/'])
+        self.assertEqual(json.loads(ut['kall'][0]['body']), {},
+                         'uten `type` spør serveren alle på vakt')
         self.assertEqual(ut['kall'][-1], {'alert': 'Haugesund 56 er ikke på vakt.'},
                          'serverens grunn, ikke vår egen')
-        self.assertEqual(ut['lastet'], 3)
+        self.assertEqual(ut['lastet'], 2)
 
     def test_lista_tegnes_paa_nytt_naar_venter_blir_kom_ikke(self):
         (ut,) = self._kjor("""
@@ -878,6 +878,46 @@ class KallstedeneTests(unittest.TestCase):
         (ms,) = json.loads([l for l in ut.splitlines() if l != 'OK'][-1])
         self.assertGreater(ms, 30000)
         self.assertLess(ms, 37000)
+
+    def test_hent_alle_staar_over_lista_og_ikke_i_gruppene(self):
+        """André, 20. okt. 2026: «Jeg mener den skal hente fra alle enheter som vi har koblet til.»
+        Gjennom `tegnEnhetsliste()`: én knapp i `#ressurs-hent-alle`, ingen i gruppehodene, og en
+        bil i en skjult gruppe teller — «alle» er alle på vakt."""
+        from .tests_prodtest_13sep import SYNLIGHET_STUBB, DenDelteListaLeserDenLevendeEnhetslistaTests as D
+        ut = run_node(SYNLIGHET_STUBB + build_harness(D.HARNESS), """
+            globalThis.setTimeout = () => 1;
+            window.OPPDRAG_ENHETSTYPER = [[1, 'Ambulanse'], [2, 'Lege']];
+            // `type`, som i `enheter_view` — `_grupperEnheter` leser det feltet.
+            const bil = (id, type, kan) => ({ id, navn: 'B' + id, pa_vakt: true, status: 'ledig',
+              status_navn: 'Ledig', antall_ventende: 0, type, posisjon_kan_hentes: kan });
+            const GRUPPER_SKJULT_NOKKEL = 'tavle.grupper.skjult';
+            let skjult = [];
+            globalThis.localStorage = { getItem: () => JSON.stringify(skjult) };
+            const r = {};
+            const tegn = (liste) => { tegnEnhetsliste(liste);
+              return [document.getElementById('ressurs-hent-alle').innerHTML,
+                      document.getElementById('enhetsliste').innerHTML]; };
+            window.OPPDRAG_TILGANG = { kanSkrive: true };
+            r.to = tegn([bil(1, 1, true), bil(2, 2, true)]);
+            r.bareLegenKan = tegn([bil(1, 1, false), bil(2, 2, true)]);
+            r.ingenKan = tegn([bil(1, 1, false)]);
+            skjult = ['type:1'];
+            r.bareSkjultKan = tegn([bil(1, 1, true), bil(2, 2, false)]);
+            skjult = [];
+            window.OPPDRAG_TILGANG = { kanSkrive: false };
+            r.leser = tegn([bil(1, 1, true)]);
+            console.log(JSON.stringify(r));""", preamble=D.DOM_STUBB)
+        r = json.loads([linje for linje in ut.splitlines() if linje != 'OK'][-1])
+        knapp, liste = r['to']
+        self.assertIn('>Ambulanse<', liste, 'premisset: to grupper, altså to gruppehoder')
+        self.assertIn('>Lege<', liste)
+        self.assertEqual(knapp.count('data-action="hentPosisjonAlle"'), 1)
+        self.assertNotIn('hentPosisjonAlle', liste, 'ingen knapp per gruppe lenger')
+        self.assertIn('hentPosisjonAlle', r['bareLegenKan'][0], 'én som kan svare er nok')
+        self.assertEqual(r['ingenKan'][0], '')
+        self.assertNotIn('B1', r['bareSkjultKan'][1], 'premisset: ambulansene er skjult')
+        self.assertIn('hentPosisjonAlle', r['bareSkjultKan'][0], '«alle» er alle på vakt, også de skjulte')
+        self.assertEqual(r['leser'][0], '', 'den som ikke kan skrive får ingen knapp')
 
     def test_lagre_sender_posisjonen(self):
         from patients.js_test_utils import OPPDRAG_SENTRAL_JS

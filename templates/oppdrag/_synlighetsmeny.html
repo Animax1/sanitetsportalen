@@ -7,7 +7,13 @@
   lukker seg for hvert klikk. `strategy: fixed`: KO-vinduene klipper det som
   stikker ut (`overflow: hidden`), og en meny som klippes er en meny halve
   lista ikke når.
+
+  `#ressurs-hent-alle` står her fordi det er verktøylinja over lista på begge sidene:
+  «Hent alle» (`hentAlleKnapp()`), fylt av `tegnEnhetsliste()` — tom for den som
+  ikke kan skrive, og når ingen bil kan svare. Står foran «Vis», så den ikke
+  ruller bort med lista.
 {% endcomment %}
+<span id="ressurs-hent-alle" class="ms-2"></span>
 <div class="dropdown d-inline-block ms-2 synlighet">
   <button type="button" class="btn btn-outline-secondary btn-sm synlighet-knapp" id="ressurs-vis-knapp"
           data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config='{"strategy":"fixed"}'

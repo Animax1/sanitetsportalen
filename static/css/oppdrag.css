@@ -785,11 +785,4 @@ button.verdi-brikke.verdi-kan-endres:hover { border-color: #60a5fa; }
 .henting-mottatt { color: #86efac; }
 .henting-venter { color: #fcd34d; }
 .henting-kom-ikke { color: #fca5a5; }
-.enhet-gruppe .enhet-hent-alle {
-  margin-left: 0.5rem;
-  padding: 0 0.5rem;
-  font-size: 0.72rem;
-  text-transform: none;
-  letter-spacing: normal;
-}
-.enhet-gruppe-kun-knapp { text-align: right; }
+.enhet-hent-alle { white-space: nowrap; }

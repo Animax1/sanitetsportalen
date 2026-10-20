@@ -248,11 +248,19 @@ function hentPosisjonKnapp(e) {
   return `<button type="button" class="btn btn-sm enhet-hent-posisjon" data-action="hentPosisjon" data-id="${escHtmlValue(e.id)}" title="Hent posisjon" aria-label="Hent posisjon fra ${escHtmlValue(e.navn)}"${venter ? ' disabled' : ''}><i class="bi bi-crosshair"></i></button>`;
 }
 
-/** «Hent posisjon fra alle» i gruppehodet — når minst én i gruppa kan svare. */
-function hentAlleKnapp(g) {
+/** «Hent alle» ved «Vis», over lista — når minst én bil på vakt kan svare.
+ *
+ *  André, 20. okt. 2026: «Jeg mener den skal hente fra alle enheter som vi har koblet til.
+ *  Altså ikke lag. Da hentet vi posisjon fra alle og så kan vi pinge individuelle enheter.»
+ *  Knappen sto før i hvert gruppehode og het «Hent posisjon fra alle», men gjaldt bare gruppa
+ *  — «det eg trodde den knappen va til, heilt til eg scrolla nedover». Én knapp for alle,
+ *  sikte-knappen på kortet for én. Skjulte grupper er med: «alle» betyr alle på vakt. */
+function hentAlleKnapp(enheter) {
   if (globalThis.window?.OPPDRAG_TILGANG?.kanSkrive !== true) return '';
-  if (!g.enheter.some((e) => e.posisjon_kan_hentes === true)) return '';
-  return `<button type="button" class="btn btn-sm btn-outline-success enhet-hent-alle" data-action="hentPosisjonAlle" data-arg="type:${escHtmlValue(g.type)}">Hent posisjon fra alle</button>`;
+  if (!enheter.some((e) => e.posisjon_kan_hentes === true)) return '';
+  return '<button type="button" class="btn btn-sm btn-outline-success enhet-hent-alle" data-action="hentPosisjonAlle"'
+    + ' title="Hent posisjon fra alle enheter på vakt" aria-label="Hent posisjon fra alle enheter på vakt">'
+    + '<i class="bi bi-crosshair me-1"></i>Hent alle</button>';
 }
 
 /** Når neste henting på lista skifter fra «venter» til «kom ikke fram», i ms fra
@@ -605,9 +613,8 @@ function oppdaterSynlighetsmeny() {
   document.getElementById('ressurs-vis-knapp')?.classList.toggle('aktiv', ressurser > 0);
 }
 
-function gruppehode(navn, knapp = '') {
-  // `knapp` er ferdig markup fra `hentAlleKnapp()`, som skannes for seg.
-  return `<div class="enhet-gruppe">${escapeHtml(navn)}${knapp}</div>`;
+function gruppehode(navn) {
+  return `<div class="enhet-gruppe">${escapeHtml(navn)}</div>`;
 }
 
 
@@ -631,6 +638,10 @@ function tegnEnhetsliste(liste) {
   const paVakt = sisteEnhetsliste.filter((e) => e.pa_vakt);
   const antallAv = sisteEnhetsliste.length - paVakt.length;
 
+  // «Hent alle» over lista, ved «Vis» — se `hentAlleKnapp`.
+  const hentAlle = document.getElementById('ressurs-hent-alle');
+  if (hentAlle) hentAlle.innerHTML = hentAlleKnapp(paVakt);
+
   if (!paVakt.length) {
     el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
   } else {
@@ -639,13 +650,7 @@ function tegnEnhetsliste(liste) {
     // skjult gruppe tas ikke med i det hele tatt — tallet står på «Vis».
     const grupper = _grupperEnheter(paVakt);
     const synlige = grupper.filter((g) => !gruppeErSkjult('type:' + g.type));
-    // «Hent posisjon fra alle» står i gruppehodet (skisse A). Med én gruppe er
-    // det ingen overskrift, så knappen står alene.
-    const hode = (g) => {
-      const knapp = hentAlleKnapp(g);
-      if (grupper.length > 1) return gruppehode(g.navn, knapp);
-      return knapp ? `<div class="enhet-gruppe enhet-gruppe-kun-knapp">${knapp}</div>` : '';
-    };
+    const hode = (g) => (grupper.length > 1 ? gruppehode(g.navn) : '');
     el.innerHTML = synlige.length
       ? synlige.map((g) => '<div class="enhet-gruppe-blokk">'
           + hode(g)
