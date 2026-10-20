@@ -434,15 +434,17 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
 
 /* ── Skjulte vinduer (21. sep. 2026) ────────────────────────────────────── */
 
-/* Stripa over konsollen. Den finnes bare når noe er skjult, og da er den
-   selve grunnen til at skjuling er trygt: et vindu ingen ser skal stå ett
-   sted med navnet sitt. Liten, men ikke dempet — den skal kunne finnes. */
+/* Stripa i verktøylinja (20. okt. 2026; før på egen linje over konsollen). Den
+   er selve grunnen til at skjuling er trygt: et vindu ingen ser skal stå ett
+   sted med navnet sitt. Liten, men ikke dempet — den skal kunne finnes. En
+   tynn strek til venstre skiller den fra knappene som gjelder hele sida. */
 .ko-skjulte {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
-  margin-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--border-color);
 }
 .ko-skjulte-tekst { font-size: 0.8rem; color: var(--text-muted); }
 .ko-hent-tilbake { --bs-btn-padding-y: 0.1rem; --bs-btn-padding-x: 0.45rem; font-size: 0.78rem; }

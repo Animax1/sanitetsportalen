@@ -36,7 +36,7 @@ Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bre
 og høyden mellom radene. Ikke frie vinduer, med vilje: et vindu som kan legges oppå et
 annet kan forsvinne, og gulvet (`KO_MIN_PROSENT`, `min-width`/`min-height`) hindrer at en
 flate dras bort. **Skjuling (21. sep. 2026) erstattet forbudet fra 18. sep.** («en ramme
-som sperrer for at de kan gjemmes»): et skjult vindu står alltid i stripa over konsollen
+som sperrer for at de kan gjemmes»): et skjult vindu står alltid i stripa i verktøylinja
 med navnet sitt (`#ko-skjulte`), og `koKanSkjule()` nekter det siste synlige — skjult er
 da en tilstand man ser. Naboen tar plassen; er begge i en rad skjult, forsvinner raden.
 Oppsettet huskes **per nettleser** (`ko.oppsett`), `skjult` med: KO-PC-en beholder sitt

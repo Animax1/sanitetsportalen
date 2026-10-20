@@ -101,7 +101,18 @@
         {% endif %}
       </div>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    {% comment %}
+      **Stripa er hele grunnen til at skjuling er trygt** (André, 21. sep. 2026:
+      «vinduer må kunne gjemmes og hentes tilbake igjen»). Et skjult vindu står
+      her med navnet sitt, så «skjult» er en tilstand man ser — og veien tilbake
+      står der tilstanden står. Tegnes av `koTegnSkjulte()` i ko-layout.js.
+      **I verktøylinja, ikke på egen linje** (20. okt. 2026, André: «Da får en
+      litt mer plass i høyden»): to vinduer er alltid parkert, så stripa sto
+      der alltid, og raden kostet 32 px av konsollen. Blir linja for trang,
+      bryter den som før — da er det ikke verre enn det var.
+    {% endcomment %}
+    <div class="ko-skjulte d-none" id="ko-skjulte"></div>
+    <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
       {% comment %}
         Ansvarsmerket (§5.1, pulje 6): hva du gjør nå. Vises ved navnet i
         «Pålogget» og på linjene du skriver. Styrer ingenting.
@@ -149,7 +160,7 @@
           <div class="small text-muted mb-2">Dra <i class="bi bi-grip-vertical"></i> i et vindu over et
             annet for å bytte plass. Dra i skillelinjene for å endre størrelse.
             <i class="bi bi-eye-slash"></i> skjuler et vindu; det kommer tilbake fra
-            stripa over konsollen. Det siste synlige kan ikke skjules.</div>
+            «Skjult:» øverst. Det siste synlige kan ikke skjules.</div>
           <button type="button" class="btn btn-sm btn-outline-secondary w-100"
                   data-action="koTilbakestillOppsett">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Tilbakestill til 2×2
@@ -162,15 +173,6 @@
   {% if kan_se_oppdrag %}
   {% include "oppdrag/_sentralbord_oppsettvarsel.html" %}
   {% endif %}
-
-  {% comment %}
-    **Stripa er hele grunnen til at skjuling er trygt** (André, 21. sep. 2026:
-    «vinduer må kunne gjemmes og hentes tilbake igjen»). Et skjult vindu står
-    her med navnet sitt, så «skjult» er en tilstand man ser — og veien tilbake
-    står der tilstanden står. Tom og borte når alt er framme; tegnes av
-    `koTegnSkjulte()` i ko-layout.js.
-  {% endcomment %}
-  <div class="ko-skjulte d-none" id="ko-skjulte"></div>
 
   <div class="ko-konsoll" id="ko-konsoll">
     <div class="ko-rad" id="ko-rad-1">

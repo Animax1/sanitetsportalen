@@ -13,8 +13,8 @@
 // kan gjemmes og forsvinnes») — bekymringen var at en flate ingen ser er en
 // flate ingen vet har endret seg, siden sida poller. 21. sep. 2026 ba han om
 // skjuling likevel, og den bekymringen er besvart i konstruksjonen framfor
-// med et forbud: **et skjult vindu står alltid som en knapp i stripa over
-// konsollen**, med navnet sitt, og det siste synlige lar seg ikke skjule
+// med et forbud: **et skjult vindu står alltid som en knapp i stripa i
+// verktøylinja**, med navnet sitt, og det siste synlige lar seg ikke skjule
 // (`koKanSkjule`). Da er «skjult» en tilstand man ser, ikke en flate som er
 // borte. Vinduet kan fortsatt ikke legges oppå et annet eller dras forbi
 // gulvet (`min-width`/`min-height` i ko.css og `KO_MIN_PROSENT` her).
@@ -32,7 +32,7 @@ const KO_OPPSETT_NOKKEL = 'ko.oppsett';
 //: (22. sep. 2026): tavla og ressursoversikten deler én plass i rutenettet
 //: (`KO_PAR`) — André: «den skal være med, selv om det kanskje ikke er plass
 //: med de fire andre … som et skjult vindu som erstattes». Den som ikke står i
-//: rutenettet, står i stripa over konsollen, som de skjulte: en flate man ikke
+//: rutenettet, står i stripa i verktøylinja, som de skjulte: en flate man ikke
 //: ser, skal være en tilstand man ser.
 //:
 //: **Planleggeren er det sjette** (23. sep. 2026), og deler plass med
@@ -251,7 +251,7 @@ function koTegnOppsett(oppsett) {
   if (typeof koPlanSynligNaa === 'function') koPlanSynligNaa();
 }
 
-// Stripa over konsollen: ett kort per skjult vindu, med navnet sitt. Den er
+// Stripa i verktøylinja: ett kort per skjult vindu, med navnet sitt. Den er
 // hele svaret på «en flate ingen ser» — skjult skal være en tilstand man ser,
 // og veien tilbake skal stå der tilstanden står.
 function koSkjulteHtml(oppsett) {
@@ -268,6 +268,9 @@ function koTegnSkjulte(oppsett) {
   stripe.classList.toggle('d-none', !skjult.length);
   stripe.innerHTML = skjult.length
     ? '<span class="ko-skjulte-tekst">Skjult:</span>' + koSkjulteHtml(oppsett) : '';
+  // Stripa står i verktøylinja (20. okt. 2026). Flere eller færre knapper kan
+  // få linja til å bryte, og da flytter konsollen seg — høyden må følge.
+  koSettKonsollhoyde();
 }
 
 // Knappen i vinduets eget hode. Den siste synlige nekter — og sier det.

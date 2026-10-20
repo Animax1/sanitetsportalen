@@ -1487,7 +1487,10 @@ class OppsettetTests(SimpleTestCase):
                      'koBytt', 'koProsentAv', 'koGyldigSkjult', 'koErSkjult',
                      'koKanSkjule', 'koSkjul', 'koVisIgjen', 'koSkjulteHtml',
                      'koTegnOppsett', 'koTegnSkjulte', 'koVinduElement',
-                     'koGyldigePlasser', 'koIRutenettet', 'koParkerte')),
+                     'koGyldigePlasser', 'koIRutenettet', 'koParkerte',
+                     # Stripa står i verktøylinja (20. okt. 2026), og
+                     # `koTegnSkjulte` regner konsollhøyden på nytt.
+                     'koSettKonsollhoyde', 'koKonsollhoyde')),
         ))
         # Konstantene leses fra fila, ikke skrives av (22. sep. 2026). Kopien
         # som sto her hadde fire vinduer og ville fortsatt vært grønn den dagen
@@ -1495,7 +1498,7 @@ class OppsettetTests(SimpleTestCase):
         from oppdrag.tests_runde_d import _konst
         self.pre = ''.join(_konst(KO_LAYOUT_JS, n) for n in (
             'KO_VINDUER', 'KO_PLASSER', 'KO_PAR', 'KO_OPPSETT_STANDARD',
-            'KO_VINDUSNAVN', 'KO_MIN_PROSENT'))
+            'KO_VINDUSNAVN', 'KO_MIN_PROSENT', 'KO_BUNNMARG', 'KO_MIN_HOYDE'))
 
     #: Et rutenett av stubber: de to radene med hver sin skillelinje, de fire
     #: vinduene, den vannrette skillelinja og stripa. `skjult` leses av

@@ -8,7 +8,7 @@
 // ko.js, som er den siste fila.
 //
 // **Tavla og ressursoversikten deler én plass** (`KO_PAR` i ko-layout.js).
-// Den som ikke står i rutenettet, står i stripa over konsollen.
+// Den som ikke står i rutenettet, står i stripa i verktøylinja.
 //
 // **Dra og slipp går med pekerhendelser, ikke med nettleserens dra-API.**
 // HTML5-dra virker dårlig på nettbrett, og KO-PC-en er ikke den eneste

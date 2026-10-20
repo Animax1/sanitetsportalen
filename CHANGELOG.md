@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — KO: «Skjult:» står i verktøylinja, og konsollen får 32 px mer  `#ko/oppsett`
+
+André: «Kan legge skjulte vinduer på samme linje som KO verktøylinje. Da får en litt mer plass i
+høyden.» **Stripa sto alltid der:** seks vinduer på fire plasser, så to er alltid parkert
+(`KO_PAR`), og `koTegnSkjulte()` viser parkerte sammen med skjulte. Raden kostet 24 px + 8 px
+marg på hver KO-skjerm.
+
+- `#ko-skjulte` står nå i `#ko-verktoy`, etter venstre gruppe og med en tynn strek foran;
+  høyre gruppe (Ansvar, Pålogget, Oppsett) har `ms-auto`. «Skjult:» og navnene står som før —
+  regelen fra 21. sep. om at skjult skal være en tilstand man ser, gjelder fortsatt.
+- **`koTegnSkjulte()` regner konsollhøyden på nytt** (`koSettKonsollhoyde()`): med flere knapper
+  kan verktøylinja bryte, og da flytter konsollen seg. Før ble høyden bare regnet ved lasting og
+  når vinduet endret størrelse.
+- Hjelpeteksten i «Oppsett» sier «kommer tilbake fra «Skjult:» øverst», ikke «fra stripa over
+  konsollen».
+- **Målt i Chromium** mot den ekte siden: konsollen 916 → 948 px på 1920×1080 og 604 → 636 px på
+  1366×768; verktøylinja står på én linje (31 px) i begge. **Verste tilfelle** — tre vinduer
+  skjult, fem knapper, 1366 px — bryter linja til 70 px, og konsollen begynner 7 px lenger ned
+  enn før. Høyden følger, så sida ruller ikke av det.
+- **Funnet under målingen, ikke rettet:** vindushodene er 45 px, men på 1366 px bryter
+  «Ressursoversikt» til 84 px og «Oppdragsliste» til 113 px (84 px også på 1920). Det er mer plass
+  enn stripa var. Står i TODO.
+
+---
+
 ## 2026-10-19 — Tavla: Pause-raden står fast under tidsaksen når tavla rulles  `#ko/ressursbildet`
 
 André: «Kan vi fikse en ting på ko tavlen, som er at pauseoversikten følger scrollingen nedover?»
