@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — Vakt: en glemt `atomic` rundt `select_for_update` blir rød i hele suiten  `#ko/ressursbildet`
+
+André, etter «kan ikke flytte» (`95c1630`): «Ja jeg vil ha den» — en vakt mot at samme
+feil kommer igjen et annet sted.
+
+**Hvorfor suiten ikke kunne se den:** `TestCase` legger en transaksjon rundt hver test, og Django
+sjekker bare at det *finnes* en transaksjon når `select_for_update` kjører — ikke hvem som åpnet
+den. På SQLite sjekker Django ingenting. En manglende `@transaction.atomic` i en tjeneste var
+derfor usynlig i alle 6 000 testene, og ble først en 500 på staging (`TransactionManagementError`).
+
+- **`core/transaksjonsvakt.py`** stiller spørsmålet Django ikke stiller: er minst én åpen
+  transaksjon åpnet av koden, og ikke av `TestCase`? Django merker sine egne med
+  `_from_testcase` — samme merke `atomic(durable=True)` bruker. Vakten ligger på
+  `SQLCompiler.as_sql` og slår bare inn for spørringer med `select_for_update`.
+- **Bare under `manage.py test`** (`TRANSAKSJONSVAKT` i `settings.py`, installert fra
+  `CoreConfig.ready()`, som også kjører i arbeiderne under `--parallel` på Windows). I drift gjør
+  Django den ekte sjekken selv, på PostgreSQL.
+- **Hvorfor ikke en `TransactionTestCase` per endepunkt:** en liste over endepunkter blir utdatert
+  idet noen legger til et nytt, og den ville gjort suiten tregere. Nå er **hver eksisterende test**
+  som går gjennom en låsende sti, også en prøve av transaksjonen — på SQLite også.
+- **Vakten fant én til: `ko.program.folg()`** («Følger konserten»), uten egen `atomic`. Ingen feil i
+  drift i dag — det eneste kallstedet (`tavle_plassering_view`) har en transaksjon rundt — men
+  søsknene `rett()` og `sett_planlagt_slutt()` har sin egen, og den neste som kalte `folg` fra et
+  annet sted ville fått samme 500. Har fått dekoratøren.
+- **Hjelpere som skal låse inne i kallerens transaksjon** (`core.vakt.laas_aktiv_vakt`) skal *ikke*
+  få egen `atomic` for å stilne vakten: da slipper låsen når noen kaller dem bart, og feilen blir
+  stille. Står i modulens docstring.
+- **Følge for mutasjonstestingen:** mutanten «`transaction.atomic()` fjernet» (tabellen i
+  `CLAUDE.md`) dør nå i en vanlig `TestCase`. Før overlevde den alltid når den bare holdt en lås.
+- **Min egen test fra `95c1630` var ustabil:** `ko/tests_tavle_transaksjon.py` var en
+  `TransactionTestCase` med `serialized_rollback`, og under `--parallel` kolliderte gjenopprettingen
+  når en annen `TransactionTestCase` hadde tømt basen først (`duplicate key value violates unique
+  constraint "django_content_type_app_label_model…"`). CI var grønn på rekkefølgeflaks. Nå en vanlig
+  `TestCase` — vakten gjør at den fanger feilen likevel (drept med `atomic` fjernet fra `plasser()`).
+- `core/tests_transaksjonsvakt.py`, 5 tester. **5 mutanter, alle drept:** `installer()` fjernet,
+  `_from_testcase`-sjekken snudd, flagget av, og `atomic` fjernet fra `plasser()` og fra `folg()`.
+  Den på `plasser()` — den ekte feilen — gir **44 røde i `ko.tests_tavle` på SQLite**, mot 0 før.
+
 ## 2026-10-20 — «Kan ikke flytte»: plasser() mistet transaksjonen sin  `#ko/ressursbildet`
 
 André: «Jeg har et lag jeg ikke får flytte og får feilmelding kan ikke flytte.» Feilvarselet:

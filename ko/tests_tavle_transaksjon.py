@@ -5,14 +5,17 @@ André: «Jeg har et lag jeg ikke får flytte og får feilmelding kan ikke flytt
 fra `POST /ko/api/tavle/plasser/`. `@transaction.atomic` sto over `plasser()` til a3e70e6
 la `paa_pause()` inn mellom dekoratøren og funksjonen, og da satt den på feil funksjon.
 
-**`TestCase` kunne ikke se det:** hver test går inne i en transaksjon, så `select_for_update`
-klager aldri. Denne klassen er en `TransactionTestCase` — forespørselen kjører i autocommit,
-som i drift. `serialized_rollback`, fordi migrasjonene sår rader (portalen, gruppene) som
-resten av suiten trenger etter at tabellene er tømt.
+**`TestCase` kunne ikke se det** alene: hver test går inne i en transaksjon, så Django klager
+aldri. Det gjør `core/transaksjonsvakt.py` nå — den krever en transaksjon koden selv har åpnet.
+
+Første utgave var en `TransactionTestCase` med `serialized_rollback`, og den var ustabil under
+`--parallel`: hadde en annen `TransactionTestCase` tømt basen først, var contenttypes laget på nytt
+med andre ID-er, og gjenopprettingen kolliderte (`duplicate key … django_content_type`). Med vakten
+er en vanlig `TestCase` nok, og den er raskere.
 """
 from __future__ import annotations
 
-from django.test import Client, TransactionTestCase, override_settings
+from django.test import Client, TestCase, override_settings
 
 from core.vakt import hent_aktiv_vakt
 from ko import tavle
@@ -25,8 +28,7 @@ from .tests_hendelseslogg import _bruker, _gi, skift
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
-class PlasserUtenforTransaksjonTests(TransactionTestCase):
-    serialized_rollback = True
+class PlasserUtenforTransaksjonTests(TestCase):
 
     def setUp(self):
         self.vakt = hent_aktiv_vakt()

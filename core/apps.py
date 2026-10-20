@@ -62,6 +62,13 @@ class CoreConfig(AppConfig):
     def ready(self):
         post_migrate.connect(_ensure_module_settings_defaults, sender=self)
 
+        # Under test: `select_for_update` må ha kodens egen transaksjon, ikke
+        # bare testens. Ellers er en glemt `atomic` usynlig — se modulen.
+        from django.conf import settings
+        if getattr(settings, 'TRANSAKSJONSVAKT', False):
+            from .transaksjonsvakt import installer
+            installer()
+
         # Norsk sortering i SQLite (26. sep. 2026): `Norsk('navn')` ber om
         # kollasjonen `norsk`, og den finnes bare når den legges inn på hver
         # ny tilkobling. PostgreSQL har sin egen (ICU) — se `core/sortering.py`.

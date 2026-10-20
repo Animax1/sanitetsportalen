@@ -329,6 +329,7 @@ def program_data(vakt) -> dict:
     }
 
 
+@transaction.atomic
 def folg(plassering, post, *, naa) -> Tavleplassering:
     """«Følger konserten»: den åpne plasseringen slutter når `post` slutter.
 

@@ -250,6 +250,10 @@ if _RUNNING_TESTS:
     # telles de i stedet — se `oppdrag/bro.py`.
     OPPDRAG_BRO_KASTER = True
 
+    # `select_for_update` krever en transaksjon koden selv har åpnet, ikke bare
+    # testens (20. okt. 2026, «kan ikke flytte»). Se `core/transaksjonsvakt.py`.
+    TRANSAKSJONSVAKT = True
+
     # Backup-planleggeren ut av middleware-stacken under test.
     #
     # `core.backup.klokke.forfalt()` svarer ja når planen aldri er sjekket
