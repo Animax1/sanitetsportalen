@@ -153,6 +153,13 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Ustabil test: `ko.tests_utskrift.OppdrageneTests.test_de_aktive_eldste_forst_med_enhetens_status`
+
+- [ ] Feilet én gang i `manage.py test ko --parallel 4` mot PostgreSQL 20. okt. 2026, grønn alene og
+      tre kjøringer på rad etterpå. Utskriften var ikke rørt i den endringen. Meldingen ble ikke
+      tatt vare på — neste gang den feiler, behold loggen. Mistanke: rekkefølgen «eldste først» på
+      to oppdrag opprettet i samme øyeblikk, eller statusteksten. «Flake» er ikke en årsak
+
 ### KO: vindushodene som bryter over flere linjer (målt 20. okt. 2026)
 
 - [ ] Hodet på «Oppdragsliste» er 113 px på 1366 px og 84 px på 1920 px, «Ressursoversikt» 84 px

@@ -234,3 +234,46 @@ class PausenIOppdragsfileneTests(SimpleTestCase):
         self.assertIn('er-ledig', rad2)
         uten = run_node(h, enheter + ' console.log(mkEnhetsvalg());')
         self.assertNotIn('pause', uten)
+
+
+class BilenKanFaaPauseTests(_Grunnlag):
+    """André: «vi får ikke sett ambulansene, vi må kunne gi dem pause og» (20. okt. 2026)."""
+
+    def test_bilen_planlegges_og_startes_i_pause(self):
+        naa = timezone.now()
+        plan = tavle.planlegg_pause(self.vakt, self.bil, fra=naa + timedelta(minutes=5),
+                                    til=naa + timedelta(minutes=35), bruker=self.operator, naa=naa)
+        tavle.start_pause(plan, bruker=self.operator, naa=naa + timedelta(minutes=5))
+        (p,) = tavle.paa_pause(self.vakt)
+        self.assertEqual((p['ressurs_id'], p['enhet_id']), (self.bil.pk, self.enhet.pk))
+
+    def test_ukoblet_bil_paa_vakt_meldes(self):
+        from oppdrag.models import Enhet
+        Enhet.objects.create(navn='Ambulanse 9', pa_vakt=True)
+        Enhet.objects.create(navn='Ambulanse 8', pa_vakt=False)
+        Enhet.objects.create(navn='Ambulanse 7', pa_vakt=True, er_aktiv=False)
+        self.assertEqual(tavle.ukoblede_enheter(), ['Ambulanse 9'],
+                         'koblet (HGSD 56), av vakt og pensjonert meldes ikke')
+
+    def test_tavla_bærer_lista_bare_med_oppdragstilgang(self):
+        from oppdrag.models import Enhet
+        Enhet.objects.create(navn='Ambulanse 9', pa_vakt=True)
+        self.assertEqual(tavle.tavle_data(self.vakt)['ukoblede_enheter'], ['Ambulanse 9'])
+        self.assertEqual(tavle.tavle_data(self.vakt, med_biler=False)['ukoblede_enheter'], [])
+
+
+class UkobledeJsTests(SimpleTestCase):
+
+    def setUp(self):
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koTavleUkobledeHtml',)),
+        ))
+
+    def test_navnene_og_veien_til_koblingen(self):
+        ut = run_node(self.harness, "console.log(JSON.stringify([koTavleUkobledeHtml(['Amb <9>']),"
+                                    " koTavleUkobledeHtml([]), koTavleUkobledeHtml(undefined)]));")
+        med, tom, mangler = json.loads(ut.splitlines()[0])
+        self.assertIn('Amb &lt;9&gt;', med)
+        self.assertIn('Koble til delt konto', med)
+        self.assertEqual((tom, mangler), ('', ''))

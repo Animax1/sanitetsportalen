@@ -363,6 +363,18 @@ function koTavleRader(data, vindu, filter) {
   });
 }
 
+// Bilene på vakt som ikke kan stå på tavla (20. okt. 2026): ingen ressurs i vaktlista peker på
+// dem, og en plassering peker på ressursen. Nederst i «Uten plass», med navn og hvor de kobles —
+// ellers var de synlige i ressursoversikten og borte her uten at noe sa hvorfor.
+function koTavleUkobledeHtml(navn) {
+  if (!navn || !navn.length) return '';
+  return '<div class="ko-tavle-ukoblet small text-muted mt-2">'
+    + '<div class="ko-tavle-overskrift">Ikke på tavlen</div>'
+    + navn.map((n) => '<div>' + escapeHtml(n) + '</div>').join('')
+    + '<div class="mt-1">På vakt, men ikke koblet til en enhet i vaktlisten — '
+    + 'koble dem i «Rediger enhet» → «Koble til delt konto».</div></div>';
+}
+
 // «Uten plass»: de ledige som ikke står noe sted, og de opptatte — som ikke
 // kan plasseres, men skal synes. **Tid siden pause** står på de ledige.
 function koTavleUtenPlass(data, filter, naaMs) {
@@ -924,13 +936,15 @@ function koTavleSkjemaData(skjema, data, naaMs) {
   const forslag = Math.ceil((Number.isFinite(skjema.ref) ? skjema.ref : naaMs) / kvarter) * kvarter;
   const flytt = pause ? '«Pause nå»' : '«Flytt nå»';
   // Hele vaktlista, ikke bare tavla nå: et lag som går vakt i morgen kan
-  // planlegges i morgen. Serveren sjekker skiftet. En bil tar ikke pause.
+  // planlegges i morgen. Serveren sjekker skiftet. **Biler også i Pause-raden**
+  // (20. okt. 2026, André: «vi må kunne gi dem pause og») — til da sto det
+  // «En bil tar ikke pause» her, og bilene var filtrert bort.
   const kilde = data.alle_ressurser && data.alle_ressurser.length ? data.alle_ressurser : (data.ressurser || []);
   return {
     type: 'pause', id: q ? q.id : null, lokasjon_id: lokasjonId, pause,
     tittel: q ? (pause ? 'Endre pause · ' : 'Endre plan · ' + stedNavn + ' · ') + q.ressurs_navn
       : (pause ? 'Planlegg pause' : 'Planlegg · ' + stedNavn),
-    ressurser: q ? null : kilde.filter((r) => !pause || !r.bil).map((r) => ({ id: r.id, navn: r.navn })),
+    ressurser: q ? null : kilde.map((r) => ({ id: r.id, navn: r.navn })),
     fra: q ? koTavleHHMM(Date.parse(q.fra)) : koTavleHHMM(forslag),
     til: q ? koTavleHHMM(Date.parse(q.til)) : koTavleHHMM(forslag + (pause ? 30 : 120) * 60000),
     // Klokkeslettene leses nær dette tidspunktet (`koTavleSkjemaKropp`).
@@ -1001,7 +1015,8 @@ function koTegnTavle() {
   const naaStrek = koTavleIVinduet(naa, vindu)
     ? '<div class="ko-tavle-naa" style="left:' + escapeHtml(koTavleProsent(naa, vindu).toFixed(2)) + '%"></div>' : '';
   boks.innerHTML = '<div class="ko-tavle-uten" tabindex="0" data-tavle-mal="uten">'
-    + koTavleUtenPlassHtml(koTavleUtenPlass(koTavle, filter, naa)) + '</div>'
+    + koTavleUtenPlassHtml(koTavleUtenPlass(koTavle, filter, naa))
+    + koTavleUkobledeHtml(koTavle.ukoblede_enheter) + '</div>'
     + '<div class="ko-tavle-rutenett">' + koTidKontrollHtml(vindu, koTidAnker)
     + '<div class="ko-tavle-hode"><div class="ko-tavle-radnavn">Lokasjon · nå</div>'
     + '<div class="ko-tavle-tidslinje" data-tid-akse="1" title="Dra for å gå fram eller tilbake i tid">'

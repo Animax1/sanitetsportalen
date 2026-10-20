@@ -85,6 +85,27 @@ def ressurser_paa_tavla(naa=None, *, med_biler=True):
                 .order_by('gruppe__rekkefolge', Norsk('gruppe__navn'), 'rekkefolge', Norsk('navn')))
 
 
+def ukoblede_enheter() -> list[str]:
+    """Bilene på vakt som tavla **ikke** kan vise: ingen ressurs i vaktlista peker på dem
+    (20. okt. 2026).
+
+    André: «vi får ikke sett ambulansene, vi må kunne gi dem pause og». En bil står på tavla
+    bare gjennom en vaktlisteressurs med `enhet` — plasseringen peker på ressursen — mens
+    ressursoversikten viser alle enhetene på vakt. Uten koblingen var ambulansen synlig der og
+    borte her, uten at noe sa hvorfor. Lista er det tavla sier fra med; selve koblingen er
+    vaktlistas («Rediger enhet» → «Koble til delt konto»).
+    """
+    from oppdrag.models import Enhet
+    from vaktliste.models import Ressurs
+    from vaktliste.vaktdrift import vaktliste_i_bruk
+
+    liste = vaktliste_i_bruk()
+    koblet = (Ressurs.objects.filter(vaktliste=liste, enhet__isnull=False).values('enhet_id')
+              if liste is not None else Ressurs.objects.none().values('enhet_id'))
+    return list(Enhet.objects.filter(er_aktiv=True, pa_vakt=True).exclude(pk__in=koblet)
+                .order_by(Norsk('navn')).values_list('navn', flat=True))
+
+
 def opptatt(ressurser, vakt) -> dict:
     """``{ressurs_id: {merke, tekst, lokasjon_id, fra}}`` for ressursene som er
     opptatt — på en åpen hendelse, eller på et oppdrag.
@@ -848,6 +869,9 @@ def tavle_data(vakt, naa=None, *, med_biler=True) -> dict:
         # morgen gjelder lagene som går vakt i morgen. Serveren sjekker skiftet
         # (`paa_vakt_ved`); lista er bare nedtrekket.
         'alle_ressurser': _planbare(med_biler),
+        # Bilene på vakt uten ressurs i vaktlista (20. okt. 2026) — tavla sier fra om dem.
+        # Bare med oppdragstilgang, som bilene selv.
+        'ukoblede_enheter': ukoblede_enheter() if med_biler else [],
     }
 
 

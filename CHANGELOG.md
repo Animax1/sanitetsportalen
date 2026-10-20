@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — Tavla: ambulansene kan få pause, og ukoblede biler meldes  `#ko/ressursbildet`
+
+André: «Veldig bra men vi får ikke sett ambulansene, vi må kunne gi dem pause og.»
+
+**To grunner, en i koden og en i dataene:**
+
+- **«+ Planlegg» i Pause-raden filtrerte bort bilene** — «En bil tar ikke pause» sto i
+  `koTavleSkjemaData`. Fjernet; serveren hadde aldri sperret (`planlegg_pause` sjekker skiftet
+  eller at ressursen står på tavla, og en bil på vakt gjør det). Testen som krevde regelen
+  (`test_skjemaet_for_et_sted_tilbyr_hele_lista_ogsaa_biler`) krever nå det motsatte.
+- **En ambulanse uten ressurs i vaktlista står aldri på tavla.** Plasseringen peker på
+  `vaktliste.Ressurs`, og bilen kommer inn gjennom `Ressurs.enhet` — mens ressursoversikten viser
+  alle enhetene på vakt. Uten koblingen var bilen synlig der og borte på tavla, uten at noe sa
+  hvorfor. **Nå sier tavla fra:** «Ikke på tavlen» nederst i «Uten plass», med navnene og hvor de
+  kobles («Rediger enhet» → «Koble til delt konto» i vaktlista). `ko.tavle.ukoblede_enheter()`:
+  aktive enheter på vakt uten ressurs i vaktlista i bruk; bare med oppdragstilgang, som bilene.
+  **Selve koblingen er vaktlistas** og gjøres der — en tavle som laget vaktlisterader selv,
+  ville gitt to sannheter om samme bil.
+- Sett i Chromium: en ambulanse i Pause-raden, en i «Uten plass», en ukoblet under «Ikke på
+  tavlen», og pauseskjemaet med begge de koblede.
+- 5 nye tester, blant dem en bil planlagt og startet i pause gjennom tjenestelaget, og
+  kallstedet i `koTegnTavle()`. **8 mutanter, alle drept.**
+
+---
+
 ## 2026-10-20 — KO: pause vises i ressursoversikten, i tildelingen og i hendelsene  `#ko/ressursbildet`
 
 André: «I ressursoversikt i komodulen så må den vise hvem som er på pause. Når et lag eller bil

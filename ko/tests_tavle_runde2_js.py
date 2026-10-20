@@ -34,7 +34,7 @@ HARNESS = (
         'koTavleVarighet', 'koTavleTo', 'koTavleHHMM', 'koTavleTidNaer', 'koTavleTilEtter',
         'koTavlePauseStatus', 'koTavlePauseKildetekst', 'koTavleSlutt', 'koTavleProgram', 'koTavleBehovNaa',
         'koTavleRader', 'koTavleFlyttetAv', 'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleSluttHtml', 'koTavleKonsertHtml',
-        'koTavleBehovHtml', 'koTavleRadHtml', 'koTavleTimerHtml', 'koTavleUtenPlassHtml', 'koTavlePlanlagtHtml',
+        'koTavleBehovHtml', 'koTavleRadHtml', 'koTavleTimerHtml', 'koTavleUtenPlassHtml', 'koTavleUkobledeHtml', 'koTavlePlanlagtHtml',
         'koTavleValgtHtml', 'koTavleFilterHtml', 'koTavleDognnokkel', 'koTavleDognnavn', 'koTavleIkkeVaert',
         'koTavleIkkeVaertHtml', 'koTavleSkjemaData', 'koTavleSkjemaHtml', 'koTavleSkjemaKropp',
         'koTavleOppsettHtml', 'koTegnTavle', 'koTegnTavleSkjema',
@@ -168,6 +168,18 @@ class TidsvinduetJsTests(SimpleTestCase):
         self.assertEqual(ut[0], 'true true')
         self.assertEqual(ut[1], 'false true true', 'nå-streken klemmes ikke til kanten')
 
+    def test_tavla_sier_fra_om_ukoblede_biler(self):
+        """Kallstedet (20. okt. 2026): bilene på vakt uten ressurs i vaktlista står nederst i
+        «Uten plass», så de ikke er borte uten at noe sier hvorfor."""
+        ut = self._kjor("""
+            koTavle = Object.assign({}, DATA, { ukoblede_enheter: ['Ambulanse 9'] });
+            Date.now = () => NAA;
+            koTegnTavle();
+            const html = ELS['ko-tavle'].innerHTML;
+            console.log(html.includes('Ikke på tavlen'), html.includes('Ambulanse 9'));
+        """, dom=True)
+        self.assertEqual(ut[0], 'true true')
+
     # ── Stolpen vokser framover ─────────────────────────────────────────────
 
     def test_den_aapne_stolpen_begynner_der_laget_kom(self):
@@ -261,7 +273,9 @@ class TidsvinduetJsTests(SimpleTestCase):
         })()""")
         self.assertEqual(ut[0], 'Planlegg · Village')
         self.assertEqual(ut[1], [101, 102, 103, 201, 109], 'et lag med skift i morgen, og bilen')
-        self.assertEqual(ut[2], [101, 102, 103, 109], 'en bil tar ikke pause')
+        # **Bilen også i Pause-raden** fra 20. okt. 2026 (André: «vi må kunne gi dem pause og»).
+        # Til da krevde denne linja «en bil tar ikke pause».
+        self.assertEqual(ut[2], [101, 102, 103, 201, 109], 'bilen kan også få pause')
         self.assertEqual(ut[3:6], ['Endre plan · Village · Lag 2', 2, None])
         self.assertIsNone(ut[6], 'en rad som ikke finnes, gir ikke et skjema')
 
