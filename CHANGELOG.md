@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — «Hent alle» heter nå «Hent posisjoner»  `#ko/ressursbildet`
+
+André: «Hent alle er litt for vag beskrivelse, vi må ha noe mer passende.» Han valgte «Hent
+posisjoner» blant tre forslag («Posisjon fra alle», «Hent posisjoner», «Ping alle enheter»).
+Hjelpeteksten ved musepekeren er uendret: «Hent posisjon fra alle enheter på vakt».
+
+- Bare teksten på knappen (`hentAlleKnapp()`), og prøven som krever den. Målt: hodet på
+  ressursoversikten har samme høyde som med «Hent alle» ved 1366, 1920 og 2560 px — det brøt
+  allerede ved de to første, og ved 2560 er det fortsatt plass.
+
 ## 2026-10-20 — «Hent alle»: én knapp for posisjon fra alle enheter, ikke én per gruppe  `#ko/ressursbildet`
 
 André: «Burde det vært ein knapp for spor alle enheter? Va opprinnelig det eg trodde den knappen va

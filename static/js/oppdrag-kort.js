@@ -248,7 +248,7 @@ function hentPosisjonKnapp(e) {
   return `<button type="button" class="btn btn-sm enhet-hent-posisjon" data-action="hentPosisjon" data-id="${escHtmlValue(e.id)}" title="Hent posisjon" aria-label="Hent posisjon fra ${escHtmlValue(e.navn)}"${venter ? ' disabled' : ''}><i class="bi bi-crosshair"></i></button>`;
 }
 
-/** «Hent alle» ved «Vis», over lista — når minst én bil på vakt kan svare.
+/** «Hent posisjoner» ved «Vis», over lista — når minst én bil på vakt kan svare.
  *
  *  André, 20. okt. 2026: «Jeg mener den skal hente fra alle enheter som vi har koblet til.
  *  Altså ikke lag. Da hentet vi posisjon fra alle og så kan vi pinge individuelle enheter.»
@@ -260,7 +260,7 @@ function hentAlleKnapp(enheter) {
   if (!enheter.some((e) => e.posisjon_kan_hentes === true)) return '';
   return '<button type="button" class="btn btn-sm btn-outline-success enhet-hent-alle" data-action="hentPosisjonAlle"'
     + ' title="Hent posisjon fra alle enheter på vakt" aria-label="Hent posisjon fra alle enheter på vakt">'
-    + '<i class="bi bi-crosshair me-1"></i>Hent alle</button>';
+    + '<i class="bi bi-crosshair me-1"></i>Hent posisjoner</button>';
 }
 
 /** Når neste henting på lista skifter fra «venter» til «kom ikke fram», i ms fra
@@ -638,7 +638,7 @@ function tegnEnhetsliste(liste) {
   const paVakt = sisteEnhetsliste.filter((e) => e.pa_vakt);
   const antallAv = sisteEnhetsliste.length - paVakt.length;
 
-  // «Hent alle» over lista, ved «Vis» — se `hentAlleKnapp`.
+  // «Hent posisjoner» over lista, ved «Vis» — se `hentAlleKnapp`.
   const hentAlle = document.getElementById('ressurs-hent-alle');
   if (hentAlle) hentAlle.innerHTML = hentAlleKnapp(paVakt);
 

@@ -163,7 +163,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 ### KO: vindushodene som bryter over flere linjer (målt 20. okt. 2026)
 
 - [ ] Hodet på «Oppdragsliste» er 113 px på 1366 px og 84 px på 1920 px, «Ressursoversikt» 84 px
-      på 1366 px og — fra «Hent alle» kom i hodet 20. okt. — også på 1920 px (vinduet er 628 px
+      på 1366 px og — fra «Hent posisjoner» kom i hodet 20. okt. — også på 1920 px (vinduet er 628 px
       bredt der; selv bare sikte-ikonet bryter), mot 45 px for de andre. Knappene (Trenger ressurs ×2, Tildelt, Nytt oppdrag,
       Historikk, Konsertplanlegger) bryter linja. Mulige grep: ikon uten tekst under en bredde,
       eller de sjeldne bak en «Mer»-meny. Det koster mer enn stripa gjorde

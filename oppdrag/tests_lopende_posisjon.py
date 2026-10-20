@@ -739,7 +739,7 @@ class SkjemaetIValglisteneTests(unittest.TestCase):
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class KortetIKoTests(unittest.TestCase):
-    """Knappen per bil, «Hent alle» for hele lista (20. okt. 2026 — var per gruppe), svaret på kortet."""
+    """Knappen per bil, «Hent posisjoner» for hele lista (20. okt. 2026 — var per gruppe), svaret på kortet."""
 
     def _kjor(self, kode):
         from patients.js_test_utils import KORT_HENTING, OPPDRAG_SENTRAL_JS
@@ -809,7 +809,7 @@ class KortetIKoTests(unittest.TestCase):
             await hentPosisjon(8);
             console.log(JSON.stringify({ ...r, kall, lastet, etagEnheter }));""")
         self.assertIn('data-action="hentPosisjonAlle"', ut['knapp'])
-        self.assertIn('Hent alle', ut['knapp'])
+        self.assertIn('Hent posisjoner', ut['knapp'])
         self.assertNotIn('data-arg', ut['knapp'], 'ingen gruppe å avgrense til')
         self.assertEqual(ut['ingen'], '')
         self.assertEqual([k.get('url') for k in ut['kall'][:2]], [
