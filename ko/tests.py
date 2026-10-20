@@ -369,7 +369,9 @@ class SidenHarIngenFanerTests(TestCase):
         self.assertIn('data-bs-toggle="dropdown"', knapp)
         self.assertNotIn('data-action', knapp)
         self.assertIn('dropdown-menu', markup)
-        self.assertIn('>Pålogget', markup.replace('\n', ''))
+        # Ikon uten tekst fra 20. okt. 2026 (André): navnet står for skjermleser og musepeker.
+        self.assertIn('aria-label="Pålogget"', knapp)
+        self.assertIn('title="Pålogget"', knapp)
 
     def test_loggen_og_tavla_staar_samtidig(self):
         """Det er *dette* fraværet av faner skal gi, og derfor det som prøves.

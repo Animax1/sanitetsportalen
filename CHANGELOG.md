@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — KO: «Lagre oppsettet» på kontoen, Vaktarkiv i KO-innstillinger, ikonknapper  `#ko/oppsett`
+
+André: «Vakt arkiv kan vel gjemmes i ko innstillinger? Pålogget er vel noe vi kan justere
+størrelse på? Og en bug oppsett knappen har ingen måte å lagre oppsett på.»
+
+**Feilen:** oppsettet sto bare i `localStorage` (`ko.oppsett`), og «Logg ut» sender
+`Clear-Site-Data: "cache", "storage"` (H4) — det tømmer `localStorage`. Kommentaren i
+ko-layout.js lovet at «en KO-PC beholder oppsettet sitt uansett hvem som logger på»; i praksis
+forsvant det ved hver utlogging. Fremprovosert i Chromium før rettingen: lagret, logget ut, logget
+inn — `localStorage` tom, Loggstrøm tilbake.
+
+- **`ko.KoOppsett`** (`ko/0029`), per (portal, konto) som ansvarsmerket, ikke i backupen.
+  `POST /ko/api/oppsett/` (`les`, `30/m`): raden er alltid den innloggedes, kroppen bærer ingen
+  bruker. Serveren sjekker form (de fire feltene) og størrelse (2000 byte); innholdet avvises av
+  `koGyldigOppsett()` når det leses, som kjenner vinduene — en kopi av den lista på serveren ville
+  glidd fra den.
+- **`koLesOppsett()`: nettleserens kopi først, så kontoens, så standarden.** Kontoens kommer med
+  siden (`KO_LAGRET_OPPSETT`, `js_json`). Arbeidskopien er fortsatt i nettleseren, så å dra i en
+  skillelinje lagrer ingenting på serveren.
+- **«Lagre oppsettet»** i Oppsett-menyen, med «Lagret på kontoen din 20. okt 08:50 — det gjelder
+  etter «Logg ut» og på andre PC-er», eller «Ikke lagret … forsvinner ved «Logg ut»». Menyen
+  står åpen etter et trykk (`data-bs-auto-close="outside"`), så svaret synes.
+- **KO-innstillinger er en meny** med «Innstillinger …» og «Vaktarkiv …». En meny og ikke en fane
+  i vinduet, fordi de har hver sin gate (`kan_lede`/`verdifaner_ekstra` mot `skriv_full` i
+  oppdrag): den som har arkivet, men ikke innstillingene, ser menyen med bare arkivet.
+  «Valglister» står ikke i verktøylinja (18. sep.), så valget heter «Innstillinger».
+- **Pålogget og Oppsett er ikoner**, navnet i `title` og `aria-label`; 48 px hver.
+  `test_sidebaren_tar_ikke_en_kolonne` krever nå navnet der, ikke som tekst på knappen.
+- Målt i Chromium: verktøylinja står på én linje (31 px) på både 1920 og 1366; konsollen
+  948 og 636 px som etter forrige endring.
+- 20 nye tester (`ko/tests_oppsett.py`). **17 mutanter, alle drept** — to av dem portalscopet
+  (`i_portal()` fjernet fra lesing og skriving), som krevde en test med to portaler.
+
+---
+
 ## 2026-10-20 — KO: «Skjult:» står i verktøylinja, og konsollen får 32 px mer  `#ko/oppsett`
 
 André: «Kan legge skjulte vinduer på samme linje som KO verktøylinje. Da får en litt mer plass i

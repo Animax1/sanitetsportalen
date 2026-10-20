@@ -54,7 +54,8 @@ class KoBackupHandler(BaseBackupHandler):
     # (`Logglinje.delt_at`) er med. Se `ko/models.py`.
     # `HendelseLest` (27. sep. 2026) er samme slags som ansvarsmerket: hvor
     # langt hver konto har lest *nå*, med en peker til kontoen.
-    exclude = ['ko.Ansvarsmerke', 'ko.Linjedeling', 'ko.HendelseLest']
+    # `KoOppsett` (20. okt. 2026) er en innstilling per konto, ikke noe som skjedde.
+    exclude = ['ko.Ansvarsmerke', 'ko.Linjedeling', 'ko.HendelseLest', 'ko.KoOppsett']
 
     #: FK-er ut av modulens eget datasett.
     #:

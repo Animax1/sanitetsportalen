@@ -23,6 +23,8 @@ urlpatterns = [
     # «Åpne kartet» (19. okt. 2026): billett til kart.sanitet.net, postet videre.
     path('kart/', views.kart_view, name='ko_kart'),
     path('api/tilstede/', views.tilstede_view, name='ko_api_tilstede'),
+    # «Lagre oppsettet» (20. okt. 2026): vinduenes oppsett på kontoen.
+    path('api/oppsett/', views.oppsett_view, name='ko_api_oppsett'),
     # Eget ansvarsmerke (§5.1, pulje 6). Vises, styrer ingenting.
     path('api/ansvar/', views.ansvar_view, name='ko_api_ansvar'),
     # Loggen (pulje 2). **Retting og fjerning er navngitte stier**, ikke et

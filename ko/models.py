@@ -712,6 +712,36 @@ class Ansvarsomraade(PortalEid):
         return self.navn
 
 
+class KoOppsett(PortalEid):
+    """Vinduenes oppsett i KO, lagret på kontoen med «Lagre oppsettet» (20. okt. 2026).
+
+    André: «oppsett knappen har ingen måte å lagre oppsett på». Oppsettet sto bare i
+    nettleseren (`ko.oppsett` i `localStorage`), og «Logg ut» tømmer den
+    (`Clear-Site-Data`, H4) — så det forsvant ved hver utlogging. Nettleserens kopi er
+    fortsatt arbeidskopien; denne raden er det man kommer tilbake til når den er tom,
+    også på en annen PC.
+
+    **Per (portal, konto), som ansvarsmerket.** Ikke med i backupen: det er en
+    innstilling, ikke noe som skjedde. Innholdet leses av `koGyldigOppsett()` i
+    ko-layout.js, som avviser alt den ikke kjenner; serveren sjekker bare form og størrelse.
+    """
+
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='ko_oppsett', verbose_name='Bruker')
+    oppsett = models.JSONField(verbose_name='Oppsett')
+    lagret_at = models.DateTimeField(auto_now=True, verbose_name='Lagret')
+
+    class Meta:
+        verbose_name = 'KO-oppsett'
+        verbose_name_plural = 'KO-oppsett'
+        constraints = [models.UniqueConstraint(fields=['portal', 'bruker'],
+                                               name='ko_oppsett_unik_per_portal_bruker')]
+
+    def __str__(self):
+        return f'{self.bruker_id}: KO-oppsett'
+
+
 class Ansvarsmerke(PortalEid):
     """Hva operatøren gjør nå — samband, ressurser, logg, media (§5.1).
 

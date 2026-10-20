@@ -214,6 +214,7 @@ def index_view(request):
     # linje. Gatene i den er **oppdragsmodulens**, også her — se funksjonens
     # egen docstring.
     kontekst = sentralbordkontekst(request)
+    lagret = services.lagret_oppsett(request.user)
     verdifaner_ekstra = [
         {'slug': 'ansvarsomraader', 'navn': 'Ansvarsområder', 'ny': 'Nytt ansvarsområde',
          'url': '/ko/api/ansvarsomraader/'},
@@ -296,6 +297,10 @@ def index_view(request):
         # «Åpne kartet» (19. okt. 2026): bare når miljøet har nøkkelen og admin har slått
         # den på. Gaten står også i `kart_view`, så knappen er ikke den eneste døra.
         'kart_innlogging': kartkobling.innlogging_paa(),
+        # «Lagre oppsettet» (20. okt. 2026): det kontoen har lagret, til når nettleserens kopi er
+        # tom — etter «Logg ut», eller på en annen PC. `js_json`, som alt inn i et skript.
+        'lagret_oppsett_json': js_json(lagret.oppsett if lagret else None),
+        'lagret_oppsett_tid': lagret.lagret_at if lagret else None,
     })
     return render(request, 'ko/index.html', kontekst)
 
@@ -365,6 +370,22 @@ def ansvar_view(request):
     except services.Ugyldig as feil:
         return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'omraade': omraade})
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:oppsett', rate='30/m', method='POST')
+def oppsett_view(request):
+    """«Lagre oppsettet» (20. okt. 2026): vinduenes oppsett på kontoen, i portalen man står i.
+
+    `les` holder: oppsettet er ens eget og styrer ingen andre. Raden er alltid den innloggedes —
+    kroppen bærer ingen bruker å velge, så ingen kan lagre på en annens konto.
+    """
+    try:
+        rad = services.lagre_oppsett(request.user, json_body(request).get('oppsett'))
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
+    return JsonResponse({'status': 'ok', 'lagret': rad.lagret_at.isoformat()})
 
 
 @never_cache

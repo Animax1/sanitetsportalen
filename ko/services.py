@@ -7,6 +7,7 @@ er.
 """
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 from django.db import models, transaction
@@ -22,7 +23,7 @@ from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
     Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, HendelseLest, HendelseVarsling,
-    Linjedeling, Logglinje, Talegruppe,
+    KoOppsett, Linjedeling, Logglinje, Talegruppe,
 )
 
 
@@ -160,6 +161,33 @@ def sett_ansvar(bruker, omraade) -> str:
         omraade = treff[0]
     Ansvarsmerke.objects.i_portal().update_or_create(bruker=bruker, defaults={'omraade': omraade})
     return omraade
+
+
+#: Oppsettet (20. okt. 2026): de seks vinduene og fire tall er noen hundre byte. Taket står for
+#: at et skript ikke skal kunne legge en megabyte på en konto.
+OPPSETT_MAKS_BYTE = 2000
+OPPSETT_FELT = frozenset({'rader', 'bredde', 'hoyde', 'skjult'})
+
+
+def lagret_oppsett(bruker):
+    """Oppsettet kontoen har lagret i portalen, eller None."""
+    return KoOppsett.objects.i_portal().filter(bruker=bruker).first()
+
+
+def lagre_oppsett(bruker, oppsett) -> KoOppsett:
+    """Lagre KO-oppsettet på kontoen. **Form og størrelse sjekkes her, innholdet i klienten.**
+
+    `koGyldigOppsett()` i ko-layout.js avviser alt den ikke kjenner når oppsettet leses, og den
+    kjenner vinduene; en kopi av den lista her ville glidd fra den. Det serveren må hindre, er
+    noe annet enn et oppsett i raden: ikke et objekt, felter som ikke hører hjemme, for stort.
+    """
+    if not isinstance(oppsett, dict) or set(oppsett) != OPPSETT_FELT:
+        raise Ugyldig('Oppsettet har feil form.')
+    if len(json.dumps(oppsett, separators=(',', ':'))) > OPPSETT_MAKS_BYTE:
+        raise Ugyldig('Oppsettet er for stort.')
+    rad, _ = KoOppsett.objects.i_portal().update_or_create(
+        bruker=bruker, defaults={'oppsett': oppsett})
+    return rad
 
 
 def vurder_tidspunkt(oppgitt, naa=None):

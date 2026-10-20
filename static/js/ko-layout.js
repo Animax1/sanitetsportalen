@@ -170,13 +170,37 @@ function koStandardOppsett() {
   return koGyldigOppsett(KO_OPPSETT_STANDARD);
 }
 
+// **Nettleserens kopi først, så kontoens, så standarden** (20. okt. 2026). «Logg ut» tømmer
+// `localStorage` (`Clear-Site-Data`, H4), og da forsvant oppsettet ved hver utlogging —
+// André: «oppsett knappen har ingen måte å lagre oppsett på». Kontoens kopi
+// (`KO_LAGRET_OPPSETT`, satt av malen fra `ko.KoOppsett`) er det man kommer tilbake til når
+// nettleserens er tom. Begge går gjennom `koGyldigOppsett()`: kontoens kan være lagret av en
+// eldre versjon av sida.
 function koLesOppsett() {
+  let lokal = null;
   try {
-    const raa = JSON.parse(globalThis.localStorage?.getItem(KO_OPPSETT_NOKKEL) || 'null');
-    return koGyldigOppsett(raa) || koStandardOppsett();
+    lokal = JSON.parse(globalThis.localStorage?.getItem(KO_OPPSETT_NOKKEL) || 'null');
   } catch (e) {
-    return koStandardOppsett();
+    lokal = null;
   }
+  return koGyldigOppsett(lokal) || koGyldigOppsett(globalThis.KO_LAGRET_OPPSETT ?? null)
+    || koStandardOppsett();
+}
+
+// «Lagre oppsettet» i Oppsett-menyen: det som står nå, på kontoen i portalen.
+async function koLagreOppsettPaaKontoen() {
+  const status = document.getElementById('ko-oppsett-lagret');
+  const oppsett = koOppsett || koLesOppsett();
+  const res = await apiFetch('/ko/api/oppsett/', {
+    method: 'POST', body: JSON.stringify({ oppsett }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (status) status.textContent = data.message || 'Kunne ikke lagre oppsettet.';
+    return;
+  }
+  globalThis.KO_LAGRET_OPPSETT = oppsett;
+  if (status) status.textContent = 'Lagret på kontoen din nå.';
 }
 
 function koLagreOppsett(oppsett) {

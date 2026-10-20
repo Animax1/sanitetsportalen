@@ -49,6 +49,8 @@
   window.KO_EKSTERNE = {{ eksterne_json }};
   window.KO_TALEGRUPPER = {{ talegrupper_json }};
   window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
+  // Oppsettet kontoen har lagret (20. okt. 2026), `null` uten — `koLesOppsett()`.
+  window.KO_LAGRET_OPPSETT = {{ lagret_oppsett_json }};
 </script>
 
 <div class="container-fluid px-3 py-2">
@@ -58,14 +60,36 @@
       <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO
         <span class="text-muted fw-normal fs-6" id="ko-logg-vakt">· {{ vakt_navn }}</span></h1>
       <div class="d-flex gap-2">
-        {% if kan_lede or verdifaner_ekstra %}
-        {# «KO-innstillinger» (André, 18. sep. 2026) — sentralbordets valglister #}
-        {# pluss KOs egne ansvarsområder, i samme vindu. #}
-        <button type="button" class="btn btn-outline-secondary btn-sm"
-                data-bs-toggle="modal" data-bs-target="#valglisterModal"
-                data-action="lastVerdiadmin">
-          <i class="bi bi-sliders me-1"></i>KO-innstillinger
-        </button>
+        {% comment %}
+          «KO-innstillinger» (André, 18. sep. 2026) — sentralbordets valglister pluss KOs egne
+          ansvarsområder — og **Vaktarkiv i samme meny** (20. okt. 2026, André: «Vakt arkiv kan
+          vel gjemmes i ko innstillinger?»). En meny og ikke en fane i vinduet, fordi de to har
+          **hver sin gate**: innstillingene `kan_lede`/`verdifaner_ekstra`, arkivet `skriv_full`
+          i oppdrag. Som fane hadde den som har arkivet, men ikke innstillingene, mistet det.
+        {% endcomment %}
+        {% if kan_lede or verdifaner_ekstra or kan_se_oppdrag and kan_skrive %}
+        <div class="dropdown">
+          <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                  id="ko-innstillinger-knapp" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-sliders me-1"></i>KO-innstillinger
+          </button>
+          <div class="dropdown-menu">
+            {% if kan_lede or verdifaner_ekstra %}
+            <button type="button" class="dropdown-item"
+                    data-bs-toggle="modal" data-bs-target="#valglisterModal"
+                    data-action="lastVerdiadmin">
+              <i class="bi bi-list-check me-2"></i>Innstillinger …
+            </button>
+            {% endif %}
+            {% if kan_se_oppdrag and kan_skrive %}
+            <button type="button" class="dropdown-item"
+                    data-bs-toggle="modal" data-bs-target="#arkivModal"
+                    data-action="lastArkiv">
+              <i class="bi bi-archive me-2"></i>Vaktarkiv …
+            </button>
+            {% endif %}
+          </div>
+        </div>
         {% endif %}
         {% comment %}
           Utskriften (13. okt. 2026): **alle vinduene, alltid** — ett valg for
@@ -92,13 +116,6 @@
         {% endif %}
         <span class="small text-muted align-self-center d-none" id="ko-kopi-status"
               title="Utskriften ligger i nettleseren og kan skrives ut uten nett. «Logg ut» sletter den."></span>
-        {% if kan_se_oppdrag and kan_skrive %}
-        <button type="button" class="btn btn-outline-secondary btn-sm"
-                data-bs-toggle="modal" data-bs-target="#arkivModal"
-                data-action="lastArkiv">
-          <i class="bi bi-archive me-1"></i>Vaktarkiv
-        </button>
-        {% endif %}
       </div>
     </div>
     {% comment %}
@@ -133,10 +150,11 @@
         (`klikkSkalKjore()`). ko.js henger seg på Bootstraps hendelser.
       {% endcomment %}
       <div class="dropdown">
+        {# Ikon uten tekst (20. okt. 2026): navnet står i title og aria-label. #}
         <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
                 id="ko-sidebar-knapp" data-bs-toggle="dropdown"
-                aria-expanded="false">
-          <i class="bi bi-people me-1"></i>Pålogget
+                aria-expanded="false" title="Pålogget" aria-label="Pålogget">
+          <i class="bi bi-people"></i>
         </button>
         <div class="dropdown-menu dropdown-menu-end p-2" id="ko-sidebar"
              style="min-width:280px;">
@@ -148,19 +166,31 @@
       </div>
       {% comment %}
         Oppsettet: bytte plass gjøres med håndtaket i hvert vindu, størrelse
-        med skillelinjene. Her: tilbake til 2×2. Huskes per nettleser
-        (`ko.oppsett`), som gruppene på tavla.
+        med skillelinjene. Her: lagre det på kontoen, eller tilbake til 2×2.
+        Nettleseren holder arbeidskopien (`ko.oppsett`); «Logg ut» tømmer den, og
+        da gjelder det som er lagret på kontoen (`ko.KoOppsett`, 20. okt. 2026).
+        `data-bs-auto-close="outside"`: menyen blir stående, så «Lagret» synes.
       {% endcomment %}
       <div class="dropdown">
         <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                id="ko-oppsett-knapp" data-bs-toggle="dropdown" aria-expanded="false">
-          <i class="bi bi-grid-1x2 me-1"></i>Oppsett
+                id="ko-oppsett-knapp" data-bs-toggle="dropdown" aria-expanded="false"
+                data-bs-auto-close="outside" title="Oppsett" aria-label="Oppsett">
+          <i class="bi bi-grid-1x2"></i>
         </button>
         <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:260px;">
           <div class="small text-muted mb-2">Dra <i class="bi bi-grip-vertical"></i> i et vindu over et
             annet for å bytte plass. Dra i skillelinjene for å endre størrelse.
             <i class="bi bi-eye-slash"></i> skjuler et vindu; det kommer tilbake fra
             «Skjult:» øverst. Det siste synlige kan ikke skjules.</div>
+          <button type="button" class="btn btn-sm btn-primary w-100 mb-1"
+                  data-action="koLagreOppsettPaaKontoen">
+            <i class="bi bi-floppy me-1"></i>Lagre oppsettet
+          </button>
+          <div class="small text-muted mb-2" id="ko-oppsett-lagret" role="status">
+            {% if lagret_oppsett_tid %}Lagret på kontoen din {{ lagret_oppsett_tid|date:"j. b H:i" }}.
+            Det gjelder etter «Logg ut» og på andre PC-er.{% else %}Ikke lagret på kontoen din ennå —
+            det som står nå, forsvinner ved «Logg ut».{% endif %}
+          </div>
           <button type="button" class="btn btn-sm btn-outline-secondary w-100"
                   data-action="koTilbakestillOppsett">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Tilbakestill til 2×2
