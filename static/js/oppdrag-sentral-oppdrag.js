@@ -622,7 +622,7 @@ function _flyttValg(o) {
   // Valgene bygges før mal-strengene — en nøstet mal-streng er usynlig for
   // XSS-skanneren (oppdrag/tests_xss.py).
   const fraValg = velgValg('') + paaOppdraget.map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('');
-  const tilValg = velgValg('') + kandidater.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
+  const tilValg = velgValg('') + kandidater.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn + ((typeof enhetPauseTekst === 'function') ? enhetPauseTekst(e.id) : ''))}</option>`).join('');
   const fra = paaOppdraget.length > 1
     ? `<select id="flytt-fra" class="form-select" aria-label="Flytt fra enhet">${fraValg}</select>`
     : `<span class="input-group-text fw-semibold">${escapeHtml(paaOppdraget[0]?.enhet_navn || o.enhet_navn || '')}</span>`;
@@ -663,7 +663,7 @@ function _varsleValg(o) {
   const ledige = enheter.filter((e) => e.pa_vakt && !paa.has(e.id));
   if (!ledige.length) return '';
   const valg = velgValg('') + ledige.map(
-    (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
+    (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn + ((typeof enhetPauseTekst === 'function') ? enhetPauseTekst(e.id) : ''))}</option>`).join('');
   return `
     <div class="input-group input-group-sm mt-2">
       <select id="varsle-enhet" class="form-select" aria-label="Enhet å varsle">${valg}</select>

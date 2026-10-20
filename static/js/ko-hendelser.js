@@ -894,7 +894,9 @@ function koLagVelgerHtml(h) {
   const paa = new Set((h.lag || []).map((l) => l.ressurs_id));
   const valg = koLagKandidater().filter((r) => !paa.has(r.id)).map((r) => {
     const opptatt = koLagPaa(r.id).map((x) => x.kode).join(', ');
-    return '<option value="' + escapeHtml(r.id) + '">' + escapeHtml(r.navn)
+    // Pausen fra tavla (20. okt. 2026), som « · pause» bak navnet.
+    const pause = (typeof lagPauseTekst === 'function') ? lagPauseTekst(r.id) : '';
+    return '<option value="' + escapeHtml(r.id) + '">' + escapeHtml(r.navn + pause)
       + (opptatt ? ' (på ' + escapeHtml(opptatt) + ')' : '') + '</option>';
   }).join('');
   if (!valg) return '';
@@ -1227,11 +1229,13 @@ function koFyllLagvalg(h) {
   const paa = new Set((h ? h.lag : []).map((l) => l.ressurs_id));
   const rader = koLagKandidater().map((r) => {
     const opptatt = koLagPaa(r.id).filter((x) => !h || x.id !== h.id);
-    const hint = opptatt.length
+    // Pausen fra tavla (20. okt. 2026), foran hintet om hendelsen.
+    const pause = (typeof koPauseFor === 'function') ? koPauseMerke(koPauseFor(r.id, null)) : '';
+    const hint = (pause ? pause + ' ' : '') + (opptatt.length
       ? '<span class="ko-opptatt small">på ' + escapeHtml(opptatt.map((x) => x.kode).join(', '))
         + ' · ' + escapeHtml(koSiden(opptatt[0].fra)) + '</span>'
       : '<span class="text-muted small">' + (r.antall
-        ? escapeHtml(String(r.tilstede)) + ' av ' + escapeHtml(String(r.antall)) + ' møtt' : 'ubemannet') + '</span>';
+        ? escapeHtml(String(r.tilstede)) + ' av ' + escapeHtml(String(r.antall)) + ' møtt' : 'ubemannet') + '</span>');
     return '<label class="form-check nytt-enhet-valg"><input class="form-check-input" type="checkbox"'
       + ' value="' + escapeHtml(r.id) + '"' + (paa.has(r.id) ? ' checked' : '') + '> '
       + escapeHtml(r.navn) + ' ' + hint + '</label>';

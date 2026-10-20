@@ -153,6 +153,30 @@ def _stedsnavn(plassering) -> str:
 
 
 @transaction.atomic
+def paa_pause(vakt) -> list[dict]:
+    """Hvem står i Pause-raden **nå**: den åpne plasseringen med `pause` (20. okt. 2026).
+
+    André: «Når et lag eller bil settes på pause, er det ønskelig at det vises at den/de er på
+    pause på ressursoversikt, og ved oppdragstildeling/hendelser.» Tavla er det ene stedet
+    pausen står — oppdragsmodulen har ingen pausestatus, og vaktlista vet ikke om KO — så
+    ressursoversikten, tildelingen og hendelsene leser den herfra, gjennom logg-pollen.
+
+    **Bare den som har startet.** En planlagt pause som ikke er startet med «Pause nå», er en
+    plan, og tavla flytter ingen (`PlanlagtPause`). `enhet_id` er satt for en bil, så
+    bilkortet kan finne den; et lag har bare `ressurs_id`.
+    """
+    rader = (Tavleplassering.objects
+             .filter(vakt=vakt, til__isnull=True, pause=True, ressurs__isnull=False)
+             .select_related('ressurs'))
+    return [{
+        'ressurs_id': p.ressurs_id,
+        'enhet_id': p.ressurs.enhet_id,
+        'navn': p.ressurs_navn,
+        'fra': p.fra.isoformat(),
+        'planlagt_til': p.planlagt_til.isoformat() if p.planlagt_til else None,
+    } for p in rader]
+
+
 def plasser(vakt, ressurs, *, bruker, lokasjon=None, pause=False, naa=None) -> Tavleplassering:
     """Sett en **ledig** ressurs på en lokasjon, eller i pause, fra **nå**.
 

@@ -239,12 +239,19 @@ function mkEnhetsvalg() {
       ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
     // **Statusen står ved navnet** (André, 23. sep. 2026: «så kan du se hvem
     // som er ledig»), med samme prikk og farge som ressurslista.
-    return hode + g.enheter.map((e) => `
+    // **Pausen fra KO-tavla** (20. okt. 2026): « · pause» bak statusen, og gul i stedet for
+    // grønn — en ledig på pause er noe man tenker seg om før man sender. `typeof`-vakt fordi
+    // `enhetPauseTekst` bare finnes i `/ko/`; inline fordi harnessene henter funksjoner alene.
+    return hode + g.enheter.map((e) => {
+      const pause = (typeof enhetPauseTekst === 'function') ? enhetPauseTekst(e.id) : '';
+      const klasse = pause ? ' er-pause' : (e.status === 'ledig' ? ' er-ledig' : '');
+      return `
     <label class="form-check nytt-enhet-valg">
       <input class="form-check-input" type="checkbox" name="nytt-enhet" value="${escHtmlValue(e.id)}">
       <span class="form-check-label">${escapeHtml(e.navn)}</span>
-      <span class="nytt-enhet-status${e.status === 'ledig' ? ' er-ledig' : ''}"><span class="status-prikk status-${escHtmlValue(e.status || '')}"></span>${escapeHtml(e.status_navn || '')}</span>
-    </label>`).join('');
+      <span class="nytt-enhet-status${klasse}"><span class="status-prikk status-${escHtmlValue(e.status || '')}"></span>${escapeHtml((e.status_navn || '') + pause)}</span>
+    </label>`;
+    }).join('');
   }).join('');
 }
 

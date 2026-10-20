@@ -387,6 +387,8 @@ async function koHentLogg() {
     // Hendelsene følger med hver poll — hele lista, som `fjernede`: en
     // hendelse som lukkes eller omdøpes har ingen ny id.
     if (data.hendelser) koTaImotHendelser(data.hendelser, data.nye);
+    // Pausene fra tavla (20. okt. 2026), hele lista: en pause som slutter, er fravær.
+    if (Array.isArray(data.pauser)) koTaImotPauser(data.pauser);
   } catch (e) {
     // En logg som ikke svarer skal ikke tømme skjermen: linjene som alt står
     // der er fortsatt sanne. Feilen vises bare når det ikke står noe.
@@ -672,6 +674,74 @@ function koRessursOpptattHtml(r) {
   return '<div class="enhet-meta">' + hode + '</div>' + linjer;
 }
 
+// ── Pause (20. okt. 2026) ────────────────────────────────────────────────────
+//
+// André: «Når et lag eller bil settes på pause, er det ønskelig at det vises at den/de er på
+// pause på ressursoversikt, og ved oppdragstildeling/hendelser.» Pausen står på tavla (en åpen
+// plassering i Pause-raden) og følger med logg-pollen (`pauser`, `ko.tavle.paa_pause`), hel hver
+// gang. Et lag finnes på `ressurs_id`, en bil på `enhet_id`.
+//
+// **Et merke, ikke en sperre.** En bil på pause kan sendes likevel — det er KO som vet om
+// pausen må brytes. Merket skal bare gjøre at ingen sender den uten å vite det.
+
+//: Pausene fra siste logg-poll: `[{ressurs_id, enhet_id, navn, fra, planlagt_til}]`.
+let koPauser = [];
+let koPauserJson = '[]';
+
+// Pausen et lag (`ressursId`) eller en bil (`enhetId`) står i nå, eller null.
+function koPauseFor(ressursId, enhetId) {
+  // `ressurs_id` er aldri null (serveren tar dem ikke med), så den første sammenligningen holder
+  // alene; `enhet_id` er null for hvert lag, og må derfor vaktes.
+  return koPauser.find((p) => p.ressurs_id === ressursId
+    || (enhetId != null && p.enhet_id === enhetId)) || null;
+}
+
+// «Pause 14:10 · 12 min → 14:30». Over planlagt slutt: «over tida», som på tavla.
+function koPauseTekst(p, naa) {
+  const n = naa === undefined ? Date.now() : naa;
+  const slutt = p.planlagt_til ? ' → ' + koKlokke(p.planlagt_til) : '';
+  const over = p.planlagt_til && new Date(p.planlagt_til).getTime() < n ? ' · over tida' : '';
+  return 'Pause ' + koKlokke(p.fra) + ' · ' + koSiden(p.fra, n) + slutt + over;
+}
+
+function koPauseMerke(p, naa) {
+  if (!p) return '';
+  const n = naa === undefined ? Date.now() : naa;
+  const over = p.planlagt_til && new Date(p.planlagt_til).getTime() < n;
+  return '<span class="ko-pause-merke' + (over ? ' ko-pause-over' : '') + '">'
+    + '<i class="bi bi-cup-hot"></i> ' + escapeHtml(koPauseTekst(p, n)) + '</span>';
+}
+
+function koRessursPauseHtml(r) {
+  const merke = koPauseMerke(koPauseFor(r.id, null));
+  return merke ? '<div class="enhet-meta">' + merke + '</div>' : '';
+}
+
+// For oppdragsmodulens filer — bilkortet og tildelingen — som ikke kjenner KO og kaller gjennom
+// en `typeof`-vakt (samme grep som `koEtterOppdragTegnet`). I `/oppdrag/` finnes de ikke.
+function enhetPauseMerke(enhetId) {
+  return koPauseMerke(koPauseFor(null, enhetId));
+}
+
+// Ren tekst til et `<option>` eller en avkryssing: « · pause» eller tomt.
+function enhetPauseTekst(enhetId) {
+  return koPauseFor(null, enhetId) ? ' · pause' : '';
+}
+
+function lagPauseTekst(ressursId) {
+  return koPauseFor(ressursId, null) ? ' · pause' : '';
+}
+
+// Logg-pollen leverer lista hel. Uendret lista tegner ingenting på nytt.
+function koTaImotPauser(liste) {
+  const json = JSON.stringify(liste);
+  if (json === koPauserJson) return;
+  koPauser = liste;
+  koPauserJson = json;
+  koTegnRessurser();
+  if (typeof renderEnheter === 'function') renderEnheter();
+}
+
 function koRessurskort(r) {
   const tall = r.antall
     ? escapeHtml(String(r.tilstede)) + ' av ' + escapeHtml(String(r.antall)) + ' møtt'
@@ -679,12 +749,14 @@ function koRessurskort(r) {
   const apen = koApenRessurs === r.id;
   const besetning = apen ? koRessursBesetningHtml(r) : '';
   const opptatt = koRessursOpptattHtml(r);
+  const pause = (typeof koRessursPauseHtml === 'function') ? koRessursPauseHtml(r) : '';
   return '<div class="enhet-kort ko-ressurskort enhet-kort-klikkbar' + (apen ? ' ko-ressurskort-apen' : '') + '"'
     + ' data-action="koVippRessurs" data-id="' + escapeHtml(r.id) + '" role="button" tabindex="0">'
     + '<i class="bi bi-' + escapeHtml(r.gruppe_ikon || 'box') + ' ko-ressursikon"></i>'
     + '<div class="flex-grow-1">'
     + '<div class="enhet-navn">' + escapeHtml(r.navn) + '</div>'
     + '<div class="enhet-meta">' + tall + '</div>'
+    + pause
     + opptatt
     + besetning
     + '</div></div>';

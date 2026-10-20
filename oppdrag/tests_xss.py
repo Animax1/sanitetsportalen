@@ -258,6 +258,9 @@ REVIEWED_INTERPOLATIONS = {
     # Hver av dem er lest før den ble ført opp; ingen hadde uescapet
     # brukerdata. Hullet var i dekningen, ikke i escapingen.
     'passiv': 'markup bygget lokalt av en ternær — ingen data i den',
+    # Pausen fra KO-tavla (20. okt. 2026): markup fra `enhetPauseMerke` i ko.js, som escaper
+    # pauseteksten med `escapeHtml` (prøvd i `ko/tests_pause.py`); tom utenfor `/ko/`.
+    'pauselinje': 'markup bygget lokalt av `enhetPauseMerke`, teksten escapet inni',
     'klokke(siden)': 'vår egen tidsformatering, «14:32», av et ISO-tidspunkt',
     'tidSiden(siden)': 'vår egen tidsformatering, «12 min»',
     '_lokalNaa()': 'vår egen datetime-local-formatering av klokka nå',

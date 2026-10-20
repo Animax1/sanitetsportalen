@@ -178,10 +178,18 @@ function enhetskortInnmat(e) {
   // «Hent posisjon» (André, 19. okt. 2026, skisse A): knappen, og svaret på kortet.
   const hent = hentPosisjonKnapp(e);
   const henting = hentingLinje(e, Date.now());
+  // **Pausen fra KO-tavla** (20. okt. 2026, André: «vises at den/de er på pause på
+  // ressursoversikt, og ved oppdragstildeling»). Fila kjenner ikke KO: `enhetPauseMerke` står
+  // i ko.js og finnes bare i `/ko/`, så kallet går gjennom en `typeof`-vakt — samme grep som
+  // `koEtterOppdragTegnet`. Inline og ikke en hjelper: harnessene henter funksjoner alene
+  // (`oppdrag/CLAUDE.md`). Ferdig markup, tom utenfor `/ko/`.
+  const pause = (typeof enhetPauseMerke === 'function') ? enhetPauseMerke(e.id) : '';
+  const pauselinje = pause ? '<div class="enhet-meta">' + pause + '</div>' : '';
   return `<span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}${passiv}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
+          ${pauselinje}
           ${oppdragslinje}
           ${henting}
         </div>${hent}${posdeling}`;

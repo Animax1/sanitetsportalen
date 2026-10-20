@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — KO: pause vises i ressursoversikten, i tildelingen og i hendelsene  `#ko/ressursbildet`
+
+André: «I ressursoversikt i komodulen så må den vise hvem som er på pause. Når et lag eller bil
+settes på pause, er det ønskelig at det vises at den/de er på pause på ressursoversikt, og ved
+oppdragstildeling/hendelser.»
+
+**Pausen fantes alt, bare på tavla:** en åpen `Tavleplassering` med `pause=True` (Pause-raden,
+også etter «Pause nå» fra en plan). Oppdragsmodulen har ingen pausestatus, og vaktlista vet ikke
+om KO — så ressursoversikten, tildelingen og hendelsene leser den derfra.
+
+- **`ko.tavle.paa_pause(vakt)`**: de som står i Pause-raden nå, med `enhet_id` for en bil.
+  Bare startede pauser — en plan flytter ingen.
+- **Logg-pollen bærer `pauser`**, hel hver gang som `hendelser` (en pause som slutter, er
+  fravær). Hver plassering på tavla skriver en systemlinje, så pollen går når pausen begynner
+  og slutter. **Hver kildes gate** (`_pauser_for`): et lag vises med `les` i vaktlista, en bil med
+  `les` i oppdrag, KO alene gir ingenting.
+- **Merket:** «Pause 14:10 · 12 min → 14:30», gult, rødt «over tida» etter planlagt slutt — som
+  på tavla. **Et merke, ikke en sperre:** en bil på pause kan sendes, det er KO som vet om pausen
+  må brytes.
+- **Hvor:** lagkortet og bilkortet i ressursoversikten; «Nytt oppdrag» («Ledig · pause», gult
+  og ikke grønt), «Legg til» og «Flytt til» i oppdraget; avkryssingen og «+ Lag» i hendelsen.
+- **Oppdragsmodulens filer kjenner ikke KO** (`oppdrag-kort.js`, `oppdrag-sentral-*.js`): de
+  kaller `enhetPauseMerke`/`enhetPauseTekst` gjennom en `typeof`-vakt, som
+  `koEtterOppdragTegnet`. I `/oppdrag/` er funksjonene borte og ingenting endres. Vakten står
+  inline og ikke i en hjelper: harnessene henter funksjoner alene, og en ny hjelper ga 52 røde
+  tester (`oppdrag/CLAUDE.md` tar samme valg).
+- Sett i Chromium med et lag og en bil i pause: merket på begge kortene, «Ledig · pause» i
+  «Nytt oppdrag», og pausen med planlagt slutt i hendelsens lagvalg.
+- 20 nye tester (`ko/tests_pause.py`), blant dem kallstedet i `koHentLogg()` og bilkortet og
+  «Nytt oppdrag» gjennom de ekte byggerne. **19 mutanter, 18 drept.** Den som står er
+  `escapeHtml` i merket: teksten bygges bare av klokkeslett og minutter, så det finnes ingen data
+  å escape — escapingen står som forsvar. To andre overlevde først og var doble vakter
+  (`if not (lag or biler)`, `ressursId != null`); de ble fjernet.
+
+---
+
 ## 2026-10-20 — KO: «Lagre oppsettet» på kontoen, Vaktarkiv i KO-innstillinger, ikonknapper  `#ko/oppsett`
 
 André: «Vakt arkiv kan vel gjemmes i ko innstillinger? Pålogget er vel noe vi kan justere

@@ -473,7 +473,20 @@ def logg_view(request):
         # Delingstilstanden, hel hver gang (19. sep. 2026) — en angret deling
         # er fravær, og fravær kommer aldri gjennom `?siden=`.
         'delte': services.delte_for_vakt(vakt),
+        # Hvem står på pause nå (20. okt. 2026), hel hver gang: en pause som slutter, er fravær.
+        'pauser': _pauser_for(request.user, vakt),
     })
+
+
+def _pauser_for(bruker, vakt) -> list[dict]:
+    """Pausene fra tavla, **med hver kildes gate** (rollemodellen §5): et lag er vaktlistas, og
+    vises med `les` der; en bil vises med `les` i oppdrag, som bilkortet selv. Uten noen av dem
+    er lista tom — KO `les` alene gir ingen innsyn i ressursene."""
+    from . import tavle
+
+    lag = har_tilgang(bruker, 'vaktliste', 'les')
+    biler = har_tilgang(bruker, 'oppdrag', 'les')
+    return [p for p in tavle.paa_pause(vakt) if (biler if p['enhet_id'] else lag)]
 
 
 @modul_kreves('ko', 'skriv_full', svar='json')
