@@ -1150,6 +1150,16 @@ async function lagreFoerStatus(enhetId) {
 //: tegnes på nytt etter en retting, og rettingen kjenner bare meldings-ID-en.
 let apentOppdragId = null;
 
+//: Lukkes detaljvinduet, står ingen oppdrag åpent lenger (20. okt. 2026). Uten
+//: dette ble ID-en stående etter lukking, og hvert kallsted som spør «er et
+//: oppdrag åpent?» svarte ja: «Del» på en linje i en KO-hendelse åpnet
+//: vinduet til det sist viste oppdraget igjen («popper opp oppdragsvindu ved
+//: deling»), og det samme gjorde «Knytt» på det oppdraget. Koblet til
+//: `hide.bs.modal` i `oppdrag-sentral-lasting.js`.
+function glemApentOppdrag() {
+  apentOppdragId = null;
+}
+
 
 function visRettTid(meldingId) {
   const rad = document.getElementById(`tidslinje-rad-${meldingId}`);

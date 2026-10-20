@@ -328,3 +328,7 @@ document.getElementById('nyttOppdragModal')
 // Vaktarkivet og historikken åpnes med data-bs-toggle: notatet fra et avvist
 // forsøk og søketeksten skal ikke stå igjen (André, 19. sep. 2026).
 nullstillModalVedLukking('historikkModal', ['historikk-sok'], 'historikk-feil');
+// Lukket detaljvindu er lukket: «er et oppdrag åpent?» skal svare nei etterpå —
+// se `glemApentOppdrag`.
+document.getElementById('oppdragDetaljModal')
+  ?.addEventListener('hide.bs.modal', glemApentOppdrag);

@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — «Popper opp oppdragsvindu ved deling»: lukket detaljvindu glemmes nå  `#ko/hendelseslogg`
+
+Feilmelding: «Deling med biler: Popper opp oppdragsvindu ved deling av loggføring i hendelse til
+biler.» **Stemte.** Trykk «Del» (eller «Angre») på en linje i en KO-hendelse, og detaljvinduet til
+et oppdrag spratt opp — det oppdraget operatøren sist hadde sett på, også lenge etter at vinduet
+var lukket.
+
+- **Årsak:** `_koDeling()` i `ko-hendelser.js` tegner detaljvinduet på nytt når et oppdrag står
+  åpent, så «Del med HGSD 56» inne i vinduet vises der med en gang. «Står åpent» ble lest av
+  `apentOppdragId`, som `visOppdrag()` setter — men **ingenting satte den tilbake når vinduet ble
+  lukket**. Etter første oppdrag operatøren åpnet, svarte den «ja» resten av økten, og
+  `visOppdrag()` kaller `.show()`.
+- **Samme feil, ett sted til:** «Knytt» fra hendelsen på det sist viste oppdraget åpnet vinduet
+  (`_koSettHendelsePaaOppdrag`). Kallstedene inne i vinduet (status, tid, enheter) var ikke
+  rammet — der er vinduet faktisk åpent.
+- **Fiksen er der tilstanden lever, ikke ved kallstedet:** `glemApentOppdrag()` i
+  `oppdrag-sentral-oppdrag.js`, koblet til `hide.bs.modal` på detaljvinduet i
+  `oppdrag-sentral-lasting.js` (toppnivået står i den siste fila). Alle som spør «er et oppdrag
+  åpent?», får riktig svar — også den neste.
+- `ko/tests_deling_oppdragsvindu.py`, 2 tester. De kjører den ekte toppnivåkoden i
+  `oppdrag-sentral-lasting.js` og lukker vinduet gjennom lytteren. **3 mutanter, alle drept:**
+  lytteren fjernet, `glemApentOppdrag` tømt, lytteren på feil vindu.
+
 ## 2026-10-20 — Vakt: en glemt `atomic` rundt `select_for_update` blir rød i hele suiten  `#ko/ressursbildet`
 
 André, etter «kan ikke flytte» (`95c1630`): «Ja jeg vil ha den» — en vakt mot at samme
