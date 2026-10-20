@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — «Håndtert» heter «Kvitter ut», og «krever håndtering» heter «må kvitteres»  `#ko/loggen`
+
+André: «Flott nen bytt tekst fra Håndtert til «Kvitter ut» og vi må ha noe annet enn krever
+håndtering men som passer.» Han valgte «Må kvitteres» blant tre forslag.
+
+- Avkryssingen heter «må kvitteres», boksen øverst og merket på linja «Venter på kvittering»,
+  knappen «Kvitter ut», og etterpå står det «✓ Kvittert ut av Kari 14:32». Utskriften og
+  verktøytipsene følger.
+- **Bare det brukeren ser.** Feltene, endepunktene og funksjonene heter fortsatt `haandtering`/
+  `haandter` — en omdøping hadde krevd en migrasjon for ingen synlig forskjell.
+
 ## 2026-10-20 — KO: «Krever håndtering» og «Håndtert» på logglinjer  `#ko/loggen`
 
 André: «Av og til skriver jo våre representant i LSKO et logginnlegg med noe som er til info for

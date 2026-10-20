@@ -214,19 +214,19 @@ function koLinjeKnapper(linje) {
     }
     ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Rediger"'
       + ' data-action="koRett" data-id="' + id + '"><i class="bi bi-pencil"></i></button>';
-    // Håndtering (20. okt. 2026): «Håndtert» på enhver manuell linje, «Angre»
-    // når den er det. Merket «krever håndtering» settes og tas av så lenge linja
+    // Håndtering (20. okt. 2026): «Kvitter ut» på enhver manuell linje, «Angre»
+    // når den er det. Merket «må kvitteres» settes og tas av så lenge linja
     // ikke er håndtert — etterpå er det kvitteringen som gjelder.
     if (linje.haandtert_at) {
-      ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Angre «håndtert»"'
+      ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Angre kvitteringen"'
         + ' data-action="koAngreHaandtert" data-id="' + id + '"><i class="bi bi-arrow-counterclockwise"></i></button>';
     } else {
       ut += linje.haandtering_krevd_at
-        ? '<button type="button" class="btn btn-link btn-sm p-0" title="Ta av «krever håndtering»"'
+        ? '<button type="button" class="btn btn-link btn-sm p-0" title="Ta av «må kvitteres»"'
           + ' data-action="koFjernKrav" data-id="' + id + '"><i class="bi bi-exclamation-diamond-fill"></i></button>'
-        : '<button type="button" class="btn btn-link btn-sm p-0" title="Merk «krever håndtering»"'
+        : '<button type="button" class="btn btn-link btn-sm p-0" title="Merk «må kvitteres»"'
           + ' data-action="koKrevHaandtering" data-id="' + id + '"><i class="bi bi-exclamation-diamond"></i></button>';
-      ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Håndtert — mottatt og utført"'
+      ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Kvitter ut — mottatt og utført"'
         + ' data-action="koHaandtert" data-id="' + id + '"><i class="bi bi-check2-circle"></i></button>';
     }
   }
@@ -237,7 +237,7 @@ function koLinjeKnapper(linje) {
   return ut;
 }
 
-// **Venter linja på håndtering?** Merket «krever håndtering», ikke håndtert,
+// **Venter linja på kvittering?** Merket «må kvitteres», ikke kvittert ut,
 // ikke fjernet, og en manuell linje. Den ene regelen bak både uthevingen i
 // strømmen og boksen øverst — en egen funksjon, så den lar seg prøve.
 function koVenterPaaHaandtering(linje) {
@@ -245,17 +245,17 @@ function koVenterPaaHaandtering(linje) {
     && !linje.fjernet && linje.kilde !== 'system';
 }
 
-// Merket på linja: «Venter på håndtering», eller «✓ Håndtert av Kari 14:32».
+// Merket på linja: «Venter på kvittering», eller «✓ Kvittert ut av Kari 14:32».
 // Tomt ellers — en linje til info skal se ut som før.
 function koHaandteringMerke(linje) {
   if (linje.fjernet || linje.kilde === 'system') return '';
   if (linje.haandtert_at) {
     const av = linje.haandtert_av ? ' av ' + escapeHtml(linje.haandtert_av) : '';
-    return ' <span class="ls-haandtert-merke"><i class="bi bi-check2-circle me-1"></i>Håndtert'
+    return ' <span class="ls-haandtert-merke"><i class="bi bi-check2-circle me-1"></i>Kvittert ut'
       + av + ' ' + escapeHtml(koKlokke(linje.haandtert_at)) + '</span>';
   }
   if (koVenterPaaHaandtering(linje)) {
-    return ' <span class="ls-krever-merke"><i class="bi bi-exclamation-diamond-fill me-1"></i>Venter på håndtering</span>';
+    return ' <span class="ls-krever-merke"><i class="bi bi-exclamation-diamond-fill me-1"></i>Venter på kvittering</span>';
   }
   return '';
 }
@@ -302,11 +302,11 @@ function koFestetHtml(linje) {
 }
 
 // En linje som venter på håndtering, i boksen øverst: teksten, hvem som skrev
-// den og når, og «Håndtert». Den står der til noen har kvittert.
+// den og når, og «Kvitter ut». Den står der til noen har kvittert ut.
 function koVenterHtml(linje) {
   const knapp = koKanSkrive()
-    ? '<button type="button" class="btn btn-sm btn-outline-warning ms-auto ls-haandtert-knapp" title="Håndtert — mottatt og utført"'
-      + ' data-action="koHaandtert" data-id="' + escapeHtml(linje.id) + '"><i class="bi bi-check2-circle me-1"></i>Håndtert</button>'
+    ? '<button type="button" class="btn btn-sm btn-outline-warning ms-auto ls-haandtert-knapp" title="Kvitter ut — mottatt og utført"'
+      + ' data-action="koHaandtert" data-id="' + escapeHtml(linje.id) + '"><i class="bi bi-check2-circle me-1"></i>Kvitter ut</button>'
     : '';
   return '<div class="ls-venter"><i class="bi bi-exclamation-diamond-fill"></i>'
     + '<div>' + koLinjeTekst(linje) + ' <span class="hvem text-muted small">— '
@@ -404,7 +404,7 @@ function koTegnLogg() {
     return;
   }
   const venterHtml = venter.length
-    ? '<div class="ls-festet-hode ls-venter-hode"><i class="bi bi-exclamation-diamond-fill me-1"></i>Venter på håndtering</div>'
+    ? '<div class="ls-festet-hode ls-venter-hode"><i class="bi bi-exclamation-diamond-fill me-1"></i>Venter på kvittering</div>'
       + venter.map(koVenterHtml).join('')
     : '';
   const festetHtml = festede.length
@@ -664,7 +664,7 @@ async function koFest(id) { await _koFesting(id, 'fest'); }
 async function koLosne(id) { await _koFesting(id, 'losne'); }
 
 // Håndteringen (20. okt. 2026): samme form som festingen — svaret er linja, og
-// den byttes ut på plass. «Håndtert» løsner også en festet linje på serveren.
+// den byttes ut på plass. «Kvitter ut» løsner også en festet linje på serveren.
 async function _koHaandtering(id, sti, kropp) {
   const res = await apiFetch('/ko/api/logg/' + id + '/' + sti + '/', {
     method: 'POST', body: JSON.stringify(kropp),

@@ -1,4 +1,4 @@
-"""«Krever håndtering» og «Håndtert» på manuelle logglinjer (20. okt. 2026).
+"""«Må kvitteres» og «Kvitter ut» på manuelle logglinjer (20. okt. 2026) — internt `haandtering`.
 
 André: «Av og til skriver jo våre representant i LSKO et logginnlegg med noe som er til info
 for oss, som kanskje ikke haster og heller ikke er en hendelse … er det nyttig at vi kan markere
@@ -196,8 +196,8 @@ class EndepunkteneTests(_Grunnlag):
                                      krever_haandtering=True)
         services.haandter(self.linje, bruker=self.andre)
         side = self.klient.get('/ko/utskrift/').content.decode()
-        self.assertIn('venter på håndtering', side)
-        self.assertIn('håndtert av ko2', side)
+        self.assertIn('venter på kvittering', side)
+        self.assertIn('kvittert ut av ko2', side)
         self.assertTrue(aapen.krever_haandtering)
 
 
@@ -252,11 +252,11 @@ class LinjaJsTests(SimpleTestCase):
             ]));""")
         vanlig, venter, haandtert = json.loads(ut.splitlines()[0])
         self.assertNotIn('ls-krever', vanlig)
-        self.assertNotIn('håndtering', vanlig.replace('krever håndtering', '').replace('«krever håndtering»', ''),
-                         'en linje til info ser ut som før')
+        self.assertNotIn('Venter på kvittering', vanlig, 'en linje til info ser ut som før')
+        self.assertNotIn('Kvittert ut', vanlig)
         self.assertIn('ls-krever', venter)
-        self.assertIn('Venter på håndtering', venter)
-        self.assertIn('Håndtert av &lt;img', haandtert)
+        self.assertIn('Venter på kvittering', venter)
+        self.assertIn('Kvittert ut av &lt;img', haandtert)
         self.assertNotIn('<img', haandtert)
         self.assertNotIn('ls-krever', haandtert)
 
@@ -311,7 +311,8 @@ class BoksenOeverstJsTests(SimpleTestCase):
         foer, etter = json.loads(run_node(harness, kode, preamble='const window = {MODUL_TILGANG: {ko: "skriv_full"}};\n')
                                  .splitlines()[0])
         venter = foer[:foer.index('Festet</div>')]
-        self.assertIn('Venter på håndtering', venter)
+        self.assertIn('Venter på kvittering', venter)
+        self.assertIn('>Kvitter ut</button>', venter)
         self.assertLess(venter.index('Eldst'), venter.index('Nyest'), 'eldste først')
         self.assertNotIn('Ferdig', venter)
         self.assertIn('data-action="koHaandtert" data-id="1"', venter)

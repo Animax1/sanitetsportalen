@@ -348,7 +348,7 @@ def _kan_haandteres(linje):
     """Bare manuelle, gjeldende linjer med innhold. En rettet linje er ikke den
     gjeldende — skjermen viser rettingen, og den har arvet merket."""
     if linje.kilde == KILDE_SYSTEM:
-        raise Ugyldig('Systemlinjer håndteres ikke; de sier hva som skjedde.')
+        raise Ugyldig('Systemlinjer kvitteres ikke; de sier hva som skjedde.')
     if linje.er_fjernet:
         raise Ugyldig('Linja er fjernet.')
     if Logglinje.objects.filter(korrigerer=linje).exists():
