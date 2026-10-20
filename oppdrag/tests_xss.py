@@ -152,7 +152,8 @@ REVIEWED_INTERPOLATIONS = {
     'posdeling': 'ferdig markup fra posisjonsdelingIkon(), som skannes for seg',
     'hent': 'ferdig markup fra hentPosisjonKnapp(), som skannes for seg',
     'henting': 'ferdig markup fra hentingLinje(), som skannes for seg',
-    'knapp': 'oppdragsnotatet: «Endre»/«Legg til»-knappen bygget lokalt, faste tekster fra en ternær',
+    'knapp': 'oppdragsnotatet: «Endre»-knappen bygget lokalt, fast tekst fra en ternær',
+    'leggTil': 'oppdragsnotatet uten notat: «Legg til»-knappen bygget lokalt, fast tekst fra en ternær',
     'besetning': 'ferdig markup fra mkBesetning(), som skannes for seg',
     # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
     # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter

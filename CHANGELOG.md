@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — Oppdragsnotatet i en blå boks over hendelsen  `#ko/sentralbordet`
+
+André: «Oppdragsnotat på et oppdrag må være mer synlig. Nå kommer det etter mye tekst og innhold
+fra loggen til knyttet hendelse. Oppdragsnotatet er viktig å lett få øye på og lese kjapt. Bør
+plasseres over hendelse, og gjerne rammet inn i en liten boks for å fremheve den bedre.» Fem
+skisser fra den ekte siden; han valgte **B og E**: «Fargen er fin.»
+
+- **Notatet står rett under verdiene** (hastegrad, problemstilling, sted, enhet) og **over
+  hendelsen**, i en blå boks med «OPPDRAGSNOTAT» i hodet og større tekst. Før sto det under
+  hendelsesvalget, lagene og alle linjene fra hendelsens logg — jo mer som skjedde, jo lenger ned.
+- **Uten notat** er det en tynn stiplet linje, «Ingen oppdragsnotat · Legg til», så en tom boks ikke
+  tar plassen. Redigeringen står i samme boks.
+- **Blått** fordi rødt og oransje alt betyr noe i KO: Akutt og «Venter på kvittering».
+- Gjelder detaljvinduet både i `/ko/` og `/oppdrag/` (`_notatHtml` i `oppdrag-sentral-oppdrag.js`,
+  stilen i `oppdrag.css`). Ikke skisse C (over verdiene, skjøv hastegrad og sted ned) eller D (loggen
+  fra hendelsen foldet — de delte linjene er det bilen ser, og å skjule dem er en egen avgjørelse).
+- `oppdrag/tests_notat_synlig.py` går gjennom den ekte `visOppdrag()`: rekkefølgen, boks mot stiplet
+  linje, og ingen knapp for den som bare leser. **3 mutanter, alle drept.**
+
 ## 2026-10-20 — KO: «Ny hendelse fra oppdraget»  `#ko/hendelseslogg`
 
 André: «Det skjer at vi lager et oppdrag som man tror er et enkelt oppdrag, men så ser man

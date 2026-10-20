@@ -325,6 +325,24 @@
   white-space: pre-wrap;
 }
 
+/* Oppdragsnotatet i detaljvinduet (20. okt. 2026, skisse B og E): blå boks over
+   hendelsen, større tekst; uten notat en tynn stiplet linje. */
+.oppdrag-notat-boks {
+  border: 1px solid #38bdf8; border-left: 4px solid #38bdf8; border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08); padding: 0.5rem 0.75rem;
+}
+.oppdrag-notat-hode {
+  display: flex; gap: 0.4rem; align-items: center;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+  font-weight: 600; color: #7dd3fc;
+}
+.oppdrag-notat-hode .btn-link { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 0.8rem; }
+.oppdrag-notat-boks .oppdrag-fritekst { font-size: 1rem; color: #f1f5f9; margin-top: 0.2rem; }
+.oppdrag-notat-tom {
+  border: 1px dashed #475569; border-radius: 8px; padding: 0.3rem 0.75rem;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+
 /* ── Flere enheter på ett oppdrag (11. sep. 2026) ────────────────────────── */
 
 /* Mens «Endre status» står åpent på én rad, skjules knappene på de andre:

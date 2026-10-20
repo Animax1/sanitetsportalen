@@ -520,11 +520,11 @@ async function visOppdrag(id) {
   innhold.innerHTML = (`
     <div class="oppdrag-verdier mb-2" id="oppdrag-verdier">${_verdierHtml(o, null, OPPDRAG_TILGANG.kanSkrive)}</div>
     <div class="text-danger small mb-2 d-none" id="verdi-feil"></div>
+    <div id="oppdrag-notat">${_notatHtml(o, false, OPPDRAG_TILGANG.kanSkrive)}</div>
     ${hendelseValg}
     ${hendelseinfo}
     ${lagBlokk}
     ${beskrivelse}
-    <div id="oppdrag-notat">${_notatHtml(o, false, OPPDRAG_TILGANG.kanSkrive)}</div>
     <h6 class="text-muted">Enheter</h6>
     <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>
     <h6 class="text-muted">Tidslinje</h6>
@@ -1036,10 +1036,16 @@ async function lagreVerdi(felt) {
 }
 
 // Oppdragsnotatet: alltid synlig, redigeres der det står.
+//
+// **I en blå boks rett under verdiene, over hendelsen** (André, 20. okt. 2026:
+// «Oppdragsnotat på et oppdrag må være mer synlig. Nå kommer det etter mye
+// tekst og innhold fra loggen til knyttet hendelse» — skisse B). Uten notat er
+// det en tynn stiplet linje (skisse E), så en tom boks ikke tar plassen. Blått
+// fordi rødt og oransje alt betyr noe i KO: Akutt og «Venter på kvittering».
 function _notatHtml(o, aapen, kanSkrive) {
   if (aapen && kanSkrive) {
-    return `<div class="oppdrag-notat mb-3">
-        <label class="form-label small mb-1" for="notat-felt">Oppdragsnotat</label>
+    return `<div class="oppdrag-notat oppdrag-notat-boks mb-3">
+        <label class="oppdrag-notat-hode mb-1" for="notat-felt"><i class="bi bi-sticky"></i>Oppdragsnotat</label>
         <textarea id="notat-felt" class="form-control form-control-sm" rows="3">${escapeHtml(o.fritekst || '')}</textarea>
         <div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes, og slettes når oppdraget har stått urørt i fristen.</div>
         <div class="d-flex gap-2 justify-content-end mt-1">
@@ -1048,13 +1054,18 @@ function _notatHtml(o, aapen, kanSkrive) {
         </div>
       </div>`;
   }
+  if (!o.fritekst) {
+    const leggTil = kanSkrive
+      ? ' · <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-action="visNotat">Legg til</button>'
+      : '';
+    return `<div class="oppdrag-notat oppdrag-notat-tom mb-3"><i class="bi bi-sticky me-1"></i>Ingen oppdragsnotat${leggTil}</div>`;
+  }
   const knapp = kanSkrive
-    ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visNotat">${o.fritekst ? 'Endre' : 'Legg til'}</button>`
+    ? '<button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-action="visNotat">Endre</button>'
     : '';
-  const notatTekst = o.fritekst
-    ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>${notatSlettesHtml(o)}`
-    : '<div class="oppdrag-meta">Ingen oppdragsnotat.</div>';
-  return `<div class="oppdrag-notat mb-3"><div class="oppdrag-meta small">Oppdragsnotat${knapp}</div>${notatTekst}</div>`;
+  return `<div class="oppdrag-notat oppdrag-notat-boks mb-3">`
+    + `<div class="oppdrag-notat-hode"><i class="bi bi-sticky"></i>Oppdragsnotat${knapp}</div>`
+    + `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>${notatSlettesHtml(o)}</div>`;
 }
 
 function _tegnNotat() {
