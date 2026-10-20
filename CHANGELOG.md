@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — «Kan ikke flytte»: plasser() mistet transaksjonen sin  `#ko/ressursbildet`
+
+André: «Jeg har et lag jeg ikke får flytte og får feilmelding kan ikke flytte.» Feilvarselet:
+`TransactionManagementError: select_for_update cannot be used outside of a transaction` fra
+`POST /ko/api/tavle/plasser/` (500). **Ingen ressurs kunne flyttes på tavla** — verken til et sted
+eller til pause — fra a3e70e6 gikk ut på staging.
+
+- **Årsak, min feil:** i a3e70e6 la jeg `paa_pause()` inn mellom `@transaction.atomic` og
+  `def plasser(...)`. Dekoratøren satt da på den nye lesefunksjonen, og `plasser()` låste forrige
+  plassering med `select_for_update` uten transaksjon. Flyttet tilbake.
+- **Hvorfor suiten var grønn:** `TestCase` kjører hver test inne i en transaksjon, så
+  `select_for_update` klager aldri der. Og på SQLite er den en no-op uansett. Jeg traff samme feil
+  da jeg sådde demobasen, og pakket kallene i en transaksjon i stedet for å spørre hvorfor —
+  signalet var der.
+- **`ko/tests_tavle_transaksjon.py`** er en `TransactionTestCase`: forespørselen kjører i
+  autocommit, som i drift — plasser, flytt og pause gjennom endepunktet, og tjenesten direkte.
+  **Mutant (dekoratøren fjernet): drept** på PostgreSQL, 1 feil og 4 errors.
+- **De andre `select_for_update`-stedene uten egen dekoratør er gått gjennom** (`_tell` i
+  `oppdrag/bro.py`, `_laas_ressursens`, `program.folg`, `core.vakt.gjor_aktiv`/`laas_aktiv_vakt`):
+  alle kalles inne i en transaksjon.
+
 ## 2026-10-20 — Tavla finner bilene som besetningen finner dem  `#ko/ressursbildet`
 
 André, om ambulansene som ikke sto på tavla: «Men dette var koblede biler som er på vakt.»

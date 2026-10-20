@@ -188,7 +188,6 @@ def _stedsnavn(plassering) -> str:
     return 'Pause' if plassering.pause else plassering.lokasjon_navn
 
 
-@transaction.atomic
 def paa_pause(vakt) -> list[dict]:
     """Hvem står i Pause-raden **nå**: den åpne plasseringen med `pause` (20. okt. 2026).
 
@@ -213,6 +212,7 @@ def paa_pause(vakt) -> list[dict]:
     } for p in rader]
 
 
+@transaction.atomic
 def plasser(vakt, ressurs, *, bruker, lokasjon=None, pause=False, naa=None) -> Tavleplassering:
     """Sett en **ledig** ressurs på en lokasjon, eller i pause, fra **nå**.
 
