@@ -366,13 +366,15 @@ function koTavleRader(data, vindu, filter) {
 // Bilene på vakt som ikke kan stå på tavla (20. okt. 2026): ingen ressurs i vaktlista peker på
 // dem, og en plassering peker på ressursen. Nederst i «Uten plass», med navn og hvor de kobles —
 // ellers var de synlige i ressursoversikten og borte her uten at noe sa hvorfor.
-function koTavleUkobledeHtml(navn) {
-  if (!navn || !navn.length) return '';
+// **Med grunnen per bil** (20. okt. 2026): «ikke koblet» eller «koblet i vakta X, som ikke er i
+// drift» — det første svaret var feil for den andre, og da leter man etter en feil som ikke finnes.
+function koTavleUkobledeHtml(biler) {
+  if (!biler || !biler.length) return '';
   return '<div class="ko-tavle-ukoblet small text-muted mt-2">'
     + '<div class="ko-tavle-overskrift">Ikke på tavlen</div>'
-    + navn.map((n) => '<div>' + escapeHtml(n) + '</div>').join('')
-    + '<div class="mt-1">På vakt, men ikke koblet til en enhet i vaktlisten — '
-    + 'koble dem i «Rediger enhet» → «Koble til delt konto».</div></div>';
+    + biler.map((b) => '<div><b>' + escapeHtml(b.navn) + '</b> — ' + escapeHtml(b.grunn) + '</div>').join('')
+    + '<div class="mt-1">På vakt i oppdrag, men uten enhet i vaktlisten som er i bruk. '
+    + 'Koble i «Rediger enhet» → «Koble til delt konto».</div></div>';
 }
 
 // «Uten plass»: de ledige som ikke står noe sted, og de opptatte — som ikke

@@ -78,14 +78,23 @@ def ressurser_paa_tavla(naa=None, *, med_biler=True):
         return []
     utvalg = Q(pk__in=ressurser_paa_vakt_naa(liste, naa).values('pk'))
     if med_biler:
-        utvalg |= Q(vaktliste=liste, enhet__isnull=False, enhet__pa_vakt=True,
-                    enhet__er_aktiv=True)
+        # **Bilene finnes som besetningen finner dem** (20. okt. 2026), ikke bare i lista i bruk:
+        # `bilressurser()` er én regel for ressursoversikten og tavla.
+        utvalg |= Q(pk__in=[r.pk for r in _bilressurser_paa_vakt().values()])
     return list(Ressurs.objects.filter(utvalg)
                 .select_related('gruppe', 'enhet')
                 .order_by('gruppe__rekkefolge', Norsk('gruppe__navn'), 'rekkefolge', Norsk('navn')))
 
 
-def ukoblede_enheter() -> list[str]:
+def _bilressurser_paa_vakt() -> dict:
+    """``{enhet_id: Ressurs}`` for de aktive bilene på vakt, etter `vaktdrift.bilressurser()`."""
+    from oppdrag.models import Enhet
+    from vaktliste.vaktdrift import bilressurser
+
+    return bilressurser(Enhet.objects.filter(er_aktiv=True, pa_vakt=True).values_list('pk', flat=True))
+
+
+def ukoblede_enheter() -> list[dict]:
     """Bilene på vakt som tavla **ikke** kan vise: ingen ressurs i vaktlista peker på dem
     (20. okt. 2026).
 
@@ -94,16 +103,22 @@ def ukoblede_enheter() -> list[str]:
     ressursoversikten viser alle enhetene på vakt. Uten koblingen var ambulansen synlig der og
     borte her, uten at noe sa hvorfor. Lista er det tavla sier fra med; selve koblingen er
     vaktlistas («Rediger enhet» → «Koble til delt konto»).
+
+    **Med grunnen** (20. okt. 2026): «ikke koblet» var feil for en bil koblet i en vakt som
+    ikke er i drift, og det var nettopp den feilmeldingen `koblet_i_annen_vakt()` ble laget
+    for å unngå. Spørringen per bil kjøres bare for dem som mangler, og det er unntaket.
     """
     from oppdrag.models import Enhet
-    from vaktliste.models import Ressurs
-    from vaktliste.vaktdrift import vaktliste_i_bruk
+    from vaktliste.vaktdrift import koblet_i_annen_vakt
 
-    liste = vaktliste_i_bruk()
-    koblet = (Ressurs.objects.filter(vaktliste=liste, enhet__isnull=False).values('enhet_id')
-              if liste is not None else Ressurs.objects.none().values('enhet_id'))
-    return list(Enhet.objects.filter(er_aktiv=True, pa_vakt=True).exclude(pk__in=koblet)
-                .order_by(Norsk('navn')).values_list('navn', flat=True))
+    funnet = _bilressurser_paa_vakt()
+    ut = []
+    for pk, navn in (Enhet.objects.filter(er_aktiv=True, pa_vakt=True).exclude(pk__in=list(funnet))
+                     .order_by(Norsk('navn')).values_list('pk', 'navn')):
+        annen = koblet_i_annen_vakt(pk)
+        ut.append({'navn': navn, 'grunn': (f'koblet i vakten «{annen}», som ikke er i drift'
+                                           if annen else 'ikke koblet i vaktlisten')})
+    return ut
 
 
 def opptatt(ressurser, vakt) -> dict:
@@ -883,7 +898,13 @@ def _planbare(med_biler) -> list[dict]:
     if liste is None:
         return []
     qs = Ressurs.objects.filter(vaktliste=liste).select_related('gruppe')
-    if not med_biler:
+    if med_biler:
+        # Bilene som besetningen finner dem, også fra en annen liste i drift (20. okt. 2026).
+        from django.db.models import Q
+        qs = Ressurs.objects.filter(
+            Q(vaktliste=liste) | Q(pk__in=[r.pk for r in _bilressurser_paa_vakt().values()])
+        ).select_related('gruppe')
+    else:
         qs = qs.filter(enhet__isnull=True)
     return [{'id': r.pk, 'navn': r.navn, 'gruppe_id': r.gruppe_id, 'bil': r.enhet_id is not None}
             for r in qs.order_by('gruppe__rekkefolge', Norsk('gruppe__navn'), 'rekkefolge', Norsk('navn'))]

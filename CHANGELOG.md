@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — Tavla finner bilene som besetningen finner dem  `#ko/ressursbildet`
+
+André, om ambulansene som ikke sto på tavla: «Men dette var koblede biler som er på vakt.»
+Forklaringen jeg ga — at de manglet kobling — var feil for hans biler.
+
+**Uoverensstemmelsen:** besetningen i ressursoversikten (`vaktdrift.besetning()`) fant bilens
+ressurs i **hvilken som helst** liste i drift, ellers i den aktive vaktens; tavla lette bare i
+`vaktliste_i_bruk()` — **én** liste, den sist satt i drift. Står ambulansene i en annen liste i drift
+enn lagene, var de synlige med besetning i ressursoversikten og borte på tavla. Verre: meldingen
+fra forrige endring ville kalt dem «ikke koblet».
+
+- **`vaktdrift.bilressurser(enhet_ider)`** er regelen, i bulk, og `besetning()` bruker den nå —
+  ressursoversikten og tavla viser samme ressurs for samme bil. Prioriteringen er den gamle: en
+  liste i drift i portalen, sist satt i drift først; ellers den aktive vaktens.
+- **Tavla og pauseskjemaet** (`ressurser_paa_tavla`, `_planbare`) tar bilene derfra.
+- **«Ikke på tavlen» sier grunnen per bil:** «ikke koblet i vaktlisten», eller «koblet i vakten
+  «Oktobervakta», som ikke er i drift» (`koblet_i_annen_vakt()`, laget for nettopp denne
+  feilmeldingen 30. aug.). Står en bil på vakt verken på tavla eller i den lista, ligger feilen et
+  annet sted — og da vil jeg vite det.
+- **Dette er en sannsynlig forklaring, ikke en bekreftet:** jeg ser ikke dataene på staging.
+  Uoverensstemmelsen er ekte og rettet uansett.
+- 6 nye tester, blant dem to lister i drift med ambulansen i den eldste. **8 mutanter, alle
+  drept** — én overlevde først: at den sist satte lista vinner når bilen er koblet i begge. Den
+  regelen sto i `besetning()` før, og var udekket der også.
+
+---
+
 ## 2026-10-20 — Tavla: ambulansene kan få pause, og ukoblede biler meldes  `#ko/ressursbildet`
 
 André: «Veldig bra men vi får ikke sett ambulansene, vi må kunne gi dem pause og.»

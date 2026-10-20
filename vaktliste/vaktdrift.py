@@ -226,6 +226,39 @@ def vaktliste_i_bruk():
     return Vaktliste.objects.filter(vakt=vakt).select_related('vakt').first()
 
 
+def bilressurser(enhet_ider) -> dict:
+    """``{enhet_id: Ressurs}`` — vaktlisteressursen hver bil hører til **nå** (20. okt. 2026).
+
+    **Én regel, to lesere:** `besetning()` (ressursoversikten) og KO-tavla. Tavla lette bare i
+    `vaktliste_i_bruk()` — én liste — mens besetningen lette i alle lister i drift. Sto
+    ambulansene i en annen liste i drift enn lagene, var de synlige med besetning i
+    ressursoversikten og borte på tavla (André: «dette var koblede biler som er på vakt»).
+
+    Samme prioritering som før, per enhet: en liste i drift i portalen, sist satt i drift
+    først; ellers den aktive vaktas liste. En liste i drift der enheten *ikke* er koblet, står
+    ikke i veien for en der hun er — det er forskjellen fra `vaktliste_i_bruk()` (17. sep. 2026).
+    """
+    from core.vakt import hent_aktiv_vakt
+
+    ider = list(enhet_ider)
+    if not ider:
+        return {}
+    vakt = hent_aktiv_vakt()
+    ut = {}
+    i_drift = (Ressurs.objects
+               .filter(enhet_id__in=ider, vaktliste__in=lister_i_drift(vakt.portal))
+               .select_related('vaktliste__vakt', 'gruppe', 'enhet')
+               .order_by('-vaktliste__satt_i_drift_at', '-vaktliste__pk', 'pk'))
+    for r in i_drift:
+        ut.setdefault(r.enhet_id, r)
+    rest = [i for i in ider if i not in ut]
+    if rest and vakt is not None:
+        for r in (Ressurs.objects.filter(enhet_id__in=rest, vaktliste__vakt=vakt)
+                  .select_related('vaktliste__vakt', 'gruppe', 'enhet').order_by('pk')):
+            ut.setdefault(r.enhet_id, r)
+    return ut
+
+
 def besetning(enhet_id, naa=None):
     """Hvem som er på bilen nå — navn, rolle og innsjekkstatus.
 
@@ -261,14 +294,9 @@ def besetning(enhet_id, naa=None):
     # der enheten ikke er koblet skal ikke komme i veien for en der hun er.
     # Et forsøk på å slå de to sammen (17. sep. 2026) gjorde nettopp det, og
     # suiten var grønn — ingen test hadde to lister i drift samtidig.
-    kandidater = (Ressurs.objects
-                  .filter(enhet_id=enhet_id)
-                  .select_related('vaktliste__vakt'))
-    # Samme utvalg og samme rekkefølge som `vaktliste_i_bruk()` (A6): står to
-    # lister i drift, skal sentralbordet og KO vise samme liste for samme bil.
-    ressurs = (kandidater.filter(vaktliste__in=lister_i_drift(vakt.portal))
-               .order_by('-vaktliste__satt_i_drift_at', '-vaktliste__pk').first()
-               or (kandidater.filter(vaktliste__vakt=vakt).first() if vakt else None))
+    # Regelen står i `bilressurser()` (20. okt. 2026), så sentralbordet og KO-tavla viser
+    # samme ressurs for samme bil — også når to lister står i drift.
+    ressurs = bilressurser([enhet_id]).get(enhet_id)
     if ressurs is None:
         return None
 

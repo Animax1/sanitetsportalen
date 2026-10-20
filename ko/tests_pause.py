@@ -16,6 +16,9 @@ from ko import tavle
 from ko.models import Tavleplassering
 from patients.js_test_utils import KO_JS, PORTAL_UTILS_JS, build_harness, run_node
 
+from vaktliste.models import Vaktliste
+from vaktliste.test_helpers import lag_ressurs
+
 from .tests_hendelseslogg import _bruker, _gi
 from .tests_tavle import _Grunnlag
 
@@ -247,19 +250,79 @@ class BilenKanFaaPauseTests(_Grunnlag):
         (p,) = tavle.paa_pause(self.vakt)
         self.assertEqual((p['ressurs_id'], p['enhet_id']), (self.bil.pk, self.enhet.pk))
 
-    def test_ukoblet_bil_paa_vakt_meldes(self):
+    def test_ukoblet_bil_paa_vakt_meldes_med_grunnen(self):
         from oppdrag.models import Enhet
         Enhet.objects.create(navn='Ambulanse 9', pa_vakt=True)
         Enhet.objects.create(navn='Ambulanse 8', pa_vakt=False)
         Enhet.objects.create(navn='Ambulanse 7', pa_vakt=True, er_aktiv=False)
-        self.assertEqual(tavle.ukoblede_enheter(), ['Ambulanse 9'],
+        self.assertEqual(tavle.ukoblede_enheter(),
+                         [{'navn': 'Ambulanse 9', 'grunn': 'ikke koblet i vaktlisten'}],
                          'koblet (HGSD 56), av vakt og pensjonert meldes ikke')
+
+    def test_koblet_i_en_vakt_som_ikke_er_i_drift_sier_det(self):
+        """«Ikke koblet» var feil svar her — det er feilmeldingen `koblet_i_annen_vakt()` ble
+        laget for å unngå (30. aug. 2026)."""
+        from oppdrag.models import Enhet
+        from vaktliste import services as vservices
+        okt = vservices.opprett_planlagt_vakt('Oktobervakta')
+        bil = Enhet.objects.create(navn='Ambulanse 9', pa_vakt=True)
+        lag_ressurs(vaktliste=okt, navn='Ambulanse 9', enhet=bil)
+        (b,) = tavle.ukoblede_enheter()
+        self.assertIn('Oktobervakta', b['grunn'])
+        self.assertIn('ikke er i drift', b['grunn'])
 
     def test_tavla_bærer_lista_bare_med_oppdragstilgang(self):
         from oppdrag.models import Enhet
         Enhet.objects.create(navn='Ambulanse 9', pa_vakt=True)
-        self.assertEqual(tavle.tavle_data(self.vakt)['ukoblede_enheter'], ['Ambulanse 9'])
+        self.assertEqual([b['navn'] for b in tavle.tavle_data(self.vakt)['ukoblede_enheter']],
+                         ['Ambulanse 9'])
         self.assertEqual(tavle.tavle_data(self.vakt, med_biler=False)['ukoblede_enheter'], [])
+
+
+class BilenFinnesSomBesetningenFinnerDenTests(_Grunnlag):
+    """André: «dette var koblede biler som er på vakt» (20. okt. 2026). To lister i drift:
+    lagene i den ene, ambulansen i den andre. Besetningen lette i alle lister i drift, tavla bare
+    i den nyeste — så ambulansen var synlig i ressursoversikten og borte på tavla."""
+
+    def setUp(self):
+        super().setUp()
+        from oppdrag.models import Enhet
+        from vaktliste import choices as vchoices
+        from vaktliste import services as vservices
+        naa = timezone.now()
+        Vaktliste.objects.filter(pk=self.vl.pk).update(status=vchoices.DRIFT, satt_i_drift_at=naa)
+        self.annen = vservices.opprett_planlagt_vakt('Ambulansene')
+        Vaktliste.objects.filter(pk=self.annen.pk).update(
+            status=vchoices.DRIFT, satt_i_drift_at=naa - timedelta(hours=1))
+        self.enhet2 = Enhet.objects.create(navn='Ambulanse 2', pa_vakt=True)
+        self.bil2 = lag_ressurs(vaktliste=self.annen, navn='Ambulanse 2', enhet=self.enhet2)
+
+    def test_ambulansen_i_den_andre_lista_staar_paa_tavla(self):
+        ider = {r.pk for r in tavle.ressurser_paa_tavla()}
+        self.assertIn(self.bil2.pk, ider)
+        self.assertIn(self.lag1.pk, ider, 'lagene står der de sto')
+        self.assertNotIn('Ambulanse 2', [b['navn'] for b in tavle.ukoblede_enheter()])
+
+    def test_og_den_kan_faa_pause(self):
+        self._plasser(self.bil2, pause=True)
+        self.assertEqual([p['enhet_id'] for p in tavle.paa_pause(self.vakt)], [self.enhet2.pk])
+
+    def test_den_kan_planlegges(self):
+        ider = {r['id'] for r in tavle.tavle_data(self.vakt)['alle_ressurser']}
+        self.assertIn(self.bil2.pk, ider)
+
+    def test_koblet_i_begge_listene_vinner_den_sist_satt_i_drift(self):
+        """Regelen sto i `besetning()` før, og var udekket der også (funnet av en mutant)."""
+        from vaktliste.vaktdrift import bilressurser
+        nyest = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 2 (ny liste)', enhet=self.enhet2)
+        self.assertEqual(bilressurser([self.enhet2.pk])[self.enhet2.pk].pk, nyest.pk)
+        ider = {r.pk for r in tavle.ressurser_paa_tavla()}
+        self.assertIn(nyest.pk, ider)
+        self.assertNotIn(self.bil2.pk, ider, 'samme bil står ikke to ganger på tavla')
+
+    def test_besetningen_og_tavla_finner_samme_ressurs(self):
+        from vaktliste.vaktdrift import bilressurser
+        self.assertEqual(bilressurser([self.enhet2.pk])[self.enhet2.pk].pk, self.bil2.pk)
 
 
 class UkobledeJsTests(SimpleTestCase):
@@ -271,9 +334,10 @@ class UkobledeJsTests(SimpleTestCase):
         ))
 
     def test_navnene_og_veien_til_koblingen(self):
-        ut = run_node(self.harness, "console.log(JSON.stringify([koTavleUkobledeHtml(['Amb <9>']),"
+        ut = run_node(self.harness, "console.log(JSON.stringify([koTavleUkobledeHtml([{navn: 'Amb <9>', grunn: 'ikke koblet'}]),"
                                     " koTavleUkobledeHtml([]), koTavleUkobledeHtml(undefined)]));")
         med, tom, mangler = json.loads(ut.splitlines()[0])
         self.assertIn('Amb &lt;9&gt;', med)
+        self.assertIn('ikke koblet', med)
         self.assertIn('Koble til delt konto', med)
         self.assertEqual((tom, mangler), ('', ''))

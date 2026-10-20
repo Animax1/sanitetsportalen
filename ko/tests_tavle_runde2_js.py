@@ -172,7 +172,7 @@ class TidsvinduetJsTests(SimpleTestCase):
         """Kallstedet (20. okt. 2026): bilene på vakt uten ressurs i vaktlista står nederst i
         «Uten plass», så de ikke er borte uten at noe sier hvorfor."""
         ut = self._kjor("""
-            koTavle = Object.assign({}, DATA, { ukoblede_enheter: ['Ambulanse 9'] });
+            koTavle = Object.assign({}, DATA, { ukoblede_enheter: [{navn: 'Ambulanse 9', grunn: 'ikke koblet'}] });
             Date.now = () => NAA;
             koTegnTavle();
             const html = ELS['ko-tavle'].innerHTML;
