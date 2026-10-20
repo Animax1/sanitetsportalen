@@ -51,6 +51,7 @@ from __future__ import annotations
 
 
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils.dateparse import parse_datetime
@@ -131,6 +132,10 @@ def _til_dict(linje):
         # sier hvem. Tom/`''` når linja ikke er festet.
         'festet_at': linje.festet_at.isoformat() if linje.festet_at else '',
         'festet_av': linje.festet_av_navn,
+        # «Krever håndtering» og «Håndtert» (20. okt. 2026). Tom når ikke satt.
+        # Tilstanden sendes hel i `haandtering` på hver poll, som `festede`.
+        **_haandtering_dict(linje.haandtering_krevd_at, linje.haandtering_krevd_av_navn,
+                            linje.haandtert_at, linje.haandtert_av_navn),
         # Deling med enhetene (19. sep. 2026): `delt_at` når linja er delt
         # med alle oppdrag i hendelsen, `delt_med` oppdragene den er delt
         # med enkeltvis. Tilstanden sendes hel i `delte` på hver poll; her
@@ -138,6 +143,15 @@ def _til_dict(linje):
         'delt_at': linje.delt_at.isoformat() if linje.delt_at else None,
         'delt_av': linje.delt_av_navn,
         'delt_med': sorted(d.oppdrag_id for d in linje.delinger.all()),
+    }
+
+
+def _haandtering_dict(krevd_at, krevd_av, haandtert_at, haandtert_av) -> dict:
+    return {
+        'haandtering_krevd_at': krevd_at.isoformat() if krevd_at else '',
+        'haandtering_krevd_av': krevd_av,
+        'haandtert_at': haandtert_at.isoformat() if haandtert_at else '',
+        'haandtert_av': haandtert_av,
     }
 
 
@@ -457,11 +471,22 @@ def logg_view(request):
         .filter(vakt=vakt, festet_at__isnull=False)
         .values_list('pk', 'festet_at', 'festet_av_navn')
     ]
+    # Håndteringen (20. okt. 2026) av samme grunn: merket, kvitteringen og
+    # angringen endrer en rad uten ny id. Bare linjene der noe er satt.
+    haandtering = [
+        {'id': pk, **_haandtering_dict(krevd_at, krevd_av, h_at, h_av)}
+        for pk, krevd_at, krevd_av, h_at, h_av in Logglinje.objects
+        .filter(vakt=vakt)
+        .filter(Q(haandtering_krevd_at__isnull=False) | Q(haandtert_at__isnull=False))
+        .values_list('pk', 'haandtering_krevd_at', 'haandtering_krevd_av_navn',
+                     'haandtert_at', 'haandtert_av_navn')
+    ]
     return JsonResponse({
         'status': 'ok',
         'data': linjer,
         'fjernede': fjernede,
         'festede': festede,
+        'haandtering': haandtering,
         'vakt': vakt.navn,
         # Hele lista hver gang, som `fjernede`: en hendelse som lukkes eller
         # omdøpes får ingen ny id, og ville aldri kommet gjennom `?siden=`.
@@ -517,6 +542,7 @@ def logg_skriv_view(request):
             ansvarsomraade=data.get('ansvarsomraade'),
             uformell=bool(data.get('uformell')),
             hendelse=hendelse,
+            krever_haandtering=bool(data.get('krever_haandtering')),
         )
     except services.Ugyldig as feil:
         return json_feil(str(feil))
@@ -543,6 +569,46 @@ def logg_fest_view(request, pk):
 def logg_losne_view(request, pk):
     linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
     services.losne_linje(linje, bruker=request.user)
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_krever_haandtering', rate='60/m', method='POST')
+def logg_krever_haandtering_view(request, pk):
+    """`{"krever": true}` merker linja «Krever håndtering», `false` tar merket av
+    (20. okt. 2026). «Føre loggen», som festingen — en beskjed på en felles tavle."""
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
+    krever = json_body(request).get('krever')
+    if not isinstance(krever, bool):
+        return json_feil('Send «krever» som true eller false.')
+    try:
+        if krever:
+            services.krev_haandtering(linje, bruker=request.user)
+        else:
+            services.fjern_krav(linje, bruker=request.user)
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_haandtert', rate='60/m', method='POST')
+def logg_haandtert_view(request, pk):
+    """`{"haandtert": true}` kvitterer linja — mottatt og utført — og løsner den
+    om den er festet; `false` angrer (20. okt. 2026)."""
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
+    haandtert = json_body(request).get('haandtert')
+    if not isinstance(haandtert, bool):
+        return json_feil('Send «haandtert» som true eller false.')
+    try:
+        if haandtert:
+            services.haandter(linje, bruker=request.user)
+        else:
+            services.angre_haandtert(linje, bruker=request.user)
+    except services.Ugyldig as feil:
+        return json_feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 

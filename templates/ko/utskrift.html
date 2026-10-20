@@ -251,7 +251,7 @@
         <td class="tid">{{ l.tid|date:"H:i" }}</td>
         <td class="nr">{% if l.hendelse_nummer %}H{{ l.hendelse_nummer }}{% endif %}</td>
         <td class="hvem">{% if l.systemkode %}System{% else %}{{ l.forfatter|default:"–" }}{% if l.delt_konto %} <span class="merke">delt konto</span>{% endif %}{% if l.ansvarsomraade %}<br><span class="dempet">{{ l.ansvarsomraade }}</span>{% endif %}{% endif %}</td>
-        <td class="tekst">{% if l.fjernet %}<span class="tom">Innholdet er fjernet av {{ l.fjernet_av|default:"–" }} {{ l.fjernet_tid|date:"j.n. H:i" }}</span>{% else %}{{ l.tekst }}{% endif %}{% if l.korrigerer %}<span class="merke">rettet, skrevet {{ l.registrert|date:"H:i" }}</span>{% endif %}{% if l.uformell %}<span class="merke">chat</span>{% endif %}{% if l.delt_at %}<span class="merke">delt med enhetene</span>{% endif %}{% if l.festet_at %}<span class="merke">festet</span>{% endif %}</td>
+        <td class="tekst">{% if l.fjernet %}<span class="tom">Innholdet er fjernet av {{ l.fjernet_av|default:"–" }} {{ l.fjernet_tid|date:"j.n. H:i" }}</span>{% else %}{{ l.tekst }}{% endif %}{% if l.korrigerer %}<span class="merke">rettet, skrevet {{ l.registrert|date:"H:i" }}</span>{% endif %}{% if l.uformell %}<span class="merke">chat</span>{% endif %}{% if l.delt_at %}<span class="merke">delt med enhetene</span>{% endif %}{% if l.festet_at %}<span class="merke">festet</span>{% endif %}{% if not l.fjernet and not l.systemkode %}{% if l.haandtert_at %}<span class="merke">håndtert av {{ l.haandtert_av|default:"–" }} {{ l.haandtert_tid|date:"H:i" }}</span>{% elif l.haandtering_krevd_at %}<span class="merke">venter på håndtering</span>{% endif %}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

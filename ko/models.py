@@ -223,6 +223,27 @@ class Logglinje(models.Model):
     festet_av_navn = models.CharField(
         max_length=150, blank=True, default='', verbose_name='Festet av (navn)')
 
+    #: **«Krever håndtering» og «Håndtert»** (André, 20. okt. 2026: «Av og til skriver
+    #: jo våre representant i LSKO et logginnlegg med noe som er til info for oss …
+    #: er det nyttig at vi kan markere disse som "håndtert" for å kommunisere at det
+    #: er mottatt og utført?» — og så: «en symbol, merke eller en utheving som gjør
+    #: at dette her, her må ha en kvittering»). To tilstander og ikke én: den som
+    #: skriver vet at noe skal gjøres, og uten merket er «ikke håndtert ennå» usynlig
+    #: — det ser ut som en linje til info. «Håndtert» kan settes på enhver manuell
+    #: linje, merket eller ikke; **ingenting krever det** («det betyr ikke at absolutt
+    #: alle linjer som ligger manuelt trengs å kvitteres»).
+    #:
+    #: Tidspunkt og frosset navn, som festingen — men **uten FK til kontoen**: ingen
+    #: kode trenger kontoen, bare navnet som vises, og en peker til hadde måttet
+    #: strippes i backupen (`ko/backup.py`). Arves ved retting (`korriger`).
+    haandtering_krevd_at = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='Krever håndtering (fra)')
+    haandtering_krevd_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Krever håndtering (merket av)')
+    haandtert_at = models.DateTimeField(null=True, blank=True, verbose_name='Håndtert')
+    haandtert_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Håndtert av (navn)')
+
     class Meta:
         verbose_name = 'Logglinje'
         verbose_name_plural = 'Logglinjer'
@@ -255,6 +276,14 @@ class Logglinje(models.Model):
     @property
     def er_delt(self) -> bool:
         return self.delt_at is not None
+
+    @property
+    def krever_haandtering(self) -> bool:
+        return self.haandtering_krevd_at is not None
+
+    @property
+    def er_haandtert(self) -> bool:
+        return self.haandtert_at is not None
 
 
 class Linjedeling(models.Model):

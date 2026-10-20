@@ -414,6 +414,17 @@ body.ko-hs-drar { cursor: col-resize; user-select: none; }
   background: rgba(167, 139, 250, 0.08); font-size: 0.86rem; display: flex; gap: 0.5rem; align-items: flex-start;
 }
 .ls-festet .bi-pin-angle-fill { color: #a78bfa; }
+/* «Krever håndtering» (20. okt. 2026): oransje, som det som venter ellers i portalen. */
+.ls-festet-hode.ls-venter-hode { color: #fbbf24; }
+.ls-venter {
+  border: 1px solid #f59e0b; border-radius: 8px; padding: 0.35rem 0.6rem; margin-bottom: 0.35rem;
+  background: rgba(245, 158, 11, 0.1); font-size: 0.86rem; display: flex; gap: 0.5rem; align-items: flex-start;
+}
+.ls-venter > .bi-exclamation-diamond-fill { color: #fbbf24; }
+.ls-haandtert-knapp { white-space: nowrap; padding: 0 0.45rem; font-size: 0.78rem; }
+.ls-linje.ls-krever { box-shadow: inset 3px 0 0 #f59e0b; }
+.ls-krever-merke { color: #fbbf24; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.ls-haandtert-merke { color: #86efac; font-size: 0.75rem; white-space: nowrap; }
 .ls-linje { padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.86rem; display: flex; gap: 0.5rem; align-items: flex-start; }
 .ls-linje:nth-child(even) { background: #172033; }
 .ls-linje .tid { font-weight: 600; white-space: nowrap; }

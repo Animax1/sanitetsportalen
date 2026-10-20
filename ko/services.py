@@ -244,7 +244,7 @@ def _frys_forfatter(linje, bruker) -> None:
 
 def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
                 ansvarsomraade=None, uformell=False, hendelse=None,
-                naa=None) -> Logglinje:
+                krever_haandtering=False, naa=None) -> Logglinje:
     """En menneskeskrevet linje. Den vanlige veien inn i loggen.
 
     **`hendelse` gjør linja til en kommentar i hendelsen** (18. sep. 2026).
@@ -266,6 +266,9 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
     enhetene ser den ikke før `del_linje()` er kalt. Standarden er intern
     fordi loggen er KOs arbeidsnotat, og det som skal ut til en bil er et
     bevisst valg — se `del_linje`.
+
+    **`krever_haandtering`** (20. okt. 2026) merker linja fra start: den som
+    skriver vet best at noe skal gjøres. Se `krev_haandtering`.
     """
     tekst = rens_tekst(raa_tekst)
     tid = vurder_tidspunkt(tidspunkt, naa)
@@ -284,6 +287,9 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         uformell=bool(uformell),
         hendelse=hendelse,
     )
+    if krever_haandtering:
+        linje.haandtering_krevd_at = naa or timezone.now()
+        linje.haandtering_krevd_av_navn = getattr(bruker, 'username', '') or ''
     _frys_forfatter(linje, bruker)
     linje.save()
     if hendelse is not None:
@@ -319,6 +325,90 @@ def losne_linje(linje, *, bruker) -> Logglinje:
     linje.festet_av = None
     linje.festet_av_navn = ''
     linje.save(update_fields=['festet_at', 'festet_av', 'festet_av_navn'])
+    return linje
+
+
+# ── «Krever håndtering» og «Håndtert» (20. okt. 2026) ────────────────────────
+#
+# André: en linje fra LSKO «som er til info for oss, som kanskje ikke haster og
+# heller ikke er en hendelse» — og et merke som sier «her må ha en kvittering».
+# Tre måter å løfte en linje på, og de skal ikke flyte sammen: **festet** er
+# «alle bør se dette», **krever håndtering** er «én ting skal gjøres», og en
+# **hendelse** er en situasjon med flere linjer, oppdrag og lag.
+#
+# Tilstand på linja, ikke en hendelse i loggen: ingen systemlinje. Merket med
+# navn og klokkeslett *er* sporet, og en linje til i strømmen per kvittering ville
+# druknet nettopp det merket skal få fram.
+
+_HAANDTERING_FELT = ['haandtering_krevd_at', 'haandtering_krevd_av_navn']
+_HAANDTERT_FELT = ['haandtert_at', 'haandtert_av_navn']
+
+
+def _kan_haandteres(linje):
+    """Bare manuelle, gjeldende linjer med innhold. En rettet linje er ikke den
+    gjeldende — skjermen viser rettingen, og den har arvet merket."""
+    if linje.kilde == KILDE_SYSTEM:
+        raise Ugyldig('Systemlinjer håndteres ikke; de sier hva som skjedde.')
+    if linje.er_fjernet:
+        raise Ugyldig('Linja er fjernet.')
+    if Logglinje.objects.filter(korrigerer=linje).exists():
+        raise Ugyldig('Linja er rettet; bruk den gjeldende linja.')
+
+
+def krev_haandtering(linje, *, bruker, naa=None) -> Logglinje:
+    """Merk linja «Krever håndtering». Idempotent: første merking står, som
+    festingen — to som trykker samtidig skal ikke bytte navn på hverandre."""
+    _kan_haandteres(linje)
+    if linje.krever_haandtering:
+        return linje
+    linje.haandtering_krevd_at = naa or timezone.now()
+    linje.haandtering_krevd_av_navn = getattr(bruker, 'username', '') or ''
+    linje.save(update_fields=_HAANDTERING_FELT)
+    return linje
+
+
+def fjern_krav(linje, *, bruker) -> Logglinje:
+    """Ta merket av — feiltrykk, eller det viste seg å være til info. Rører
+    ikke «Håndtert»."""
+    _kan_haandteres(linje)
+    if not linje.krever_haandtering:
+        return linje
+    linje.haandtering_krevd_at = None
+    linje.haandtering_krevd_av_navn = ''
+    linje.save(update_fields=_HAANDTERING_FELT)
+    return linje
+
+
+@transaction.atomic
+def haandter(linje, *, bruker, naa=None) -> Logglinje:
+    """Merk linja håndtert — mottatt og utført. **En festet linje løsnes i samme
+    lagring**: ellers blir de festede stående og hope seg opp, og en topp som
+    aldri ryddes er en topp ingen ser på. Idempotent: første kvittering står."""
+    _kan_haandteres(linje)
+    if linje.er_haandtert:
+        return linje
+    linje.haandtert_at = naa or timezone.now()
+    linje.haandtert_av_navn = getattr(bruker, 'username', '') or ''
+    felt = list(_HAANDTERT_FELT)
+    if linje.er_festet:
+        linje.festet_at = None
+        linje.festet_av = None
+        linje.festet_av_navn = ''
+        felt += ['festet_at', 'festet_av', 'festet_av_navn']
+    linje.save(update_fields=felt)
+    return linje
+
+
+def angre_haandtert(linje, *, bruker) -> Logglinje:
+    """Angre kvitteringen. Linja står åpen igjen om den krever håndtering, men
+    **festes ikke på nytt** — festingen var et eget valg, og den som angrer vet
+    ikke om det fortsatt gjelder."""
+    _kan_haandteres(linje)
+    if not linje.er_haandtert:
+        return linje
+    linje.haandtert_at = None
+    linje.haandtert_av_navn = ''
+    linje.save(update_fields=_HAANDTERT_FELT)
     return linje
 
 
@@ -370,6 +460,17 @@ def korriger(linje, *, bruker, tekst=None, tidspunkt=None, naa=None) -> Logglinj
         delt_at=linje.delt_at,
         delt_av=linje.delt_av,
         delt_av_navn=linje.delt_av_navn,
+        # Festingen og håndteringen også (20. okt. 2026). Klienten finner dem på
+        # den gjeldende linjas id, så uten dette ble en festet linje stille
+        # løsnet av en retting — og en retting av «krever håndtering» ville
+        # lukket oppgaven uten at noen hadde gjort den.
+        festet_at=linje.festet_at,
+        festet_av=linje.festet_av,
+        festet_av_navn=linje.festet_av_navn,
+        haandtering_krevd_at=linje.haandtering_krevd_at,
+        haandtering_krevd_av_navn=linje.haandtering_krevd_av_navn,
+        haandtert_at=linje.haandtert_at,
+        haandtert_av_navn=linje.haandtert_av_navn,
         korrigerer=linje,
         rot=linje.rot or linje,
     )

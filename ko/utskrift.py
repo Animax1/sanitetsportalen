@@ -134,7 +134,7 @@ def logg_del(vakt, naa) -> list[dict]:
         rad = _til_dict(linje)
         tid = lokal(linje.tidspunkt)
         rad.update(tid=tid, dag=tid.date(), registrert=lokal(linje.registrert_at),
-                   fjernet_tid=lokal(linje.fjernet_at))
+                   fjernet_tid=lokal(linje.fjernet_at), haandtert_tid=lokal(linje.haandtert_at))
         ut.append(rad)
     return ut
 

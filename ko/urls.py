@@ -38,6 +38,9 @@ urlpatterns = [
     # Festing (18. sep. 2026) — to stier, som rett/fjern: én regel per sti.
     path('api/logg/<int:pk>/fest/', views.logg_fest_view, name='ko_api_logg_fest'),
     path('api/logg/<int:pk>/losne/', views.logg_losne_view, name='ko_api_logg_losne'),
+    path('api/logg/<int:pk>/krever-haandtering/', views.logg_krever_haandtering_view,
+         name='ko_api_logg_krever_haandtering'),
+    path('api/logg/<int:pk>/haandtert/', views.logg_haandtert_view, name='ko_api_logg_haandtert'),
     # Deling med enhetene (19. sep. 2026) — samme form: én regel per sti.
     path('api/logg/<int:pk>/del/', views.logg_del_view, name='ko_api_logg_del'),
     path('api/logg/<int:pk>/angre-deling/', views.logg_angre_deling_view,

@@ -167,7 +167,8 @@ class LoggEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml',)),
         (KO_JS, ('koKlokke', 'koLinjeMerke', 'koLinjeTekst', 'koLinjeKnapper',
-                 'koLinjeHtml', 'koKanSkrive', 'koKanFjerne')),
+                 'koLinjeHtml', 'koKanSkrive', 'koKanFjerne', 'koVenterPaaHaandtering',
+                 'koHaandteringMerke')),
         (JS_DIR / 'oppdrag-kort.js', ('hendelsesnr',)),
     )
 

@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — KO: «Krever håndtering» og «Håndtert» på logglinjer  `#ko/loggen`
+
+André: «Av og til skriver jo våre representant i LSKO et logginnlegg med noe som er til info for
+oss, som kanskje ikke haster og heller ikke er en hendelse … er det nyttig at vi kan markere disse
+som "håndtert" for å kommunisere at det er mottatt og utført?» Og så: «la oss også gjøre det sånn
+at du kan faktisk enten ha en symbol, merke eller en utheving som gjør at dette her, her må ha en
+kvittering eller en håndtering.» «Alle manuelle, men det betyr ikke at absolutt alle linjer som
+ligger manuelt trengs å kvitteres og håndteres.»
+
+- **«Krever håndtering»:** en avkryssing ved «Loggfør», eller et ikon på linja i etterkant. Linja står
+  øverst under **«Venter på håndtering»**, over «Festet», eldste først, og med oransje kant og merket
+  «Venter på håndtering» der den står i strømmen. Filteret skjuler den ikke fra boksen.
+- **«Håndtert»** (mottatt og utført) på **enhver manuell linje**, merket eller ikke: «✓ Håndtert av
+  Kari 14:32», og linja går ut av boksen. **En festet linje løsnes samtidig.** «Angre» åpner den
+  igjen, men fester den ikke på nytt — festingen var et eget valg. Ingenting krever kvittering, og
+  det finnes ingen teller over umerkede linjer.
+- **Ingen systemlinje:** merket med navn og klokkeslett er sporet; en linje til per kvittering ville
+  druknet det merket skal få fram. Står på utskriften.
+- **Nivå:** «Føre loggen og hendelsene» i KO (`skriv_full`), som festingen. `POST
+  api/logg/<pk>/krever-haandtering/` (`{"krever": bool}`) og `api/logg/<pk>/haandtert/`
+  (`{"haandtert": bool}`); hele tilstanden følger pollen som `haandtering`, som `festede`.
+- **Felter uten FK til kontoen** (`ko/0030`): tidspunkt og frosset navn. Ingen kode trenger kontoen,
+  og en peker hadde måttet strippes i backupen.
+- **Funnet underveis — festingen ble borte ved retting.** `korriger()` arvet `uformell` og delingen,
+  men ikke festingen, og klienten finner den på den gjeldende linjas id: å rette en festet linje
+  løsnet den stille. Nå arves festingen, merket og kvitteringen — uten det ville en retting av
+  «krever håndtering» lukket oppgaven uten at noen hadde gjort den.
+- **Kjent, ikke rettet:** en poll som ble sendt før en kvittering og kommer tilbake etter den, kan vise
+  den gamle tilstanden til neste poll (≤ 2,5 s). Samme for festingen i dag. Sett én gang av fire i
+  nettleseren; trykk to ganger er ufarlig (idempotent).
+- `ko/tests_haandtering.py`, 21 tester. **24 mutanter, alle drept** — én overlevde først: pollen tok
+  bare de *merkede* linjene, og da forsvant en kvittering på en umerket linje fra alle andre skjermer.
+  Prøven for det står nå.
+
 ## 2026-10-20 — «Hent alle» heter nå «Hent posisjoner»  `#ko/ressursbildet`
 
 André: «Hent alle er litt for vag beskrivelse, vi må ha noe mer passende.» Han valgte «Hent

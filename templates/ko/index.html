@@ -326,6 +326,12 @@
               chat
             </label>
             {% endif %}
+            {# «Krever håndtering» (20. okt. 2026): linja står øverst til noen har kvittert. #}
+            <label class="small text-muted d-flex align-items-center gap-1 mb-0 pt-1"
+                   title="Linja står øverst under «Venter på håndtering» til noen trykker «Håndtert»">
+              <input type="checkbox" class="form-check-input mt-0" id="ko-logg-krever">
+              krever håndtering
+            </label>
             <button type="submit" class="btn btn-primary btn-sm" id="ko-logg-send" title="Loggfør">
               <i class="bi bi-send"></i>
             </button>

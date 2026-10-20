@@ -30,7 +30,7 @@ uten at noen rykket ut.
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
 | **Hendelsene**: nummer, opprett, rediger, prioritet, bli med, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse`, `HendelseDeltaker` |
 | **Utskriften** — alle vinduene, og kopien uten nett | `ko/utskrift.py` (delene, gatene, kopiregelen), `utskrift_view`, `sw_view`, `static/js/ko-sw.js`, `koKopiStart` i `ko.js`, `templates/ko/utskrift.html`, `ko/tests_utskrift.py` |
-| Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
+| Festet og «håndtert» i loggstrømmen | `Logglinje.festet_*`/`haandter*`, `services.fest_linje`/`haandter`, `logg_view` |
 | KO-innstillinger: ansvarsområder, eksterne aktører, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views_innstillinger.py`, fanene via `verdifaner_ekstra` |
 | «H12»-merket, lag, melder, varslinger og delte linjer på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_*`, `delte_linjer`), lest gjennom metoder på `Hendelse`: `lag_navn`, `melder_tekst`, `varslet`, `delte_linjer_for` |
 | **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |

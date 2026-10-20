@@ -81,6 +81,8 @@
   "/ko/api/logg/1/del/",
   "/ko/api/logg/1/fest/",
   "/ko/api/logg/1/fjern/",
+  "/ko/api/logg/1/haandtert/",
+  "/ko/api/logg/1/krever-haandtering/",
   "/ko/api/logg/1/losne/",
   "/ko/api/logg/1/rett/",
   "/ko/api/logg/ny/",
