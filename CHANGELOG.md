@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-20 — KO: «Ny hendelse fra oppdraget»  `#ko/hendelseslogg`
+
+André: «Det skjer at vi lager et oppdrag som man tror er et enkelt oppdrag, men så ser man
+etterhvert at dette oppdraget må være en hendelse. Da er det fint at man på oppdraget kan ha en
+shortcut for opprett hendelse, og da knyttes så klart dette oppdraget automatisk til hendelsen.
+Men så bør det gjerne ikke være mulig å lage hendelse fra et oppdrag dersom oppdraget allerede
+tilhører en annen hendelse.»
+
+- **Knappen «Ny hendelse fra oppdraget»** står i detaljvinduet på oppdraget, ved «Hendelse: Uten
+  hendelse» — **bare når oppdraget ikke hører til en hendelse** (heller ikke en lukket), og bare for
+  den som kan skrive i både KO og oppdrag, som «Knytt».
+- **Den åpner «Ny hendelse»** («Ny hendelse fra O45»), med tittelen foreslått fra problemstillingen
+  og stedet («Fallskade — Hovedscene»; «Udefinert» utelates) og lokasjonen valgt. Detaljvinduet
+  lukkes først — to Bootstrap-modaler oppå hverandre gir et bakteppe som blir hengende.
+- **Prioriteten foreslås ikke**, og **oppdragsnotatet kopieres ikke**: «ingen er valgt på forhånd» er
+  en regel i skjemaet, og notatet slettes tre dager etter siste aktivitet mens hendelsens beskrivelse
+  er en logglinje i 730 dager — en kopi ville vært en vei rundt fristen. (Prioritet fra hastegraden
+  var bygget og prøvd, og tatt ut igjen da hjelpeteksten «ingen er valgt på forhånd» ble synlig i
+  skjermbildet.)
+- **Serveren knytter i samme transaksjon** (`opprett_hendelse(fra_oppdrag=…)`), gjennom
+  `knytt_oppdrag` — den ene skriveren av `Oppdrag.hendelse` — så systemlinja «O45 knyttet til H14»
+  og deltakelsen blir som ved en vanlig knytting. Oppdraget låses før nummeret trekkes, og et
+  oppdrag i en hendelse gir 400 uten å bruke et nummer. `fra_oppdrag` krever `skriv_full` i
+  oppdragsmodulen også (403), og et oppdrag i en annen vakt er 404.
+- Prøvd i nettleseren mot demobasen: knappen, vinduet som lukkes, forslagene, lagringen, «H1» på
+  oppdraget etterpå og knappen borte; ingen JS-feil.
+- `ko/tests_hendelse_fra_oppdrag.py`, 11 tester. **14 mutanter: 12 drept, 2 overlevde** — vakt-sjekken
+  i tjenesten var overflødig (`knytt_oppdrag` avviser det samme, og transaksjonen ruller tilbake), og
+  er fjernet; **låsen mot to samtidige trykk** fanges bare av en samtidighetsprøve med to tråder mot
+  PostgreSQL, og den er ikke skrevet.
+
 ## 2026-10-20 — «Håndtert» heter «Kvitter ut», og «krever håndtering» heter «må kvitteres»  `#ko/loggen`
 
 André: «Flott nen bytt tekst fra Håndtert til «Kvitter ut» og vi må ha noe annet enn krever

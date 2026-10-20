@@ -890,7 +890,8 @@ def bli_med(hendelse, bruker) -> bool:
 @transaction.atomic
 def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
                      fra_linje=None, prioritet=None, beskrivelse=None,
-                     melder_typer=None, melder=None, lag=None) -> Hendelse:
+                     melder_typer=None, melder=None, lag=None,
+                     fra_oppdrag=None) -> Hendelse:
     """Ny hendelse. Fra en logglinje eller fra ingenting.
 
     **Linja blir stående** (§4.5): hendelsen peker tilbake på den, og linja
@@ -910,6 +911,15 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     oppdragsnotatet, og der redigerer operatøren fritt. Lagene som
     velges i skjemaet står på opprettelseslinja, ikke som én linje hver: de
     kom med hendelsen, og fem linjer for én handling leser som fem ting.
+
+    **`fra_oppdrag` knytter oppdraget til den nye hendelsen** (20. okt. 2026,
+    André: «det skjer at vi lager et oppdrag som man tror er et enkelt
+    oppdrag, men så ser man etterhvert at dette oppdraget må være en
+    hendelse»). Gjennom `knytt_oppdrag`, den ene skriveren av feltet, så
+    systemlinja og deltakelsen blir som ved en vanlig knytting. **Et oppdrag
+    som alt hører til en hendelse, gir ingen ny** — da er det en flytting, og
+    den har sin egen vei. Raden låses før nummeret trekkes: to som trykker
+    samtidig skal ikke få to hendelser av samme oppdrag.
     """
     tittel = rens_tittel(raa_tittel)
     prio = rens_prioritet(prioritet)
@@ -918,6 +928,13 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     lagene = _lag_fra(vakt, lag) or []
     if fra_linje is not None and fra_linje.vakt_id != vakt.pk:
         raise Ugyldig('Linja hører til en annen vakt.')
+    if fra_oppdrag is not None:
+        # Vakta sjekker `knytt_oppdrag`; avviser den, ruller transaksjonen
+        # hendelsen og nummeret tilbake.
+        fra_oppdrag = type(fra_oppdrag).objects.select_for_update().get(pk=fra_oppdrag.pk)
+        if fra_oppdrag.hendelse_id is not None:
+            raise Ugyldig(f'Oppdraget hører alt til {hendelsesnr(fra_oppdrag.hendelse.hendelsesnummer)}'
+                          ' — flytt det heller, eller løsne det først.')
     hendelse = Hendelse(
         vakt=vakt,
         hendelsesnummer=neste_hendelsesnummer(vakt),
@@ -945,6 +962,8 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     if beskrivelse:
         hendelse.beskrivelse_linje = skriv_linje(vakt, beskrivelse, bruker=bruker, hendelse=hendelse)
         hendelse.save(update_fields=['beskrivelse_linje'])
+    if fra_oppdrag is not None:
+        knytt_oppdrag(fra_oppdrag, hendelse, bruker=bruker)
     bli_med(hendelse, bruker)
     return hendelse
 

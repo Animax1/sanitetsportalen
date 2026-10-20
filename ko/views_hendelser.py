@@ -52,7 +52,13 @@ def _lokasjon_fra(data):
 @require_http_methods(['POST'])
 @rate_limit(group='ko:hendelse_ny', rate='60/m', method='POST')
 def hendelse_ny_view(request):
-    """Ny hendelse — fra en logglinje (`fra_linje`) eller fra ingenting."""
+    """Ny hendelse — fra en logglinje (`fra_linje`), fra et oppdrag
+    (`fra_oppdrag`, som da knyttes til den) eller fra ingenting.
+
+    `fra_oppdrag` krever `skriv_full` i oppdragsmodulen også, som knyttingen
+    (`oppdrag_hendelse_view`): kallet skriver på en oppdragsrad."""
+    from oppdrag.models import Oppdrag
+
     data = json_body(request)
     vakt = hent_aktiv_vakt()
     lokasjon, feil = _lokasjon_fra(data)
@@ -61,6 +67,11 @@ def hendelse_ny_view(request):
     fra_linje = None
     if data.get('fra_linje'):
         fra_linje = get_object_or_404(Logglinje, pk=data['fra_linje'], vakt=vakt)
+    fra_oppdrag = None
+    if data.get('fra_oppdrag'):
+        if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
+            return json_feil('Krever skrivetilgang i oppdragsmodulen.', status=403)
+        fra_oppdrag = get_object_or_404(Oppdrag, pk=data['fra_oppdrag'], vakt=vakt)
     try:
         hendelse = services.opprett_hendelse(
             vakt, data.get('tittel'), bruker=request.user,
@@ -69,7 +80,8 @@ def hendelse_ny_view(request):
             beskrivelse=data.get('beskrivelse'),
             melder_typer=data.get('melder_typer'),
             melder=data.get('melder'),
-            lag=data.get('lag'))
+            lag=data.get('lag'),
+            fra_oppdrag=fra_oppdrag)
     except services.Ugyldig as feil:
         return json_feil(str(feil))
     hendelse = services.hendelse_med_telling(hendelse)

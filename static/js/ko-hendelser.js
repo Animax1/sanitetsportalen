@@ -1173,6 +1173,7 @@ function _koFyllSkjema(h, fraLinjeId, forslag) {
   sett('ko-h-id', h ? h.id : '');
   sett('ko-h-versjon', h ? h.versjon : '');
   sett('ko-h-fra-linje', fraLinjeId || '');
+  sett('ko-h-fra-oppdrag', '');   // settes av `koHendelseFraOppdrag` etter fyllingen
   sett('ko-h-tittel', h ? h.tittel : (forslag || ''));
   sett('ko-h-melder', h ? h.melder : '');
   // Beskrivelsen (19. okt. 2026, «kunne oppdatere hendelse»): ved redigering
@@ -1261,6 +1262,53 @@ function koHendelseFraLinje(linjeId) {
   if (modal) modal.show();
 }
 
+// «Ny hendelse fra oppdraget» (André, 20. okt. 2026: «det skjer at vi lager et
+// oppdrag som man tror er et enkelt oppdrag, men så ser man etterhvert at dette
+// oppdraget må være en hendelse»). Tittelen og stedet foreslås fra oppdraget;
+// serveren knytter oppdraget til hendelsen i samme lagring.
+//
+// **Prioriteten foreslås ikke**: «ingen er valgt på forhånd» er en regel i
+// skjemaet, så en hendelse aldri får en prioritet fordi ingen så etter.
+//
+// **Oppdragsnotatet kopieres ikke** inn som beskrivelse: notatet slettes tre
+// dager etter siste aktivitet (`oppdrag/fritekstfrist.py`), beskrivelsen er en
+// logglinje som står i 730 dager — en kopi ville vært en vei rundt fristen.
+//
+// Detaljvinduet lukkes først: to Bootstrap-modaler oppå hverandre gir et
+// bakteppe som blir stående og fokus som havner i feil vindu.
+function koHendelseFraOppdrag(id) {
+  const o = (typeof apentOppdrag !== 'undefined' && apentOppdrag && apentOppdrag.id === Number(id))
+    ? apentOppdrag : null;
+  if (!o || o.hendelse_id) return;
+  const vis = () => {
+    _koFyllSkjema(null, null, koTittelForOppdrag(o));
+    const fra = document.getElementById('ko-h-fra-oppdrag');
+    if (fra) fra.value = String(o.id);
+    koFyllLokasjoner(o.lokasjon_id || null);
+    const tittel = document.getElementById('ko-hendelse-modal-tittel');
+    if (tittel) tittel.innerHTML = '<i class="bi bi-flag me-2"></i>Ny hendelse fra ' + escapeHtml(oppdragsnr(o.nummer));
+    const modal = koHendelseModal();
+    if (modal) modal.show();
+  };
+  const detalj = document.getElementById('oppdragDetaljModal');
+  const apen = detalj && detalj.classList && detalj.classList.contains('show');
+  if (apen && typeof bootstrap !== 'undefined') {
+    detalj.addEventListener('hidden.bs.modal', vis, { once: true });
+    bootstrap.Modal.getOrCreateInstance(detalj).hide();
+  } else {
+    vis();
+  }
+}
+
+// Tittelforslaget: problemstillingen og stedet — «Fallskade — Hovedscene».
+// «Udefinert» er ingen beskrivelse og står ikke i forslaget. Operatøren retter.
+function koTittelForOppdrag(o) {
+  const deler = [];
+  if (o.problemstilling && o.problemstilling !== 'Udefinert') deler.push(String(o.problemstilling));
+  if (o.lokasjon_navn) deler.push(String(o.lokasjon_navn));
+  return deler.join(' — ').slice(0, 120);
+}
+
 function koRedigerHendelse(id) {
   const h = koHendelser.get(Number(id));
   if (!h) return;
@@ -1330,6 +1378,8 @@ async function koLagreHendelse() {
       verdier.beskrivelse = les('ko-h-beskrivelse');
       const fra = (document.getElementById('ko-h-fra-linje') || {}).value;
       verdier.fra_linje = fra ? Number(fra) : null;
+      const fraOppdrag = (document.getElementById('ko-h-fra-oppdrag') || {}).value;
+      if (fraOppdrag) verdier.fra_oppdrag = Number(fraOppdrag);
       svar = await _koHendelsehandling('/ko/api/hendelser/ny/', verdier);
     }
     if (!svar.res.ok) {
@@ -1487,6 +1537,12 @@ function koHendelseValg(o) {
     ? '<button class="btn btn-outline-secondary" type="button"'
       + ' data-action="koLosneOppdrag" data-id="' + escapeHtml(o.id) + '">Løsne</button>'
     : '';
+  // «Ny hendelse» bare når oppdraget ikke hører til noen (20. okt. 2026) — et
+  // oppdrag i en hendelse flyttes med nedtrekket, det får ikke en til.
+  const nyHendelse = o.hendelse_id ? ''
+    : '<button class="btn btn-sm btn-outline-warning" type="button" title="Lag en hendelse, og knytt oppdraget til den"'
+      + ' data-action="koHendelseFraOppdrag" data-id="' + escapeHtml(o.id) + '">'
+      + '<i class="bi bi-flag me-1"></i>Ny hendelse fra oppdraget</button>';
   return '<div class="mb-2 small d-flex align-items-center gap-2 flex-wrap">'
     + '<span>Hendelse: ' + naa + '</span>'
     + '<span class="input-group input-group-sm w-auto">'
@@ -1495,7 +1551,7 @@ function koHendelseValg(o) {
     + '<button class="btn btn-outline-primary" type="button"'
     + ' data-action="koKnyttOppdrag" data-id="' + escapeHtml(o.id) + '">Knytt</button>'
     + losne
-    + '</span></div>';
+    + '</span>' + nyHendelse + '</div>';
 }
 
 async function _koSettHendelsePaaOppdrag(oppdragId, hendelseId) {
