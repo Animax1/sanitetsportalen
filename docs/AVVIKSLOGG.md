@@ -18,7 +18,7 @@ ikke avgjørelser.
 
 ## 2026-10-22 — Railway: miljøvariabler kan være dekryptert av en tredjepart
 
-**Status:** Åpen — tiltak gjenstår til Railway åpner for deploy igjen.
+**Status:** Åpen — Railway deployer igjen (fra ca. 17:15 UTC 22. okt.); rotasjonene under gjenstår.
 
 ### Hva skjedde
 
@@ -79,18 +79,21 @@ Miljøvariablene til portalen (`portal.sanitet.net`, `testportal.sanitet.net`) o
 3. `ObjectStorageFullAccess` fjernet fra `sanitetsportalen-backup`.
 4. AhaSend-nøkkelen trukket tilbake og erstattet.
 5. Nye verdier generert for resten — lagret i passordbehandleren, ikke i Railway ennå.
-6. **Databasepassordet i kart.sanitet.net prod rotert** (ca. 11:40 UTC). Variabelen
-   `POSTGRES_PASSWORD` ble endret først, og kartet krasjet på `password authentication failed`
-   til passordet i basen ble satt til samme verdi. Se lærdommen under.
+6. **Databasepassordet i kart.sanitet.net prod rotert.** Kartet var nede fra ca. 11:14 til
+   ca. 19:00 UTC, med «password authentication failed for user "postgres"» i pre-deploy
+   (`migrate`). Første forsøk ga basen verdien fra Postgres-containeren, mens appen fikk en
+   annen verdi av samme variabel; først et helt nytt passord, Redeploy av Postgres-tjenesten og
+   så av appen fikk de tre til å stemme. Se lærdommen under.
 
-### Tiltak som gjenstår (blokkert av Railways deploystans)
+### Tiltak som gjenstår
 
 En endret variabel tas først i bruk ved neste deploy. I denne rekkefølgen:
 
 1. Prøv en variabelendring på staging.
 2. `SECRET_KEY` og `DJANGO_SECRET_KEY` — alle logges ut.
 3. Nøklene mellom portal og kart, med kort `_FORRIGE`-vindu i kartet.
-4. Postgres-passordet (`ALTER USER`, så variablene, så deploy).
+4. Postgres-passordet for portalen, prod og staging — **prosedyren under «Lærdom»**, ikke
+   `ALTER USER` fra web-tjenesten.
 5. `OFFSITE_BACKUP_KEY`, så `backup_kjor` og `verifiser_backup`. **Den gamle nøkkelen beholdes i
    passordbehandleren** — den trengs for å lese backupene som alt ligger der.
 6. MapTiler.
@@ -113,13 +116,22 @@ Datatilsynet**, med forbehold om at Railway ikke melder om mer. Avgjørelsen er 
 
 - **På Railway endrer `POSTGRES_PASSWORD` ikke passordet i basen** — variabelen leses bare når
   basen opprettes. Endres den alene, får appen det nye passordet gjennom
-  `${{Postgres.DATABASE_URL}}` mens basen har det gamle, og neste deploy eller restart krasjer
-  (kartet, 22. okt.). Rekkefølgen er: ny verdi i variabelen, så samme verdi i basen fra
-  Postgres-tjenestens konsoll — uten å lime inn passordet:
-  `printf '%s\n' "SET log_statement = 'none';" '\getenv pw POSTGRES_PASSWORD' "ALTER USER postgres WITH PASSWORD :'pw';" | psql -h /var/run/postgresql -U postgres`,
-  så `psql -c "select 1;"` for å bekrefte, så **Redeploy** av appen. Innliming i `\password`
-  bommet første gang — et usynlig tegn fulgte med.
+  `${{Postgres.DATABASE_URL}}` mens basen har det gamle, og neste deploy krasjer.
+- **Tre steder skal ha samme verdi, og de oppdateres hver for seg:** variabelen (det appen får
+  ved neste deploy), Postgres-containeren (det konsollet ser, fra da den sist startet) og basen.
+  Kartet krasjet videre etter `ALTER USER` fordi containeren og variabelen hadde ulik verdi —
+  `select 1` virket i konsollet, appen ble avvist. Prosedyren som virket (22. okt.):
+  1. Nytt passord lokalt: `python -c "import secrets; print(secrets.token_urlsafe(32))"` (43 tegn).
+  2. `POSTGRES_PASSWORD` i Postgres-tjenestens Raw Editor; ta i bruk endringen.
+  3. **Redeploy Postgres-tjenesten.** Dataene står på volumet.
+  4. Nytt konsoll: `printf '%s' "$POSTGRES_PASSWORD" | wc -c` skal gi **43**. Gir det noe annet,
+     har containeren ikke fått verdien — stopp.
+  5. `printf '%s\n' "SET log_statement = 'none';" '\getenv pw POSTGRES_PASSWORD' "ALTER USER postgres WITH PASSWORD :'pw';" | psql -h /var/run/postgresql -U postgres`,
+     så `psql -c "select 1;"`. Passordet limes aldri inn: innliming i `\password` bommet.
+  6. **Redeploy appen** (og cron-tjenestene i portalen).
 - **Restart bruker variablene deployment-en ble laget med; Redeploy henter de nye.**
+- **Appen skal ha `DATABASE_URL="${{Postgres.DATABASE_URL}}"`**, aldri en kopi. Det var riktig i
+  kartet, og er det første å se etter i portalen før rotasjonen.
 
 - **Rettighetene glir uten at noe sier fra.** S3-nøkkelen hadde mer enn planen sa, og ingen
   så det før en hendelse. Kontroll av nøkkelens rettigheter bør inn i `/admin/backup/`.

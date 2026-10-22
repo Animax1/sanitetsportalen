@@ -35,6 +35,10 @@ språk».
 - **Avviksloggen** har fått rotasjonen av kartets databasepassord og lærdommen fra den:
   «password authentication failed for user "postgres"» etter at bare `POSTGRES_PASSWORD` var endret;
   passordet i basen settes med `\getenv` + `ALTER USER`, og **Redeploy**, ikke Restart.
+- **Kart prod oppe igjen** etter rotasjonen av databasepassordet (nede ca. 11:14–19:00 UTC).
+  Avviksloggen har prosedyren som virket: tre steder skal ha samme verdi — variabelen,
+  Postgres-containeren og basen — og Postgres-tjenesten må redeployes før `ALTER USER`;
+  `printf '%s' "$POSTGRES_PASSWORD" | wc -c` i et nytt konsoll viser om containeren har fått den.
 - **Kartet har ingen tilsvarende mekanisme** (ingen `must_change_password` der) — eget punkt i TODO.
 - **pillow 12.3.0 → 13.0.0** (pip-audit i CI: 24 CVE-er, «CVE-2026-112390» m.fl., rettet i 13.0.0).
   Pillow kommer inn via `qrcode` (MFA-oppsettet); QR-bildet og testene i `accounts` og `patients`
