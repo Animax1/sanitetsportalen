@@ -79,6 +79,9 @@ Miljøvariablene til portalen (`portal.sanitet.net`, `testportal.sanitet.net`) o
 3. `ObjectStorageFullAccess` fjernet fra `sanitetsportalen-backup`.
 4. AhaSend-nøkkelen trukket tilbake og erstattet.
 5. Nye verdier generert for resten — lagret i passordbehandleren, ikke i Railway ennå.
+6. **Databasepassordet i kart.sanitet.net prod rotert** (ca. 11:40 UTC). Variabelen
+   `POSTGRES_PASSWORD` ble endret først, og kartet krasjet på `password authentication failed`
+   til passordet i basen ble satt til samme verdi. Se lærdommen under.
 
 ### Tiltak som gjenstår (blokkert av Railways deploystans)
 
@@ -107,6 +110,16 @@ Datatilsynet**, med forbehold om at Railway ikke melder om mer. Avgjørelsen er 
 - [ ] Korpsets beslutning om melding til Datatilsynet (dato, hvem):
 
 ### Lærdom
+
+- **På Railway endrer `POSTGRES_PASSWORD` ikke passordet i basen** — variabelen leses bare når
+  basen opprettes. Endres den alene, får appen det nye passordet gjennom
+  `${{Postgres.DATABASE_URL}}` mens basen har det gamle, og neste deploy eller restart krasjer
+  (kartet, 22. okt.). Rekkefølgen er: ny verdi i variabelen, så samme verdi i basen fra
+  Postgres-tjenestens konsoll — uten å lime inn passordet:
+  `printf '%s\n' "SET log_statement = 'none';" '\getenv pw POSTGRES_PASSWORD' "ALTER USER postgres WITH PASSWORD :'pw';" | psql -h /var/run/postgresql -U postgres`,
+  så `psql -c "select 1;"` for å bekrefte, så **Redeploy** av appen. Innliming i `\password`
+  bommet første gang — et usynlig tegn fulgte med.
+- **Restart bruker variablene deployment-en ble laget med; Redeploy henter de nye.**
 
 - **Rettighetene glir uten at noe sier fra.** S3-nøkkelen hadde mer enn planen sa, og ingen
   så det før en hendelse. Kontroll av nøkkelens rettigheter bør inn i `/admin/backup/`.

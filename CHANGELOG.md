@@ -32,6 +32,9 @@ språk».
   enkeltobjekter logges ikke), funnet at S3-nøkkelen hadde `ObjectStorageFullAccess` (fjernet),
   tiltakene og rotasjonene som venter på Railway. **André er databehandler, Kverneland Røde Kors
   behandlingsansvarlig** — vurderingen er en anbefaling til korpset, ikke en avgjørelse.
+- **Avviksloggen** har fått rotasjonen av kartets databasepassord og lærdommen fra den:
+  «password authentication failed for user "postgres"» etter at bare `POSTGRES_PASSWORD` var endret;
+  passordet i basen settes med `\getenv` + `ALTER USER`, og **Redeploy**, ikke Restart.
 - **Kartet har ingen tilsvarende mekanisme** (ingen `must_change_password` der) — eget punkt i TODO.
 - **pillow 12.3.0 → 13.0.0** (pip-audit i CI: 24 CVE-er, «CVE-2026-112390» m.fl., rettet i 13.0.0).
   Pillow kommer inn via `qrcode` (MFA-oppsettet); QR-bildet og testene i `accounts` og `patients`
