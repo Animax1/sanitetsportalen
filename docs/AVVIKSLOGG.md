@@ -114,6 +114,8 @@ Datatilsynet**, med forbehold om at Railway ikke melder om mer. Avgjørelsen er 
 
 ### Lærdom
 
+**Oppskriften for neste gang står i [`docs/RUNBOOK_LEKKASJE.md`](./RUNBOOK_LEKKASJE.md).**
+
 - **På Railway endrer `POSTGRES_PASSWORD` ikke passordet i basen** — variabelen leses bare når
   basen opprettes. Endres den alene, får appen det nye passordet gjennom
   `${{Postgres.DATABASE_URL}}` mens basen har det gamle, og neste deploy krasjer.

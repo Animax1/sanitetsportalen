@@ -63,6 +63,9 @@ DOKUMENTER = [
     'core/backup/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',
+    # Lekkasjerunbooken (22. okt. 2026). Den navngir variabler, kommandoer og
+    # filer som må stemme den dagen den trengs — og den dagen er sjelden.
+    'docs/RUNBOOK_LEKKASJE.md',
     # Testsjekklistene (19. sep. 2026). De navngir flater, filer og nivåer, og
     # er nettopp den sorten dokument som råtner uten å si fra: en sjekkliste
     # som peker på en knapp som er flyttet, blir stille hoppet over av den som

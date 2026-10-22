@@ -176,6 +176,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Send dem (og auditlogg/innloggingslogg) til en lagring med lengre frist — Scaleway Cockpit
       (Loki-push med eget token) er nærmest, siden backupene alt står der. Forleng Scaleways
       egen loggfrist utover 7 dager.
+- [ ] **Vurder Railways «Infrastructure as Code»** (`.railway/railway.ts`, docs.railway.com/infrastructure-as-code).
+      Én fil beskriver tjenestene, databasene og variablene for både staging og prod (`ctx.environment`),
+      og `railway config plan` viser forskjellen før den tas i bruk. 22. okt. var staging og prod i
+      kartet satt opp forskjellig uten at noen visste det; det er den feilen fila hindrer. Portalen er
+      *ikke* berørt av at `railway.json` slutter å virke 01.12.2026 (den bruker `Procfile` og
+      `nixpacks.toml`), så dette haster ikke her. Pris: CLI og TypeScript i et Python-prosjekt, `apply`
+      er et manuelt steg (GitHub-handlingen krever et prosjekt-token — en ny hemmelighet), og
+      hemmeligheter må stå som `preserve()`, aldri `pull --include-variables`. Kartet går først.
 - [ ] **Reserve hos en annen leverandør** (André: «Vent litt med det»). Papirskjemaene er
       førstelinja; en kald reserve på Scaleway er skissert.
 

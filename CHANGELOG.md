@@ -39,6 +39,17 @@ språk».
   Avviksloggen har prosedyren som virket: tre steder skal ha samme verdi — variabelen,
   Postgres-containeren og basen — og Postgres-tjenesten må redeployes før `ALTER USER`;
   `printf '%s' "$POSTGRES_PASSWORD" | wc -c` i et nytt konsoll viser om containeren har fått den.
+- **`docs/RUNBOOK_LEKKASJE.md` (ny): hva vi gjør neste gang hemmelighetene kan være lekket.**
+  André: «Dette skal vi ha airtight slik at det ikke tar meg en hel dag å få det opp.» Første
+  halvtime (steng Postgres, trekk S3- og AhaSend-nøkler, sikre loggene), hver variabel i begge apper
+  med hva den åpner og hva et bytte koster, Python-skriptet som lager alle nøklene, rekkefølgen,
+  nøkkelparene portal↔kart med `_FORRIGE`, databasepassordet med lengdesjekk og `\getenv`,
+  `OFFSITE_BACKUP_KEY`, Scaleway-loggene (`scw cockpit grafana sync-data-sources`,
+  `{resource_type="object_storage_bucket"}`), varsling av korpset, kontrollen av alle fire miljøene
+  og fallgruvene fra i dag. Står i dokumentråte-testens liste, så stier og kommandoer i den holdes
+  sanne. Lenket fra `RUNBOOK_VAKT.md` og avviksloggen.
+- **TODO: vurder Railways «Infrastructure as Code»** for portalen (kartet først — der slutter
+  `railway.json` å virke 01.12.2026).
 - **Kartet har ingen tilsvarende mekanisme** (ingen `must_change_password` der) — eget punkt i TODO.
 - **pillow 12.3.0 → 13.0.0** (pip-audit i CI: 24 CVE-er, «CVE-2026-112390» m.fl., rettet i 13.0.0).
   Pillow kommer inn via `qrcode` (MFA-oppsettet); QR-bildet og testene i `accounts` og `patients`

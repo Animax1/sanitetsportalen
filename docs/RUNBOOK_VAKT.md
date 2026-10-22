@@ -9,6 +9,10 @@ Railway-tjenester med hver sin database, hver sin deploy og hver sin helsesjekk,
 må være i vakt-modus**. Det som gjelder kartet står i §1d, §1e og §8e; resten av runbooken
 gjelder portalen der ikke annet står.
 
+**Kan nøkler eller miljøvariabler være lekket?** Det er en egen runbook:
+[`docs/RUNBOOK_LEKKASJE.md`](./RUNBOOK_LEKKASJE.md) — alle hemmelighetene, skriptet som lager nye,
+rekkefølgen, databasepassordet og fallgruvene fra 22. okt. 2026.
+
 ---
 
 ## 1. Første ting før vakten starter
