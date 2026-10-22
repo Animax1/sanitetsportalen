@@ -10,7 +10,7 @@
   det forblir slik; da er rekkefølgen uten betydning.
 - **Hver knapp på siden har en handler, og hver handler en knapp.** En
   skrivefeil i `value` ga før, som nå, en side som bare ble tegnet på nytt.
-- **«Tø konto»** hadde ingen test.
+- **«Opphev frysing»** («Tø konto» til 22. okt. 2026) hadde ingen test.
 - **De to handlingene som tegner siden i stedet for å sende videre** — et
   ugyldig skjema og et midlertidig passord — er de eneste som skriver i `side`.
 """

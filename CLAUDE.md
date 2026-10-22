@@ -308,7 +308,7 @@ Den siste er den som holder de tre andre i live: sperrene verner nøyaktig de ve
 finnes i dag, og en ny vei er usynlig for dem. **«Siste admin»-sperra dekker den ikke** — er det tre
 administratorer, kan superbrukeren degraderes uten at noe protesterer, og da er nødutgangen
 borte mens portalen ser helt normal ut. **Og frysing** (`_kan_fryses`, 18. okt.
-2026): «Tø konto» krever en admin som kommer inn, og superbrukeren er den som alltid gjør det.
+2026): «Opphev frysing» krever en admin som kan logge inn, og superbrukeren er den som alltid kan.
 
 De fem `kan_redigere_*`-flaggene er **borte** (deploy 3). Skal en ny modul gates, trengs
 ingen kolonne på `CustomUser` — en `ModulTilgang`-rad er hele mekanismen. Det var nettopp

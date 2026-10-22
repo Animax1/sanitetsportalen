@@ -9,6 +9,13 @@
       <a href="?filter=uten_portal" class="btn btn-outline-secondary{% if filter == 'uten_portal' %} active{% endif %}">Uten portal</a>
       <a href="?filter=inaktiv" class="btn btn-outline-secondary{% if filter == 'inaktiv' %} active{% endif %}">Ikke innlogget på 12 mnd</a>
     </div>
+    <form method="post" class="d-inline" data-confirm="Kreve passordbytte for alle personlige kontoer? Alle logges ut nå, også i kartet, og må velge nytt passord ved neste innlogging. Delte kontoer, kontoer uten passord og din egen er ikke med.">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="krev_passordbytte_alle">
+      <button type="submit" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-arrow-repeat me-1"></i>Krev passordbytte for alle
+      </button>
+    </form>
     <a href="{% url 'portaladmin:user_create' %}" class="btn btn-primary btn-sm">
       <i class="bi bi-person-plus me-1"></i>Ny bruker
     </a>
@@ -35,7 +42,7 @@
         <tr>
           <td>
             <strong>{{ user.username }}</strong>
-            {% if user.must_change_password %}<span class="badge bg-warning ms-1" title="Må bytte passord">Midl. passord</span>{% endif %}
+            {% if user.must_change_password %}<span class="badge bg-warning ms-1" title="Må bytte passord ved neste innlogging">Må bytte passord</span>{% endif %}
           </td>
           <td class="text-muted">{{ user.email|default:"–" }}</td>
           <td>

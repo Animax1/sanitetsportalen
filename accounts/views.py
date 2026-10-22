@@ -39,7 +39,7 @@ from .passord_reset import (
     send_i_bakgrunnen,
 )
 from .passord import lag_midlertidig_passord
-from . import kontolaas, mfa
+from . import kontolaas, mfa, passordbytte
 from .backends import finn_konto
 from .sesjoner import (
     avslutt_alle_sesjoner, avslutt_andre_sesjoner, registrer_aktiv_sesjon,
@@ -726,6 +726,7 @@ def change_password_view(request):
 # ── Admin-panel: brukeradministrasjon ─────────────────────────────────────────
 
 @admin_required
+@rate_limit(group='accounts:user-list', rate='10/m', method='POST', on_limit='html')
 def user_list_view(request):
     """Liste over alle brukere.
 
@@ -739,7 +740,13 @@ def user_list_view(request):
     noen mistet noe er verre enn ingen knapp: neste gang tilgang faktisk skal
     trekkes tilbake, tror admin at jobben er gjort. Tilgang settes per konto i
     matrisen på ``user_detail``, som skriver til tabellen håndhevelsen leser.
+
+    **Én bulk-handling er tilbake, og den skriver til det som håndheves** (22. okt. 2026):
+    «Krev passordbytte for alle» setter ``must_change_password``, som middlewaren leser på
+    hver forespørsel. Til en hendelse som Railways 22. okt., der passord kan være kjent.
     """
+    if request.method == 'POST' and request.POST.get('action') == 'krev_passordbytte_alle':
+        return _krev_passordbytte_alle(request)
     # **Filtrene fra §4.11** (fase 5b): når moderatorer oppretter og tar ut
     # kontoer, blir noen foreldreløse — de kan logge inn, men ser ingenting.
     users = (CustomUser.objects.all().order_by('username')
@@ -753,6 +760,29 @@ def user_list_view(request):
     else:
         filter_ = ''
     return render(request, 'accounts/user_list.html', {'users': users, 'filter': filter_})
+
+
+def _krev_passordbytte_alle(request):
+    """Alle personlige kontoer med passord må bytte det ved neste innlogging.
+
+    Tre unntak, og hvert av dem er et valg (`passordbytte.kontoer_for_alle`):
+    **delte kontoer** — en bilskjerm eller et vaktrom som blir stående med et passordskjema
+    midt i en vakt, og passordet kjenner mange; de byttes for hånd. **Kontoer uten passord**
+    — invitasjonen er ikke brukt, det er ingenting å bytte. **Deg selv** — du ville blitt
+    logget ut midt i handlingen; ditt bytter du under «Min profil».
+    """
+    antall = 0
+    for bruker in passordbytte.kontoer_for_alle(utenom=request.user):
+        forrige = str(bruker.must_change_password)
+        if passordbytte.krev(bruker):
+            _log_user_admin_action(request, bruker, 'UPDATE', field_name='must_change_password',
+                                   old_value=forrige, new_value='True (alle)')
+            antall += 1
+    messages.success(
+        request,
+        f'{antall} kontoer er logget ut og må bytte passord ved neste innlogging. '
+        'Ikke med: delte kontoer, kontoer uten passord, og din egen — bytt ditt under «Min profil».')
+    return redirect('portaladmin:user_list')
 
 
 @admin_required
@@ -1285,7 +1315,7 @@ def _handling_frys(request, user, side):
         request,
         f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
         + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
-        + 'Bruk «Tø konto» for å reversere.',
+        + 'Bruk «Opphev frysing» for å reversere.',
     )
     return redirect('portaladmin:user_detail', pk=user.pk)
 
@@ -1294,7 +1324,7 @@ def _kan_fryses(target, actor) -> str:
     """Hvorfor ``target`` ikke kan fryses av ``actor`` — tom streng når det går.
 
     **Superbrukeren fryses ikke** (André, 18. okt. 2026: «Superbruker skal ikke kunne
-    fryses»). Frysing kan reverseres med «Tø konto» — men bare av en administrator som
+    fryses»). Frysing kan reverseres med «Opphev frysing» — men bare av en administrator som
     kommer inn. Er superbrukeren frosset og de andre administratorene borte, er nødutgangen
     stengt, og den fantes nettopp for det tilfellet. Samme grunn som `_kan_degraderes`.
     """
@@ -1307,7 +1337,9 @@ def _kan_fryses(target, actor) -> str:
 
 
 def _handling_to(request, user, side):
-    """Tø en frosset konto."""
+    """Opphev frysingen av en konto («Tø konto» til 22. okt. 2026 — André: «Ordet tø finnes
+    ikke i norsk språk» i den betydningen; det er været som tør, ikke en konto).
+    Handlingen heter fortsatt `thaw` i skjemaet."""
     user.is_active = True
     user.save(update_fields=['is_active'])
     _log_user_admin_action(
@@ -1316,7 +1348,8 @@ def _handling_to(request, user, side):
     )
     messages.success(
         request,
-        f'Kontoen til «{user.username}» er tødd. Brukeren kan logge inn med samme passord.',
+        f'Frysingen av kontoen til «{user.username}» er opphevet. '
+        'Brukeren kan logge inn med samme passord.',
     )
     return redirect('portaladmin:user_detail', pk=user.pk)
 
@@ -1347,6 +1380,29 @@ def _handling_nytt_passord(request, user, side):
 
     messages.success(request, 'Nytt midlertidig passord generert (vises nedenfor).')
     side['temp_password'] = temp_password
+
+
+def _handling_krev_passordbytte(request, user, side):
+    """Brukeren må bytte sitt eget passord ved neste innlogging (22. okt. 2026).
+
+    André, etter Railway-hendelsen: «Jeg må kunne tvinge passordbytte hos brukere av
+    portalen». «Generer nytt midlertidig passord» gjør det også, men da lager admin et
+    passord og må dele det ut. Her beholder brukeren sitt, og bytter det selv. Se
+    `passordbytte.krev`.
+    """
+    forrige = str(user.must_change_password)
+    if not passordbytte.krev(user):
+        messages.warning(
+            request,
+            f'«{user.username}» har ikke noe passord ennå (invitasjonen er ikke tatt i bruk), '
+            'så det er ingenting å bytte.')
+        return redirect('portaladmin:user_detail', pk=user.pk)
+    _log_user_admin_action(request, user, 'UPDATE', field_name='must_change_password',
+                           old_value=forrige, new_value='True')
+    messages.success(
+        request,
+        f'«{user.username}» er logget ut og må bytte passord ved neste innlogging.')
+    return redirect('portaladmin:user_detail', pk=user.pk)
 
 
 def _handling_nullstill_mfa(request, user, side):
@@ -1394,6 +1450,7 @@ _BRUKERHANDLINGER = {
     'logg_ut': _handling_logg_ut,
     'freeze': _handling_frys,
     'thaw': _handling_to,
+    'krev_passordbytte': _handling_krev_passordbytte,
     'unlock': _handling_laas_opp,
     'reset_password': _handling_nytt_passord,
     'reset_mfa': _handling_nullstill_mfa,

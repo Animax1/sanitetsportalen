@@ -139,11 +139,21 @@
             </button>
           </form>
 
+          {% if target_user.has_usable_password %}
+          <form method="post" data-confirm="Kreve at {{ target_user.username }} bytter passord? Brukeren logges ut overalt, også i kartet, og må velge et nytt passord ved neste innlogging.">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="krev_passordbytte">
+            <button type="submit" class="btn btn-outline-warning btn-sm w-100">
+              <i class="bi bi-arrow-repeat me-1"></i>Krev passordbytte (logg ut nå)
+            </button>
+          </form>
+          {% endif %}
+
           {% if target_user.is_active %}
             {% if target_user.is_superuser %}
             <p class="form-text mb-0"><i class="bi bi-shield-lock me-1"></i>{{ frys_sperre }}</p>
             {% elif not frys_sperre %}
-            <form method="post" data-confirm="Fryse kontoen til {{ target_user.username }}? Brukeren logges ut umiddelbart og kan ikke logge inn igjen før kontoen tøs." >
+            <form method="post" data-confirm="Fryse kontoen til {{ target_user.username }}? Brukeren logges ut umiddelbart og kan ikke logge inn igjen før frysingen oppheves." >
               {% csrf_token %}
               <input type="hidden" name="action" value="freeze">
               <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
@@ -156,7 +166,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="thaw">
             <button type="submit" class="btn btn-outline-success btn-sm w-100">
-              <i class="bi bi-sun me-1"></i>Tø konto
+              <i class="bi bi-sun me-1"></i>Opphev frysing
             </button>
           </form>
           {% endif %}

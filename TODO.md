@@ -35,6 +35,15 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
+- [ ] **Railway-hendelsen 22. okt. 2026 — rotasjonene som venter på at deploy åpner igjen.**
+      Rekkefølgen og hvorfor står i [`docs/AVVIKSLOGG.md`](./docs/AVVIKSLOGG.md): prøv en
+      variabelendring på staging; `SECRET_KEY`/`DJANGO_SECRET_KEY`; nøklene mellom portal og kart
+      med `_FORRIGE`-vindu; Postgres-passordet; `OFFSITE_BACKUP_KEY` (den gamle beholdes i
+      passordbehandleren) og så `backup_kjor` + `verifiser_backup`; MapTiler; staging. Til slutt
+      «Krev passordbytte for alle» på `/admin/brukere/`.
+- [ ] **Varsle Kverneland Røde Kors om Railway-hendelsen** (art. 33(2) — du er databehandler),
+      og før korpsets beslutning om Datatilsynet inn i `docs/AVVIKSLOGG.md`. Ta skjermbilder av
+      Scaleway-linja 19. okt. 05:41 UTC **før ~26. okt.** — loggene beholdes i 7 dager.
 - [ ] **Test flere portaler på staging før `main`** (fase 0–7, 17.–18. okt. 2026). Moderator­
       flyten på `/moderator/brukere/` (legg til flere, «Rediger tilgang», ny konto med tilgang i
       samme skjema, gjør til moderator), tilhørighetene på `/admin/tilhorigheter/` og på
@@ -152,6 +161,23 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Kartets side er alt i prod og står inert til nøkkelen er satt
 
 ## Pågående / neste
+
+### Etter Railway-hendelsen 22. okt. 2026 — se [`docs/AVVIKSLOGG.md`](./docs/AVVIKSLOGG.md)
+
+- [ ] **Tvunget passordbytte i kartet.** Portalen har det (`accounts/passordbytte.py`); kartet
+      har ingen `must_change_password` og egne adminmaler under `konto/templates/konto/admin`.
+      Innloggede via «Åpne kartet» logges alt ut av portalens knapp.
+- [ ] **`OFFSITE_BACKUP_KEY_FORRIGE`.** `core/offsite.py` kjenner bare én nøkkel, så en rotasjon
+      gjør hver eldre backup uleselig for portalen. Dekryptér med den nye, prøv den forrige.
+- [ ] **Sjekk S3-nøkkelens rettigheter fra `/admin/backup/`.** Nøkkelen hadde
+      `ObjectStorageFullAccess` uten at noe sa fra; runbooken sier skriv + les, ikke slett.
+      Et forsøk på `DeleteObject` mot en prøvefil som *skal* gi 403, vist som rødt ellers.
+- [ ] **Loggene ut av Railway.** Applikasjonsloggene ligger hos leverandøren som hadde hendelsen.
+      Send dem (og auditlogg/innloggingslogg) til en lagring med lengre frist — Scaleway Cockpit
+      (Loki-push med eget token) er nærmest, siden backupene alt står der. Forleng Scaleways
+      egen loggfrist utover 7 dager.
+- [ ] **Reserve hos en annen leverandør** (André: «Vent litt med det»). Papirskjemaene er
+      førstelinja; en kald reserve på Scaleway er skissert.
 
 ### Ustabil test: `ko.tests_utskrift.OppdrageneTests.test_de_aktive_eldste_forst_med_enhetens_status`
 

@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-22 — Railway-hendelsen: «Krev passordbytte», «Opphev frysing» og avviksloggen  `#accounts/innlogging` `#core/personvern`
+
+Railway varslet 22. okt. at miljøvariabler på plattformen kan være dekryptert av en tredjepart,
+og stanset alle bygg. André: «Jeg må kunne tvinge passordbytte hos brukere av portalen/kart
+appen som admin» og «motparten til frys konto heter 'Tø konto' Ordet tø finnes ikke i norsk
+språk».
+
+- **«Krev passordbytte (logg ut nå)»** på brukersiden (`/admin/brukere/<pk>/`): setter
+  `must_change_password` og logger brukeren ut overalt, også i kartet
+  (`avslutt_alle_sesjoner`). Passordet beholdes — brukeren bytter det selv ved neste innlogging.
+  Mekanismen fantes (middlewaren håndhever flagget på hver forespørsel); det som manglet var en
+  knapp som satte det **uten** å lage et midlertidig passord admin må dele ut.
+  `accounts/passordbytte.py`.
+- **«Krev passordbytte for alle»** på brukerlista (`/admin/brukere/`) — tvunget passordbytte
+  for alle etter et mulig innbrudd. **Ikke med:** delte kontoer (bilskjermen skal ikke møte et
+  passordskjema midt i en vakt; de byttes for hånd), frosne kontoer, kontoer uten passord
+  (invitasjonen er ikke brukt) og din egen. Hver konto får sin auditrad (`True (alle)`).
+- Ingen av knappene vises for en konto uten passord: skjemaet for passordbytte krever det gamle,
+  og flagget ville låst kontoen i en dør uten håndtak.
+- **«Tø konto» heter «Opphev frysing»** — knappen, bekreftelsen («før frysingen oppheves») og
+  meldingen («Frysingen av kontoen til … er opphevet»). Handlingen heter fortsatt `thaw` i skjemaet.
+- Merket på brukerlista het «Midl. passord» også når passordet ikke var midlertidig; nå
+  «Må bytte passord».
+- **`docs/AVVIKSLOGG.md`** (ny): hendelsen, undersøkelsene i Scaleway-loggene (ett avvist
+  `ListObjects` 19. okt. 05:41 UTC fra `104.199.26.126`, ingen vellykket listing fra andre;
+  enkeltobjekter logges ikke), funnet at S3-nøkkelen hadde `ObjectStorageFullAccess` (fjernet),
+  tiltakene og rotasjonene som venter på Railway. **André er databehandler, Kverneland Røde Kors
+  behandlingsansvarlig** — vurderingen er en anbefaling til korpset, ikke en avgjørelse.
+- **Kartet har ingen tilsvarende mekanisme** (ingen `must_change_password` der) — eget punkt i TODO.
+- `accounts/tests_passordbytte.py`: 8 tester gjennom viewene, med en ekte innlogget sesjon.
+  **9 mutanter, alle drept** (sesjonene ikke avsluttet, passordsjekken fjernet, delt konto /
+  egen konto / frosne tatt med, GET i stedet for POST, auditraden fjernet, auditrad uten
+  endring, knappen uten passord).
+
 ## 2026-10-20 — Oppdragsnotatet i en blå boks over hendelsen  `#ko/sentralbordet`
 
 André: «Oppdragsnotat på et oppdrag må være mer synlig. Nå kommer det etter mye tekst og innhold
