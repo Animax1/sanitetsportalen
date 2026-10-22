@@ -33,6 +33,9 @@ språk».
   tiltakene og rotasjonene som venter på Railway. **André er databehandler, Kverneland Røde Kors
   behandlingsansvarlig** — vurderingen er en anbefaling til korpset, ikke en avgjørelse.
 - **Kartet har ingen tilsvarende mekanisme** (ingen `must_change_password` der) — eget punkt i TODO.
+- **pillow 12.3.0 → 13.0.0** (pip-audit i CI: 24 CVE-er, «CVE-2026-112390» m.fl., rettet i 13.0.0).
+  Pillow kommer inn via `qrcode` (MFA-oppsettet); QR-bildet og testene i `accounts` og `patients`
+  er kjørt mot den nye versjonen.
 - `accounts/tests_passordbytte.py`: 8 tester gjennom viewene, med en ekte innlogget sesjon.
   **9 mutanter, alle drept** (sesjonene ikke avsluttet, passordsjekken fjernet, delt konto /
   egen konto / frosne tatt med, GET i stedet for POST, auditraden fjernet, auditrad uten
