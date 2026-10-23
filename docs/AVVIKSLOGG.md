@@ -92,6 +92,10 @@ Miljøvariablene til portalen (`portal.sanitet.net`, `testportal.sanitet.net`) o
    passordbehandleren for backupene tatt før byttet. Alle fire svarte grønt på `/healthz` og
    tegnet innloggingssiden etterpå (kontrollert 23. okt.).
 
+8. **23. okt.: nøkkelparene mellom portal og kart byttet** (`KART_HMAC_NOKKEL` ↔
+   `PORTAL_HMAC_NOKKEL`, `KART_INNLOGGING_NOKKEL` ↔ `PORTAL_INNLOGGING_NOKKEL`), **MapTiler-nøkkelen
+   byttet**, og **passordbytte krevd** for de berørte kontoene i portalen.
+
 ### Tiltak som gjenstår
 
 Oppskriften står i [`docs/RUNBOOK_LEKKASJE.md`](./RUNBOOK_LEKKASJE.md).
@@ -99,12 +103,10 @@ Oppskriften står i [`docs/RUNBOOK_LEKKASJE.md`](./RUNBOOK_LEKKASJE.md).
 1. **Bekreft backupen med den nye nøkkelen:** `python manage.py backup_kjor --alle` og
    `python manage.py verifiser_backup` i prod, og at `/admin/backup/` viser en ny opplasting
    (runbook §5.7).
-2. **Nøkkelparene mellom portal og kart** (`KART_HMAC_NOKKEL` ↔ `PORTAL_HMAC_NOKKEL`,
-   `KART_INNLOGGING_NOKKEL` ↔ `PORTAL_INNLOGGING_NOKKEL`), begge miljøer, med `_FORRIGE`-vindu
-   som tømmes samme dag (runbook §5.5).
-3. **MapTiler** (runbook §5.8).
-4. **«Krev passordbytte for alle»** på `/admin/brukere/` i prod og staging (runbook §5.9), og
-   send invitasjonene på nytt til dem som ikke har tatt dem i bruk.
+2. **Kontroller koblingen portal ↔ kart** i begge miljøer: «Åpne kartet» fra KO og «Send
+   posisjon», og at `PORTAL_HMAC_NOKKEL_FORRIGE` og `PORTAL_INNLOGGING_NOKKEL_FORRIGE` er tomme i
+   kartet (runbook §5.5 trinn 4) — de gamle nøklene er nettopp dem som kan være kjent.
+3. Varsle korpset og føre beslutningen under.
 
 ### Vurdering — anbefaling til Kverneland Røde Kors
 

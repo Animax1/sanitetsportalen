@@ -11,6 +11,8 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
   fire svarte grønt på `/healthz` og tegnet innloggingssiden etterpå. Ført i `docs/AVVIKSLOGG.md`
   (tiltak 7), med det som gjenstår: bekrefte backupen med ny nøkkel, nøkkelparene portal↔kart,
   MapTiler og «Krev passordbytte for alle».
+- **Nøkkelparene portal↔kart og MapTiler-nøkkelen er byttet**, og passordbytte er krevd for de
+  berørte kontoene. Igjen: bekrefte backupen med ny nøkkel og prøve koblingen til kartet.
 - `main` er spolt fram til `staging` (`61ef294..4b3d0ac`, 78 commits, 22. okt.) etter at alle 12
   migrasjonsprøvene gikk gjennom mot PostgreSQL. TODO-punktene som sa «på staging før `main`» —
   flere portaler og ordboka — er skrevet om til «i prod».

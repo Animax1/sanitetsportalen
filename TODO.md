@@ -35,11 +35,10 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Railway-hendelsen 22. okt. 2026 — det som gjenstår av rotasjonen.** Databasepassordene,
-      `SECRET_KEY`/`DJANGO_SECRET_KEY` (alle fire miljøene) og `OFFSITE_BACKUP_KEY` er byttet 22.–23. okt.
-      Igjen: bekreft backupen med den nye nøkkelen (`backup_kjor --alle` + `verifiser_backup` i prod),
-      nøkkelparene mellom portal og kart med `_FORRIGE`, MapTiler, og «Krev passordbytte for alle» på
-      `/admin/brukere/` i begge portalmiljøene. Oppskriften: [`docs/RUNBOOK_LEKKASJE.md`](./docs/RUNBOOK_LEKKASJE.md).
+- [ ] **Railway-hendelsen 22. okt. 2026 — to kontroller igjen.** Alle hemmelighetene er byttet
+      22.–23. okt. Igjen: bekreft backupen med den nye nøkkelen (`backup_kjor --alle` + `verifiser_backup`
+      i prod, og en ny opplasting på `/admin/backup/`), og prøv «Åpne kartet» og «Send posisjon» i begge
+      miljøer med `_FORRIGE`-variablene i kartet tømt. [`docs/RUNBOOK_LEKKASJE.md`](./docs/RUNBOOK_LEKKASJE.md) §5.5 og §5.7.
 - [ ] **Varsle Kverneland Røde Kors om Railway-hendelsen** (art. 33(2) — du er databehandler),
       og før korpsets beslutning om Datatilsynet inn i `docs/AVVIKSLOGG.md`. Ta skjermbilder av
       Scaleway-linja 19. okt. 05:41 UTC **før ~26. okt.** — loggene beholdes i 7 dager.
