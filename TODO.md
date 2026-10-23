@@ -35,23 +35,21 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Railway-hendelsen 22. okt. 2026 — rotasjonene som venter på at deploy åpner igjen.**
-      Rekkefølgen og hvorfor står i [`docs/AVVIKSLOGG.md`](./docs/AVVIKSLOGG.md): prøv en
-      variabelendring på staging; `SECRET_KEY`/`DJANGO_SECRET_KEY`; nøklene mellom portal og kart
-      med `_FORRIGE`-vindu; Postgres-passordet; `OFFSITE_BACKUP_KEY` (den gamle beholdes i
-      passordbehandleren) og så `backup_kjor` + `verifiser_backup`; MapTiler; staging. Til slutt
-      «Krev passordbytte for alle» på `/admin/brukere/`.
+- [ ] **Railway-hendelsen 22. okt. 2026 — det som gjenstår av rotasjonen.** Databasepassordene,
+      `SECRET_KEY`/`DJANGO_SECRET_KEY` (alle fire miljøene) og `OFFSITE_BACKUP_KEY` er byttet 22.–23. okt.
+      Igjen: bekreft backupen med den nye nøkkelen (`backup_kjor --alle` + `verifiser_backup` i prod),
+      nøkkelparene mellom portal og kart med `_FORRIGE`, MapTiler, og «Krev passordbytte for alle» på
+      `/admin/brukere/` i begge portalmiljøene. Oppskriften: [`docs/RUNBOOK_LEKKASJE.md`](./docs/RUNBOOK_LEKKASJE.md).
 - [ ] **Varsle Kverneland Røde Kors om Railway-hendelsen** (art. 33(2) — du er databehandler),
       og før korpsets beslutning om Datatilsynet inn i `docs/AVVIKSLOGG.md`. Ta skjermbilder av
       Scaleway-linja 19. okt. 05:41 UTC **før ~26. okt.** — loggene beholdes i 7 dager.
-- [ ] **Test flere portaler på staging før `main`** (fase 0–7, 17.–18. okt. 2026). Moderator­
-      flyten på `/moderator/brukere/` (legg til flere, «Rediger tilgang», ny konto med tilgang i
-      samme skjema, gjør til moderator), tilhørighetene på `/admin/tilhorigheter/` og på
-      brukersiden, «Hent inn fra tidligere» i vaktlistas mannskapsregister, personsøket på
-      `/admin/personsok/` og sladdingen på `/admin/sladding/`. **Kartet** (gikk ut i prod
-      18. okt., kart-sanitet `519c975`): gruppen din skal stå med «standard» under
-      Administrasjon → Grupper, og bilene og lagene skal vises som før.
-- [ ] **Se over ordboka på staging før `main`** (bygget 14. okt. 2026). Sentralbordet
+- [ ] **Test flere portaler i prod** (fase 0–7, 17.–18. okt. 2026; i prod fra 22. okt., `4b3d0ac`, uten
+      at staging-testen var gjort). Moderatorflyten på `/moderator/brukere/` (legg til flere, «Rediger
+      tilgang», ny konto med tilgang i samme skjema, gjør til moderator), tilhørighetene på
+      `/admin/tilhorigheter/` og på brukersiden, «Hent inn fra tidligere» i vaktlistas mannskapsregister,
+      personsøket på `/admin/personsok/` og sladdingen på `/admin/sladding/`. **Kartet**: gruppen din skal
+      stå med «standard» under Administrasjon → Grupper, og bilene og lagene skal vises som før.
+- [ ] **Se over ordboka i prod** (bygget 14. okt. 2026, i prod siden da). Sentralbordet
       («Ressurser» står, «Hent tilbake til oppdragslisten»), KO (vinduet «Ressursoversikt»
       står, «Vaktlistens enheter uten delt konto» i innstillingene, kolonnen «Enhet» i
       utskriften), og -en-formen der du ser den — «Tavlen», «vakten». Er et ord feil i

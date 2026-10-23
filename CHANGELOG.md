@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-10-23 — Rotasjonen etter Railway-hendelsen: databasene, SECRET_KEY og backupnøkkelen  `#core/personvern`
+
+- André har rotert **databasepassordene i alle fire miljøene** (portal og kart, prod og staging),
+  **`SECRET_KEY`/`DJANGO_SECRET_KEY` i alle fire** og **`OFFSITE_BACKUP_KEY`** i portal prod. Alle
+  fire svarte grønt på `/healthz` og tegnet innloggingssiden etterpå. Ført i `docs/AVVIKSLOGG.md`
+  (tiltak 7), med det som gjenstår: bekrefte backupen med ny nøkkel, nøkkelparene portal↔kart,
+  MapTiler og «Krev passordbytte for alle».
+- `main` er spolt fram til `staging` (`61ef294..4b3d0ac`, 78 commits, 22. okt.) etter at alle 12
+  migrasjonsprøvene gikk gjennom mot PostgreSQL. TODO-punktene som sa «på staging før `main`» —
+  flere portaler og ordboka — er skrevet om til «i prod».
+
 ## 2026-10-22 — Railway-hendelsen: «Krev passordbytte», «Opphev frysing» og avviksloggen  `#accounts/innlogging` `#core/personvern`
 
 Railway varslet 22. okt. at miljøvariabler på plattformen kan være dekryptert av en tredjepart,

@@ -85,21 +85,26 @@ Miljøvariablene til portalen (`portal.sanitet.net`, `testportal.sanitet.net`) o
    annen verdi av samme variabel; først et helt nytt passord, Redeploy av Postgres-tjenesten og
    så av appen fikk de tre til å stemme. Se lærdommen under.
 
+7. **22.–23. okt.: databasepassordene rotert i alle fire miljøene** (portal og kart, prod og
+   staging), etter prosedyren i `docs/RUNBOOK_LEKKASJE.md` §5.6. **`SECRET_KEY` (portalen) og
+   `DJANGO_SECRET_KEY` (kartet) byttet i alle fire** — alle brukere er logget ut, og utestående
+   invitasjoner er ugyldige. **`OFFSITE_BACKUP_KEY` byttet i portal prod**; den gamle står i
+   passordbehandleren for backupene tatt før byttet. Alle fire svarte grønt på `/healthz` og
+   tegnet innloggingssiden etterpå (kontrollert 23. okt.).
+
 ### Tiltak som gjenstår
 
-En endret variabel tas først i bruk ved neste deploy. I denne rekkefølgen:
+Oppskriften står i [`docs/RUNBOOK_LEKKASJE.md`](./RUNBOOK_LEKKASJE.md).
 
-1. Prøv en variabelendring på staging.
-2. `SECRET_KEY` og `DJANGO_SECRET_KEY` — alle logges ut.
-3. Nøklene mellom portal og kart, med kort `_FORRIGE`-vindu i kartet.
-4. Postgres-passordet for portalen, prod og staging — **prosedyren under «Lærdom»**, ikke
-   `ALTER USER` fra web-tjenesten.
-5. `OFFSITE_BACKUP_KEY`, så `backup_kjor` og `verifiser_backup`. **Den gamle nøkkelen beholdes i
-   passordbehandleren** — den trengs for å lese backupene som alt ligger der.
-6. MapTiler.
-7. Staging.
-8. **Kreve passordbytte for alle personlige kontoer** når `SECRET_KEY` er byttet
-   («Krev passordbytte for alle» på `/admin/brukere/`, fra 22. okt. 2026).
+1. **Bekreft backupen med den nye nøkkelen:** `python manage.py backup_kjor --alle` og
+   `python manage.py verifiser_backup` i prod, og at `/admin/backup/` viser en ny opplasting
+   (runbook §5.7).
+2. **Nøkkelparene mellom portal og kart** (`KART_HMAC_NOKKEL` ↔ `PORTAL_HMAC_NOKKEL`,
+   `KART_INNLOGGING_NOKKEL` ↔ `PORTAL_INNLOGGING_NOKKEL`), begge miljøer, med `_FORRIGE`-vindu
+   som tømmes samme dag (runbook §5.5).
+3. **MapTiler** (runbook §5.8).
+4. **«Krev passordbytte for alle»** på `/admin/brukere/` i prod og staging (runbook §5.9), og
+   send invitasjonene på nytt til dem som ikke har tatt dem i bruk.
 
 ### Vurdering — anbefaling til Kverneland Røde Kors
 
